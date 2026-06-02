@@ -420,11 +420,11 @@ public sealed class WorldSession(
     private async Task SendInitialSpellsAsync(byte race, CancellationToken ct)
     {
         var spells = LanguageSpells.ForRace(race);
-        var w = new ByteWriter(8 + spells.Count * 4)
+        var w = new ByteWriter(8 + spells.Count * 6)
             .UInt8(0)
             .UInt16((ushort)spells.Count);
         foreach (var spell in spells)
-            w.UInt16((ushort)spell).UInt16(0);
+            w.UInt32((uint)spell).UInt16(0); // 3.3.5: spellId — u32 + u16 (on-cooldown)
         w.UInt16(0); // нет кулдаунов
         await SendPacketAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
     }
