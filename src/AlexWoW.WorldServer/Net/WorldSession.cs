@@ -418,7 +418,7 @@ public sealed class WorldSession(
     {
         var reader = new ByteReader(body);
         var type = reader.UInt32();        // тип чата (say/yell/emote…)
-        var language = reader.UInt32();
+        reader.UInt32();                   // язык клиента (расовый) — игнорируем
         var rest = reader.Bytes(reader.Remaining);
         var len = rest.Length;
         while (len > 0 && rest[len - 1] == 0)
@@ -433,7 +433,7 @@ public sealed class WorldSession(
         // Эхо отправителю, чтобы он видел свой /say (для одного игрока этого достаточно).
         var w = new ByteWriter(40 + msg.Length)
             .UInt8((byte)type)             // эхо того же типа
-            .UInt32(language)
+            .UInt32(0)                     // LANG_UNIVERSAL — понятно всем (нет навыков языков)
             .UInt64(_inWorldGuid)          // отправитель
             .UInt32(0)                     // chat flags
             .UInt64(0)                     // target
