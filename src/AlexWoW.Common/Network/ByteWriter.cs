@@ -1,0 +1,62 @@
+using System.Buffers.Binary;
+using System.Text;
+
+namespace AlexWoW.Common.Network;
+
+/// <summary>
+/// Помощник для сборки бинарных пакетов в little-endian (порядок байт протокола WoW).
+/// </summary>
+public sealed class ByteWriter
+{
+    private readonly List<byte> _buffer;
+
+    public ByteWriter(int capacity = 64) => _buffer = new List<byte>(capacity);
+
+    public int Length => _buffer.Count;
+
+    public ByteWriter UInt8(byte value)
+    {
+        _buffer.Add(value);
+        return this;
+    }
+
+    public ByteWriter UInt16(ushort value)
+    {
+        Span<byte> tmp = stackalloc byte[2];
+        BinaryPrimitives.WriteUInt16LittleEndian(tmp, value);
+        _buffer.AddRange(tmp);
+        return this;
+    }
+
+    public ByteWriter UInt32(uint value)
+    {
+        Span<byte> tmp = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32LittleEndian(tmp, value);
+        _buffer.AddRange(tmp);
+        return this;
+    }
+
+    public ByteWriter Single(float value)
+    {
+        Span<byte> tmp = stackalloc byte[4];
+        BinaryPrimitives.WriteSingleLittleEndian(tmp, value);
+        _buffer.AddRange(tmp);
+        return this;
+    }
+
+    public ByteWriter Bytes(ReadOnlySpan<byte> value)
+    {
+        _buffer.AddRange(value);
+        return this;
+    }
+
+    /// <summary>Записывает строку в ASCII с завершающим нулевым байтом.</summary>
+    public ByteWriter CString(string value)
+    {
+        _buffer.AddRange(Encoding.ASCII.GetBytes(value));
+        _buffer.Add(0);
+        return this;
+    }
+
+    public byte[] ToArray() => _buffer.ToArray();
+}

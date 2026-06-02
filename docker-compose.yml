@@ -1,0 +1,48 @@
+# AlexWoW — auth-стек для домашнего сервера (homeserver, 192.168.2.210).
+# Запуск:  docker compose up -d --build
+# Логи:    docker compose logs -f alexwow-auth
+services:
+  alexwow-mysql:
+    image: mysql:8.4
+    container_name: alexwow-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: alexwow_auth
+      MYSQL_USER: ${MYSQL_USER:-alexwow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-alexwow}
+    volumes:
+      - alexwow-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - alexwow
+
+  alexwow-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alexwow-auth
+    restart: unless-stopped
+    environment:
+      # Переопределяем конфиг через переменные окружения (.NET: __ = вложенность).
+      AuthServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # IP world-сервера, который увидит клиент. На homeserver — его адрес в LAN.
+      AuthServer__DefaultRealm__Address: ${REALM_ADDRESS:-192.168.2.210}
+    ports:
+      - "3724:3724"   # сырой TCP логин-протокола (Caddy здесь не используется)
+    depends_on:
+      alexwow-mysql:
+        condition: service_healthy
+    networks:
+      - alexwow
+
+volumes:
+  alexwow-mysql-data:
+
+networks:
+  alexwow:
+    driver: bridge

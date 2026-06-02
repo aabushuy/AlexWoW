@@ -1,0 +1,22 @@
+# .NET build output
+**/bin/
+**/obj/
+**/out/
+*.user
+
+# IDE
+.vs/
+.idea/
+.vscode/
+
+# Локальные секреты/конфиги
+.env
+appsettings.*.Local.json
+.claude/settings.local.json
+
+# Данные клиента (НЕ коммитим — генерируются игроком из своей копии WoW)
+client/
+dbc/
+maps/
+vmaps/
+mmaps/
