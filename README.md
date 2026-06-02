@@ -50,13 +50,21 @@ dotnet run --project src/AlexWoW.AuthServer
 dotnet test
 ```
 
-## Запуск на домашнем сервере (homeserver, 192.168.2.210)
+## Деплой на домашний сервер (homeserver, 192.168.2.210)
+
+**Сборка локальная**, на сервер копируются только готовые бинарники — на сервере
+нет SDK/restore/компиляции (рантайм-образ просто копирует `./publish`).
+
+```powershell
+# с Windows-машины, из корня репозитория
+./deploy/deploy.ps1
+```
+
+Скрипт делает: `dotnet publish -c Release` → `scp publish + Dockerfile + compose`
+на сервер → `docker compose up -d --build` (build = тривиальный COPY).
 
 ```bash
-# на homeserver, в каталоге с проектом
-docker compose up -d --build
-
-# создать аккаунт внутри контейнера
+# создать аккаунт внутри контейнера (на сервере)
 docker compose exec alexwow-auth dotnet AlexWoW.AuthServer.dll create-account test test
 ```
 
