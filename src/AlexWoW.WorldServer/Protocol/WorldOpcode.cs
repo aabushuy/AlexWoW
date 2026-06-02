@@ -12,6 +12,12 @@ public enum WorldOpcode : uint
     SmsgCharDelete = 0x03C,
     CmsgPlayerLogin = 0x03D,
 
+    // Вход в мир (M4)
+    SmsgLoginSetTimeSpeed = 0x042,
+    SmsgTutorialFlags = 0x0FD,
+    SmsgUpdateObject = 0x0A9,
+    SmsgLoginVerifyWorld = 0x236,
+
     // Keep-alive
     CmsgPing = 0x1DC,
     SmsgPong = 0x1DD,

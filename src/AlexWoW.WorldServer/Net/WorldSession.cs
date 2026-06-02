@@ -87,6 +87,9 @@ public sealed class WorldSession(
             case WorldOpcode.CmsgCharDelete:
                 await HandleCharDeleteAsync(body, ct);
                 break;
+            case WorldOpcode.CmsgPlayerLogin:
+                await HandlePlayerLoginAsync(body, ct);
+                break;
             default:
                 logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
                     opcode, (uint)opcode, _remoteIp);
@@ -276,6 +279,41 @@ public sealed class WorldSession(
         await SendPacketAsync(WorldOpcode.SmsgCharDelete,
             new ByteWriter(1).UInt8((byte)(deleted ? CharResponse.DeleteSuccess : CharResponse.DeleteFailed)).ToArray(), ct);
         logger.LogInformation("CHAR_DELETE guid={Guid} для '{User}' → {Ok}", guid, _account, deleted);
+    }
+
+    // --- Вход в мир (M4) -----------------------------------------------------
+
+    private async Task HandlePlayerLoginAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var guid = (uint)reader.UInt64();
+
+        var character = await characters.GetByGuidAsync(guid, ct);
+        if (character is null || character.AccountId != _accountId)
+        {
+            logger.LogWarning("PLAYER_LOGIN: персонаж guid={Guid} не найден/чужой для '{User}'", guid, _account);
+            return;
+        }
+
+        // 1) Подтверждение мира: карта + позиция.
+        var verify = new ByteWriter(20)
+            .UInt32(character.Map)
+            .Single(character.X).Single(character.Y).Single(character.Z)
+            .Single(0f);
+        await SendPacketAsync(WorldOpcode.SmsgLoginVerifyWorld, verify.ToArray(), ct);
+
+        // 2) Флаги обучения (8 × uint32) — выключаем подсказки.
+        var tutorials = new ByteWriter(32);
+        for (var i = 0; i < 8; i++)
+            tutorials.UInt32(0);
+        await SendPacketAsync(WorldOpcode.SmsgTutorialFlags, tutorials.ToArray(), ct);
+
+        // 3) Спавн собственного игрока (CREATE_OBJECT2).
+        var spawn = PlayerSpawn.BuildCreateObject(character, (uint)Environment.TickCount);
+        await SendPacketAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
+
+        logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
+            character.Name, guid, character.Map, character.X, character.Y, character.Z);
     }
 
     /// <summary>Имя WoW: первая буква заглавная, остальные строчные.</summary>

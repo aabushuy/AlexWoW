@@ -1,0 +1,47 @@
+namespace AlexWoW.WorldServer.Protocol;
+
+/// <summary>Производные данные персонажа (модель, фракция, тип ресурса) по расе/классу.</summary>
+public static class DisplayData
+{
+    // Нативные display id моделей (race → [male, female]). Значения из ChrRaces.dbc 3.3.5a.
+    private static readonly Dictionary<byte, (uint Male, uint Female)> Models = new()
+    {
+        [1] = (49, 50),         // Human
+        [2] = (51, 52),         // Orc
+        [3] = (53, 54),         // Dwarf
+        [4] = (55, 56),         // Night Elf
+        [5] = (57, 58),         // Undead
+        [6] = (59, 60),         // Tauren
+        [7] = (1563, 1564),     // Gnome
+        [8] = (1478, 1479),     // Troll
+        [10] = (15476, 15475),  // Blood Elf
+        [11] = (16125, 16126),  // Draenei
+    };
+
+    // Faction template по расе (UNIT_FIELD_FACTIONTEMPLATE), ChrRaces.dbc.
+    private static readonly Dictionary<byte, uint> Factions = new()
+    {
+        [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 5, [6] = 6,
+        [7] = 115, [8] = 116, [10] = 1610, [11] = 1629,
+    };
+
+    /// <summary>Display id модели по расе и полу (0 = male, 1 = female).</summary>
+    public static uint ModelForRace(byte race, byte gender)
+    {
+        if (!Models.TryGetValue(race, out var pair))
+            return 49; // human male по умолчанию
+        return gender == 0 ? pair.Male : pair.Female;
+    }
+
+    public static uint FactionForRace(byte race)
+        => Factions.TryGetValue(race, out var f) ? f : 1;
+
+    /// <summary>Тип ресурса (powertype): 0 mana, 1 rage, 3 energy, 6 runic power.</summary>
+    public static byte PowerTypeForClass(byte charClass) => charClass switch
+    {
+        1 => 1,  // Warrior — rage
+        4 => 3,  // Rogue — energy
+        6 => 6,  // Death Knight — runic power
+        _ => 0,  // остальные — mana
+    };
+}
