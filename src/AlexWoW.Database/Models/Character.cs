@@ -1,0 +1,23 @@
+namespace AlexWoW.Database.Models;
+
+/// <summary>Игровой персонаж (минимальный набор для экрана выбора, веха M3).</summary>
+public sealed class Character
+{
+    public uint Guid { get; init; }
+    public uint AccountId { get; init; }
+    public required string Name { get; init; }
+    public byte Race { get; init; }
+    public byte Class { get; init; }
+    public byte Gender { get; init; }
+    public byte Skin { get; init; }
+    public byte Face { get; init; }
+    public byte HairStyle { get; init; }
+    public byte HairColor { get; init; }
+    public byte FacialHair { get; init; }
+    public byte Level { get; init; }
+    public uint Zone { get; init; }
+    public uint Map { get; init; }
+    public float X { get; init; }
+    public float Y { get; init; }
+    public float Z { get; init; }
+}

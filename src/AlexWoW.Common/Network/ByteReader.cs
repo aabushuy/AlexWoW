@@ -36,6 +36,14 @@ public ref struct ByteReader(ReadOnlySpan<byte> data)
         return value;
     }
 
+    public ulong UInt64()
+    {
+        EnsureAvailable(8);
+        var value = BinaryPrimitives.ReadUInt64LittleEndian(_data.Slice(_position, 8));
+        _position += 8;
+        return value;
+    }
+
     public ReadOnlySpan<byte> Bytes(int count)
     {
         EnsureAvailable(count);
