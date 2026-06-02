@@ -1,0 +1,43 @@
+using AlexWoW.Database;
+using AlexWoW.WorldServer;
+using AlexWoW.WorldServer.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Serilog;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateLogger();
+builder.Services.AddSerilog();
+
+builder.Services.Configure<WorldServerOptions>(
+    builder.Configuration.GetSection(WorldServerOptions.SectionName));
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new AuthDatabase(options.ConnectionString);
+});
+builder.Services.AddHostedService<WorldListener>();
+
+var host = builder.Build();
+
+try
+{
+    Log.Information("AlexWoW WorldServer запускается…");
+    await host.RunAsync();
+    return 0;
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "WorldServer аварийно завершился");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

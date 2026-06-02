@@ -54,6 +54,19 @@ public ref struct ByteReader(ReadOnlySpan<byte> data)
     public string FixedString(int count)
         => Encoding.ASCII.GetString(Bytes(count));
 
+    /// <summary>Читает строку, завершённую нулевым байтом (C-string), и потребляет сам ноль.</summary>
+    public string CString()
+    {
+        var start = _position;
+        while (_position < _data.Length && _data[_position] != 0)
+            _position++;
+
+        var value = Encoding.ASCII.GetString(_data.Slice(start, _position - start));
+        if (_position < _data.Length)
+            _position++; // пропускаем терминирующий ноль
+        return value;
+    }
+
     private readonly void EnsureAvailable(int count)
     {
         if (_position + count > _data.Length)

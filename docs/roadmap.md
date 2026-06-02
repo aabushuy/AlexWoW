@@ -9,7 +9,7 @@
 |---|---|---|
 | M0 | Каркас решения | ✅ |
 | M1 | AuthServer (логин) | ✅ |
-| M2 | World handshake | ⬜ следующая |
+| M2 | World handshake | 🟡 реализовано, ждёт проверки клиентом |
 | M3 | Экран персонажей | ⬜ |
 | M4 | Вход в мир | ⬜ |
 | M5 | Видимость и мир | ⬜ |
@@ -49,16 +49,18 @@ Solution на .NET 10, базовая инфраструктура.
 
 ---
 
-## ⬜ M2. World handshake
+## 🟡 M2. World handshake
 
 **Критерий приёмки:** клиент проходит аутентификацию в world-сервере и
 устанавливает шифрованную сессию (без вылета).
 
-- [ ] Проект `AlexWoW.WorldServer` (exe, порт 8085) + `AlexWoW.Network`
-- [ ] Фрейминг world-пакетов (размер + opcode)
-- [ ] **RC4 header crypt** (ключи через HMAC-SHA1 из session key) + тесты
-- [ ] `CMSG_AUTH_SESSION` → проверка session key (из auth-БД) → `SMSG_AUTH_RESPONSE`
-- [ ] Диспетчер опкодов (handler-реестр)
+- [x] Проект `AlexWoW.WorldServer` (exe, порт 8085); сетевой код внутри проекта
+- [x] Фрейминг world-пакетов (size big-endian + opcode)
+- [x] **RC4 header crypt** (ключи через HMAC-SHA1 из session key) + тесты (вкл. вектор RC4)
+- [x] `SMSG_AUTH_CHALLENGE`, проверено смоук-тестом по TCP
+- [x] `CMSG_AUTH_SESSION` → проверка digest по session key (из auth-БД) → `SMSG_AUTH_RESPONSE`
+- [x] Диспетчер опкодов (switch; handler-реестр с атрибутами — позже) + CMSG_PING/PONG
+- [ ] **Финальная проверка живым клиентом** (RC4 + digest байт-в-байт)
 
 ---
 

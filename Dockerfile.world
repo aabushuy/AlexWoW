@@ -1,0 +1,6 @@
+# Runtime-only образ WorldServer. Сборка ЛОКАЛЬНАЯ: копируем готовые бинарники из publish/world.
+FROM mcr.microsoft.com/dotnet/runtime:10.0
+WORKDIR /app
+COPY publish/world/ ./
+EXPOSE 8085
+ENTRYPOINT ["dotnet", "AlexWoW.WorldServer.dll"]
