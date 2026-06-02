@@ -57,7 +57,9 @@
 
 ### 3.3 Opcodes
 - Сотни опкодов: `CMSG_*` (от клиента), `SMSG_*` (к клиенту), `MSG_*` (двусторонние).
-- Архитектура обработки: **диспетчер opcode → handler**. В .NET удобно делать через атрибуты на методах (как в WCell) + реестр.
+- Архитектура обработки: **реестр opcode → handler** (реализовано). Методы помечены
+  `[WorldOpcodeHandler(...)]`, `WorldPacketRouter` строит таблицу через рефлексию (стиль WCell).
+  Обработчики сгруппированы по фичам в `Handlers/`; `WorldSession` — только транспорт + состояние.
 - Старт-набор для «входа в мир»: `CMSG_AUTH_SESSION`, `SMSG_AUTH_RESPONSE`, `CMSG_CHAR_ENUM`/`SMSG_CHAR_ENUM`, `CMSG_PLAYER_LOGIN`, `SMSG_LOGIN_VERIFY_WORLD`, набор начальных `SMSG_*` (account data, tutorial, time).
 
 ### 3.4 Сериализация
@@ -104,7 +106,8 @@ AlexWoW.slnx
 │  ├─ AlexWoW.Cryptography  ✅ SRP6, RC4 header crypt, auth digest, хэши
 │  ├─ AlexWoW.Database      ✅ MySqlConnector/Dapper, репозитории, схема
 │  ├─ AlexWoW.AuthServer    ✅ exe: realmd (логин + список реалмов)
-│  ├─ AlexWoW.WorldServer   🟡 exe: mangosd (handshake + RC4; протокол внутри проекта)
+│  ├─ AlexWoW.WorldServer   🟡 exe: mangosd. WorldSession=транспорт+состояние;
+│  │                           обработчики опкодов — реестр Handlers/ ([WorldOpcodeHandler])
 │  ├─ AlexWoW.DataStores    🔜 парсеры DBC, загрузка maps/vmaps/mmaps
 │  └─ AlexWoW.Game          🔜 игровая логика: сущности, грид, бой, спеллы
 ├─ tools/
