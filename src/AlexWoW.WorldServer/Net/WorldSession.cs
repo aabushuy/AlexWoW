@@ -365,6 +365,9 @@ public sealed class WorldSession(
         await SendPacketAsync(WorldOpcode.SmsgFeatureSystemStatus,
             new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
 
+        // 3.5) Спеллбук: минимум — языковые спеллы, иначе клиент блокирует /say.
+        await SendInitialSpellsAsync(character.Race, ct);
+
         // 4) Флаги обучения (8 × uint32) — выключаем подсказки.
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)
@@ -414,6 +417,18 @@ public sealed class WorldSession(
         await SendPacketAsync(WorldOpcode.SmsgQueryTimeResponse, w.ToArray(), ct);
     }
 
+    private async Task SendInitialSpellsAsync(byte race, CancellationToken ct)
+    {
+        var spells = LanguageSpells.ForRace(race);
+        var w = new ByteWriter(8 + spells.Count * 4)
+            .UInt8(0)
+            .UInt16((ushort)spells.Count);
+        foreach (var spell in spells)
+            w.UInt16((ushort)spell).UInt16(0);
+        w.UInt16(0); // нет кулдаунов
+        await SendPacketAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
+    }
+
     private async Task HandleChatAsync(byte[] body, CancellationToken ct)
     {
         var reader = new ByteReader(body);
@@ -432,8 +447,8 @@ public sealed class WorldSession(
 
         // Эхо отправителю, чтобы он видел свой /say (для одного игрока этого достаточно).
         var w = new ByteWriter(40 + msg.Length)
-            .UInt8((byte)type)             // эхо того же типа
-            .UInt32(0)                     // LANG_UNIVERSAL — понятно всем (нет навыков языков)
+            .UInt8(1)                      // CHAT_MSG_SAY (display enum); CMSG-тип иной — логируем выше
+            .UInt32(0)                     // LANG_UNIVERSAL — понятно всем
             .UInt64(_inWorldGuid)          // отправитель
             .UInt32(0)                     // chat flags
             .UInt64(0)                     // target
