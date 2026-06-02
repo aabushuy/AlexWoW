@@ -1,0 +1,51 @@
+using AlexWoW.AuthServer;
+using AlexWoW.AuthServer.Net;
+using AlexWoW.Database;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Serilog;
+
+// Вспомогательный CLI: создание аккаунта без запуска сервера.
+//   dotnet run -- create-account <username> <password>
+if (args.Length >= 1 && args[0].Equals("create-account", StringComparison.OrdinalIgnoreCase))
+{
+    return await AccountCreator.RunAsync(args);
+}
+
+var builder = Host.CreateApplicationBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateLogger();
+builder.Services.AddSerilog();
+
+builder.Services.Configure<AuthServerOptions>(
+    builder.Configuration.GetSection(AuthServerOptions.SectionName));
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+    return new AuthDatabase(options.ConnectionString);
+});
+builder.Services.AddHostedService<AuthListener>();
+
+var host = builder.Build();
+
+try
+{
+    Log.Information("AlexWoW AuthServer запускается…");
+    await host.RunAsync();
+    return 0;
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "AuthServer аварийно завершился");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
