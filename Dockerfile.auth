@@ -1,0 +1,6 @@
+# Runtime-only образ AuthServer. Сборка ЛОКАЛЬНАЯ: копируем готовые бинарники из publish/auth.
+FROM mcr.microsoft.com/dotnet/runtime:10.0
+WORKDIR /app
+COPY publish/auth/ ./
+EXPOSE 3724
+ENTRYPOINT ["dotnet", "AlexWoW.AuthServer.dll"]

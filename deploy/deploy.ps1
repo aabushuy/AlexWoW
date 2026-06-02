@@ -1,12 +1,13 @@
 <#
 .SYNOPSIS
-    Local publish of AuthServer + deploy of prebuilt binaries to the home server.
+    Local publish of AuthServer + WorldServer and deploy of prebuilt binaries.
 
 .DESCRIPTION
     Compilation runs LOCALLY (dotnet publish). Only the published binaries
-    (./publish) plus Dockerfile and docker-compose.yml are copied to the server.
-    The server has no SDK, no restore, no compilation - the runtime image just
-    COPYs ./publish. This avoids slow/fragile server-side Docker builds.
+    (./publish/auth, ./publish/world) plus the Dockerfiles and docker-compose.yml
+    are copied to the server. The server has no SDK, no restore, no compilation -
+    the runtime images just COPY the published output. This avoids slow/fragile
+    server-side Docker builds.
 
     NOTE: ASCII-only on purpose. Windows PowerShell 5.1 reads BOM-less .ps1 as
     ANSI, so non-ASCII comments would corrupt parsing.
@@ -23,13 +24,16 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
-$Project    = Join-Path $RepoRoot 'src/AlexWoW.AuthServer/AlexWoW.AuthServer.csproj'
+$AuthProj   = Join-Path $RepoRoot 'src/AlexWoW.AuthServer/AlexWoW.AuthServer.csproj'
+$WorldProj  = Join-Path $RepoRoot 'src/AlexWoW.WorldServer/AlexWoW.WorldServer.csproj'
 $PublishDir = Join-Path $RepoRoot 'publish'
 
-Write-Host '==> 1/4 Publish (Release)...' -ForegroundColor Cyan
+Write-Host '==> 1/4 Publish AuthServer + WorldServer (Release)...' -ForegroundColor Cyan
 if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
-dotnet publish $Project -c Release -o $PublishDir
-if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
+dotnet publish $AuthProj  -c Release -o (Join-Path $PublishDir 'auth')
+if ($LASTEXITCODE -ne 0) { throw 'dotnet publish (auth) failed.' }
+dotnet publish $WorldProj -c Release -o (Join-Path $PublishDir 'world')
+if ($LASTEXITCODE -ne 0) { throw 'dotnet publish (world) failed.' }
 
 Write-Host '==> 2/4 Preparing remote directory...' -ForegroundColor Cyan
 # Wipe the dir fully (MySQL data lives in a named volume, not here).
@@ -41,7 +45,7 @@ Write-Host '==> 3/4 Copying binaries and configs...' -ForegroundColor Cyan
 # from the repo root (no colon).
 Push-Location $RepoRoot
 try {
-    scp -r publish Dockerfile docker-compose.yml "${RemoteHost}:${RemoteDir}/"
+    scp -r publish Dockerfile.auth Dockerfile.world docker-compose.yml "${RemoteHost}:${RemoteDir}/"
     if ($LASTEXITCODE -ne 0) { throw 'scp failed.' }
 }
 finally {

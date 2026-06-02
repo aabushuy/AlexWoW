@@ -33,7 +33,7 @@
 | Служба | Аналог в mangos | Назначение | Статус |
 |---|---|---|---|
 | **AuthServer** | `realmd` | SRP6-логин, выдача списка реалмов | ✅ M1 |
-| **WorldServer** | `mangosd` | Сессии игроков, мир, бой, спеллы, БД | 🔜 M2+ |
+| **WorldServer** | `mangosd` | Сессии игроков, мир, бой, спеллы, БД | 🟡 M2 (handshake) |
 
 Процессная модель на старте — два процесса (auth + world), как в оригинале. Позже можно вынести в отдельные сервисы/контейнеры.
 
@@ -101,14 +101,12 @@
 AlexWoW.slnx
 ├─ src/
 │  ├─ AlexWoW.Common        ✅ утилиты, бинарные примитивы пакетов (ByteReader/Writer)
-│  ├─ AlexWoW.Cryptography  ✅ SRP6; позже RC4 header crypt, хэши
+│  ├─ AlexWoW.Cryptography  ✅ SRP6, RC4 header crypt, auth digest, хэши
 │  ├─ AlexWoW.Database      ✅ MySqlConnector/Dapper, репозитории, схема
 │  ├─ AlexWoW.AuthServer    ✅ exe: realmd (логин + список реалмов)
-│  ├─ AlexWoW.Network       🔜 сокеты, Pipelines, фрейминг world-пакетов
-│  ├─ AlexWoW.Protocol      🔜 опкоды, структуры пакетов, ObjectUpdate
+│  ├─ AlexWoW.WorldServer   🟡 exe: mangosd (handshake + RC4; протокол внутри проекта)
 │  ├─ AlexWoW.DataStores    🔜 парсеры DBC, загрузка maps/vmaps/mmaps
-│  ├─ AlexWoW.Game          🔜 игровая логика: сущности, грид, бой, спеллы
-│  └─ AlexWoW.WorldServer   🔜 exe: mangosd
+│  └─ AlexWoW.Game          🔜 игровая логика: сущности, грид, бой, спеллы
 ├─ tools/
 │  └─ MapExtractor          🔜 извлечение DBC/maps/vmaps/mmaps из клиента
 └─ tests/
