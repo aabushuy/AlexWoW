@@ -24,7 +24,8 @@ public sealed class WorldListener(
         using var listener = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         listener.Bind(endpoint);
         listener.Listen(128);
-        logger.LogInformation("WorldServer слушает {Endpoint}", endpoint);
+        logger.LogInformation("WorldServer слушает {Endpoint} ({Handlers} опкодов зарегистрировано)",
+            endpoint, Handlers.WorldPacketRouter.HandlerCount);
 
         while (!stoppingToken.IsCancellationRequested)
         {
