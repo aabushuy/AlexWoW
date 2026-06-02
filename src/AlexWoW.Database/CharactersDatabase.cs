@@ -62,6 +62,18 @@ public sealed class CharactersDatabase(string connectionString)
         return rows.AsList();
     }
 
+    public async Task<Character?> GetByGuidAsync(uint guid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        return await db.QuerySingleOrDefaultAsync<Character>("""
+            SELECT guid AS Guid, account_id AS AccountId, name AS Name, race AS Race, class AS Class,
+                   gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
+                   hair_color AS HairColor, facial_hair AS FacialHair, level AS Level,
+                   zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z
+            FROM characters WHERE guid = @guid;
+            """, new { guid });
+    }
+
     public async Task<bool> NameExistsAsync(string name, CancellationToken ct = default)
     {
         await using var db = await OpenAsync(ct);
