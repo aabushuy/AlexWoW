@@ -3,6 +3,13 @@ namespace AlexWoW.WorldServer.Protocol;
 /// <summary>Опкоды world-протокола (WotLK 3.3.5a, build 12340). Подмножество для M2–M3.</summary>
 public enum WorldOpcode : uint
 {
+    // Логаут (M4)
+    CmsgLogoutRequest = 0x04B,
+    SmsgLogoutResponse = 0x04C,
+    SmsgLogoutComplete = 0x04D,
+    CmsgLogoutCancel = 0x04E,
+    SmsgLogoutCancelAck = 0x04F,
+
     // Запросы (M4)
     CmsgNameQuery = 0x050,
     SmsgNameQueryResponse = 0x051,

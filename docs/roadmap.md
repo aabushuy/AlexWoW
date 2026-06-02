@@ -11,7 +11,7 @@
 | M1 | AuthServer (логин) | ✅ проверено клиентом |
 | M2 | World handshake | ✅ проверено клиентом |
 | M3 | Экран персонажей | ✅ проверено клиентом |
-| M4 | Вход в мир | 🟡 спавн реализован, ждёт проверки |
+| M4 | Вход в мир | 🟡 управление работает (бег/прыжки); чат — TODO |
 | M5 | Видимость и мир | ⬜ |
 | M6 | Игровые системы | ⬜ |
 
@@ -83,13 +83,16 @@ Solution на .NET 10, базовая инфраструктура.
 
 **Критерий приёмки:** персонаж появляется в мире, виден ландшафт, можно бегать и писать в чат.
 
-- [x] `CMSG_PLAYER_LOGIN` → `SMSG_LOGIN_VERIFY_WORLD` + `SMSG_TUTORIAL_FLAGS`
-- [x] Базовый `SMSG_UPDATE_OBJECT` (CREATE_OBJECT2) для своего игрока:
-      packed guid, movement-блок (9 скоростей), update-mask полей (модель/фракция/внешность)
-- [ ] **Проверка живым клиентом** (персонаж появляется в мире, виден ландшафт)
-- [ ] Движение (bit-packed movement opcodes) — следующий шаг M4
-- [ ] Чат
-- [ ] Ответы на `CMSG_PING`/прочие keep-alive в мире
+- [x] `CMSG_PLAYER_LOGIN` → полная последовательность входа: `SMSG_LOGIN_VERIFY_WORLD`,
+      `SMSG_ACCOUNT_DATA_TIMES`, `SMSG_FEATURE_SYSTEM_STATUS`, `SMSG_TUTORIAL_FLAGS`,
+      `SMSG_LOGIN_SETTIMESPEED`, `SMSG_UPDATE_OBJECT`, `SMSG_TIME_SYNC_REQ`
+- [x] Базовый `SMSG_UPDATE_OBJECT` (CREATE_OBJECT2): packed guid, movement-блок
+      (9 скоростей), update-mask полей (модель/фракция/внешность)
+- [x] Ответ на `CMSG_UPDATE_ACCOUNT_DATA` (против зацикливания), name/time query
+- [x] **Проверено живым клиентом: персонаж в мире, камера, бег и прыжки работают** ✅
+- [x] Логаут (`CMSG_LOGOUT_REQUEST` → `SMSG_LOGOUT_RESPONSE`/`COMPLETE`)
+- [ ] Чат (`CMSG_MESSAGECHAT`) — следующий шаг
+- [ ] Серверная обработка движения (`MSG_MOVE_*`) — пока клиент двигается локально
 
 ---
 

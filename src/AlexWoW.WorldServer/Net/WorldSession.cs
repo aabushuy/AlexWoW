@@ -93,6 +93,12 @@ public sealed class WorldSession(
             case WorldOpcode.CmsgPlayerLogin:
                 await HandlePlayerLoginAsync(body, ct);
                 break;
+            case WorldOpcode.CmsgLogoutRequest:
+                await HandleLogoutRequestAsync(ct);
+                break;
+            case WorldOpcode.CmsgLogoutCancel:
+                await SendPacketAsync(WorldOpcode.SmsgLogoutCancelAck, [], ct);
+                break;
             case WorldOpcode.CmsgTimeSyncResp:
                 logger.LogInformation("CMSG_TIME_SYNC_RESP получен — пост-спавн пакеты доходят, поток в порядке");
                 break;
@@ -377,6 +383,17 @@ public sealed class WorldSession(
             .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             .UInt32(0); // время до ежедневного сброса
         await SendPacketAsync(WorldOpcode.SmsgQueryTimeResponse, w.ToArray(), ct);
+    }
+
+    private async Task HandleLogoutRequestAsync(CancellationToken ct)
+    {
+        // reason = 0 (можно выходить), instant = 1 (мгновенный логаут).
+        var response = new ByteWriter(5).UInt32(0).UInt8(1);
+        await SendPacketAsync(WorldOpcode.SmsgLogoutResponse, response.ToArray(), ct);
+
+        // Завершаем логаут — клиент вернётся к экрану выбора персонажа.
+        await SendPacketAsync(WorldOpcode.SmsgLogoutComplete, [], ct);
+        logger.LogInformation("LOGOUT '{User}' → возврат к выбору персонажа", _account);
     }
 
     private async Task SendLoginTimeSpeedAsync(CancellationToken ct)
