@@ -79,6 +79,16 @@ public static class PlayerSpawn
         m.SetBytes(UpdateField.PlayerBytes2, c.FacialHair, 0, 0, 0);
         m.SetBytes(UpdateField.PlayerBytes3, c.Gender, 0, 0, 0);
 
+        // Языковые навыки — иначе клиент блокирует /say («не знаете языка») и скилл-таб пуст.
+        var languageSkills = LanguageSkills.ForRace(c.Race);
+        for (var slot = 0; slot < languageSkills.Count; slot++)
+        {
+            var baseIdx = UpdateField.PlayerSkillInfo11 + slot * 3;
+            m.SetUInt32(baseIdx, (uint)languageSkills[slot]); // skillId | step(0)
+            m.SetUInt32(baseIdx + 1, 300u | (300u << 16));    // value | max
+            m.SetUInt32(baseIdx + 2, 0);                      // временный/постоянный бонус
+        }
+
         return m;
     }
 }

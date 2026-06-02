@@ -26,6 +26,8 @@ public static class UpdateField
     public const int UnitNativeDisplayId = 0x0044;
 
     // PLAYER
+    /// <summary>Начало блока навыков (128 слотов × 3 поля). UNIT_END(0x94) + 0x1E8.</summary>
+    public const int PlayerSkillInfo11 = 0x027C;
     public const int PlayerFlags = 0x0096;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
