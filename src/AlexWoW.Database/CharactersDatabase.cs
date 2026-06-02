@@ -104,6 +104,14 @@ public sealed class CharactersDatabase(string connectionString)
         return (uint)guid;
     }
 
+    public async Task SavePositionAsync(uint guid, float x, float y, float z, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("""
+            UPDATE characters SET position_x = @x, position_y = @y, position_z = @z WHERE guid = @guid;
+            """, new { guid, x, y, z });
+    }
+
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>
     public async Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default)
     {

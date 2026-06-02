@@ -36,6 +36,22 @@ public sealed class WorldSession(
     private string? _account;
     private uint _accountId;
 
+    // Текущее состояние игрока в мире (guid != 0, пока в мире).
+    private uint _inWorldGuid;
+    private float _posX, _posY, _posZ, _posO;
+
+    // Опкоды движения: все несут packed guid + MovementInfo с позицией.
+    private static readonly HashSet<WorldOpcode> MovementOpcodes =
+    [
+        WorldOpcode.MsgMoveStartForward, WorldOpcode.MsgMoveStartBackward, WorldOpcode.MsgMoveStop,
+        WorldOpcode.MsgMoveStartStrafeLeft, WorldOpcode.MsgMoveStartStrafeRight, WorldOpcode.MsgMoveStopStrafe,
+        WorldOpcode.MsgMoveJump, WorldOpcode.MsgMoveStartTurnLeft, WorldOpcode.MsgMoveStartTurnRight,
+        WorldOpcode.MsgMoveStopTurn, WorldOpcode.MsgMoveStartPitchUp, WorldOpcode.MsgMoveStartPitchDown,
+        WorldOpcode.MsgMoveStopPitch, WorldOpcode.MsgMoveSetRunMode, WorldOpcode.MsgMoveSetWalkMode,
+        WorldOpcode.MsgMoveFallLand, WorldOpcode.MsgMoveStartSwim, WorldOpcode.MsgMoveStopSwim,
+        WorldOpcode.MsgMoveSetFacing, WorldOpcode.MsgMoveSetPitch, WorldOpcode.MsgMoveHeartbeat,
+    ];
+
     public async Task RunAsync(CancellationToken ct)
     {
         try
@@ -58,6 +74,7 @@ public sealed class WorldSession(
         }
         finally
         {
+            await SavePositionIfInWorldAsync(CancellationToken.None);
             await _stream.DisposeAsync();
         }
     }
@@ -108,9 +125,15 @@ public sealed class WorldSession(
             case WorldOpcode.CmsgQueryTime:
                 await SendQueryTimeResponseAsync(ct);
                 break;
+            case WorldOpcode.CmsgMessageChat:
+                await HandleChatAsync(body, ct);
+                break;
             default:
-                logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
-                    opcode, (uint)opcode, _remoteIp);
+                if (MovementOpcodes.Contains(opcode))
+                    HandleMovement(body);
+                else
+                    logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
+                        opcode, (uint)opcode, _remoteIp);
                 break;
         }
     }
@@ -321,6 +344,12 @@ public sealed class WorldSession(
             return;
         }
 
+        // Запоминаем позицию для серверного трекинга и сохранения при выходе.
+        _inWorldGuid = character.Guid;
+        _posX = character.X;
+        _posY = character.Y;
+        _posZ = character.Z;
+
         // Последовательность входа в мир (порядок как в эталонных ядрах).
         // 1) Подтверждение мира: карта + позиция.
         var verify = new ByteWriter(20)
@@ -385,8 +414,75 @@ public sealed class WorldSession(
         await SendPacketAsync(WorldOpcode.SmsgQueryTimeResponse, w.ToArray(), ct);
     }
 
+    private async Task HandleChatAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var type = reader.UInt32();        // тип чата (say/yell/emote…)
+        var language = reader.UInt32();
+        var rest = reader.Bytes(reader.Remaining);
+        var len = rest.Length;
+        while (len > 0 && rest[len - 1] == 0)
+            len--;
+        if (len == 0)
+            return;
+        var msg = rest[..len].ToArray();   // сырые байты — без перекодировки (Кириллица ок)
+
+        logger.LogInformation("CHAT '{User}' type={Type}: {Msg}",
+            _account, type, System.Text.Encoding.UTF8.GetString(msg));
+
+        // Эхо отправителю, чтобы он видел свой /say (для одного игрока этого достаточно).
+        var w = new ByteWriter(40 + msg.Length)
+            .UInt8((byte)type)             // эхо того же типа
+            .UInt32(language)
+            .UInt64(_inWorldGuid)          // отправитель
+            .UInt32(0)                     // chat flags
+            .UInt64(0)                     // target
+            .UInt32((uint)(msg.Length + 1))
+            .Bytes(msg).UInt8(0)           // сообщение + null
+            .UInt8(0);                     // chat tag
+        await SendPacketAsync(WorldOpcode.SmsgMessageChat, w.ToArray(), ct);
+    }
+
+    /// <summary>Извлекает позицию из MovementInfo любого MSG_MOVE_* и запоминает её.</summary>
+    private void HandleMovement(byte[] body)
+    {
+        try
+        {
+            var reader = new ByteReader(body);
+            reader.PackedGuid();   // mover guid
+            reader.UInt32();       // movement flags
+            reader.UInt16();       // movement flags 2
+            reader.UInt32();       // time
+            _posX = reader.Single();
+            _posY = reader.Single();
+            _posZ = reader.Single();
+            _posO = reader.Single();
+        }
+        catch (InvalidOperationException)
+        {
+            // Нестандартный вариант пакета — игнорируем для трекинга позиции.
+        }
+    }
+
+    private async Task SavePositionIfInWorldAsync(CancellationToken ct)
+    {
+        if (_inWorldGuid == 0)
+            return;
+        try
+        {
+            await characters.SavePositionAsync(_inWorldGuid, _posX, _posY, _posZ, ct);
+            logger.LogInformation("Позиция '{User}' сохранена: ({X};{Y};{Z})", _account, _posX, _posY, _posZ);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Не удалось сохранить позицию '{User}': {Msg}", _account, ex.Message);
+        }
+    }
+
     private async Task HandleLogoutRequestAsync(CancellationToken ct)
     {
+        await SavePositionIfInWorldAsync(ct);
+        _inWorldGuid = 0; // персонаж покидает мир
         // reason = 0 (можно выходить), instant = 1 (мгновенный логаут).
         var response = new ByteWriter(5).UInt32(0).UInt8(1);
         await SendPacketAsync(WorldOpcode.SmsgLogoutResponse, response.ToArray(), ct);

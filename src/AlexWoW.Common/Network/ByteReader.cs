@@ -44,6 +44,25 @@ public ref struct ByteReader(ReadOnlySpan<byte> data)
         return value;
     }
 
+    public float Single()
+    {
+        EnsureAvailable(4);
+        var value = BinaryPrimitives.ReadSingleLittleEndian(_data.Slice(_position, 4));
+        _position += 4;
+        return value;
+    }
+
+    /// <summary>Читает «упакованный» GUID: байт-маска + только ненулевые байты.</summary>
+    public ulong PackedGuid()
+    {
+        var mask = UInt8();
+        ulong guid = 0;
+        for (var i = 0; i < 8; i++)
+            if ((mask & (1 << i)) != 0)
+                guid |= (ulong)UInt8() << (i * 8);
+        return guid;
+    }
+
     public ReadOnlySpan<byte> Bytes(int count)
     {
         EnsureAvailable(count);
