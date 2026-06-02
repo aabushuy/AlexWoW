@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using AlexWoW.Common.Network;
 using AlexWoW.Cryptography;
 using AlexWoW.Database;
+using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -19,6 +20,7 @@ namespace AlexWoW.WorldServer.Net;
 public sealed class WorldSession(
     Socket socket,
     AuthDatabase database,
+    CharactersDatabase characters,
     WorldServerOptions options,
     ILogger logger)
 {
@@ -32,6 +34,7 @@ public sealed class WorldSession(
 
     private uint _authSeed;
     private string? _account;
+    private uint _accountId;
 
     public async Task RunAsync(CancellationToken ct)
     {
@@ -68,6 +71,21 @@ public sealed class WorldSession(
                 break;
             case WorldOpcode.CmsgPing:
                 await HandlePingAsync(body, ct);
+                break;
+            case WorldOpcode.CmsgReadyForAccountDataTimes:
+                await SendAccountDataTimesAsync(ct);
+                break;
+            case WorldOpcode.CmsgRealmSplit:
+                await HandleRealmSplitAsync(body, ct);
+                break;
+            case WorldOpcode.CmsgCharEnum:
+                await HandleCharEnumAsync(ct);
+                break;
+            case WorldOpcode.CmsgCharCreate:
+                await HandleCharCreateAsync(body, ct);
+                break;
+            case WorldOpcode.CmsgCharDelete:
+                await HandleCharDeleteAsync(body, ct);
                 break;
             default:
                 logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
@@ -131,6 +149,8 @@ public sealed class WorldSession(
             return;
         }
 
+        _accountId = account.Id;
+
         // С этого момента заголовки шифруются.
         _crypt.Init(account.SessionKey);
 
@@ -152,6 +172,119 @@ public sealed class WorldSession(
         var ping = reader.UInt32();        // sequence
         var pong = new ByteWriter(4).UInt32(ping).ToArray();
         await SendPacketAsync(WorldOpcode.SmsgPong, pong, ct);
+    }
+
+    // --- Экран персонажей (M3) -----------------------------------------------
+
+    private async Task SendAccountDataTimesAsync(CancellationToken ct)
+    {
+        const uint mask = 0x15; // GLOBAL_CACHE_MASK
+        var w = new ByteWriter(48)
+            .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            .UInt8(1)
+            .UInt32(mask);
+        for (var i = 0; i < 8; i++)
+            if ((mask & (1u << i)) != 0)
+                w.UInt32(0);
+        await SendPacketAsync(WorldOpcode.SmsgAccountDataTimes, w.ToArray(), ct);
+    }
+
+    private async Task HandleRealmSplitAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var clientState = reader.UInt32();
+        var w = new ByteWriter(16)
+            .UInt32(clientState)
+            .UInt32(0)              // RealmSplitState: 0 = SPLIT_NORMAL
+            .CString("01/01/01");   // split date
+        await SendPacketAsync(WorldOpcode.SmsgRealmSplit, w.ToArray(), ct);
+    }
+
+    private async Task HandleCharEnumAsync(CancellationToken ct)
+    {
+        var list = await characters.GetByAccountAsync(_accountId, ct);
+        await SendPacketAsync(WorldOpcode.SmsgCharEnum, CharEnum.BuildBody(list), ct);
+        logger.LogInformation("CHAR_ENUM: {Count} персонажей для '{User}'", list.Count, _account);
+    }
+
+    private async Task HandleCharCreateAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var name = NormalizeName(reader.CString());
+        var race = reader.UInt8();
+        var charClass = reader.UInt8();
+        var gender = reader.UInt8();
+        var skin = reader.UInt8();
+        var face = reader.UInt8();
+        var hairStyle = reader.UInt8();
+        var hairColor = reader.UInt8();
+        var facialHair = reader.UInt8();
+        // reader: outfitId (uint8) — не используется
+
+        var result = await TryCreateCharacterAsync(
+            name, race, charClass, gender, skin, face, hairStyle, hairColor, facialHair, ct);
+
+        await SendPacketAsync(WorldOpcode.SmsgCharCreate,
+            new ByteWriter(1).UInt8((byte)result).ToArray(), ct);
+        logger.LogInformation("CHAR_CREATE '{Name}' для '{User}' → {Result}", name, _account, result);
+    }
+
+    private async Task<CharResponse> TryCreateCharacterAsync(
+        string name, byte race, byte charClass, byte gender,
+        byte skin, byte face, byte hairStyle, byte hairColor, byte facialHair, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return CharResponse.CreateFailed;
+
+        if (await characters.CountByAccountAsync(_accountId, ct) >= CharactersDatabase.MaxCharactersPerAccount)
+            return CharResponse.CreateServerLimit;
+
+        if (await characters.NameExistsAsync(name, ct))
+            return CharResponse.CreateNameInUse;
+
+        var start = StartPositions.ForRace(race);
+        var character = new Character
+        {
+            AccountId = _accountId,
+            Name = name,
+            Race = race,
+            Class = charClass,
+            Gender = gender,
+            Skin = skin,
+            Face = face,
+            HairStyle = hairStyle,
+            HairColor = hairColor,
+            FacialHair = facialHair,
+            Level = 1,
+            Zone = start.Zone,
+            Map = start.Map,
+            X = start.X,
+            Y = start.Y,
+            Z = start.Z,
+        };
+
+        await characters.CreateAsync(character, ct);
+        return CharResponse.CreateSuccess;
+    }
+
+    private async Task HandleCharDeleteAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var guid = (uint)reader.UInt64();
+        var deleted = await characters.DeleteAsync(guid, _accountId, ct);
+
+        await SendPacketAsync(WorldOpcode.SmsgCharDelete,
+            new ByteWriter(1).UInt8((byte)(deleted ? CharResponse.DeleteSuccess : CharResponse.DeleteFailed)).ToArray(), ct);
+        logger.LogInformation("CHAR_DELETE guid={Guid} для '{User}' → {Ok}", guid, _account, deleted);
+    }
+
+    /// <summary>Имя WoW: первая буква заглавная, остальные строчные.</summary>
+    private static string NormalizeName(string name)
+    {
+        name = name.Trim();
+        if (name.Length == 0)
+            return name;
+        return char.ToUpperInvariant(name[0]) + name[1..].ToLowerInvariant();
     }
 
     // --- Низкоуровневый ввод/вывод -------------------------------------------

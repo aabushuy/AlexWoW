@@ -22,6 +22,11 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new AuthDatabase(options.ConnectionString);
 });
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new CharactersDatabase(options.ConnectionString);
+});
 builder.Services.AddHostedService<WorldListener>();
 
 var host = builder.Build();

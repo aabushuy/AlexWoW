@@ -36,6 +36,14 @@ public sealed class ByteWriter
         return this;
     }
 
+    public ByteWriter UInt64(ulong value)
+    {
+        Span<byte> tmp = stackalloc byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(tmp, value);
+        _buffer.AddRange(tmp);
+        return this;
+    }
+
     public ByteWriter Single(float value)
     {
         Span<byte> tmp = stackalloc byte[4];
