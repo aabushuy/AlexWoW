@@ -17,7 +17,7 @@ public sealed class AuthListener(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await database.EnsureSchemaAsync(ToRealm(_options.DefaultRealm), stoppingToken);
+        await EnsureSchemaWithRetryAsync(stoppingToken);
 
         var endpoint = new IPEndPoint(IPAddress.Parse(_options.BindAddress), _options.Port);
         using var listener = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -39,6 +39,31 @@ public sealed class AuthListener(
 
             // Каждую сессию обрабатываем независимо, не блокируя accept-цикл.
             _ = Task.Run(() => new AuthSession(client, database, logger).RunAsync(stoppingToken), stoppingToken);
+        }
+    }
+
+    /// <summary>
+    /// Ждёт готовности MySQL и создаёт схему. БД может стартовать чуть дольше контейнера,
+    /// поэтому повторяем с экспоненциальной задержкой вместо падения сервиса.
+    /// </summary>
+    private async Task EnsureSchemaWithRetryAsync(CancellationToken ct)
+    {
+        const int maxAttempts = 30;
+        var realm = ToRealm(_options.DefaultRealm);
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await database.EnsureSchemaAsync(realm, ct);
+                return;
+            }
+            catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Min(5, attempt));
+                logger.LogWarning("БД недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
+                    attempt, maxAttempts, ex.Message, delay.TotalSeconds);
+                await Task.Delay(delay, ct);
+            }
         }
     }
 
