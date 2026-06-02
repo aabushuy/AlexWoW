@@ -54,6 +54,7 @@ public enum WorldOpcode : uint
 
     // Вход в мир (M4)
     SmsgLoginSetTimeSpeed = 0x042,
+    SmsgInitialSpells = 0x12A,
     SmsgTutorialFlags = 0x0FD,
     SmsgUpdateObject = 0x0A9,
     SmsgLoginVerifyWorld = 0x236,
