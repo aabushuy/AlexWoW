@@ -90,6 +90,8 @@ public sealed class WorldSession(
             case WorldOpcode.CmsgPlayerLogin:
                 await HandlePlayerLoginAsync(body, ct);
                 break;
+            case WorldOpcode.CmsgTimeSyncResp:
+                break; // ответ клиента на time-sync — пока просто принимаем
             default:
                 logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
                     opcode, (uint)opcode, _remoteIp);
@@ -302,18 +304,43 @@ public sealed class WorldSession(
             .Single(0f);
         await SendPacketAsync(WorldOpcode.SmsgLoginVerifyWorld, verify.ToArray(), ct);
 
-        // 2) Флаги обучения (8 × uint32) — выключаем подсказки.
+        // 2) Установка игрового времени — без неё клиентский тик-луп заморожен (нет управления).
+        await SendLoginTimeSpeedAsync(ct);
+
+        // 3) Флаги обучения (8 × uint32) — выключаем подсказки.
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)
             tutorials.UInt32(0);
         await SendPacketAsync(WorldOpcode.SmsgTutorialFlags, tutorials.ToArray(), ct);
 
-        // 3) Спавн собственного игрока (CREATE_OBJECT2).
+        // 4) Спавн собственного игрока (CREATE_OBJECT2).
         var spawn = PlayerSpawn.BuildCreateObject(character, (uint)Environment.TickCount);
         await SendPacketAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
+        // 5) Старт синхронизации времени.
+        await SendPacketAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(0).ToArray(), ct);
+
         logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
+    }
+
+    private async Task SendLoginTimeSpeedAsync(CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+        // Упакованное календарное время (bitfield, как ждёт клиент).
+        var packed = (uint)(
+            now.Minute
+            | (now.Hour << 6)
+            | ((int)now.DayOfWeek << 11)
+            | ((now.Day - 1) << 14)
+            | ((now.Month - 1) << 20)
+            | ((now.Year - 2000) << 24));
+
+        var w = new ByteWriter(12)
+            .UInt32(packed)
+            .Single(0.01666667f)   // скорость игрового времени
+            .UInt32(0);            // unk (3.3.5)
+        await SendPacketAsync(WorldOpcode.SmsgLoginSetTimeSpeed, w.ToArray(), ct);
     }
 
     /// <summary>Имя WoW: первая буква заглавная, остальные строчные.</summary>
