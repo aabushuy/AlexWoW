@@ -65,6 +65,13 @@
   `SMSG_UPDATE_ACCOUNT_DATA_COMPLETE = 0x463`,
   `CMSG_LOGOUT_REQUEST = 0x4B` → `SMSG_LOGOUT_RESPONSE = 0x4C` + `SMSG_LOGOUT_COMPLETE = 0x4D`.
 
+## Известные мелочи
+
+- Клиентская Lua-ошибка «Ошибка загрузки (Blizzard_TimeManager): Отключено» при входе —
+  встроенный аддон-часы **выключен в клиенте** (DISABLED). Косметика, не блокирует игру.
+  Наш `SMSG_LOGIN_SETTIMESPEED` формат-корректен (сверено с gtker). Чинится включением
+  аддона в клиенте, на сервере чинить нечего.
+
 ## Дальше (в рамках M4 / к M5)
 
 Чат (`CMSG_MESSAGECHAT`), серверная обработка движения (`MSG_MOVE_*` приём+рассылка),
