@@ -35,8 +35,11 @@ public enum WorldOpcode : uint
     CmsgAuthSession = 0x1ED,
     SmsgAuthResponse = 0x1EE,
 
-    // Прочее, что шлёт клиент на экране персонажей
+    // Прочее, что шлёт клиент на экране персонажей / при входе
+    SmsgFeatureSystemStatus = 0x3C9,
     SmsgAccountDataTimes = 0x209,
+    CmsgUpdateAccountData = 0x20B,
+    SmsgUpdateAccountDataComplete = 0x463,
     SmsgRealmSplit = 0x38B,
     CmsgRealmSplit = 0x38C,
     CmsgReadyForAccountDataTimes = 0x4FF,

@@ -73,7 +73,10 @@ public sealed class WorldSession(
                 await HandlePingAsync(body, ct);
                 break;
             case WorldOpcode.CmsgReadyForAccountDataTimes:
-                await SendAccountDataTimesAsync(ct);
+                await SendAccountDataTimesAsync(0x15, ct); // GLOBAL_CACHE_MASK
+                break;
+            case WorldOpcode.CmsgUpdateAccountData:
+                await HandleUpdateAccountDataAsync(body, ct);
                 break;
             case WorldOpcode.CmsgRealmSplit:
                 await HandleRealmSplitAsync(body, ct);
@@ -91,7 +94,8 @@ public sealed class WorldSession(
                 await HandlePlayerLoginAsync(body, ct);
                 break;
             case WorldOpcode.CmsgTimeSyncResp:
-                break; // ответ клиента на time-sync — пока просто принимаем
+                logger.LogInformation("CMSG_TIME_SYNC_RESP получен — пост-спавн пакеты доходят, поток в порядке");
+                break;
             case WorldOpcode.CmsgNameQuery:
                 await HandleNameQueryAsync(body, ct);
                 break;
@@ -187,9 +191,8 @@ public sealed class WorldSession(
 
     // --- Экран персонажей (M3) -----------------------------------------------
 
-    private async Task SendAccountDataTimesAsync(CancellationToken ct)
+    private async Task SendAccountDataTimesAsync(uint mask, CancellationToken ct)
     {
-        const uint mask = 0x15; // GLOBAL_CACHE_MASK
         var w = new ByteWriter(48)
             .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             .UInt8(1)
@@ -198,6 +201,15 @@ public sealed class WorldSession(
             if ((mask & (1u << i)) != 0)
                 w.UInt32(0);
         await SendPacketAsync(WorldOpcode.SmsgAccountDataTimes, w.ToArray(), ct);
+    }
+
+    private async Task HandleUpdateAccountDataAsync(byte[] body, CancellationToken ct)
+    {
+        // Достаточно подтвердить приём, иначе клиент зацикливается при входе.
+        var reader = new ByteReader(body);
+        var dataType = reader.UInt32();
+        var w = new ByteWriter(8).UInt32(dataType).UInt32(0);
+        await SendPacketAsync(WorldOpcode.SmsgUpdateAccountDataComplete, w.ToArray(), ct);
     }
 
     private async Task HandleRealmSplitAsync(byte[] body, CancellationToken ct)
@@ -303,6 +315,7 @@ public sealed class WorldSession(
             return;
         }
 
+        // Последовательность входа в мир (порядок как в эталонных ядрах).
         // 1) Подтверждение мира: карта + позиция.
         var verify = new ByteWriter(20)
             .UInt32(character.Map)
@@ -310,20 +323,27 @@ public sealed class WorldSession(
             .Single(0f);
         await SendPacketAsync(WorldOpcode.SmsgLoginVerifyWorld, verify.ToArray(), ct);
 
-        // 2) Установка игрового времени — без неё клиентский тик-луп заморожен (нет управления).
-        await SendLoginTimeSpeedAsync(ct);
+        // 2) Времена кэша аккаунта (per-character mask).
+        await SendAccountDataTimesAsync(0xEA, ct);
 
-        // 3) Флаги обучения (8 × uint32) — выключаем подсказки.
+        // 3) Статус системных фич (complaint + voice).
+        await SendPacketAsync(WorldOpcode.SmsgFeatureSystemStatus,
+            new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
+
+        // 4) Флаги обучения (8 × uint32) — выключаем подсказки.
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)
             tutorials.UInt32(0);
         await SendPacketAsync(WorldOpcode.SmsgTutorialFlags, tutorials.ToArray(), ct);
 
-        // 4) Спавн собственного игрока (CREATE_OBJECT2).
+        // 5) Установка игрового времени.
+        await SendLoginTimeSpeedAsync(ct);
+
+        // 6) Спавн собственного игрока (CREATE_OBJECT2).
         var spawn = PlayerSpawn.BuildCreateObject(character, (uint)Environment.TickCount);
         await SendPacketAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
-        // 5) Старт синхронизации времени.
+        // 7) Старт синхронизации времени — без неё игрок не управляется.
         await SendPacketAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(0).ToArray(), ct);
 
         logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
