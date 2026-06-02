@@ -3,6 +3,33 @@ namespace AlexWoW.WorldServer.Protocol;
 /// <summary>Опкоды world-протокола (WotLK 3.3.5a, build 12340). Подмножество для M2–M3.</summary>
 public enum WorldOpcode : uint
 {
+    // Чат (M4)
+    CmsgMessageChat = 0x095,
+    SmsgMessageChat = 0x096,
+
+    // Движение (M4) — все несут packed guid + MovementInfo
+    MsgMoveStartForward = 0x0B5,
+    MsgMoveStartBackward = 0x0B6,
+    MsgMoveStop = 0x0B7,
+    MsgMoveStartStrafeLeft = 0x0B8,
+    MsgMoveStartStrafeRight = 0x0B9,
+    MsgMoveStopStrafe = 0x0BA,
+    MsgMoveJump = 0x0BB,
+    MsgMoveStartTurnLeft = 0x0BC,
+    MsgMoveStartTurnRight = 0x0BD,
+    MsgMoveStopTurn = 0x0BE,
+    MsgMoveStartPitchUp = 0x0BF,
+    MsgMoveStartPitchDown = 0x0C0,
+    MsgMoveStopPitch = 0x0C1,
+    MsgMoveSetRunMode = 0x0C2,
+    MsgMoveSetWalkMode = 0x0C3,
+    MsgMoveFallLand = 0x0C9,
+    MsgMoveStartSwim = 0x0CA,
+    MsgMoveStopSwim = 0x0CB,
+    MsgMoveSetFacing = 0x0DA,
+    MsgMoveSetPitch = 0x0DB,
+    MsgMoveHeartbeat = 0x0EE,
+
     // Логаут (M4)
     CmsgLogoutRequest = 0x04B,
     SmsgLogoutResponse = 0x04C,
