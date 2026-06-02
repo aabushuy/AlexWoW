@@ -38,16 +38,21 @@ public enum AuthResponseCode : byte
     WaitQueue = 0x1B,
 }
 
-/// <summary>Коды ответа на создание/удаление персонажа (подмножество ResponseCodes).</summary>
+/// <summary>
+/// Коды ответа на создание/удаление персонажа (ResponseCodes, 3.3.5a).
+/// ВНИМАНИЕ: 0x2E = CHAR_CREATE_IN_PROGRESS, success = 0x2F (не off-by-one!).
+/// </summary>
 public enum CharResponse : byte
 {
-    CreateSuccess = 0x2E,
-    CreateError = 0x2F,
-    CreateFailed = 0x30,
-    CreateNameInUse = 0x31,
-    CreateServerLimit = 0x34,
-    CreateAccountLimit = 0x35,
+    CreateInProgress = 0x2E,
+    CreateSuccess = 0x2F,
+    CreateError = 0x30,
+    CreateFailed = 0x31,
+    CreateNameInUse = 0x32,
+    CreateServerLimit = 0x35,
+    CreateAccountLimit = 0x36,
 
-    DeleteSuccess = 0x46,
-    DeleteFailed = 0x47,
+    DeleteInProgress = 0x46,
+    DeleteSuccess = 0x47,
+    DeleteFailed = 0x48,
 }
