@@ -3,6 +3,12 @@ namespace AlexWoW.WorldServer.Protocol;
 /// <summary>Опкоды world-протокола (WotLK 3.3.5a, build 12340). Подмножество для M2–M3.</summary>
 public enum WorldOpcode : uint
 {
+    // Запросы (M4)
+    CmsgNameQuery = 0x050,
+    SmsgNameQueryResponse = 0x051,
+    CmsgQueryTime = 0x1CE,
+    SmsgQueryTimeResponse = 0x1CF,
+
     // Персонажи (M3)
     CmsgCharCreate = 0x036,
     CmsgCharEnum = 0x037,
