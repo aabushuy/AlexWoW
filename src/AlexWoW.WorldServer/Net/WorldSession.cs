@@ -92,6 +92,12 @@ public sealed class WorldSession(
                 break;
             case WorldOpcode.CmsgTimeSyncResp:
                 break; // ответ клиента на time-sync — пока просто принимаем
+            case WorldOpcode.CmsgNameQuery:
+                await HandleNameQueryAsync(body, ct);
+                break;
+            case WorldOpcode.CmsgQueryTime:
+                await SendQueryTimeResponseAsync(ct);
+                break;
             default:
                 logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — пока без обработчика",
                     opcode, (uint)opcode, _remoteIp);
@@ -322,6 +328,35 @@ public sealed class WorldSession(
 
         logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
+    }
+
+    private async Task HandleNameQueryAsync(byte[] body, CancellationToken ct)
+    {
+        var reader = new ByteReader(body);
+        var guid = (uint)reader.UInt64();
+
+        var character = await characters.GetByGuidAsync(guid, ct);
+        if (character is null)
+            return;
+
+        var w = new ByteWriter(48);
+        PackedGuid.Write(w, guid);
+        w.UInt8(0)                  // 0 = имя известно
+         .CString(character.Name)
+         .CString(string.Empty)     // кросс-реалм имя (пусто)
+         .UInt8(character.Race)
+         .UInt8(character.Gender)
+         .UInt8(character.Class)
+         .UInt8(0);                 // имя не склоняется
+        await SendPacketAsync(WorldOpcode.SmsgNameQueryResponse, w.ToArray(), ct);
+    }
+
+    private async Task SendQueryTimeResponseAsync(CancellationToken ct)
+    {
+        var w = new ByteWriter(8)
+            .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            .UInt32(0); // время до ежедневного сброса
+        await SendPacketAsync(WorldOpcode.SmsgQueryTimeResponse, w.ToArray(), ct);
     }
 
     private async Task SendLoginTimeSpeedAsync(CancellationToken ct)
