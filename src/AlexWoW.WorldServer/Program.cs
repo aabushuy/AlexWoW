@@ -1,4 +1,5 @@
 using AlexWoW.Database;
+using AlexWoW.DataStores.Maps;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
@@ -32,6 +33,11 @@ builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new WorldDatabase(options.WorldConnectionString);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new TerrainMaps(options.MapsPath);
 });
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldListener>();

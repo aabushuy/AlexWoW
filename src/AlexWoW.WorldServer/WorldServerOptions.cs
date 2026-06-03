@@ -16,6 +16,9 @@ public sealed class WorldServerOptions
     /// <summary>Строка подключения к базе мира (дамп CMaNGOS: creature, creature_template …). Пусто = без БД мира.</summary>
     public string WorldConnectionString { get; set; } = string.Empty;
 
+    /// <summary>Каталог с рельефом (maps/*.map от экстрактора CMaNGOS). Пусто = без рельефа.</summary>
+    public string MapsPath { get; set; } = string.Empty;
+
     /// <summary>Ожидаемый build клиента.</summary>
     public ushort ExpectedBuild { get; set; } = 12340;
 }

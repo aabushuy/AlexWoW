@@ -57,6 +57,12 @@ public static class WorldEntryHandlers
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
 
+        // M5.5: проверка рельефа — высота земли в точке входа против сохранённой Z.
+        var ground = session.Terrain.GetHeight(character.Map, character.X, character.Y);
+        if (ground is { } g)
+            session.Logger.LogInformation("Рельеф: земля в ({X};{Y}) = {Ground:F2} (Z персонажа {Z:F2}, дельта {Delta:F2})",
+                character.X, character.Y, g, character.Z, character.Z - g);
+
         // M5.1/M5.6: показать существ и гейм-объекты из БД мира вокруг (диф-видимость).
         await SpawnHandlers.RefreshVisibleNpcsAsync(session, character.Map, character.X, character.Y, ct);
         await SpawnHandlers.RefreshVisibleGameObjectsAsync(session, character.Map, character.X, character.Y, ct);
