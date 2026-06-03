@@ -59,12 +59,14 @@ public static class CreatureUpdate
         m.SetUInt64(UpdateField.ObjectGuid, spawn.Guid);
         m.SetUInt32(UpdateField.ObjectEntry, t.Entry);
         m.SetUInt32(UpdateField.ObjectType, TypeMask.UnitObject);
-        m.SetFloat(UpdateField.ObjectScaleX, 1.0f);
+        m.SetFloat(UpdateField.ObjectScaleX, t.Scale);
 
+        m.SetBytes(UpdateField.UnitBytes0, 0, t.UnitClass, 0, 0); // race=0|class|gender=0|powertype=0
         m.SetUInt32(UpdateField.UnitHealth, 100);
         m.SetUInt32(UpdateField.UnitMaxHealth, 100);
         m.SetUInt32(UpdateField.UnitLevel, t.Level);
         m.SetUInt32(UpdateField.UnitFactionTemplate, t.Faction);
+        m.SetUInt32(UpdateField.UnitNpcFlags, t.NpcFlags);
         m.SetUInt32(UpdateField.UnitDisplayId, t.DisplayId);
         m.SetUInt32(UpdateField.UnitNativeDisplayId, t.DisplayId);
         m.SetFloat(UpdateField.UnitBoundingRadius, 0.306f);

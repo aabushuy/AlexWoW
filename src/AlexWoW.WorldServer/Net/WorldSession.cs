@@ -26,12 +26,13 @@ public sealed class WorldSession
     private readonly SemaphoreSlim _sendLock = new(1, 1); // сериализация отправки (RC4 — stateful)
 
     public WorldSession(Socket socket, AuthDatabase database, CharactersDatabase characters,
-        WorldState world, WorldServerOptions options, ILogger logger)
+        WorldDatabase worldDatabase, WorldState world, WorldServerOptions options, ILogger logger)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
         Database = database;
         Characters = characters;
+        WorldDb = worldDatabase;
         World = world;
         Options = options;
         Logger = logger;
@@ -40,6 +41,7 @@ public sealed class WorldSession
     // --- Контекст для обработчиков ---
     internal AuthDatabase Database { get; }
     internal CharactersDatabase Characters { get; }
+    internal WorldDatabase WorldDb { get; }
     internal WorldState World { get; }
     internal WorldServerOptions Options { get; }
     internal ILogger Logger { get; }

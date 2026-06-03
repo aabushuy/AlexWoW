@@ -11,7 +11,10 @@ public sealed record CreatureTemplate(
     uint DisplayId,
     byte Level,
     uint Faction,
-    uint UnitType); // CreatureType: 7 = Humanoid
+    uint UnitType,          // CreatureType: 7 = Humanoid
+    float Scale = 1.0f,
+    uint NpcFlags = 0,
+    byte UnitClass = 1);    // 1 = Warrior
 
 /// <summary>Конкретный спавн существа в мире (шаблон + GUID + позиция).</summary>
 public sealed record NpcSpawn(ulong Guid, CreatureTemplate Template, float X, float Y, float Z, float O);

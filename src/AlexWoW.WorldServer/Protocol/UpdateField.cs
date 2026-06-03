@@ -21,6 +21,7 @@ public static class UpdateField
     public const int UnitLevel = 0x0036;
     public const int UnitFactionTemplate = 0x0037;
     public const int UnitFlags = 0x003B;
+    public const int UnitNpcFlags = 0x0052;       // OBJECT_END(0x06)+0x4C — иконки госсипа/вендора/квестов
     public const int UnitBoundingRadius = 0x0041; // float
     public const int UnitCombatReach = 0x0042;    // float
     public const int UnitDisplayId = 0x0043;
