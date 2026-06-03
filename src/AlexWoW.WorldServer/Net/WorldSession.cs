@@ -75,6 +75,12 @@ public sealed class WorldSession
     /// <summary>Гейм-объекты, показанные клиенту этой сессии (guid → спавн). M5.6b.</summary>
     internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
 
+    /// <summary>
+    /// Другие игроки, показанные клиенту этой сессии (set guid'ов). Доступ из нескольких потоков
+    /// (сосед спавнит нас из своего потока) — потокобезопасный. Динамическая видимость игроков (M6).
+    /// </summary>
+    internal System.Collections.Concurrent.ConcurrentDictionary<ulong, byte> VisiblePlayers { get; } = new();
+
     /// <summary>Позиция последнего пересчёта видимости NPC (троттлинг по дистанции). M5.6.</summary>
     internal float LastVisX { get; set; }
     internal float LastVisY { get; set; }
@@ -118,6 +124,7 @@ public sealed class WorldSession
         InWorldGuid = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
+        VisiblePlayers.Clear();
         Inventory.Clear();
         try
         {

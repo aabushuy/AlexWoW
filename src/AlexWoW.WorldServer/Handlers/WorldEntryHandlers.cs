@@ -82,6 +82,23 @@ public static class WorldEntryHandlers
         var player = new World.WorldPlayer { Guid = character.Guid, Character = character, Session = session };
         session.Player = player;
         await session.World.EnterWorldAsync(player, ct);
+
+        // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
+        // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1500, ct);
+                await session.World.ResendNearbyEquipmentToAsync(player, ct);
+                await Task.Delay(2500, ct);
+                await session.World.ResendNearbyEquipmentToAsync(player, ct);
+            }
+            catch (Exception ex)
+            {
+                session.Logger.LogDebug("Повторная досылка соседей '{User}': {Msg}", session.Account, ex.Message);
+            }
+        }, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLogoutRequest)]

@@ -14,5 +14,7 @@
 | M6.5 Квесты | [M6.5-quests.md](M6.5-quests.md) | ⬜ |
 | M6.6 Лут | [M6.6-loot.md](M6.6-loot.md) | ⬜ |
 | M6.7 ИИ существ | [M6.7-ai.md](M6.7-ai.md) | ⬜ |
+| M6.8 Производительность: кэш видимости | [M6.8-perf-spatial-cache.md](M6.8-perf-spatial-cache.md) | ⬜ |
+| M7 Техдолг и известные баги | [M7-tech-debt.md](M7-tech-debt.md) | 🔴 |
 
 Ход работ по вехе фиксируется в [devlog/M6-game-systems.md](../devlog/M6-game-systems.md).

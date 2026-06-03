@@ -42,6 +42,33 @@ public static class PlayerSpawn
         return w.ToArray();
     }
 
+    /// <summary>
+    /// SMSG_UPDATE_OBJECT с UPDATETYPE_VALUES — только поля видимой экипировки (slots 0..18).
+    /// Для досылки экипировки на УЖЕ созданный у клиента объект игрока (повторный CREATE клиент
+    /// игнорирует). Возвращает null, если надетых видимых предметов нет.
+    /// </summary>
+    public static byte[]? BuildEquipmentValuesUpdate(Character c, IReadOnlyList<InventoryItem> inventory)
+    {
+        var m = new UpdateMask();
+        var any = false;
+        foreach (var item in inventory)
+            if (item.Bag == InventorySlots.MainBag
+                && item.Slot >= InventorySlots.EquipmentStart && item.Slot < InventorySlots.EquipmentEnd)
+            {
+                m.SetUInt32(UpdateField.VisibleItemEntry(item.Slot), item.ItemEntry);
+                any = true;
+            }
+        if (!any)
+            return null;
+
+        var w = new ByteWriter(64);
+        w.UInt32(1);                  // количество блоков
+        w.UInt8(UpdateType.Values);   // 0 — обновление значений существующего объекта
+        PackedGuid.Write(w, c.Guid);
+        m.WriteTo(w);
+        return w.ToArray();
+    }
+
     private static void WriteMovementBlock(ByteWriter w, float x, float y, float z, float o,
         uint serverTimeMs, bool isSelf)
     {

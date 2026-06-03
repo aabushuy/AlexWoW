@@ -54,6 +54,10 @@ public sealed class WorldListener(
                 break;
             }
 
+            // Отключаем алгоритм Нейгла: протокол шлёт много мелких пакетов (движение),
+            // их батчинг даёт рывки/«полёт» у соседних игроков. Нужна минимальная задержка.
+            client.NoDelay = true;
+
             _ = Task.Run(
                 () => new WorldSession(client, database, characters, worldDatabase, terrain, world, _options, logger)
                     .RunAsync(stoppingToken),

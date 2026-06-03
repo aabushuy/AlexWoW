@@ -14,6 +14,7 @@ public static class ItemHandlers
         var reader = packet.Reader();
         var entry = reader.UInt32();
         // далее u64 guid — для ответа не нужен.
+        session.Logger.LogDebug("[item-query] '{User}' запросил item {Entry}", session.Account, entry);
 
         Database.Models.ItemTemplateData? t = null;
         try { t = await session.WorldDb.GetItemTemplateAsync(entry, ct); }
