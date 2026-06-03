@@ -19,6 +19,12 @@ public sealed class WorldServerOptions
     /// <summary>Каталог с рельефом (maps/*.map от экстрактора CMaNGOS). Пусто = без рельефа.</summary>
     public string MapsPath { get; set; } = string.Empty;
 
+    /// <summary>Каталог с коллизиями (vmaps/*.vmap) для LoS. Пусто = без vmap.</summary>
+    public string VmapsPath { get; set; } = string.Empty;
+
+    /// <summary>Каталог с навмешем (mmaps/*.mmtile) для поиска пути. Пусто = без навмеша.</summary>
+    public string MmapsPath { get; set; } = string.Empty;
+
     /// <summary>Ожидаемый build клиента.</summary>
     public ushort ExpectedBuild { get; set; } = 12340;
 }
