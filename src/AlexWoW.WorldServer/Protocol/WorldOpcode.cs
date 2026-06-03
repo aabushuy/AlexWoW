@@ -43,6 +43,10 @@ public enum WorldOpcode : uint
     CmsgQueryTime = 0x1CE,
     SmsgQueryTimeResponse = 0x1CF,
 
+    // Предметы (M6.1)
+    CmsgItemQuerySingle = 0x056,
+    SmsgItemQuerySingleResponse = 0x058,
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,
@@ -57,6 +61,10 @@ public enum WorldOpcode : uint
     SmsgCharEnum = 0x03B,
     SmsgCharDelete = 0x03C,
     CmsgPlayerLogin = 0x03D,
+
+    // Склонения имени (ruRU-клиент, после создания персонажа)
+    CmsgSetPlayerDeclinedNames = 0x419,
+    SmsgSetPlayerDeclinedNamesResult = 0x41A,
 
     // Вход в мир (M4)
     SmsgLoginSetTimeSpeed = 0x042,

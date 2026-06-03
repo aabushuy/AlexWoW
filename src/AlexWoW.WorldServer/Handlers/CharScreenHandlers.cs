@@ -14,8 +14,56 @@ public static class CharScreenHandlers
     public static async Task OnCharEnum(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var list = await session.Characters.GetByAccountAsync(session.AccountId, ct);
-        await session.SendAsync(WorldOpcode.SmsgCharEnum, CharEnum.BuildBody(list), ct);
+        var equipment = await BuildPaperdollAsync(session, list, ct);
+        await session.SendAsync(WorldOpcode.SmsgCharEnum, CharEnum.BuildBody(list, equipment), ct);
         session.Logger.LogInformation("CHAR_ENUM: {Count} персонажей для '{User}'", list.Count, session.Account);
+    }
+
+    /// <summary>
+    /// Экипировка для paperdoll на экране выбора: по каждому персонажу слот(0..18) → displayId+invType.
+    /// При недоступности БД мира — пустой набор (персонажи всё равно отображаются).
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<uint, CharEnum.SlotDisplay[]>> BuildPaperdollAsync(
+        WorldSession session, IReadOnlyList<Character> characters, CancellationToken ct)
+    {
+        var equippedByChar = new Dictionary<uint, List<InventoryItem>>();
+        var entries = new HashSet<uint>();
+        foreach (var c in characters)
+        {
+            var items = await session.Characters.GetItemsAsync(c.Guid, ct);
+            var equipped = items.Where(i => i.Bag == InventorySlots.MainBag
+                && i.Slot < InventorySlots.EquipmentEnd).ToList();
+            if (equipped.Count == 0)
+                continue;
+            equippedByChar[c.Guid] = equipped;
+            foreach (var i in equipped)
+                entries.Add(i.ItemEntry);
+        }
+
+        if (entries.Count == 0)
+            return new Dictionary<uint, CharEnum.SlotDisplay[]>();
+
+        IReadOnlyDictionary<uint, (uint DisplayId, byte InventoryType)> displays;
+        try
+        {
+            displays = await session.WorldDb.GetItemDisplaysAsync(entries, ct);
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("CHAR_ENUM paperdoll: БД мира недоступна ({Msg})", ex.Message);
+            return new Dictionary<uint, CharEnum.SlotDisplay[]>();
+        }
+
+        var result = new Dictionary<uint, CharEnum.SlotDisplay[]>(equippedByChar.Count);
+        foreach (var (guid, equipped) in equippedByChar)
+        {
+            var slots = new CharEnum.SlotDisplay[InventorySlots.EquipmentEnd];
+            foreach (var item in equipped)
+                if (displays.TryGetValue(item.ItemEntry, out var d))
+                    slots[item.Slot] = new CharEnum.SlotDisplay(d.DisplayId, d.InventoryType);
+            result[guid] = slots;
+        }
+        return result;
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCharCreate)]
@@ -33,8 +81,18 @@ public static class CharScreenHandlers
         var facialHair = reader.UInt8();
         // outfitId (uint8) — не используется
 
-        var result = await TryCreateAsync(session, name, race, charClass, gender,
-            skin, face, hairStyle, hairColor, facialHair, ct);
+        CharResponse result;
+        try
+        {
+            result = await TryCreateAsync(session, name, race, charClass, gender,
+                skin, face, hairStyle, hairColor, facialHair, ct);
+        }
+        catch (Exception ex)
+        {
+            // Любой сбой (БД, и т.п.) НЕ должен рвать соединение — иначе клиент вылетает.
+            session.Logger.LogError(ex, "CHAR_CREATE '{Name}' для '{User}' — ошибка", name, session.Account);
+            result = CharResponse.CreateError;
+        }
 
         await session.SendAsync(WorldOpcode.SmsgCharCreate, new ByteWriter(1).UInt8((byte)result).ToArray(), ct);
         session.Logger.LogInformation("CHAR_CREATE '{Name}' для '{User}' → {Result}", name, session.Account, result);
@@ -44,6 +102,8 @@ public static class CharScreenHandlers
         byte gender, byte skin, byte face, byte hairStyle, byte hairColor, byte facialHair, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
+            return CharResponse.CreateFailed;
+        if (name.Length is < 2 or > 12)   // лимит имени WoW — 12 символов (столбец name VARCHAR(12))
             return CharResponse.CreateFailed;
         if (await session.Characters.CountByAccountAsync(session.AccountId, ct) >= CharactersDatabase.MaxCharactersPerAccount)
             return CharResponse.CreateServerLimit;
@@ -70,8 +130,30 @@ public static class CharScreenHandlers
             Y = start.Y,
             Z = start.Z,
         };
-        await session.Characters.CreateAsync(character, ct);
+        var newGuid = await session.Characters.CreateAsync(character, ct);
+
+        // M6.1: выдать стартовую экипировку (шмот/оружие), чтобы персонаж входил в мир не голым.
+        await StartingGear.GiveAsync(session, newGuid, race, charClass, ct);
+
         return CharResponse.CreateSuccess;
+    }
+
+    /// <summary>
+    /// Склонения имени (ruRU-клиент после создания персонажа). Сами склонения пока не храним —
+    /// просто подтверждаем приём, иначе клиент зависает на «Обновление персонажа…».
+    /// </summary>
+    [WorldOpcodeHandler(WorldOpcode.CmsgSetPlayerDeclinedNames)]
+    public static async Task OnSetDeclinedNames(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var guid = reader.UInt64();
+        // далее CString name + CString[5] склонений — пока не используем.
+
+        var w = new ByteWriter(12)
+            .UInt32(0)        // result = 0 (успех)
+            .UInt64(guid);
+        await session.SendAsync(WorldOpcode.SmsgSetPlayerDeclinedNamesResult, w.ToArray(), ct);
+        session.Logger.LogInformation("SET_DECLINED_NAMES guid={Guid} → ок", guid);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCharDelete)]

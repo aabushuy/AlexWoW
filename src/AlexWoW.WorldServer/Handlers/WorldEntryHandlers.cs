@@ -47,8 +47,18 @@ public static class WorldEntryHandlers
 
         await SendLoginTimeSpeedAsync(session, ct);
 
+        // M6.1: инвентарь — выдать стартовый набор голым персонажам, загрузить и создать item-объекты
+        // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
+        if (!await session.Characters.HasItemsAsync(character.Guid, ct))
+            await StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
+        session.Inventory.Clear();
+        session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
+        if (session.Inventory.Count > 0)
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);
+
         var spawn = PlayerSpawn.BuildCreateObject(character,
-            character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true);
+            character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true, session.Inventory);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется.

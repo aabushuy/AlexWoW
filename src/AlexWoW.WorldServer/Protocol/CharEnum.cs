@@ -9,7 +9,11 @@ public static class CharEnum
     // EQUIPMENT_SLOT_END(19) + 4 слота сумок = INVENTORY_SLOT_BAG_END.
     private const int EquipmentSlots = 23;
 
-    public static byte[] BuildBody(IReadOnlyList<Character> characters)
+    /// <summary>Экипировка слота для paperdoll: displayInfoId + inventoryType (3.3.5a).</summary>
+    public readonly record struct SlotDisplay(uint DisplayId, byte InvType);
+
+    public static byte[] BuildBody(IReadOnlyList<Character> characters,
+        IReadOnlyDictionary<uint, SlotDisplay[]>? equipment = null)
     {
         var w = new ByteWriter(64 + characters.Count * 300);
         w.UInt8((byte)characters.Count);
@@ -40,9 +44,13 @@ public static class CharEnum
              .UInt32(0)                 // pet level
              .UInt32(0);                // pet family
 
-            // Экипировка: для каждого слота displayId(4) + invType(1) + enchant(4). Пока пусто.
+            // Экипировка: для каждого слота displayId(4) + invType(1) + enchant(4) (paperdoll).
+            var slots = equipment is not null && equipment.TryGetValue(c.Guid, out var e) ? e : null;
             for (var slot = 0; slot < EquipmentSlots; slot++)
-                w.UInt32(0).UInt8(0).UInt32(0);
+            {
+                var d = slots is not null && slot < slots.Length ? slots[slot] : default;
+                w.UInt32(d.DisplayId).UInt8(d.InvType).UInt32(0);
+            }
         }
 
         return w.ToArray();
