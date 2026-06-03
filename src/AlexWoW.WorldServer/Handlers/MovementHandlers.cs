@@ -35,9 +35,14 @@ public static class MovementHandlers
 
         // M5.3: ретранслируем движение соседям как есть (тело содержит packed guid мувера).
         if (session.Player is { } player)
+        {
             await session.World.RelayMovementAsync(player, packet.Opcode, packet.Body, ct);
+            // M6: видимость игроков — дёшево (в памяти), считаем на каждый пакет движения, чтобы
+            // экипировка соседа появлялась сразу при первом шаге (клиент уже догружен).
+            await session.World.RefreshVisiblePlayersAsync(player, ct);
+        }
 
-        // M5.6: пересчёт видимости NPC, если отошли достаточно далеко от последнего пересчёта.
+        // M5.6: пересчёт видимости NPC/GO (запрос в БД) — троттлим по дистанции.
         if (session.Character is { } character)
         {
             var dx = session.PosX - session.LastVisX;
