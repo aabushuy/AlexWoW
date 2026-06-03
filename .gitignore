@@ -28,3 +28,7 @@ out-maps/
 vmaps-test/
 mmaps-test/
 mmaps-map0/
+out-charstartoutfit.sql
+
+# Локальный справочник протокола (gtker/wow_messages .wowm) — не в репозиторий
+reference/
