@@ -13,6 +13,37 @@ if (args.Length >= 5 && args[0].Equals("verify", StringComparison.OrdinalIgnoreC
     return;
 }
 
+// Проверка vmap: vmapverify <dataDir> <mapDir> <adtX> <adtY> — список WMO в тайле + AABB (игровые коорд.).
+if (args.Length >= 5 && args[0].Equals("vmapverify", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqV = new MpqChain(args[1]);
+    var dir = args[2];
+    var ax = int.Parse(args[3]);
+    var ay = int.Parse(args[4]);
+    var adt = mpqV.ReadFile($"World\\Maps\\{dir}\\{dir}_{ax}_{ay}.adt")
+        ?? throw new FileNotFoundException("ADT не найден");
+    var placements = VmapExtract.ReadWmoPlacements(adt);
+    Console.WriteLine($"WMO-инстансов в {dir}_{ax}_{ay}: {placements.Count}");
+    foreach (var p in placements)
+    {
+        if ((p.Flags & 0x1) != 0) { Console.WriteLine($"  [skip destructible] {p.Name}"); continue; }
+        var wmo = WmoModel.Load(mpqV, p.Name);
+        if (wmo is null) { Console.WriteLine($"  [no geom] {p.Name}"); continue; }
+        float minx = float.MaxValue, miny = float.MaxValue, minz = float.MaxValue;
+        float maxx = float.MinValue, maxy = float.MinValue, maxz = float.MinValue;
+        foreach (var v in wmo.Vertices)
+        {
+            var g = VmapExtract.ToGame(v, p);
+            minx = MathF.Min(minx, g.X); maxx = MathF.Max(maxx, g.X);
+            miny = MathF.Min(miny, g.Y); maxy = MathF.Max(maxy, g.Y);
+            minz = MathF.Min(minz, g.Z); maxz = MathF.Max(maxz, g.Z);
+        }
+        Console.WriteLine($"  {System.IO.Path.GetFileName(p.Name),-34} tris={wmo.Triangles.Count,6}  " +
+            $"AABB X[{minx:F0}..{maxx:F0}] Y[{miny:F0}..{maxy:F0}] Z[{minz:F0}..{maxz:F0}]");
+    }
+    return;
+}
+
 // Использование: MapExtractor <dataDir> <outDir> [mapId]
 //   dataDir — каталог Data клиента 3.3.5a; outDir — куда писать maps/*.map; mapId — только эта карта.
 var dataDir = args.Length > 0 ? args[0] : @"D:\Games\WoW335\Data";
