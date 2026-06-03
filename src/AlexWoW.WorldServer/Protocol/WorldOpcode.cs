@@ -46,6 +46,8 @@ public enum WorldOpcode : uint
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,
+    CmsgGameObjectQuery = 0x05E,
+    SmsgGameObjectQueryResponse = 0x05F,
 
     // Персонажи (M3)
     CmsgCharCreate = 0x036,
