@@ -13,51 +13,82 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 public static class SpawnHandlers
 {
-    /// <summary>Сколько существ максимум показываем за один вход (защита от перегруза в городах).</summary>
-    private const int MaxNearbyNpcs = 100;
+    /// <summary>Сколько существ максимум держим видимыми (защита от перегруза в городах).</summary>
+    private const int MaxNearbyNpcs = 150;
 
-    /// <summary>Спавнит существ из БД мира рядом с игроком (или тестового NPC, если БД нет).</summary>
-    internal static async Task SendNearbyNpcsAsync(WorldSession session, Character character, CancellationToken ct)
+    /// <summary>Дистанция (ярды), при превышении которой пересчитываем видимость NPC при движении.</summary>
+    public const float VisRefreshStep = 20f;
+
+    /// <summary>
+    /// Пересчитывает видимый набор NPC для текущей позиции игрока: шлёт CREATE для новых,
+    /// DESTROY для ушедших из зоны. Используется и на входе (набор пуст → все CREATE),
+    /// и при движении (троттлинг — см. MovementHandlers).
+    /// </summary>
+    internal static async Task RefreshVisibleNpcsAsync(WorldSession session, uint map, float x, float y, CancellationToken ct)
     {
+        session.LastVisX = x;
+        session.LastVisY = y;
+
         IReadOnlyList<CreatureSpawnData> rows;
         try
         {
             rows = await session.WorldDb.GetCreaturesNearAsync(
-                character.Map, character.X, character.Y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
+                map, x, y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
         }
         catch (Exception ex)
         {
-            session.Logger.LogWarning("БД мира недоступна при спавне NPC ({Msg}) — показываю тестового", ex.Message);
-            await SendTestNpcAsync(session, character, ct);
+            // БД мира недоступна: при первом пересчёте покажем одного тестового NPC.
+            if (session.VisibleNpcs.Count == 0)
+            {
+                session.Logger.LogWarning("БД мира недоступна ({Msg}) — показываю тестового NPC", ex.Message);
+                await SendTestNpcAsync(session, x, y, session.PosZ, ct);
+            }
             return;
         }
 
-        var time = (uint)Environment.TickCount;
-        var shown = 0;
+        var newSet = new Dictionary<ulong, NpcSpawn>(rows.Count);
         foreach (var row in rows)
         {
             if (row.DisplayId == 0)
-                continue; // нет модели — пропускаем (модель задаётся иначе, не отрисуем)
-
+                continue; // нет модели — не отрисуется
             var template = new CreatureTemplate(
                 row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
                 row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
-            var spawn = new NpcSpawn(Npcs.UnitGuid(row.Entry, row.Guid), template, row.X, row.Y, row.Z, row.O);
-
-            session.VisibleNpcs[spawn.Guid] = spawn;
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(spawn, time), ct);
-            shown++;
+            newSet[Npcs.UnitGuid(row.Entry, row.Guid)] = new NpcSpawn(
+                Npcs.UnitGuid(row.Entry, row.Guid), template, row.X, row.Y, row.Z, row.O);
         }
 
-        session.Logger.LogInformation("Спавн {Count} NPC из БД мира рядом с '{User}' (map={Map})",
-            shown, session.Account, character.Map);
+        var time = (uint)Environment.TickCount;
+
+        // Ушедшие из зоны → DESTROY.
+        var gone = session.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
+        foreach (var guid in gone)
+        {
+            await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+                new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
+            session.VisibleNpcs.Remove(guid);
+        }
+
+        // Новые в зоне → CREATE.
+        var added = 0;
+        foreach (var (guid, spawn) in newSet)
+        {
+            if (session.VisibleNpcs.ContainsKey(guid))
+                continue;
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(spawn, time), ct);
+            session.VisibleNpcs[guid] = spawn;
+            added++;
+        }
+
+        if (added > 0 || gone.Length > 0)
+            session.Logger.LogDebug("Видимость NPC '{User}': +{Added} -{Gone} (всего {Total})",
+                session.Account, added, gone.Length, session.VisibleNpcs.Count);
     }
 
-    private static async Task SendTestNpcAsync(WorldSession session, Character character, CancellationToken ct)
+    private static async Task SendTestNpcAsync(WorldSession session, float x, float y, float z, CancellationToken ct)
     {
         var spawn = new NpcSpawn(
-            Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1), Npcs.TestDummy,
-            character.X + 4f, character.Y, character.Z, MathF.PI);
+            Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1), Npcs.TestDummy, x + 4f, y, z, MathF.PI);
         session.VisibleNpcs[spawn.Guid] = spawn;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildCreateObject(spawn, (uint)Environment.TickCount), ct);

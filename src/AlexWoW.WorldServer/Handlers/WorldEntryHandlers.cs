@@ -57,8 +57,8 @@ public static class WorldEntryHandlers
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
 
-        // M5.1: показать соседних NPC.
-        await SpawnHandlers.SendNearbyNpcsAsync(session, character, ct);
+        // M5.1/M5.6: показать существ из БД мира вокруг (диф-видимость).
+        await SpawnHandlers.RefreshVisibleNpcsAsync(session, character.Map, character.X, character.Y, ct);
 
         // M5.3: зарегистрировать в мире и обоюдно спавнить с соседними игроками.
         session.Character = character;
