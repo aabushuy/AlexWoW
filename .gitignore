@@ -30,5 +30,8 @@ mmaps-test/
 mmaps-map0/
 out-charstartoutfit.sql
 
+# MCP-конфиг проекта содержит API-токен Vikunja — в репозиторий не кладём
+.mcp.json
+
 # Локальный справочник протокола (gtker/wow_messages .wowm) — не в репозиторий
 reference/
