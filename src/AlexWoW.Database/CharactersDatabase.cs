@@ -47,6 +47,55 @@ public sealed class CharactersDatabase(string connectionString)
                 KEY ix_characters_account (account_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
+
+        // M6.1: инвентарь персонажа. Слоты экипировки 0..18, сумки 19..22, рюкзак 23..38.
+        // bag = 255 (INVENTORY_SLOT_BAG_0) — основной контейнер. item_guid — low-counter GUID предмета.
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_items (
+                item_guid   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                owner_guid  INT UNSIGNED NOT NULL,
+                item_entry  INT UNSIGNED NOT NULL,
+                bag         TINYINT UNSIGNED NOT NULL DEFAULT 255,
+                slot        TINYINT UNSIGNED NOT NULL,
+                stack_count INT UNSIGNED NOT NULL DEFAULT 1,
+                PRIMARY KEY (item_guid),
+                KEY ix_items_owner (owner_guid)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+    }
+
+    /// <summary>Есть ли у персонажа хоть один предмет (для выдачи стартового набора голым персонажам).</summary>
+    public async Task<bool> HasItemsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var count = await db.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM character_items WHERE owner_guid = @ownerGuid;", new { ownerGuid });
+        return count > 0;
+    }
+
+    /// <summary>Инвентарь персонажа (все предметы во всех слотах).</summary>
+    public async Task<IReadOnlyList<InventoryItem>> GetItemsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<InventoryItem>(new CommandDefinition("""
+            SELECT item_guid AS ItemGuid, owner_guid AS OwnerGuid, item_entry AS ItemEntry,
+                   bag AS Bag, slot AS Slot, stack_count AS StackCount
+            FROM character_items WHERE owner_guid = @ownerGuid ORDER BY bag, slot;
+            """, new { ownerGuid }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Кладёт предмет в слот. Возвращает low-counter GUID нового предмета.</summary>
+    public async Task<uint> AddItemAsync(uint ownerGuid, uint itemEntry, byte bag, byte slot,
+        uint stackCount = 1, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var guid = await db.ExecuteScalarAsync<ulong>("""
+            INSERT INTO character_items (owner_guid, item_entry, bag, slot, stack_count)
+            VALUES (@ownerGuid, @itemEntry, @bag, @slot, @stackCount);
+            SELECT LAST_INSERT_ID();
+            """, new { ownerGuid, itemEntry, bag, slot, stackCount });
+        return (uint)guid;
     }
 
     public async Task<IReadOnlyList<Character>> GetByAccountAsync(uint accountId, CancellationToken ct = default)
@@ -119,6 +168,8 @@ public sealed class CharactersDatabase(string connectionString)
         var affected = await db.ExecuteAsync(
             "DELETE FROM characters WHERE guid = @guid AND account_id = @accountId;",
             new { guid, accountId });
+        if (affected > 0)
+            await db.ExecuteAsync("DELETE FROM character_items WHERE owner_guid = @guid;", new { guid });
         return affected > 0;
     }
 }

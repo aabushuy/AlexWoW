@@ -70,5 +70,6 @@ public sealed class WorldState(ILogger<WorldState> logger)
     }
 
     private static byte[] BuildPlayerCreate(WorldPlayer p)
-        => PlayerSpawn.BuildCreateObject(p.Character, p.X, p.Y, p.Z, p.O, (uint)Environment.TickCount, isSelf: false);
+        => PlayerSpawn.BuildCreateObject(p.Character, p.X, p.Y, p.Z, p.O, (uint)Environment.TickCount,
+            isSelf: false, p.Session.Inventory);
 }

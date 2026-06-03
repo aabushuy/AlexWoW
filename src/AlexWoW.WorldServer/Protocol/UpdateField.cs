@@ -27,6 +27,13 @@ public static class UpdateField
     public const int UnitDisplayId = 0x0043;
     public const int UnitNativeDisplayId = 0x0044;
 
+    // ITEM (OBJECT_END = 0x06). Значения сверены с TrinityCore/CMaNGOS UpdateFields.h (3.3.5a).
+    public const int ItemOwner = 0x0006;          // size 2 (guid владельца)
+    public const int ItemContained = 0x0008;      // size 2 (guid контейнера; рюкзак = guid игрока)
+    public const int ItemStackCount = 0x000E;
+    public const int ItemDurability = 0x003C;
+    public const int ItemMaxDurability = 0x003D;
+
     // GAMEOBJECT (OBJECT_END = 0x06)
     public const int GoDisplayId = 0x0008;
     public const int GoFlags = 0x0009;
@@ -41,15 +48,32 @@ public static class UpdateField
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
     public const int PlayerBytes3 = 0x009B;       // gender|drunk
+
+    /// <summary>Видимый предмет слота экипировки (одевает 3D-модель). 19 слотов, stride 2 (entry + enchant).</summary>
+    public const int PlayerVisibleItem1EntryId = 0x011B;
+    /// <summary>Слоты-контейнеры (guid предмета, 2 поля). Контигуально: экипировка 0..18, сумки, рюкзак 23..38.</summary>
+    public const int PlayerFieldInvSlotHead = 0x0144;
+    /// <summary>Деньги игрока (медь). Задел под торговлю (M6.2).</summary>
+    public const int PlayerFieldCoinage = 0x0492;
+
+    /// <summary>Поле OBJECT_FIELD_ENTRYID видимого предмета для слота экипировки 0..18.</summary>
+    public static int VisibleItemEntry(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2;
+
+    /// <summary>Поле guid предмета для слота-контейнера 0..38 (экипировка/сумки/рюкзак).</summary>
+    public static int InvSlotGuid(int slot) => PlayerFieldInvSlotHead + slot * 2;
 }
 
 /// <summary>Типы объектов (OBJECT_FIELD_TYPE — битовая маска).</summary>
 public static class TypeMask
 {
     public const uint Object = 0x0001;
+    public const uint Item = 0x0002;
     public const uint Unit = 0x0008;
     public const uint Player = 0x0010;
     public const uint GameObject = 0x0020;
+
+    /// <summary>Маска для предмета: Object | Item.</summary>
+    public const uint ItemObject = Object | Item; // 0x03
 
     /// <summary>Маска для игрока: Object | Unit | Player.</summary>
     public const uint PlayerObject = Object | Unit | Player; // 0x19
@@ -64,6 +88,7 @@ public static class TypeMask
 /// <summary>TypeId объекта в блоке create.</summary>
 public static class TypeId
 {
+    public const byte Item = 1;
     public const byte Unit = 3;
     public const byte Player = 4;
     public const byte GameObject = 5;
@@ -83,6 +108,7 @@ public enum ObjectUpdateFlags : ushort
 {
     None = 0x0000,
     Self = 0x0001,
+    HighGuid = 0x0010,            // followed by uint32 high-part of GUID (предметы и др. неживые)
     Living = 0x0020,
     StationaryPosition = 0x0040,
     Rotation = 0x0200,            // упакованный кватернион (int64) — для гейм-объектов

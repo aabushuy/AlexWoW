@@ -66,6 +66,9 @@ public sealed class WorldSession
     /// <summary>Представление в реестре мира, пока персонаж в мире (null вне мира). M5.</summary>
     internal WorldPlayer? Player { get; set; }
 
+    /// <summary>Инвентарь персонажа в мире (предметы во всех слотах). Загружается при входе. M6.1.</summary>
+    internal List<InventoryItem> Inventory { get; } = new();
+
     /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
     internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
 
@@ -115,6 +118,7 @@ public sealed class WorldSession
         InWorldGuid = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
+        Inventory.Clear();
         try
         {
             await World.LeaveWorldAsync(player, ct);

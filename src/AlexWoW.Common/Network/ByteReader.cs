@@ -81,14 +81,18 @@ public ref struct ByteReader(ReadOnlySpan<byte> data)
     public string FixedString(int count)
         => Encoding.ASCII.GetString(Bytes(count));
 
-    /// <summary>Читает строку, завершённую нулевым байтом (C-string), и потребляет сам ноль.</summary>
+    /// <summary>
+    /// Читает строку, завершённую нулевым байтом (C-string), и потребляет сам ноль.
+    /// Декодирование — UTF-8 (клиент 3.3.5a, в т.ч. ruRU, шлёт текст в UTF-8; ASCII — подмножество).
+    /// Важно для кириллических имён персонажей и прочего пользовательского ввода.
+    /// </summary>
     public string CString()
     {
         var start = _position;
         while (_position < _data.Length && _data[_position] != 0)
             _position++;
 
-        var value = Encoding.ASCII.GetString(_data.Slice(start, _position - start));
+        var value = Encoding.UTF8.GetString(_data.Slice(start, _position - start));
         if (_position < _data.Length)
             _position++; // пропускаем терминирующий ноль
         return value;

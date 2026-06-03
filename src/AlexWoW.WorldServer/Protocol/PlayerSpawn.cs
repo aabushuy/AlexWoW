@@ -23,9 +23,11 @@ public static class PlayerSpawn
     /// <summary>
     /// Спавн игрока. <paramref name="isSelf"/> = true — для самого владельца сессии (флаг Self);
     /// false — для отображения этого игрока другим (без Self). Координаты — живые (для соседей).
+    /// <paramref name="inventory"/> — предметы персонажа: видимая экипировка (slot 0..18) одевает
+    /// модель у всех; guid'ы слотов (private) проставляются только себе.
     /// </summary>
     public static byte[] BuildCreateObject(Character c, float x, float y, float z, float o,
-        uint serverTimeMs, bool isSelf)
+        uint serverTimeMs, bool isSelf, IReadOnlyList<InventoryItem>? inventory = null)
     {
         var w = new ByteWriter(256);
 
@@ -35,7 +37,7 @@ public static class PlayerSpawn
         w.UInt8(TypeId.Player);
 
         WriteMovementBlock(w, x, y, z, o, serverTimeMs, isSelf);
-        BuildValues(c).WriteTo(w);
+        BuildValues(c, inventory, isSelf).WriteTo(w);
 
         return w.ToArray();
     }
@@ -60,7 +62,7 @@ public static class PlayerSpawn
          .Single(TurnRate).Single(PitchRate);
     }
 
-    private static UpdateMask BuildValues(Character c)
+    private static UpdateMask BuildValues(Character c, IReadOnlyList<InventoryItem>? inventory, bool isSelf)
     {
         var powerType = DisplayData.PowerTypeForClass(c.Class);
         var model = DisplayData.ModelForRace(c.Race, c.Gender);
@@ -95,6 +97,19 @@ public static class PlayerSpawn
             m.SetUInt32(baseIdx + 1, 300u | (300u << 16));    // value | max
             m.SetUInt32(baseIdx + 2, 0);                      // временный/постоянный бонус
         }
+
+        // M6.1: экипировка. Видимые предметы (entry) одевают модель — у всех наблюдателей;
+        // guid'ы слотов-контейнеров — private-поля, шлём только себе.
+        if (inventory is not null)
+            foreach (var item in inventory)
+            {
+                if (item.Bag == InventorySlots.MainBag
+                    && item.Slot >= InventorySlots.EquipmentStart && item.Slot < InventorySlots.EquipmentEnd)
+                    m.SetUInt32(UpdateField.VisibleItemEntry(item.Slot), item.ItemEntry);
+
+                if (isSelf && item.Bag == InventorySlots.MainBag)
+                    m.SetUInt64(UpdateField.InvSlotGuid(item.Slot), ItemObject.ItemGuid(item.ItemGuid));
+            }
 
         return m;
     }

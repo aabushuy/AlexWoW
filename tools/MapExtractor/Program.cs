@@ -13,6 +13,14 @@ if (args.Length >= 5 && args[0].Equals("verify", StringComparison.OrdinalIgnoreC
     return;
 }
 
+// Стартовая экипировка: charstartoutfit <dataDir> <out.sql> — CharStartOutfit.dbc → SQL для playercreateinfo_item.
+if (args.Length >= 3 && args[0].Equals("charstartoutfit", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqC = new MpqChain(args[1]);
+    CharStartOutfit.ExtractToSql(mpqC, args[2]);
+    return;
+}
+
 // Проверка vmap: vmapverify <dataDir> <mapDir> <adtX> <adtY> — список WMO в тайле + AABB (игровые коорд.).
 if (args.Length >= 5 && args[0].Equals("vmapverify", StringComparison.OrdinalIgnoreCase))
 {
