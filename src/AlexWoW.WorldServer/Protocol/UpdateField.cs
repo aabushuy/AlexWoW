@@ -9,6 +9,7 @@ public static class UpdateField
     // OBJECT
     public const int ObjectGuid = 0x0000;        // size 2
     public const int ObjectType = 0x0002;        // size 1 (type mask)
+    public const int ObjectEntry = 0x0003;       // entry шаблона (для существ/гейм-объектов)
     public const int ObjectScaleX = 0x0004;      // float
 
     // UNIT
@@ -43,11 +44,15 @@ public static class TypeMask
 
     /// <summary>Маска для игрока: Object | Unit | Player.</summary>
     public const uint PlayerObject = Object | Unit | Player; // 0x19
+
+    /// <summary>Маска для существа (NPC): Object | Unit.</summary>
+    public const uint UnitObject = Object | Unit; // 0x09
 }
 
 /// <summary>TypeId объекта в блоке create.</summary>
 public static class TypeId
 {
+    public const byte Unit = 3;
     public const byte Player = 4;
 }
 
