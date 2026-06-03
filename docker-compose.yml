@@ -50,8 +50,14 @@ services:
       WorldServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # БД мира (дамп CMaNGOS): creature, creature_template …
       WorldServer__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # Рельеф: каталог с maps/*.map (экстрактор CMaNGOS). Пусто/нет каталога — без рельефа.
+      WorldServer__MapsPath: "/data/maps"
     ports:
       - "8085:8085"   # сырой TCP world-протокола
+    volumes:
+      # Карты на хосте, ВНЕ каталога деплоя (deploy.ps1 делает rm -rf деплой-каталога!).
+      # Пользователь кладёт maps/*.map в /data/docker/alexwow-maps на сервере.
+      - /data/docker/alexwow-maps:/data/maps:ro
     depends_on:
       alexwow-mysql:
         condition: service_healthy

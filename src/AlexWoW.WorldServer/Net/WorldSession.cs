@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using AlexWoW.Cryptography;
 using AlexWoW.Database;
 using AlexWoW.Database.Models;
+using AlexWoW.DataStores.Maps;
 using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -26,13 +27,14 @@ public sealed class WorldSession
     private readonly SemaphoreSlim _sendLock = new(1, 1); // сериализация отправки (RC4 — stateful)
 
     public WorldSession(Socket socket, AuthDatabase database, CharactersDatabase characters,
-        WorldDatabase worldDatabase, WorldState world, WorldServerOptions options, ILogger logger)
+        WorldDatabase worldDatabase, TerrainMaps terrain, WorldState world, WorldServerOptions options, ILogger logger)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
         Database = database;
         Characters = characters;
         WorldDb = worldDatabase;
+        Terrain = terrain;
         World = world;
         Options = options;
         Logger = logger;
@@ -42,6 +44,7 @@ public sealed class WorldSession
     internal AuthDatabase Database { get; }
     internal CharactersDatabase Characters { get; }
     internal WorldDatabase WorldDb { get; }
+    internal TerrainMaps Terrain { get; }
     internal WorldState World { get; }
     internal WorldServerOptions Options { get; }
     internal ILogger Logger { get; }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using AlexWoW.Database;
+using AlexWoW.DataStores.Maps;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public sealed class WorldListener(
     AuthDatabase database,
     CharactersDatabase characters,
     WorldDatabase worldDatabase,
+    TerrainMaps terrain,
     WorldState world,
     ILogger<WorldListener> logger) : BackgroundService
 {
@@ -23,6 +25,9 @@ public sealed class WorldListener(
     {
         await EnsureSchemaWithRetryAsync(stoppingToken);
         await ProbeWorldDatabaseAsync(stoppingToken);
+        logger.LogInformation(terrain.Available
+            ? "Рельеф (maps) подключён"
+            : "Рельеф (maps) не задан — высота земли недоступна");
 
         var endpoint = new IPEndPoint(IPAddress.Parse(_options.BindAddress), _options.Port);
         using var listener = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -44,7 +49,7 @@ public sealed class WorldListener(
             }
 
             _ = Task.Run(
-                () => new WorldSession(client, database, characters, worldDatabase, world, _options, logger)
+                () => new WorldSession(client, database, characters, worldDatabase, terrain, world, _options, logger)
                     .RunAsync(stoppingToken),
                 stoppingToken);
         }

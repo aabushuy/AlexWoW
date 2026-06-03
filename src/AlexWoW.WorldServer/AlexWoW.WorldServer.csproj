@@ -4,6 +4,7 @@
     <ProjectReference Include="..\AlexWoW.Common\AlexWoW.Common.csproj" />
     <ProjectReference Include="..\AlexWoW.Cryptography\AlexWoW.Cryptography.csproj" />
     <ProjectReference Include="..\AlexWoW.Database\AlexWoW.Database.csproj" />
+    <ProjectReference Include="..\AlexWoW.DataStores\AlexWoW.DataStores.csproj" />
   </ItemGroup>
 
   <ItemGroup>
