@@ -50,6 +50,9 @@ public sealed class WorldSession
     internal float PosZ { get; set; }
     internal float PosO { get; set; }
 
+    /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
+    internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)

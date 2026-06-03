@@ -43,6 +43,10 @@ public enum WorldOpcode : uint
     CmsgQueryTime = 0x1CE,
     SmsgQueryTimeResponse = 0x1CF,
 
+    // Видимость / NPC (M5)
+    CmsgCreatureQuery = 0x060,
+    SmsgCreatureQueryResponse = 0x061,
+
     // Персонажи (M3)
     CmsgCharCreate = 0x036,
     CmsgCharEnum = 0x037,

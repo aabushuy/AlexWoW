@@ -55,6 +55,9 @@ public static class WorldEntryHandlers
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
+
+        // M5.1: показать соседних NPC.
+        await SpawnHandlers.SendNearbyNpcsAsync(session, character, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLogoutRequest)]

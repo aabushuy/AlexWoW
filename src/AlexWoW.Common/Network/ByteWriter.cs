@@ -58,10 +58,13 @@ public sealed class ByteWriter
         return this;
     }
 
-    /// <summary>Записывает строку в ASCII с завершающим нулевым байтом.</summary>
+    /// <summary>
+    /// Записывает строку в UTF-8 с завершающим нулевым байтом.
+    /// Клиент 3.3.5a (в т.ч. ruRU) ожидает UTF-8; ASCII — его подмножество.
+    /// </summary>
     public ByteWriter CString(string value)
     {
-        _buffer.AddRange(Encoding.ASCII.GetBytes(value));
+        _buffer.AddRange(Encoding.UTF8.GetBytes(value));
         _buffer.Add(0);
         return this;
     }
