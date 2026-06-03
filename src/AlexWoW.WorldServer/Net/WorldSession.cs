@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using AlexWoW.Cryptography;
 using AlexWoW.Database;
 using AlexWoW.Database.Models;
-using AlexWoW.DataStores.Maps;
+using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;

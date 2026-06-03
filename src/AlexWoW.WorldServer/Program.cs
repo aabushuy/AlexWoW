@@ -1,5 +1,5 @@
 using AlexWoW.Database;
-using AlexWoW.DataStores.Maps;
+using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
