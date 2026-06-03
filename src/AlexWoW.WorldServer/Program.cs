@@ -1,4 +1,6 @@
 using AlexWoW.Database;
+using AlexWoW.DataStores.Collision;
+using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Net;
@@ -38,6 +40,16 @@ builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new TerrainMaps(options.MapsPath);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new Vmaps(options.VmapsPath);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new Navmesh(options.MmapsPath);
 });
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldListener>();

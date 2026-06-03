@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
 using AlexWoW.Database;
+using AlexWoW.DataStores.Collision;
+using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Hosting;
@@ -16,6 +18,8 @@ public sealed class WorldListener(
     CharactersDatabase characters,
     WorldDatabase worldDatabase,
     TerrainMaps terrain,
+    Vmaps vmaps,
+    Navmesh navmesh,
     WorldState world,
     ILogger<WorldListener> logger) : BackgroundService
 {
@@ -28,6 +32,8 @@ public sealed class WorldListener(
         logger.LogInformation(terrain.Available
             ? "Рельеф (maps) подключён"
             : "Рельеф (maps) не задан — высота земли недоступна");
+        logger.LogInformation("Коллизии (vmaps): {V}; навмеш (mmaps): {M}",
+            vmaps.Available ? "подключены" : "нет", navmesh.Available ? "подключён" : "нет");
 
         var endpoint = new IPEndPoint(IPAddress.Parse(_options.BindAddress), _options.Port);
         using var listener = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);

@@ -69,9 +69,16 @@ public static class NavmeshBuild
             cellSize = 0.3f, cellHeight = 0.2f,
             agentHeight = 2.0f, agentRadius = 0.6f, agentMaxClimb = 0.9f, agentMaxSlope = 50f,
         };
-        var result = new SoloNavMeshBuilder().Build(geom, settings);
-        if (!result.Success || result.NavMesh is null)
-            return null;
-        return result.NavMesh.GetTile(0).data;
+        try
+        {
+            var result = new SoloNavMeshBuilder().Build(geom, settings);
+            if (!result.Success || result.NavMesh is null)
+                return null;
+            return result.NavMesh.GetTile(0).data;
+        }
+        catch
+        {
+            return null; // редкий edge-case Recast на конкретном тайле — пропускаем
+        }
     }
 }
