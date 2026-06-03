@@ -2,8 +2,10 @@ using System.Buffers.Binary;
 using System.Net.Sockets;
 using AlexWoW.Cryptography;
 using AlexWoW.Database;
+using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Protocol;
+using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Net;
@@ -21,14 +23,16 @@ public sealed class WorldSession
 
     private readonly NetworkStream _stream;
     private readonly WorldHeaderCrypt _crypt = new();
+    private readonly SemaphoreSlim _sendLock = new(1, 1); // сериализация отправки (RC4 — stateful)
 
     public WorldSession(Socket socket, AuthDatabase database, CharactersDatabase characters,
-        WorldServerOptions options, ILogger logger)
+        WorldState world, WorldServerOptions options, ILogger logger)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
         Database = database;
         Characters = characters;
+        World = world;
         Options = options;
         Logger = logger;
     }
@@ -36,6 +40,7 @@ public sealed class WorldSession
     // --- Контекст для обработчиков ---
     internal AuthDatabase Database { get; }
     internal CharactersDatabase Characters { get; }
+    internal WorldState World { get; }
     internal WorldServerOptions Options { get; }
     internal ILogger Logger { get; }
     internal string RemoteIp { get; }
@@ -49,6 +54,12 @@ public sealed class WorldSession
     internal float PosY { get; set; }
     internal float PosZ { get; set; }
     internal float PosO { get; set; }
+
+    /// <summary>Данные персонажа в мире (заданы после CMSG_PLAYER_LOGIN). M5.</summary>
+    internal Character? Character { get; set; }
+
+    /// <summary>Представление в реестре мира, пока персонаж в мире (null вне мира). M5.</summary>
+    internal WorldPlayer? Player { get; set; }
 
     /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
     internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
@@ -77,7 +88,26 @@ public sealed class WorldSession
         finally
         {
             await SavePositionIfInWorldAsync(CancellationToken.None);
+            await LeaveWorldAsync(CancellationToken.None);
             await _stream.DisposeAsync();
+        }
+    }
+
+    /// <summary>Убирает персонажа из мира (DESTROY соседям + снятие с реестра). Идемпотентно.</summary>
+    internal async Task LeaveWorldAsync(CancellationToken ct)
+    {
+        var player = Player;
+        if (player is null)
+            return;
+        Player = null;
+        InWorldGuid = 0;
+        try
+        {
+            await World.LeaveWorldAsync(player, ct);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug("LeaveWorld '{User}': {Msg}", Account, ex.Message);
         }
     }
 
@@ -107,13 +137,23 @@ public sealed class WorldSession
         header[2] = (byte)((uint)opcode & 0xFF); // opcode little-endian (2 байта)
         header[3] = (byte)(((uint)opcode >> 8) & 0xFF);
 
-        if (_crypt.IsInitialized)
-            _crypt.Encrypt(header);
+        // Сериализуем отправку: соседние сессии шлют этому клиенту из своих потоков,
+        // а RC4 (_crypt) — потоковый шифр с общим состоянием. Шифрование + запись — под локом.
+        await _sendLock.WaitAsync(ct);
+        try
+        {
+            if (_crypt.IsInitialized)
+                _crypt.Encrypt(header);
 
-        await _stream.WriteAsync(header, ct);
-        if (body.Length > 0)
-            await _stream.WriteAsync(body, ct);
-        await _stream.FlushAsync(ct);
+            await _stream.WriteAsync(header, ct);
+            if (body.Length > 0)
+                await _stream.WriteAsync(body, ct);
+            await _stream.FlushAsync(ct);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     private async Task<IncomingPacket?> ReadPacketAsync(CancellationToken ct)

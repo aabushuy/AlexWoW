@@ -20,7 +20,12 @@ public static class PlayerSpawn
     private const float TurnRate = 3.141594f;
     private const float PitchRate = 3.141594f;
 
-    public static byte[] BuildCreateObject(Character c, uint serverTimeMs)
+    /// <summary>
+    /// Спавн игрока. <paramref name="isSelf"/> = true — для самого владельца сессии (флаг Self);
+    /// false — для отображения этого игрока другим (без Self). Координаты — живые (для соседей).
+    /// </summary>
+    public static byte[] BuildCreateObject(Character c, float x, float y, float z, float o,
+        uint serverTimeMs, bool isSelf)
     {
         var w = new ByteWriter(256);
 
@@ -29,21 +34,23 @@ public static class PlayerSpawn
         PackedGuid.Write(w, c.Guid);
         w.UInt8(TypeId.Player);
 
-        WriteMovementBlock(w, c, serverTimeMs);
+        WriteMovementBlock(w, x, y, z, o, serverTimeMs, isSelf);
         BuildValues(c).WriteTo(w);
 
         return w.ToArray();
     }
 
-    private static void WriteMovementBlock(ByteWriter w, Character c, uint serverTimeMs)
+    private static void WriteMovementBlock(ByteWriter w, float x, float y, float z, float o,
+        uint serverTimeMs, bool isSelf)
     {
-        w.UInt16((ushort)(ObjectUpdateFlags.Self | ObjectUpdateFlags.Living));
+        var flags = ObjectUpdateFlags.Living | (isSelf ? ObjectUpdateFlags.Self : ObjectUpdateFlags.None);
+        w.UInt16((ushort)flags);
 
         w.UInt32(0)            // movement flags
          .UInt16(0)            // movement flags 2
          .UInt32(serverTimeMs) // time
-         .Single(c.X).Single(c.Y).Single(c.Z)
-         .Single(0f)           // orientation
+         .Single(x).Single(y).Single(z)
+         .Single(o)            // orientation
          .UInt32(0);           // fall time
 
         // 9 скоростей

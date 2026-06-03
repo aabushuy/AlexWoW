@@ -14,7 +14,7 @@ public static class MovementHandlers
         WorldOpcode.MsgMoveStopPitch, WorldOpcode.MsgMoveSetRunMode, WorldOpcode.MsgMoveSetWalkMode,
         WorldOpcode.MsgMoveFallLand, WorldOpcode.MsgMoveStartSwim, WorldOpcode.MsgMoveStopSwim,
         WorldOpcode.MsgMoveSetFacing, WorldOpcode.MsgMoveSetPitch, WorldOpcode.MsgMoveHeartbeat)]
-    public static Task OnMovement(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public static async Task OnMovement(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         try
         {
@@ -32,6 +32,9 @@ public static class MovementHandlers
         {
             // Нестандартный вариант пакета — игнорируем для трекинга позиции.
         }
-        return Task.CompletedTask;
+
+        // M5.3: ретранслируем движение соседям как есть (тело содержит packed guid мувера).
+        if (session.Player is { } player)
+            await session.World.RelayMovementAsync(player, packet.Opcode, packet.Body, ct);
     }
 }
