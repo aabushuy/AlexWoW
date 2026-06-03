@@ -28,6 +28,11 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new CharactersDatabase(options.ConnectionString);
 });
+builder.Services.AddSingleton(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
+    return new WorldDatabase(options.WorldConnectionString);
+});
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldListener>();
 

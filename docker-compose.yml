@@ -46,6 +46,8 @@ services:
     restart: unless-stopped
     environment:
       WorldServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # БД мира (дамп CMaNGOS): creature, creature_template …
+      WorldServer__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
     ports:
       - "8085:8085"   # сырой TCP world-протокола
     depends_on:

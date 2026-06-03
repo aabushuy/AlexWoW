@@ -8,29 +8,59 @@ namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
 /// Видимость и существа (M5): спавн NPC у клиента (SMSG_UPDATE_OBJECT) и ответ на
-/// CMSG_CREATURE_QUERY (имя/тип существа). Пока один захардкоженный тестовый NPC.
+/// CMSG_CREATURE_QUERY. Источник — БД мира CMaNGOS (creature/creature_template);
+/// при её недоступности — fallback на один захардкоженный тестовый NPC.
 /// </summary>
 public static class SpawnHandlers
 {
-    /// <summary>Спавнит тестового NPC рядом с игроком после его входа в мир.</summary>
+    /// <summary>Сколько существ максимум показываем за один вход (защита от перегруза в городах).</summary>
+    private const int MaxNearbyNpcs = 100;
+
+    /// <summary>Спавнит существ из БД мира рядом с игроком (или тестового NPC, если БД нет).</summary>
     internal static async Task SendNearbyNpcsAsync(WorldSession session, Character character, CancellationToken ct)
     {
-        // Ставим NPC в 4 ярдах «перед» персонажем, на ту же высоту (рельеф нам пока неизвестен — M5.5).
+        IReadOnlyList<CreatureSpawnData> rows;
+        try
+        {
+            rows = await session.WorldDb.GetCreaturesNearAsync(
+                character.Map, character.X, character.Y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogWarning("БД мира недоступна при спавне NPC ({Msg}) — показываю тестового", ex.Message);
+            await SendTestNpcAsync(session, character, ct);
+            return;
+        }
+
+        var time = (uint)Environment.TickCount;
+        var shown = 0;
+        foreach (var row in rows)
+        {
+            if (row.DisplayId == 0)
+                continue; // нет модели — пропускаем (модель задаётся иначе, не отрисуем)
+
+            var template = new CreatureTemplate(
+                row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
+                row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
+            var spawn = new NpcSpawn(Npcs.UnitGuid(row.Entry, row.Guid), template, row.X, row.Y, row.Z, row.O);
+
+            session.VisibleNpcs[spawn.Guid] = spawn;
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(spawn, time), ct);
+            shown++;
+        }
+
+        session.Logger.LogInformation("Спавн {Count} NPC из БД мира рядом с '{User}' (map={Map})",
+            shown, session.Account, character.Map);
+    }
+
+    private static async Task SendTestNpcAsync(WorldSession session, Character character, CancellationToken ct)
+    {
         var spawn = new NpcSpawn(
-            Guid: Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1),
-            Template: Npcs.TestDummy,
-            X: character.X + 4f,
-            Y: character.Y,
-            Z: character.Z,
-            O: MathF.PI); // лицом к -X (примерно к игроку)
-
+            Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1), Npcs.TestDummy,
+            character.X + 4f, character.Y, character.Z, MathF.PI);
         session.VisibleNpcs[spawn.Guid] = spawn;
-
-        var update = CreatureUpdate.BuildCreateObject(spawn, (uint)Environment.TickCount);
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject, update, ct);
-
-        session.Logger.LogInformation("Спавн NPC '{Name}' (entry={Entry}, guid=0x{Guid:X}) у '{User}'",
-            spawn.Template.Name, spawn.Template.Entry, spawn.Guid, session.Account);
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            CreatureUpdate.BuildCreateObject(spawn, (uint)Environment.TickCount), ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCreatureQuery)]
@@ -40,16 +70,31 @@ public static class SpawnHandlers
         var entry = reader.UInt32();
         // далее u64 guid — для ответа не нужен.
 
-        var template = Npcs.Find(entry);
+        var template = await ResolveTemplateAsync(session, entry, ct);
         if (template is null)
         {
-            // Нет данных: вернуть entry | 0x80000000 (клиент поймёт «шаблон неизвестен»).
             await session.SendAsync(WorldOpcode.SmsgCreatureQueryResponse,
                 new ByteWriter(4).UInt32(entry | 0x80000000u).ToArray(), ct);
             return;
         }
 
         await session.SendAsync(WorldOpcode.SmsgCreatureQueryResponse, BuildQueryResponse(template), ct);
+    }
+
+    private static async Task<CreatureTemplate?> ResolveTemplateAsync(WorldSession session, uint entry, CancellationToken ct)
+    {
+        try
+        {
+            var t = await session.WorldDb.GetCreatureTemplateAsync(entry, ct);
+            if (t is not null)
+                return new CreatureTemplate(t.Entry, t.Name, t.SubName ?? string.Empty, t.DisplayId1,
+                    t.MinLevel, t.Faction, t.CreatureType, t.Scale, t.NpcFlags, t.UnitClass);
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("CREATURE_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+        }
+        return Npcs.Find(entry); // fallback на тестовый реестр
     }
 
     /// <summary>SMSG_CREATURE_QUERY_RESPONSE (3.3.5a). Layout сверен с gtker.com.</summary>
@@ -64,7 +109,7 @@ public static class SpawnHandlers
          .CString(t.SubName)           // подпись (title под именем)
          .CString(string.Empty);       // icon ("Directions" и т.п.)
         w.UInt32(0)                    // type_flags
-         .UInt32(t.UnitType)           // creature_type (7 = Humanoid)
+         .UInt32(t.UnitType)           // creature_type
          .UInt32(0)                    // family
          .UInt32(0)                    // rank
          .UInt32(0)                    // kill_credit1

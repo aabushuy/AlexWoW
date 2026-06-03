@@ -13,6 +13,7 @@ public sealed class WorldListener(
     IOptions<WorldServerOptions> options,
     AuthDatabase database,
     CharactersDatabase characters,
+    WorldDatabase worldDatabase,
     WorldState world,
     ILogger<WorldListener> logger) : BackgroundService
 {
@@ -21,6 +22,7 @@ public sealed class WorldListener(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await EnsureSchemaWithRetryAsync(stoppingToken);
+        await ProbeWorldDatabaseAsync(stoppingToken);
 
         var endpoint = new IPEndPoint(IPAddress.Parse(_options.BindAddress), _options.Port);
         using var listener = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -42,8 +44,23 @@ public sealed class WorldListener(
             }
 
             _ = Task.Run(
-                () => new WorldSession(client, database, characters, world, _options, logger).RunAsync(stoppingToken),
+                () => new WorldSession(client, database, characters, worldDatabase, world, _options, logger)
+                    .RunAsync(stoppingToken),
                 stoppingToken);
+        }
+    }
+
+    /// <summary>Лог о доступности БД мира (не фатально, если её нет — сработает fallback на тест-NPC).</summary>
+    private async Task ProbeWorldDatabaseAsync(CancellationToken ct)
+    {
+        try
+        {
+            var count = await worldDatabase.CountCreaturesAsync(ct);
+            logger.LogInformation("БД мира подключена: {Count} спавнов существ", count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("БД мира недоступна ({Msg}) — NPC из дампа не будут спавниться", ex.Message);
         }
     }
 
