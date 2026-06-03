@@ -44,6 +44,83 @@ if (args.Length >= 5 && args[0].Equals("vmapverify", StringComparison.OrdinalIgn
     return;
 }
 
+// Проверка LoS: vmaplos <vmapDir> <map> x1 y1 z1 x2 y2 z2 — через серверный загрузчик DataStores.
+if (args.Length >= 9 && args[0].Equals("vmaplos", StringComparison.OrdinalIgnoreCase))
+{
+    var vm = new AlexWoW.DataStores.Collision.Vmaps(args[1]);
+    float P(int i) => float.Parse(args[i], System.Globalization.CultureInfo.InvariantCulture);
+    var losMap = uint.Parse(args[2]);
+    var los = vm.IsInLineOfSight(losMap, P(3), P(4), P(5), P(6), P(7), P(8));
+    Console.WriteLine($"Available={vm.Available}  LoS = {los} (true=видно, false=стена)");
+    return;
+}
+
+// Сборка vmap: vmap <dataDir> <outDir> [mapId] — пер-тайл коллизии WMO в игровых координатах.
+if (args.Length >= 2 && args[0].Equals("vmap", StringComparison.OrdinalIgnoreCase))
+{
+    var dataDir2 = args[1];
+    var outDir2 = args.Length > 2 ? args[2] : Path.Combine(Environment.CurrentDirectory, "vmaps");
+    int? onlyMap2 = args.Length > 3 && uint.TryParse(args[3], out var mm) ? (int)mm : null;
+    Directory.CreateDirectory(outDir2);
+    using var mpq2 = new MpqChain(dataDir2);
+    var maps2 = ClientData.ReadMaps(mpq2);
+    var sw2 = System.Diagnostics.Stopwatch.StartNew();
+    long totalTiles = 0;
+
+    foreach (var map in maps2)
+    {
+        if (onlyMap2 is { } only2 && map.Id != only2) continue;
+        var adtTiles = ClientData.ReadExistingTiles(mpq2, map.Directory);
+        if (adtTiles.Count == 0) continue;
+
+        var seen = new HashSet<uint>();
+        var tileTris = new Dictionary<(int, int), List<float>>();
+
+        foreach (var (ax, ay) in adtTiles)
+        {
+            var adt = mpq2.ReadFile($"World\\Maps\\{map.Directory}\\{map.Directory}_{ax}_{ay}.adt");
+            if (adt is null) continue;
+            foreach (var p in VmapExtract.ReadWmoPlacements(adt))
+            {
+                if ((p.Flags & 0x1) != 0) continue;      // разрушаемые — в динамику, пропускаем
+                if (!seen.Add(p.UniqueId)) continue;       // инстанс уже обработан в соседнем ADT
+                WmoModel? wmo;
+                try { wmo = WmoModel.Load(mpq2, p.Name); } catch { continue; }
+                if (wmo is null) continue;
+                foreach (var (ia, ib, ic) in wmo.Triangles)
+                {
+                    var g0 = VmapExtract.ToGame(wmo.Vertices[ia], p);
+                    var g1 = VmapExtract.ToGame(wmo.Vertices[ib], p);
+                    var g2 = VmapExtract.ToGame(wmo.Vertices[ic], p);
+                    var gxHi = VmapWriter.Grid(MathF.Min(g0.X, MathF.Min(g1.X, g2.X)));
+                    var gxLo = VmapWriter.Grid(MathF.Max(g0.X, MathF.Max(g1.X, g2.X)));
+                    var gyHi = VmapWriter.Grid(MathF.Min(g0.Y, MathF.Min(g1.Y, g2.Y)));
+                    var gyLo = VmapWriter.Grid(MathF.Max(g0.Y, MathF.Max(g1.Y, g2.Y)));
+                    for (var gx = gxLo; gx <= gxHi; gx++)
+                    for (var gy = gyLo; gy <= gyHi; gy++)
+                    {
+                        if (gx is < 0 or > 63 || gy is < 0 or > 63) continue;
+                        if (!tileTris.TryGetValue((gx, gy), out var list))
+                            tileTris[(gx, gy)] = list = new List<float>();
+                        list.AddRange(new[] { g0.X, g0.Y, g0.Z, g1.X, g1.Y, g1.Z, g2.X, g2.Y, g2.Z });
+                    }
+                }
+            }
+        }
+
+        foreach (var ((gx, gy), tris) in tileTris)
+        {
+            VmapWriter.Write(Path.Combine(outDir2, $"{map.Id:D3}{gx:D2}{gy:D2}.vmap"), tris);
+            totalTiles++;
+        }
+        if (tileTris.Count > 0)
+            Console.WriteLine($"  map {map.Id,4} {map.Directory,-26} vmap-тайлов: {tileTris.Count}");
+    }
+    sw2.Stop();
+    Console.WriteLine($"\nГотово: {totalTiles} vmap-тайлов за {sw2.Elapsed.TotalSeconds:F1} c → {outDir2}");
+    return;
+}
+
 // Использование: MapExtractor <dataDir> <outDir> [mapId]
 //   dataDir — каталог Data клиента 3.3.5a; outDir — куда писать maps/*.map; mapId — только эта карта.
 var dataDir = args.Length > 0 ? args[0] : @"D:\Games\WoW335\Data";

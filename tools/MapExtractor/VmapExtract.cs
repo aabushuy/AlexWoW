@@ -3,7 +3,7 @@ using System.Text;
 
 namespace AlexWoW.MapExtractor;
 
-public readonly record struct WmoPlacement(string Name, Vec3 Pos, Vec3 Rot, uint Flags);
+public readonly record struct WmoPlacement(string Name, uint UniqueId, Vec3 Pos, Vec3 Rot, uint Flags);
 
 /// <summary>
 /// Размещения WMO из ADT (MWMO имена + MODF) и трансформация вершин модели в ИГРОВЫЕ координаты
@@ -44,6 +44,7 @@ public static class VmapExtract
                 {
                     var e = body + i;
                     var nameId = (int)BinaryPrimitives.ReadUInt32LittleEndian(adt.AsSpan(e));
+                    var uniqueId = BinaryPrimitives.ReadUInt32LittleEndian(adt.AsSpan(e + 4));
                     var px = BinaryPrimitives.ReadSingleLittleEndian(adt.AsSpan(e + 8));
                     var py = BinaryPrimitives.ReadSingleLittleEndian(adt.AsSpan(e + 12));
                     var pz = BinaryPrimitives.ReadSingleLittleEndian(adt.AsSpan(e + 16));
@@ -52,7 +53,7 @@ public static class VmapExtract
                     var rz = BinaryPrimitives.ReadSingleLittleEndian(adt.AsSpan(e + 28));
                     var flags = BinaryPrimitives.ReadUInt16LittleEndian(adt.AsSpan(e + 56));
                     if (nameId >= 0 && nameId < names.Count)
-                        placements.Add(new WmoPlacement(names[nameId],
+                        placements.Add(new WmoPlacement(names[nameId], uniqueId,
                             new Vec3(px, py, pz), new Vec3(rx, ry, rz), flags));
                 }
             }
