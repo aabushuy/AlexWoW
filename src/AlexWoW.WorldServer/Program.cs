@@ -1,6 +1,7 @@
 using AlexWoW.Database;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Net;
+using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new CharactersDatabase(options.ConnectionString);
 });
+builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldListener>();
 
 var host = builder.Build();

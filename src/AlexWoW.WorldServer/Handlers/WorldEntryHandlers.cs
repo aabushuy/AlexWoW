@@ -47,7 +47,8 @@ public static class WorldEntryHandlers
 
         await SendLoginTimeSpeedAsync(session, ct);
 
-        var spawn = PlayerSpawn.BuildCreateObject(character, (uint)Environment.TickCount);
+        var spawn = PlayerSpawn.BuildCreateObject(character,
+            character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется.
@@ -58,13 +59,19 @@ public static class WorldEntryHandlers
 
         // M5.1: показать соседних NPC.
         await SpawnHandlers.SendNearbyNpcsAsync(session, character, ct);
+
+        // M5.3: зарегистрировать в мире и обоюдно спавнить с соседними игроками.
+        session.Character = character;
+        var player = new World.WorldPlayer { Guid = character.Guid, Character = character, Session = session };
+        session.Player = player;
+        await session.World.EnterWorldAsync(player, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLogoutRequest)]
     public static async Task OnLogoutRequest(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         await session.SavePositionIfInWorldAsync(ct);
-        session.InWorldGuid = 0; // персонаж покидает мир
+        await session.LeaveWorldAsync(ct); // снять с реестра + DESTROY соседям
 
         await session.SendAsync(WorldOpcode.SmsgLogoutResponse,
             new ByteWriter(5).UInt32(0).UInt8(1).ToArray(), ct); // reason=0, instant=1

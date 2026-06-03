@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using AlexWoW.Database;
+using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,7 @@ public sealed class WorldListener(
     IOptions<WorldServerOptions> options,
     AuthDatabase database,
     CharactersDatabase characters,
+    WorldState world,
     ILogger<WorldListener> logger) : BackgroundService
 {
     private readonly WorldServerOptions _options = options.Value;
@@ -40,7 +42,7 @@ public sealed class WorldListener(
             }
 
             _ = Task.Run(
-                () => new WorldSession(client, database, characters, _options, logger).RunAsync(stoppingToken),
+                () => new WorldSession(client, database, characters, world, _options, logger).RunAsync(stoppingToken),
                 stoppingToken);
         }
     }

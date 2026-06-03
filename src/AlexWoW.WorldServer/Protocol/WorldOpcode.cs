@@ -61,6 +61,7 @@ public enum WorldOpcode : uint
     SmsgInitialSpells = 0x12A,
     SmsgTutorialFlags = 0x0FD,
     SmsgUpdateObject = 0x0A9,
+    SmsgDestroyObject = 0x0AA,
     SmsgLoginVerifyWorld = 0x236,
     SmsgTimeSyncReq = 0x390,
     CmsgTimeSyncResp = 0x391,
