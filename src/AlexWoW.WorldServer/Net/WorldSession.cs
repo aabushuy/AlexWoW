@@ -66,6 +66,9 @@ public sealed class WorldSession
     /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
     internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
 
+    /// <summary>Гейм-объекты, показанные клиенту этой сессии (guid → спавн). M5.6b.</summary>
+    internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
+
     /// <summary>Позиция последнего пересчёта видимости NPC (троттлинг по дистанции). M5.6.</summary>
     internal float LastVisX { get; set; }
     internal float LastVisY { get; set; }
@@ -108,6 +111,7 @@ public sealed class WorldSession
         Player = null;
         InWorldGuid = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
+        VisibleGos.Clear();
         try
         {
             await World.LeaveWorldAsync(player, ct);

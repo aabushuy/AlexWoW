@@ -10,6 +10,8 @@ services:
       MYSQL_DATABASE: alexwow_auth
       MYSQL_USER: ${MYSQL_USER:-alexwow}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-alexwow}
+    ports:
+      - "3306:3306"   # MySQL наружу — подключение с LAN (DBeaver/Workbench и т.п.)
     volumes:
       - alexwow-mysql-data:/var/lib/mysql
     healthcheck:

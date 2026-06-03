@@ -43,7 +43,10 @@ public static class MovementHandlers
             var dx = session.PosX - session.LastVisX;
             var dy = session.PosY - session.LastVisY;
             if (dx * dx + dy * dy >= SpawnHandlers.VisRefreshStep * SpawnHandlers.VisRefreshStep)
+            {
                 await SpawnHandlers.RefreshVisibleNpcsAsync(session, character.Map, session.PosX, session.PosY, ct);
+                await SpawnHandlers.RefreshVisibleGameObjectsAsync(session, character.Map, session.PosX, session.PosY, ct);
+            }
         }
     }
 }

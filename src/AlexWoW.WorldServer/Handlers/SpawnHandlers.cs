@@ -85,6 +85,79 @@ public static class SpawnHandlers
                 session.Account, added, gone.Length, session.VisibleNpcs.Count);
     }
 
+    /// <summary>
+    /// Пересчёт видимых гейм-объектов для текущей позиции (диф: CREATE новых / DESTROY ушедших).
+    /// Аналогично NPC, вызывается на входе и при движении (в той же троттлинг-точке).
+    /// </summary>
+    internal static async Task RefreshVisibleGameObjectsAsync(WorldSession session, uint map, float x, float y, CancellationToken ct)
+    {
+        IReadOnlyList<GameObjectSpawnData> rows;
+        try
+        {
+            rows = await session.WorldDb.GetGameObjectsNearAsync(
+                map, x, y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
+        }
+        catch
+        {
+            return; // БД мира недоступна — без гейм-объектов
+        }
+
+        var newSet = new Dictionary<ulong, GoSpawn>(rows.Count);
+        foreach (var row in rows)
+        {
+            var guid = GameObjects.GameObjectGuid(row.Entry, row.Guid);
+            var template = new GoTemplate(row.Entry, row.Type, row.DisplayId, row.Name, row.Faction, row.Flags, row.Size);
+            newSet[guid] = new GoSpawn(guid, template, row.X, row.Y, row.Z, row.O,
+                row.Rot0, row.Rot1, row.Rot2, row.Rot3);
+        }
+
+        var gone = session.VisibleGos.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
+        foreach (var guid in gone)
+        {
+            await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+                new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
+            session.VisibleGos.Remove(guid);
+        }
+
+        foreach (var (guid, go) in newSet)
+        {
+            if (session.VisibleGos.ContainsKey(guid))
+                continue;
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, GameObjectUpdate.BuildCreateObject(go), ct);
+            session.VisibleGos[guid] = go;
+        }
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgGameObjectQuery)]
+    public static async Task OnGameObjectQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var entry = reader.UInt32();
+        // далее u64 guid — для ответа не нужен.
+
+        GameObjectTemplateData? t = null;
+        try { t = await session.WorldDb.GetGameObjectTemplateAsync(entry, ct); }
+        catch { /* БД недоступна */ }
+
+        if (t is null)
+        {
+            await session.SendAsync(WorldOpcode.SmsgGameObjectQueryResponse,
+                new ByteWriter(4).UInt32(entry | 0x80000000u).ToArray(), ct);
+            return;
+        }
+
+        var w = new ByteWriter(160);
+        w.UInt32(t.Entry).UInt32(t.Type).UInt32(t.DisplayId);
+        w.CString(t.Name).CString(string.Empty).CString(string.Empty).CString(string.Empty); // name[0..3]
+        w.CString(t.IconName ?? string.Empty)
+         .CString(t.CastBarCaption ?? string.Empty)
+         .CString(t.Unk1 ?? string.Empty);
+        for (var i = 0; i < 24; i++) w.UInt32(0); // data[0..23] (поведение GO — пока не нужно)
+        w.Single(t.Size <= 0 ? 1.0f : t.Size);
+        for (var i = 0; i < 6; i++) w.UInt32(0);  // quest items
+        await session.SendAsync(WorldOpcode.SmsgGameObjectQueryResponse, w.ToArray(), ct);
+    }
+
     private static async Task SendTestNpcAsync(WorldSession session, float x, float y, float z, CancellationToken ct)
     {
         var spawn = new NpcSpawn(

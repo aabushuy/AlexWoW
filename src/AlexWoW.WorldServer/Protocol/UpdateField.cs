@@ -27,6 +27,13 @@ public static class UpdateField
     public const int UnitDisplayId = 0x0043;
     public const int UnitNativeDisplayId = 0x0044;
 
+    // GAMEOBJECT (OBJECT_END = 0x06)
+    public const int GoDisplayId = 0x0008;
+    public const int GoFlags = 0x0009;
+    public const int GoParentRotation = 0x000A;  // 4 float (кватернион)
+    public const int GoFaction = 0x000F;
+    public const int GoBytes1 = 0x0011;           // state|type|artKit|animProgress
+
     // PLAYER
     /// <summary>Начало блока навыков (128 слотов × 3 поля). UNIT_END(0x94) + 0x1E8.</summary>
     public const int PlayerSkillInfo11 = 0x027C;
@@ -42,12 +49,16 @@ public static class TypeMask
     public const uint Object = 0x0001;
     public const uint Unit = 0x0008;
     public const uint Player = 0x0010;
+    public const uint GameObject = 0x0020;
 
     /// <summary>Маска для игрока: Object | Unit | Player.</summary>
     public const uint PlayerObject = Object | Unit | Player; // 0x19
 
     /// <summary>Маска для существа (NPC): Object | Unit.</summary>
     public const uint UnitObject = Object | Unit; // 0x09
+
+    /// <summary>Маска для гейм-объекта: Object | GameObject.</summary>
+    public const uint GameObjectObject = Object | GameObject; // 0x21
 }
 
 /// <summary>TypeId объекта в блоке create.</summary>
@@ -55,6 +66,7 @@ public static class TypeId
 {
     public const byte Unit = 3;
     public const byte Player = 4;
+    public const byte GameObject = 5;
 }
 
 /// <summary>Типы блоков в SMSG_UPDATE_OBJECT.</summary>
@@ -73,4 +85,5 @@ public enum ObjectUpdateFlags : ushort
     Self = 0x0001,
     Living = 0x0020,
     StationaryPosition = 0x0040,
+    Rotation = 0x0200,            // упакованный кватернион (int64) — для гейм-объектов
 }
