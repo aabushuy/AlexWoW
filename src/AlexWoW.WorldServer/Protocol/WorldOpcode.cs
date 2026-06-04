@@ -89,6 +89,7 @@ public enum WorldOpcode : uint
     SmsgSpellGo = 0x132,
     SmsgSpellFailure = 0x133,
     SmsgSpellCooldown = 0x134,
+    SmsgSpellHealLog = 0x150,
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
 

@@ -20,22 +20,25 @@ public static class SpellHandlers
     /// </summary>
     private const byte SchoolFire = 0x04;
     private const byte SchoolFrost = 0x10;
+    private const byte SchoolHoly = 0x02; // для хила (в heal-логе школа не передаётся — для полноты)
 
     /// <summary>
-    /// Минимальный «справочник спеллов» (эффект): id → школа, урон, время каста (мс), стоимость маны,
-    /// кулдаун (мс; 0 — только GCD на стороне клиента). Значения rank-1 как в WotLK. M6.4.
+    /// Минимальный «справочник спеллов» (эффект): id → школа, величина эффекта (урон ИЛИ хил), время
+    /// каста (мс), стоимость маны, кулдаун (мс; 0 — только GCD у клиента), хил-ли. Rank-1 как в WotLK. M6.4.
     /// </summary>
-    private sealed record SpellInfo(byte School, int MinDamage, int MaxDamage, int CastMs, uint ManaCost, int CooldownMs);
+    private sealed record SpellInfo(byte School, int MinAmount, int MaxAmount, int CastMs, uint ManaCost,
+        int CooldownMs, bool IsHeal = false);
 
     private static readonly Dictionary<uint, SpellInfo> Spells = new()
     {
         [133] = new(SchoolFire, 14, 22, 1500, ManaCost: 30, CooldownMs: 0),     // Fireball rank 1
         [116] = new(SchoolFrost, 14, 20, 1500, ManaCost: 25, CooldownMs: 0),    // Frostbolt rank 1
         [2136] = new(SchoolFire, 24, 32, 0, ManaCost: 40, CooldownMs: 8000),    // Fire Blast rank 1 (мгновенный, КД 8с)
+        [2050] = new(SchoolHoly, 45, 56, 1500, ManaCost: 30, CooldownMs: 0, IsHeal: true), // Lesser Heal rank 1
     };
 
     /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4.</summary>
-    public static readonly int[] GrantedCombatSpells = { 133, 116, 2136 };
+    public static readonly int[] GrantedCombatSpells = { 133, 116, 2136, 2050 };
 
     // --- SpellCastResult (3.3.5a, сверено с reference world/common.wowm) ---
     private const byte CastResultNotReady = 0x43; // спелл на кулдауне
@@ -256,11 +259,17 @@ public static class SpellHandlers
                 BuildSpellCooldown((ulong)session.InWorldGuid, spellId, (uint)info.CooldownMs), ct);
         }
 
+        if (info.IsHeal)
+        {
+            await ApplyHealAsync(session, spellId, info, targetGuid, ct);
+            return;
+        }
+
         var creature = targetGuid != 0 ? session.World.FindCreature(targetGuid) : null;
         if (creature is null || !creature.IsAlive)
             return; // цель пропала/мертва — спелл «впустую»
 
-        var damage = (uint)Random.Shared.Next(info.MinDamage, info.MaxDamage + 1);
+        var damage = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
@@ -270,6 +279,49 @@ public static class SpellHandlers
         if (died)
             session.Logger.LogInformation("SPELL KILL '{User}' убил '{Name}' спеллом {Spell}",
                 session.Account, creature.Template.Name, spellId);
+    }
+
+    /// <summary>
+    /// Применяет хил (M6.4 инкр.3): цель — игрок (себя при SELF/собственном guid, иначе указанный
+    /// дружественный игрок; фолбэк — себя). Поднимает HP до максимума, шлёт SMSG_SPELLHEALLOG (зелёное
+    /// число + овёрхил) и VALUES-апдейт HP наблюдателям. Реализуемо благодаря авторитетному HP из M6.7.
+    /// </summary>
+    private static async Task ApplyHealAsync(WorldSession session, uint spellId, SpellInfo info,
+        ulong targetGuid, CancellationToken ct)
+    {
+        var caster = (ulong)session.InWorldGuid;
+        var target = targetGuid == 0 || targetGuid == caster
+            ? session.Player
+            : session.World.FindPlayer(targetGuid) ?? session.Player;
+        if (target is null || target.Session.IsDead) // мёртвого хилом не поднять (это воскрешение)
+            return;
+
+        var ts = target.Session;
+        var amount = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
+        var before = ts.Health;
+        ts.Health = Math.Min(ts.MaxHealth, before + amount);
+        var effective = ts.Health - before;
+        var overheal = amount - effective;
+
+        await session.World.BroadcastToPlayerObserversAsync(target, WorldOpcode.SmsgSpellHealLog,
+            BuildHealLog(target.Guid, caster, spellId, effective, overheal), ct);
+        await session.World.BroadcastPlayerHealthAsync(target, ct);
+    }
+
+    /// <summary>SMSG_SPELLHEALLOG (3.3.5): packed victim + packed caster + spell + amount + overheal +
+    /// absorb(0) + crit(u8) + unused(u8). Величина — эффективный хил (овёрхил отдельным полем).</summary>
+    private static byte[] BuildHealLog(ulong victim, ulong caster, uint spellId, uint amount, uint overheal)
+    {
+        var w = new ByteWriter(32);
+        PackedGuid.Write(w, victim);
+        PackedGuid.Write(w, caster);
+        w.UInt32(spellId)
+         .UInt32(amount)
+         .UInt32(overheal)
+         .UInt32(0)   // absorb
+         .UInt8(0)    // critical
+         .UInt8(0);   // unused
+        return w.ToArray();
     }
 
     /// <summary>SMSG_SPELL_START (3.3.5): каст-бар. flags=0x2, без conditional-полей.</summary>
