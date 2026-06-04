@@ -103,6 +103,18 @@ public sealed class WorldSession
     /// <summary>Послали ли клиенту «вне радиуса» для текущего эпизода (анти-спам). M6.3.</summary>
     internal bool MeleeNotInRangeNotified { get; set; }
 
+    // --- Синхронизация часов (M6.3 ч.2: нормализация времени движения) ---
+    /// <summary>Следующий счётчик для SMSG_TIME_SYNC_REQ.</summary>
+    internal uint TimeSyncCounter { get; set; }
+    /// <summary>Счётчик последнего отправленного REQ (для матчинга RESP).</summary>
+    internal uint TimeSyncOutstanding { get; set; }
+    /// <summary>Серверное время (32-бит мс) отправки последнего REQ.</summary>
+    internal long TimeSyncSentMs { get; set; }
+    /// <summary>Серверное время (TickCount64) последней рассылки REQ — для периодичности.</summary>
+    internal long LastTimeSyncDispatchMs { get; set; }
+    /// <summary>Дельта часов: <c>serverMs − clientTicks</c>. null — пока не синхронизировано.</summary>
+    internal long? ClockDeltaMs { get; set; }
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)
