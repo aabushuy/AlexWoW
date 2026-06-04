@@ -34,6 +34,12 @@ public sealed class WorldCreature
     /// <summary>Момент следующего свинга существа (<see cref="Environment.TickCount64"/>, мс).</summary>
     public long NextSwingMs { get; set; }
 
+    // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
+    /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
+    public bool Lootable { get; set; }
+    /// <summary>Сролленный лут трупа (null — пока не убит/уже разобран). M6.6.</summary>
+    public CreatureLoot? Loot { get; set; }
+
     /// <summary>
     /// Здоровье существа по уровню (упрощённо — точные статы из creature_classlevelstats позже, M6+).
     /// Достаточно для убедимой полоски HP и боя в несколько свингов на низких уровнях.

@@ -121,6 +121,7 @@ public static class CombatHandlers
         if (died)
         {
             await StopAttackAsync(session, creature.Guid, ct);
+            await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("KILL '{User}' убил '{Name}' (guid={Guid}), респавн через {Sec}с",
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);
             return;

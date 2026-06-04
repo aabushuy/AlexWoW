@@ -220,7 +220,14 @@ public sealed class WorldState(ILogger<WorldState> logger)
     {
         creature.Health = creature.MaxHealth;
         creature.RespawnAtMs = null;
+        creature.CombatTargetGuid = 0;
+        var wasLootable = creature.Lootable; // M6.6: труп больше не lootable
+        creature.Lootable = false;
+        creature.Loot = null;
         await BroadcastCreatureHealthAsync(creature, ct);
+        if (wasLootable)
+            await BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
+                CreatureUpdate.BuildDynamicFlagsUpdate(creature.Guid, 0), ct);
         logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось", creature.Template.Name, creature.Guid);
     }
 

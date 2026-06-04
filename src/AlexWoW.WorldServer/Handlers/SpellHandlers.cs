@@ -277,8 +277,11 @@ public static class SpellHandlers
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
 
         if (died)
+        {
+            await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("SPELL KILL '{User}' убил '{Name}' спеллом {Spell}",
                 session.Account, creature.Template.Name, spellId);
+        }
     }
 
     /// <summary>

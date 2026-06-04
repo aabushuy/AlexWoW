@@ -37,10 +37,17 @@ public static class CreatureUpdate
 
     /// <summary>VALUES-апдейт здоровья существа (UNIT_FIELD_HEALTH) — в бою/при смерти/респавне. M6.3.</summary>
     public static byte[] BuildHealthUpdate(ulong guid, uint health)
+        => BuildValuesUpdate(guid, m => m.SetUInt32(UpdateField.UnitHealth, health));
+
+    /// <summary>VALUES-апдейт динамических флагов существа (UNIT_DYNAMIC_FLAGS) — LOOTABLE труп. M6.6.</summary>
+    public static byte[] BuildDynamicFlagsUpdate(ulong guid, uint flags)
+        => BuildValuesUpdate(guid, m => m.SetUInt32(UpdateField.UnitDynamicFlags, flags));
+
+    /// <summary>Каркас SMSG_UPDATE_OBJECT с одним VALUES-блоком для существа (произвольный набор полей).</summary>
+    private static byte[] BuildValuesUpdate(ulong guid, Action<UpdateMask> fill)
     {
         var m = new UpdateMask();
-        m.SetUInt32(UpdateField.UnitHealth, health);
-
+        fill(m);
         var w = new ByteWriter(32);
         w.UInt32(1);
         w.UInt8(UpdateType.Values);

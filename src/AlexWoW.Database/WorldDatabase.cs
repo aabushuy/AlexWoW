@@ -151,6 +151,44 @@ public sealed class WorldDatabase(string connectionString)
         return rows.AsList();
     }
 
+    /// <summary>
+    /// Лут-определение существа (M6.6): деньги (creature_template.MinLootGold/MaxLootGold) + кандидаты-
+    /// предметы из creature_loot_template по LootId существа ⨝ item_template (для displayid). Только обычные
+    /// предметы: ChanceOrQuestChance &gt; 0 (квест-предметы &lt; 0 — позже) и mincountOrRef &gt; 0
+    /// (отрицательное — ссылка на reference_loot_template, пропускаем). Возвращает null, если у существа нет лута.
+    /// </summary>
+    public async Task<CreatureLootData?> GetCreatureLootAsync(uint creatureEntry, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+
+        var head = await db.QuerySingleOrDefaultAsync(new CommandDefinition(
+            "SELECT LootId, MinLootGold, MaxLootGold FROM creature_template WHERE Entry = @creatureEntry;",
+            new { creatureEntry }, cancellationToken: ct));
+        if (head is null)
+            return null;
+        var h = (IDictionary<string, object>)head;
+        var lootId = Convert.ToUInt32(h["LootId"], CultureInfo.InvariantCulture);
+        var minGold = Convert.ToUInt32(h["MinLootGold"], CultureInfo.InvariantCulture);
+        var maxGold = Convert.ToUInt32(h["MaxLootGold"], CultureInfo.InvariantCulture);
+
+        IReadOnlyList<CreatureLootEntry> drops = [];
+        if (lootId != 0)
+        {
+            var rows = await db.QueryAsync<CreatureLootEntry>(new CommandDefinition("""
+                SELECT lt.item AS ItemId, lt.ChanceOrQuestChance AS Chance,
+                       lt.mincountOrRef AS MinCount, lt.maxcount AS MaxCount, it.displayid AS DisplayId
+                FROM creature_loot_template lt
+                JOIN item_template it ON it.entry = lt.item
+                WHERE lt.entry = @lootId AND lt.ChanceOrQuestChance > 0 AND lt.mincountOrRef > 0;
+                """, new { lootId }, cancellationToken: ct));
+            drops = rows.AsList();
+        }
+
+        if (maxGold == 0 && drops.Count == 0)
+            return null; // нечего лутать
+        return new CreatureLootData { MinGold = minGold, MaxGold = maxGold, Drops = drops };
+    }
+
     /// <summary>Полный шаблон предмета (item_template) для SMSG_ITEM_QUERY_SINGLE_RESPONSE.</summary>
     public async Task<ItemTemplateData?> GetItemTemplateAsync(uint entry, CancellationToken ct = default)
     {
