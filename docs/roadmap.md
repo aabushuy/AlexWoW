@@ -154,8 +154,8 @@ Solution на .NET 10, базовая инфраструктура.
 ## ⬜ M8. Веб-интерфейс игрока
 
 **Цель:** сайт для регистрации аккаунта, смены пароля, просмотра персонажей; позже — смена
-расы/пола, покупка золота. План — [TODO/M8-web-interface.md](TODO/M8-web-interface.md), задачи в
-**Vikunja** (project M8). Стек: ASP.NET Core (`AlexWoW.Web`), за Caddy на homeserver. Логин = email,
+расы/пола, покупка золота. Задачи и план — в **Vikunja** (project M8, `https://tasks.home.srv`).
+Стек: ASP.NET Core (`AlexWoW.Web`), за Caddy на homeserver. Логин = email,
 регистрация простая (email/пароль/подтверждение), без подтверждения по почте.
 
 | Срез | Статус |
