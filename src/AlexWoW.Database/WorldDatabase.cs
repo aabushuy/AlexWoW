@@ -54,11 +54,16 @@ public sealed class WorldDatabase(string connectionString)
             JOIN creature_template t ON t.Entry = c.id
             WHERE c.map = @map
               AND (c.spawnMask & 1) = 1
-              AND t.Name NOT LIKE '[%'       -- дев/плейсхолдеры: [DND], [PH], [UNUSED]…
+              AND t.Name NOT LIKE '%[%'      -- дев/плейсхолдеры в имени где угодно: [DND]/[PH]/[UNUSED]
               -- TAR-тестовые тренеры/бистмастер: generic-имя без subname (у настоящих имя — личное)
               AND NOT (t.Name LIKE '% Trainer' AND COALESCE(t.SubName, '') = '')
               AND NOT (t.Name = 'Beastmaster' AND COALESCE(t.SubName, '') = '')
-              AND c.id NOT IN @excluded     -- кастомные арена-NPC CMaNGOS
+              AND COALESCE(t.SubName, '') NOT LIKE 'Arena %'   -- арена-NPC по subname
+              AND NOT (t.Name LIKE '%Vendor%' AND COALESCE(t.SubName, '') = '') -- generic-вендоры без имени
+              AND c.id NOT IN @excluded     -- кастомные арена-NPC CMaNGOS (по entry)
+              -- Ивентовый контент (Ярмарка Новолуния, Новогодье и пр.): системы game_event у нас нет,
+              -- иначе он спавнится ПОСТОЯННО — прячем спавны, активные только во время ивента (event>0).
+              AND NOT EXISTS (SELECT 1 FROM game_event_creature gec WHERE gec.guid = c.guid AND gec.event > 0)
               AND c.position_x BETWEEN @minX AND @maxX
               AND c.position_y BETWEEN @minY AND @maxY
             LIMIT @limit;
@@ -275,7 +280,9 @@ public sealed class WorldDatabase(string connectionString)
             WHERE g.map = @map
               AND (g.spawnMask & 1) = 1
               AND t.displayId <> 0
-              AND t.name NOT LIKE '[%'       -- дев/плейсхолдеры
+              AND t.name NOT LIKE '%[%'      -- дев/плейсхолдеры в имени где угодно
+              -- Ивентовый контент (венки Новогодья, тенты/декор Ярмарки Новолуния и пр.) — прячем event>0.
+              AND NOT EXISTS (SELECT 1 FROM game_event_gameobject geg WHERE geg.guid = g.guid AND geg.event > 0)
               AND g.position_x BETWEEN @minX AND @maxX
               AND g.position_y BETWEEN @minY AND @maxY
             LIMIT @limit;
