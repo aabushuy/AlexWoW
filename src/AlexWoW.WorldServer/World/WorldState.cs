@@ -176,6 +176,7 @@ public sealed class WorldState(ILogger<WorldState> logger)
             try
             {
                 await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
+                // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике.
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
@@ -215,6 +216,17 @@ public sealed class WorldState(ILogger<WorldState> logger)
     public IEnumerable<WorldPlayer> ObserversOf(WorldCreature creature)
         => _players.Values.Where(p => p.Map == creature.Map && p.Session.VisibleNpcs.ContainsKey(creature.Guid));
 
+    /// <summary>
+    /// Рассылка пакета соседним игрокам (в радиусе, БЕЗ самого игрока). M6.4: SMSG_SPELL_GO шлётся
+    /// наблюдателям, а не кастеру — кастер ведёт каст клиентским предсказанием, и GO, присланный ему,
+    /// трактуется как чужой каст (анимация залипает, клиент шлёт CANCEL_CAST).
+    /// </summary>
+    public async Task BroadcastToNeighborsAsync(WorldPlayer player, WorldOpcode opcode, byte[] body, CancellationToken ct)
+    {
+        foreach (var other in PlayersInRangeOf(player))
+            await other.Session.SendAsync(opcode, body, ct);
+    }
+
     /// <summary>Рассылка пакета всем наблюдателям существа (бой/смерть/HP). M6.3.</summary>
     public async Task BroadcastToObserversAsync(WorldCreature creature, WorldOpcode opcode, byte[] body, CancellationToken ct)
     {
@@ -226,6 +238,21 @@ public sealed class WorldState(ILogger<WorldState> logger)
     public Task BroadcastCreatureHealthAsync(WorldCreature creature, CancellationToken ct)
         => BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildHealthUpdate(creature.Guid, creature.Health), ct);
+
+    /// <summary>
+    /// Применяет урон существу (общий путь для мили M6.3 и спеллов M6.4): уменьшает HP, на смерти
+    /// ставит таймер респавна. НЕ рассылает (порядок с combat-log контролирует вызывающий —
+    /// см. <see cref="BroadcastCreatureHealthAsync"/>). Возвращает фактический урон, овёркилл и факт смерти.
+    /// </summary>
+    public (uint Dealt, uint Overkill, bool Died) ApplyCreatureDamage(WorldCreature creature, uint damage)
+    {
+        var before = creature.Health;
+        var dealt = Math.Min(damage, before);
+        creature.Health = before - dealt;
+        if (creature.Health == 0 && creature.RespawnAtMs is null)
+            creature.RespawnAtMs = Environment.TickCount64 + RespawnDelayMs;
+        return (dealt, damage - dealt, creature.Health == 0);
+    }
 
     /// <summary>Длительность респавна существа (мс). M6.3.</summary>
     public static long RespawnDelay => RespawnDelayMs;

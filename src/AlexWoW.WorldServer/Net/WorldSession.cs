@@ -115,6 +115,22 @@ public sealed class WorldSession
     /// <summary>Дельта часов: <c>serverMs − clientTicks</c>. null — пока не синхронизировано.</summary>
     internal long? ClockDeltaMs { get; set; }
 
+    // --- Каст спелла (M6.4) ---
+    /// <summary>Спелл, который сейчас кастуется (0 — нет каста). Завершается в тике.</summary>
+    internal uint CastingSpellId { get; set; }
+    /// <summary>cast_count из CMSG_CAST_SPELL (эхо в SPELL_START/GO).</summary>
+    internal byte CastCount { get; set; }
+    /// <summary>GUID цели каста (0 — без цели / на себя).</summary>
+    internal ulong CastTargetGuid { get; set; }
+    /// <summary>Момент завершения каста (<see cref="Environment.TickCount64"/>, мс).</summary>
+    internal long CastCompleteMs { get; set; }
+    /// <summary>Позиция в начале каста — для прерывания при сдвиге (движение, не поворот). M6.4.</summary>
+    internal float CastStartX { get; set; }
+    internal float CastStartY { get; set; }
+    /// <summary>Поколение каста: инкремент на каждый каст; отложенное завершение проверяет совпадение
+    /// (чтобы не завершить отменённый/перебитый каст). M6.4.</summary>
+    internal int CastGeneration { get; set; }
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)
@@ -154,6 +170,7 @@ public sealed class WorldSession
         InWorldGuid = 0;
         CombatTargetGuid = 0; // M6.3: вне мира боя нет
         SelectionGuid = 0;
+        CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();

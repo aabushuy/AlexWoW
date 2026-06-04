@@ -39,6 +39,11 @@ public static class MovementHandlers
             timeFieldOffset = -1;
         }
 
+        // M6.4: сдвиг игрока прерывает текущий каст (клиент гасит бар локально, но серверу не шлёт
+        // CANCEL_CAST — без этого эффект применился бы и анимация залипала).
+        if (session.CastingSpellId != 0)
+            await SpellHandlers.InterruptOnMoveAsync(session, ct);
+
         // M5.3: ретранслируем движение соседям (с нормализацией поля time, если часы синхронизированы).
         if (session.Player is { } player)
         {
