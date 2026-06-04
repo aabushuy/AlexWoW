@@ -131,6 +131,17 @@ public sealed class WorldSession
     /// (чтобы не завершить отменённый/перебитый каст). M6.4.</summary>
     internal int CastGeneration { get; set; }
 
+    /// <summary>Текущая/макс. мана (UNIT_FIELD_POWER1). MaxMana=0 — класс без маны (rage/energy):
+    /// расход не применяется. Инициализируется при входе в мир. M6.4 инкремент 2.</summary>
+    internal uint Mana { get; set; }
+    internal uint MaxMana { get; set; }
+    /// <summary>Время последнего успешного каста — «правило 5 секунд» (реген маны паузится). M6.4.</summary>
+    internal long LastSpellCastMs { get; set; }
+    /// <summary>Время последнего тика регена маны (кадэнс 1 с). M6.4.</summary>
+    internal long LastManaRegenMs { get; set; }
+    /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
+    internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = new();
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)
@@ -171,6 +182,7 @@ public sealed class WorldSession
         CombatTargetGuid = 0; // M6.3: вне мира боя нет
         SelectionGuid = 0;
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
+        SpellCooldowns.Clear();
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();
