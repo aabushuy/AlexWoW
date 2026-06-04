@@ -29,6 +29,24 @@ public sealed class VendorItem
     public int Stackable { get; init; } = 1;
 }
 
+/// <summary>Строка лут-таблицы существа (creature_loot_template ⨝ item_template) — кандидат на дроп. M6.6.</summary>
+public sealed class CreatureLootEntry
+{
+    public uint ItemId { get; init; }
+    public float Chance { get; init; }     // ChanceOrQuestChance: шанс дропа (%), >0 — обычный предмет
+    public int MinCount { get; init; }     // mincountOrRef: >0 — мин. количество (отрицательное — ссылка, пропускаем)
+    public uint MaxCount { get; init; }
+    public uint DisplayId { get; init; }
+}
+
+/// <summary>Лут-определение существа: диапазон денег + кандидаты-предметы (до ролла). M6.6.</summary>
+public sealed class CreatureLootData
+{
+    public uint MinGold { get; init; }
+    public uint MaxGold { get; init; }
+    public IReadOnlyList<CreatureLootEntry> Drops { get; init; } = [];
+}
+
 /// <summary>Стартовый предмет (playercreateinfo_item ⨝ item_template) — для раскладки набора.</summary>
 public sealed class StartingItem
 {

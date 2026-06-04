@@ -64,7 +64,7 @@ public static class VendorHandlers
         var cost = vi.BuyPrice * amount;
         if (session.Money < cost) { await FailAsync(BuyResult.NotEnoughMoney); return; }
 
-        var slot = FreeBackpackSlot(session);
+        var slot = InventoryGrant.FreeBackpackSlot(session);
         if (slot < 0) { await FailAsync(BuyResult.InventoryFull); return; }
 
         var ownerGuid = session.InWorldGuid;
@@ -138,18 +138,6 @@ public static class VendorHandlers
             session.Account, item.ItemEntry, itemLow, gain, session.Money);
     }
 
-    /// <summary>Первый свободный слот рюкзака (23..38) основного контейнера; -1 если нет места.</summary>
-    private static int FreeBackpackSlot(WorldSession session)
-    {
-        var taken = new HashSet<byte>();
-        foreach (var i in session.Inventory)
-            if (i.Bag == InventorySlots.MainBag)
-                taken.Add(i.Slot);
-        for (var s = InventorySlots.BackpackStart; s < InventorySlots.BackpackEnd; s++)
-            if (!taken.Contains((byte)s))
-                return s;
-        return -1;
-    }
 }
 
 /// <summary>Коды SMSG_BUY_FAILED (BuyResult, 3.3.5a).</summary>

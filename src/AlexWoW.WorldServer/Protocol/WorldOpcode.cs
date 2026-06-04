@@ -81,6 +81,16 @@ public enum WorldOpcode : uint
     CmsgRepopRequest = 0x15A,     // пустое — «отпустить дух» после смерти
     SmsgForcedDeathUpdate = 0x37A, // пустое — сброс таймера release у клиента
 
+    // Лут (M6.6)
+    CmsgAutostoreLootItem = 0x108, // u8 loot_slot — забрать предмет из лута
+    CmsgLoot = 0x15D,              // u64 guid — открыть лут трупа
+    CmsgLootMoney = 0x15E,         // пустое — забрать деньги из открытого лута
+    CmsgLootRelease = 0x15F,       // u64 guid — закрыть окно лута
+    SmsgLootResponse = 0x160,      // содержимое лута (деньги + предметы)
+    SmsgLootReleaseResponse = 0x161, // u64 guid + u8 — подтверждение закрытия
+    SmsgLootRemoved = 0x162,       // u8 slot — предмет забран (убрать из окна)
+    SmsgLootClearMoney = 0x165,    // пустое — деньги забраны (убрать из окна)
+
     // Спеллы (M6.4)
     CmsgCastSpell = 0x12E,
     CmsgCancelCast = 0x12F,

@@ -100,6 +100,9 @@ public sealed class WorldSession
     /// <summary>Игрок мёртв (HP=0, ждёт release/возрождения). M6.7.</summary>
     internal bool IsDead { get; set; }
 
+    /// <summary>GUID трупа с открытым окном лута (0 — окно закрыто). M6.6.</summary>
+    internal ulong LootGuid { get; set; }
+
     /// <summary>GUID существа, по которому идёт авто-атака (0 — не в бою). Читается тиком. M6.3.</summary>
     internal ulong CombatTargetGuid { get; set; }
 
@@ -188,6 +191,7 @@ public sealed class WorldSession
         CombatTargetGuid = 0; // M6.3: вне мира боя нет
         SelectionGuid = 0;
         IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
+        LootGuid = 0;         // M6.6: окно лута закрыто
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
