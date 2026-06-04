@@ -9,11 +9,18 @@ public static class CharEnum
     // EQUIPMENT_SLOT_END(19) + 4 слота сумок = INVENTORY_SLOT_BAG_END.
     private const int EquipmentSlots = 23;
 
+    /// <summary>
+    /// CHARACTER_FLAG_DECLINED (3.3.5a, как в CMaNGOS/TrinityCore). Выставлен в per-char flags —
+    /// ruRU-клиент знает, что склонения имени заданы, и НЕ показывает диалог склонений на char-select.
+    /// </summary>
+    private const uint CharacterFlagDeclined = 0x02000000;
+
     /// <summary>Экипировка слота для paperdoll: displayInfoId + inventoryType (3.3.5a).</summary>
     public readonly record struct SlotDisplay(uint DisplayId, byte InvType);
 
     public static byte[] BuildBody(IReadOnlyList<Character> characters,
-        IReadOnlyDictionary<uint, SlotDisplay[]>? equipment = null)
+        IReadOnlyDictionary<uint, SlotDisplay[]>? equipment = null,
+        IReadOnlySet<uint>? declinedNameGuids = null)
     {
         var w = new ByteWriter(64 + characters.Count * 300);
         w.UInt8((byte)characters.Count);
@@ -37,7 +44,7 @@ public static class CharEnum
              .Single(c.Y)
              .Single(c.Z)
              .UInt32(0)                 // guild id
-             .UInt32(0)                 // character flags
+             .UInt32(declinedNameGuids?.Contains(c.Guid) == true ? CharacterFlagDeclined : 0u) // character flags
              .UInt32(0)                 // customization flags (recustomize)
              .UInt8(0)                  // first login (intro cinematic)
              .UInt32(0)                 // pet display id
