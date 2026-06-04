@@ -19,6 +19,7 @@ public static class InventoryHandlers
     {
         var r = packet.Reader();
         int src = r.UInt8(), dst = r.UInt8();
+        session.Logger.LogDebug("[inv] SWAP_INV src={Src} dst={Dst}", src, dst);
         await MoveOrSwapAsync(session, src, dst, ct);
     }
 
@@ -27,6 +28,7 @@ public static class InventoryHandlers
     {
         var r = packet.Reader();
         int dstBag = r.UInt8(), dst = r.UInt8(), srcBag = r.UInt8(), src = r.UInt8();
+        session.Logger.LogDebug("[inv] SWAP_ITEM srcBag={SB} src={S} dstBag={DB} dst={D}", srcBag, src, dstBag, dst);
         if (!IsMain(srcBag) || !IsMain(dstBag)) return; // доп. сумки-контейнеры пока не поддержаны
         await MoveOrSwapAsync(session, src, dst, ct);
     }
@@ -36,6 +38,7 @@ public static class InventoryHandlers
     {
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8(), dstBag = r.UInt8();
+        session.Logger.LogDebug("[inv] AUTOSTORE srcBag={SB} src={S} dstBag={DB}", srcBag, src, dstBag);
         if (!IsMain(srcBag) || !IsMain(dstBag)) return;
         var free = FreeBackpackSlot(session);
         if (free >= 0) await MoveOrSwapAsync(session, src, free, ct);
@@ -46,10 +49,20 @@ public static class InventoryHandlers
     {
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8();
+        session.Logger.LogDebug("[inv] AUTOEQUIP srcBag={SB} src={S}", srcBag, src);
         if (!IsMain(srcBag)) return;
 
         var item = ItemAt(session, src);
         if (item is null) return;
+
+        // Предмет уже надет (src — слот экипировки) → это СНЯТИЕ: в первый свободный слот рюкзака.
+        if (InventorySlots.IsEquipmentSlot(src))
+        {
+            var freeSlot = FreeBackpackSlot(session);
+            if (freeSlot >= 0) await MoveOrSwapAsync(session, src, freeSlot, ct);
+            else await ReassertAsync(session, ct, src);
+            return;
+        }
 
         var inv = await InvTypeAsync(session, item.ItemEntry, ct);
         var slot = InventorySlots.EquipSlotFor(inv);
