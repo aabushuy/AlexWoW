@@ -16,13 +16,18 @@ public static class MovementHandlers
         WorldOpcode.MsgMoveSetFacing, WorldOpcode.MsgMoveSetPitch, WorldOpcode.MsgMoveHeartbeat)]
     public static async Task OnMovement(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
+        // Смещение/значение поля time в теле — для нормализации часов при ретрансляции (M6.3 ч.2).
+        // -1 = не распарсили (нестандартный пакет) → ретранслируем как есть.
+        var timeFieldOffset = -1;
+        uint moverTime = 0;
         try
         {
             var reader = packet.Reader();
             reader.PackedGuid();   // mover guid
             reader.UInt32();       // movement flags
             reader.UInt16();       // movement flags 2
-            reader.UInt32();       // time
+            timeFieldOffset = reader.Position; // time идёт сразу после flags2
+            moverTime = reader.UInt32();       // time
             session.PosX = reader.Single();
             session.PosY = reader.Single();
             session.PosZ = reader.Single();
@@ -31,12 +36,13 @@ public static class MovementHandlers
         catch (InvalidOperationException)
         {
             // Нестандартный вариант пакета — игнорируем для трекинга позиции.
+            timeFieldOffset = -1;
         }
 
-        // M5.3: ретранслируем движение соседям как есть (тело содержит packed guid мувера).
+        // M5.3: ретранслируем движение соседям (с нормализацией поля time, если часы синхронизированы).
         if (session.Player is { } player)
         {
-            await session.World.RelayMovementAsync(player, packet.Opcode, packet.Body, ct);
+            await session.World.RelayMovementAsync(player, packet.Opcode, packet.Body, moverTime, timeFieldOffset, ct);
             // M6: видимость игроков — дёшево (в памяти), считаем на каждый пакет движения, чтобы
             // экипировка соседа появлялась сразу при первом шаге (клиент уже догружен).
             await session.World.RefreshVisiblePlayersAsync(player, ct);

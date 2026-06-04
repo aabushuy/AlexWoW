@@ -62,8 +62,8 @@ public static class WorldEntryHandlers
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true, session.Inventory);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
-        // Без time sync игрок не управляется.
-        await session.SendAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(0).ToArray(), ct);
+        // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
+        await SendTimeSyncReqAsync(session, ct);
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
@@ -121,8 +121,30 @@ public static class WorldEntryHandlers
     [WorldOpcodeHandler(WorldOpcode.CmsgTimeSyncResp)]
     public static Task OnTimeSyncResp(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        session.Logger.LogInformation("CMSG_TIME_SYNC_RESP получен — поток в порядке");
+        var reader = packet.Reader();
+        var counter = reader.UInt32();
+        var clientTicks = reader.UInt32();
+        // Матчим ответ с последним REQ → дельта часов (serverMs − clientTicks). RTT на LAN пренебрежим.
+        if (counter == session.TimeSyncOutstanding)
+        {
+            session.ClockDeltaMs = session.TimeSyncSentMs - clientTicks;
+            session.Logger.LogDebug("[timesync] '{User}': counter={C} clientTicks={T} → delta={D}мс",
+                session.Account, counter, clientTicks, session.ClockDeltaMs);
+        }
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Шлёт SMSG_TIME_SYNC_REQ (новый счётчик) и запоминает время отправки — фундамент расчёта
+    /// дельты часов клиента для нормализации времени движения. Зовётся при входе и периодически из тика.
+    /// </summary>
+    internal static async Task SendTimeSyncReqAsync(WorldSession session, CancellationToken ct)
+    {
+        var counter = session.TimeSyncCounter++;
+        session.TimeSyncOutstanding = counter;
+        session.TimeSyncSentMs = (uint)Environment.TickCount64;
+        session.LastTimeSyncDispatchMs = Environment.TickCount64;
+        await session.SendAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(counter).ToArray(), ct);
     }
 
     private static async Task SendInitialSpellsAsync(WorldSession session, byte race, CancellationToken ct)

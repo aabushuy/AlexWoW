@@ -19,6 +19,9 @@ public sealed class WorldState(ILogger<WorldState> logger)
     /// <summary>Через сколько мс после смерти существо респавнится (тест). M6.3.</summary>
     private const long RespawnDelayMs = 30_000;
 
+    /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
+    private const long TimeSyncIntervalMs = 10_000;
+
     private readonly ConcurrentDictionary<ulong, WorldPlayer> _players = new();
 
     /// <summary>
@@ -133,11 +136,30 @@ public sealed class WorldState(ILogger<WorldState> logger)
             player.Character.Name, player.Guid, _players.Count);
     }
 
-    /// <summary>Ретрансляция пакета движения соседним игрокам (тело уже содержит packed guid мувера).</summary>
-    public async Task RelayMovementAsync(WorldPlayer mover, WorldOpcode opcode, byte[] body, CancellationToken ct)
+    /// <summary>
+    /// Ретрансляция пакета движения соседним игрокам (тело уже содержит packed guid мувера).
+    /// M6.3 ч.2: переписывает поле <c>time</c> в часы наблюдателя
+    /// (<c>T_obs = T_mover + delta_mover − delta_obs</c>), чтобы убрать сдвиг экстраполяции
+    /// между клиентами с разными точками отсчёта тиков. Пока дельта любой из сторон неизвестна —
+    /// ретранслируем тело как есть (не хуже прежнего поведения).
+    /// </summary>
+    public async Task RelayMovementAsync(WorldPlayer mover, WorldOpcode opcode, byte[] body,
+        uint moverTime, int timeFieldOffset, CancellationToken ct)
     {
+        // Один рерайт в СЕРВЕРНОЕ время (как TrinityCore AdjustClientMovementTime): time += delta_мувера.
+        // Все наблюдатели получают одинаковое тело; пока дельта мувера неизвестна — как есть.
+        var outBody = body;
+        if (timeFieldOffset >= 0 && timeFieldOffset + 4 <= body.Length
+            && mover.Session.ClockDeltaMs is { } delta)
+        {
+            var serverTime = (uint)((long)moverTime + delta);
+            outBody = (byte[])body.Clone();
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
+                outBody.AsSpan(timeFieldOffset, 4), serverTime);
+        }
+
         foreach (var other in PlayersInRangeOf(mover))
-            await other.Session.SendAsync(opcode, body, ct);
+            await other.Session.SendAsync(opcode, outBody, ct);
     }
 
     /// <summary>
@@ -154,10 +176,14 @@ public sealed class WorldState(ILogger<WorldState> logger)
             try
             {
                 await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
+
+                // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
+                if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
+                    await Handlers.WorldEntryHandlers.SendTimeSyncReqAsync(player.Session, ct);
             }
             catch (Exception ex)
             {
-                logger.LogDebug("Тик боя '{User}': {Msg}", player.Character.Name, ex.Message);
+                logger.LogDebug("Тик '{User}': {Msg}", player.Character.Name, ex.Message);
             }
         }
 
