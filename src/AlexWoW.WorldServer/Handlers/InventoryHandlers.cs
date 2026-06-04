@@ -17,8 +17,12 @@ public static class InventoryHandlers
     [WorldOpcodeHandler(WorldOpcode.CmsgSwapInvItem)]
     public static async Task OnSwapInvItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
+        // ВНИМАНИЕ: порядок байт — destination_slot, ПОТОМ source_slot (как CMaNGOS
+        // `recv_data >> dstslot >> srcslot`). При свопе двух занятых слотов это незаметно
+        // (симметрично), но при перемещении/снятии в ПУСТОЙ слот порядок критичен — иначе
+        // источник=пустой слот → операция игнорируется (M7 #18: не снималась экипировка).
         var r = packet.Reader();
-        int src = r.UInt8(), dst = r.UInt8();
+        int dst = r.UInt8(), src = r.UInt8();
         session.Logger.LogDebug("[inv] SWAP_INV src={Src} dst={Dst}", src, dst);
         await MoveOrSwapAsync(session, src, dst, ct);
     }
