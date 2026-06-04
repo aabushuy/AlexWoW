@@ -69,6 +69,9 @@ public sealed class WorldSession
     /// <summary>Инвентарь персонажа в мире (предметы во всех слотах). Загружается при входе. M6.1.</summary>
     internal List<InventoryItem> Inventory { get; } = new();
 
+    /// <summary>Деньги персонажа (медь) в мире. Загружается при входе, меняется торговлей. M6.2.</summary>
+    internal uint Money { get; set; }
+
     /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
     internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
 

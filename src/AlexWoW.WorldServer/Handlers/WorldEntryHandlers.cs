@@ -53,6 +53,7 @@ public static class WorldEntryHandlers
             await StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
         session.Inventory.Clear();
         session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
+        session.Money = character.Money; // M6.2: деньги для торговли
         if (session.Inventory.Count > 0)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);
