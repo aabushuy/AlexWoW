@@ -125,9 +125,9 @@ public static class PlayerSpawn
         m.SetFloat(UpdateField.ObjectScaleX, 1.0f);
 
         m.SetBytes(UpdateField.UnitBytes0, c.Race, c.Class, c.Gender, powerType);
-        // Здоровье игрока — упрощённо по уровню (точные статы по классу/уровню позже). NPC в M6.3
-        // не отвечает ударом, так что для боя важнее HP существа; player HP — для правдоподобной полоски.
-        var maxHealth = (uint)(80 + Math.Max((byte)1, c.Level) * 20);
+        // Здоровье игрока — упрощённо по уровню (точные статы по классу/уровню позже). M6.7: существо
+        // отвечает ударом, текущий HP меняется в бою (VALUES-апдейты); в create спавним полным.
+        var maxHealth = DisplayData.MaxHealthForLevel(c.Level);
         m.SetUInt32(UpdateField.UnitHealth, maxHealth);
         m.SetUInt32(UpdateField.UnitMaxHealth, maxHealth);
         // M6.4: мана-классам — пул из MaxManaForClass (расход спеллами, реген в тике); rage/energy

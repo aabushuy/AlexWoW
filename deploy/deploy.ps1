@@ -53,7 +53,10 @@ finally {
 }
 
 Write-Host '==> 4/4 Starting on server (build = COPY only)...' -ForegroundColor Cyan
-ssh $RemoteHost "cd $RemoteDir && docker compose up -d --build"
+# Merge docker's stderr (build progress) into stdout ON THE REMOTE side. Windows PowerShell 5.1
+# with ErrorActionPreference=Stop otherwise treats that stderr as a terminating NativeCommandError
+# even when docker exits 0.
+ssh $RemoteHost "cd $RemoteDir && docker compose up -d --build 2>&1"
 if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed.' }
 
 Write-Host 'Deploy complete.' -ForegroundColor Green

@@ -55,6 +55,11 @@ public static class WorldEntryHandlers
         session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
 
+        // M6.7: авторитетное здоровье (полное при входе) — существо отвечает ударом, игрок может умереть.
+        session.MaxHealth = DisplayData.MaxHealthForLevel(character.Level);
+        session.Health = session.MaxHealth;
+        session.IsDead = false;
+
         // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
         session.MaxMana = DisplayData.MaxManaForClass(character.Class, character.Level);
         session.Mana = session.MaxMana;

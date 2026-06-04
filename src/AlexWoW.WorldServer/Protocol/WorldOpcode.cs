@@ -76,6 +76,11 @@ public enum WorldOpcode : uint
     SmsgAttackSwingNotInRange = 0x145, // пустое — цель вне мили-радиуса
     SmsgAttackerStateUpdate = 0x14A,
 
+    // ИИ существ / смерть игрока (M6.7)
+    SmsgAiReaction = 0x13C,       // Guid + u32 reaction (HOSTILE=2 — рык агро)
+    CmsgRepopRequest = 0x15A,     // пустое — «отпустить дух» после смерти
+    SmsgForcedDeathUpdate = 0x37A, // пустое — сброс таймера release у клиента
+
     // Спеллы (M6.4)
     CmsgCastSpell = 0x12E,
     CmsgCancelCast = 0x12F,

@@ -94,6 +94,12 @@ public sealed class WorldSession
     /// <summary>Текущая цель (CMSG_SET_SELECTION). 0 — нет. M6.3.</summary>
     internal ulong SelectionGuid { get; set; }
 
+    /// <summary>Авторитетное здоровье игрока (UNIT_FIELD_HEALTH). Меняется уроном существ. M6.7.</summary>
+    internal uint Health { get; set; }
+    internal uint MaxHealth { get; set; }
+    /// <summary>Игрок мёртв (HP=0, ждёт release/возрождения). M6.7.</summary>
+    internal bool IsDead { get; set; }
+
     /// <summary>GUID существа, по которому идёт авто-атака (0 — не в бою). Читается тиком. M6.3.</summary>
     internal ulong CombatTargetGuid { get; set; }
 
@@ -181,6 +187,7 @@ public sealed class WorldSession
         InWorldGuid = 0;
         CombatTargetGuid = 0; // M6.3: вне мира боя нет
         SelectionGuid = 0;
+        IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
