@@ -20,4 +20,5 @@ public sealed class Character
     public float X { get; init; }
     public float Y { get; init; }
     public float Z { get; init; }
+    public uint Money { get; init; }   // медь (M6.2)
 }

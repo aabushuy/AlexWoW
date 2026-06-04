@@ -62,6 +62,15 @@ public sealed class CharactersDatabase(string connectionString)
                 KEY ix_items_owner (owner_guid)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
+
+        // M6.2: деньги персонажа (медь). Стартовый баланс — тестовый (100g), чтобы было что тратить.
+        // MySQL не поддерживает ADD COLUMN IF NOT EXISTS — глушим ошибку «дубликат столбца» (1060).
+        try
+        {
+            await db.ExecuteAsync(
+                "ALTER TABLE characters ADD COLUMN money INT UNSIGNED NOT NULL DEFAULT 1000000;");
+        }
+        catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
     }
 
     /// <summary>Есть ли у персонажа хоть один предмет (для выдачи стартового набора голым персонажам).</summary>
@@ -105,7 +114,8 @@ public sealed class CharactersDatabase(string connectionString)
             SELECT guid AS Guid, account_id AS AccountId, name AS Name, race AS Race, class AS Class,
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
                    hair_color AS HairColor, facial_hair AS FacialHair, level AS Level,
-                   zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z
+                   zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
+                   money AS Money
             FROM characters WHERE account_id = @accountId ORDER BY guid;
             """, new { accountId });
         return rows.AsList();
@@ -118,7 +128,8 @@ public sealed class CharactersDatabase(string connectionString)
             SELECT guid AS Guid, account_id AS AccountId, name AS Name, race AS Race, class AS Class,
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
                    hair_color AS HairColor, facial_hair AS FacialHair, level AS Level,
-                   zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z
+                   zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
+                   money AS Money
             FROM characters WHERE guid = @guid;
             """, new { guid });
     }
@@ -159,6 +170,20 @@ public sealed class CharactersDatabase(string connectionString)
         await db.ExecuteAsync("""
             UPDATE characters SET position_x = @x, position_y = @y, position_z = @z WHERE guid = @guid;
             """, new { guid, x, y, z });
+    }
+
+    /// <summary>Деньги персонажа (медь). M6.2.</summary>
+    public async Task SetMoneyAsync(uint guid, uint money, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("UPDATE characters SET money = @money WHERE guid = @guid;", new { guid, money });
+    }
+
+    /// <summary>Удаляет предмет персонажа по его low-counter GUID (продажа/перемещение). M6.2.</summary>
+    public async Task RemoveItemAsync(uint itemGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("DELETE FROM character_items WHERE item_guid = @itemGuid;", new { itemGuid });
     }
 
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>

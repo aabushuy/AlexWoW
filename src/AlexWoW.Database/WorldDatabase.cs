@@ -119,6 +119,23 @@ public sealed class WorldDatabase(string connectionString)
         return result;
     }
 
+    /// <summary>Ассортимент вендора по entry существа (npc_vendor ⨝ item_template). Только за золото
+    /// (ExtendedCost=0), без условий. M6.2.</summary>
+    public async Task<IReadOnlyList<VendorItem>> GetVendorItemsAsync(uint entry, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<VendorItem>(new CommandDefinition("""
+            SELECT v.slot AS Slot, v.item AS ItemId, v.maxcount AS MaxCount,
+                   t.BuyPrice AS BuyPrice, t.displayid AS DisplayId, t.MaxDurability AS MaxDurability,
+                   t.BuyCount AS BuyCount, t.name AS Name, t.stackable AS Stackable
+            FROM npc_vendor v
+            JOIN item_template t ON t.entry = v.item
+            WHERE v.entry = @entry AND v.ExtendedCost = 0 AND COALESCE(v.condition_id, 0) = 0
+            ORDER BY v.slot;
+            """, new { entry }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
     /// <summary>Полный шаблон предмета (item_template) для SMSG_ITEM_QUERY_SINGLE_RESPONSE.</summary>
     public async Task<ItemTemplateData?> GetItemTemplateAsync(uint entry, CancellationToken ct = default)
     {

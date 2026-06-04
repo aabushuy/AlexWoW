@@ -69,6 +69,27 @@ public static class PlayerSpawn
         return w.ToArray();
     }
 
+    /// <summary>VALUES-апдейт с деньгами (PLAYER_FIELD_COINAGE) — после покупки/продажи. M6.2.</summary>
+    public static byte[] BuildCoinageUpdate(ulong guid, uint money)
+        => BuildSingleValuesUpdate(guid, m => m.SetUInt32(UpdateField.PlayerFieldCoinage, money));
+
+    /// <summary>VALUES-апдейт с GUID предмета в слоте-контейнере (slot 0..38; 0 = пусто). M6.2.</summary>
+    public static byte[] BuildInvSlotUpdate(ulong guid, int slot, ulong itemGuid)
+        => BuildSingleValuesUpdate(guid, m => m.SetUInt64(UpdateField.InvSlotGuid(slot), itemGuid));
+
+    /// <summary>Каркас SMSG_UPDATE_OBJECT с одним VALUES-блоком для игрока.</summary>
+    private static byte[] BuildSingleValuesUpdate(ulong guid, Action<UpdateMask> fill)
+    {
+        var m = new UpdateMask();
+        fill(m);
+        var w = new ByteWriter(48);
+        w.UInt32(1);
+        w.UInt8(UpdateType.Values);
+        PackedGuid.Write(w, guid);
+        m.WriteTo(w);
+        return w.ToArray();
+    }
+
     private static void WriteMovementBlock(ByteWriter w, float x, float y, float z, float o,
         uint serverTimeMs, bool isSelf)
     {
@@ -124,6 +145,10 @@ public static class PlayerSpawn
             m.SetUInt32(baseIdx + 1, 300u | (300u << 16));    // value | max
             m.SetUInt32(baseIdx + 2, 0);                      // временный/постоянный бонус
         }
+
+        // M6.2: деньги (private-поле) — только себе.
+        if (isSelf)
+            m.SetUInt32(UpdateField.PlayerFieldCoinage, c.Money);
 
         // M6.1: экипировка. Видимые предметы (entry) одевают модель — у всех наблюдателей;
         // guid'ы слотов-контейнеров — private-поля, шлём только себе.

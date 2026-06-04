@@ -47,6 +47,16 @@ public enum WorldOpcode : uint
     CmsgItemQuerySingle = 0x056,
     SmsgItemQuerySingleResponse = 0x058,
 
+    // Торговля с NPC (M6.2)
+    CmsgGossipHello = 0x17B,
+    CmsgSellItem = 0x1A0,
+    SmsgSellItem = 0x1A1,
+    CmsgBuyItem = 0x1A2,
+    SmsgBuyItem = 0x1A4,
+    SmsgBuyFailed = 0x1A5,
+    CmsgListInventory = 0x19E,
+    SmsgListInventory = 0x19F,
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,
