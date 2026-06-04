@@ -147,13 +147,20 @@ public static class CharScreenHandlers
     {
         var reader = packet.Reader();
         var guid = reader.UInt64();
-        // далее CString name + CString[5] склонений — пока не используем.
+        reader.CString();                       // имя (не нужно)
+        var declined = new string[5];
+        for (var i = 0; i < 5; i++)
+            declined[i] = reader.CString();
+
+        // Сохраняем — иначе ruRU-клиент спрашивает склонения при каждом входе.
+        try { await session.Characters.SetDeclinedNamesAsync((uint)guid, declined, ct); }
+        catch (Exception ex) { session.Logger.LogWarning("SET_DECLINED_NAMES guid={Guid}: {Msg}", guid, ex.Message); }
 
         var w = new ByteWriter(12)
             .UInt32(0)        // result = 0 (успех)
             .UInt64(guid);
         await session.SendAsync(WorldOpcode.SmsgSetPlayerDeclinedNamesResult, w.ToArray(), ct);
-        session.Logger.LogInformation("SET_DECLINED_NAMES guid={Guid} → ок", guid);
+        session.Logger.LogInformation("SET_DECLINED_NAMES guid={Guid} сохранены", guid);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCharDelete)]
@@ -178,15 +185,23 @@ public static class CharScreenHandlers
         if (character is null)
             return;
 
-        var w = new ByteWriter(48);
+        string[]? declined = null;
+        try { declined = await session.Characters.GetDeclinedNamesAsync(guid, ct); }
+        catch { /* нет таблицы/данных — отдаём без склонений */ }
+        var hasDeclined = declined is not null && declined.Any(s => !string.IsNullOrEmpty(s));
+
+        var w = new ByteWriter(64);
         PackedGuid.Write(w, guid);
-        w.UInt8(0)                              // имя известно
+        w.UInt8(0)                              // early_terminate = 0
          .CString(character.Name)
          .CString(string.Empty)                 // кросс-реалм имя
          .UInt8(character.Race)
          .UInt8(character.Gender)
          .UInt8(character.Class)
-         .UInt8(0);                             // имя не склоняется
+         .UInt8((byte)(hasDeclined ? 1 : 0));   // has_declined_names
+        if (hasDeclined)
+            for (var i = 0; i < 5; i++)
+                w.CString(declined!.ElementAtOrDefault(i) ?? string.Empty);
         await session.SendAsync(WorldOpcode.SmsgNameQueryResponse, w.ToArray(), ct);
     }
 

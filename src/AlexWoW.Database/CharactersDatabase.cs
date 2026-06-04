@@ -63,6 +63,19 @@ public sealed class CharactersDatabase(string connectionString)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
+        // ruRU-клиент: склонения имени персонажа (5 падежей). Без них клиент спрашивает каждый вход.
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_declined_names (
+                owner_guid INT UNSIGNED NOT NULL,
+                n0 VARCHAR(24) NOT NULL DEFAULT '',
+                n1 VARCHAR(24) NOT NULL DEFAULT '',
+                n2 VARCHAR(24) NOT NULL DEFAULT '',
+                n3 VARCHAR(24) NOT NULL DEFAULT '',
+                n4 VARCHAR(24) NOT NULL DEFAULT '',
+                PRIMARY KEY (owner_guid)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
         // M6.2: деньги персонажа (медь). Стартовый баланс — тестовый (100g), чтобы было что тратить.
         // MySQL не поддерживает ADD COLUMN IF NOT EXISTS — глушим ошибку «дубликат столбца» (1060).
         try
@@ -172,6 +185,35 @@ public sealed class CharactersDatabase(string connectionString)
             """, new { guid, x, y, z });
     }
 
+    /// <summary>Сохраняет 5 склонений имени персонажа (ruRU). Перезаписывает существующие.</summary>
+    public async Task SetDeclinedNamesAsync(uint ownerGuid, string[] names, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("""
+            REPLACE INTO character_declined_names (owner_guid, n0, n1, n2, n3, n4)
+            VALUES (@ownerGuid, @n0, @n1, @n2, @n3, @n4);
+            """, new
+        {
+            ownerGuid,
+            n0 = names.ElementAtOrDefault(0) ?? "", n1 = names.ElementAtOrDefault(1) ?? "",
+            n2 = names.ElementAtOrDefault(2) ?? "", n3 = names.ElementAtOrDefault(3) ?? "",
+            n4 = names.ElementAtOrDefault(4) ?? "",
+        });
+    }
+
+    /// <summary>5 склонений имени персонажа или null, если не заданы.</summary>
+    public async Task<string[]?> GetDeclinedNamesAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var row = await db.QuerySingleOrDefaultAsync(new CommandDefinition(
+            "SELECT n0,n1,n2,n3,n4 FROM character_declined_names WHERE owner_guid = @ownerGuid;",
+            new { ownerGuid }, cancellationToken: ct));
+        if (row is null) return null;
+        var d = (IDictionary<string, object>)row;
+        return new[] { d["n0"], d["n1"], d["n2"], d["n3"], d["n4"] }
+            .Select(x => x?.ToString() ?? "").ToArray();
+    }
+
     /// <summary>Деньги персонажа (медь). M6.2.</summary>
     public async Task SetMoneyAsync(uint guid, uint money, CancellationToken ct = default)
     {
@@ -194,7 +236,10 @@ public sealed class CharactersDatabase(string connectionString)
             "DELETE FROM characters WHERE guid = @guid AND account_id = @accountId;",
             new { guid, accountId });
         if (affected > 0)
+        {
             await db.ExecuteAsync("DELETE FROM character_items WHERE owner_guid = @guid;", new { guid });
+            await db.ExecuteAsync("DELETE FROM character_declined_names WHERE owner_guid = @guid;", new { guid });
+        }
         return affected > 0;
     }
 }
