@@ -26,6 +26,9 @@ public static class UpdateField
     public const int UnitCombatReach = 0x0042;    // float
     public const int UnitDisplayId = 0x0043;
     public const int UnitNativeDisplayId = 0x0044;
+    /// <summary>UNIT_MOD_CAST_SPEED (float, по умолчанию 1.0). Клиент масштабирует им анимации/время
+    /// каста — без него (0.0) анимация каста ломается (не стартует/залипает). Сверено с reference (3.3.5).</summary>
+    public const int UnitModCastSpeed = 0x0050;
 
     // ITEM (OBJECT_END = 0x06). Значения сверены с TrinityCore/CMaNGOS UpdateFields.h (3.3.5a).
     public const int ItemOwner = 0x0006;          // size 2 (guid владельца)

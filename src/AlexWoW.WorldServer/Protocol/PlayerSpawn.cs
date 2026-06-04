@@ -134,6 +134,7 @@ public static class PlayerSpawn
         m.SetUInt32(UpdateField.UnitNativeDisplayId, model);
         m.SetFloat(UpdateField.UnitBoundingRadius, 0.306f);
         m.SetFloat(UpdateField.UnitCombatReach, 1.5f);
+        m.SetFloat(UpdateField.UnitModCastSpeed, 1.0f); // M6.4: иначе анимация каста ломается (масштаб ×0)
 
         m.SetBytes(UpdateField.PlayerBytes, c.Skin, c.Face, c.HairStyle, c.HairColor);
         m.SetBytes(UpdateField.PlayerBytes2, c.FacialHair, 0, 0, 0);

@@ -76,6 +76,15 @@ public enum WorldOpcode : uint
     SmsgAttackSwingNotInRange = 0x145, // пустое — цель вне мили-радиуса
     SmsgAttackerStateUpdate = 0x14A,
 
+    // Спеллы (M6.4)
+    CmsgCastSpell = 0x12E,
+    CmsgCancelCast = 0x12F,
+    SmsgCastFailed = 0x130,
+    SmsgSpellStart = 0x131,
+    SmsgSpellGo = 0x132,
+    SmsgSpellFailure = 0x133,
+    SmsgSpellNonMeleeDamageLog = 0x250,
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,

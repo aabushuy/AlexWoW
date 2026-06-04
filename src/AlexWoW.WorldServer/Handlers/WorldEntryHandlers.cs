@@ -149,7 +149,8 @@ public static class WorldEntryHandlers
 
     private static async Task SendInitialSpellsAsync(WorldSession session, byte race, CancellationToken ct)
     {
-        var spells = LanguageSpells.ForRace(race);
+        // Языковые навыки + боевые спеллы для каста (M6.4): Fireball/Frostbolt rank 1 (req level 1).
+        var spells = LanguageSpells.ForRace(race).Concat(SpellHandlers.GrantedCombatSpells).ToList();
         var w = new ByteWriter(8 + spells.Count * 6)
             .UInt8(0)
             .UInt16((ushort)spells.Count);

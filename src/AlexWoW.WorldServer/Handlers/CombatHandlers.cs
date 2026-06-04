@@ -101,19 +101,15 @@ public static class CombatHandlers
         session.NextMeleeSwingMs = now + SwingIntervalMs;
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
-        var before = creature.Health;
-        var dealt = Math.Min(damage, before);
-        creature.Health = before - dealt;
-        var overkill = damage - dealt;
+        var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
 
         var attackerGuid = (ulong)session.InWorldGuid;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
             BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
 
-        if (creature.Health == 0)
+        if (died)
         {
-            creature.RespawnAtMs = now + WorldState.RespawnDelay;
             await StopAttackAsync(session, creature.Guid, ct);
             session.Logger.LogInformation("KILL '{User}' убил '{Name}' (guid={Guid}), респавн через {Sec}с",
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);

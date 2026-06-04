@@ -10,12 +10,45 @@
 | M6.1 Стартовая экипировка и инвентарь | 🟡 в работе |
 | M6.2 Торговля с NPC | ⬜ |
 | M6.3 Бой (мили) + серверный тик | ✅ проверено клиентом (бой + плавность движения) |
-| M6.4 Спеллы | ⬜ |
+| M6.4 Спеллы | 🟡 инкремент 1 (каст→урон) реализован; анимация завершения каста — баг M7 |
 | M6.5 Квесты | ⬜ |
 | M6.6 Лут | ⬜ |
 | M6.7 ИИ существ | ⬜ |
 
 ---
+
+## M6.4 — спеллы (🟡 инкремент 1: каст → урон — проверено клиентом)
+
+Каст спелла по цели с каст-баром и прямым уроном. Серверный парсер Spell.dbc НЕ нужен (клиент
+валидирует механику по своему Spell.dbc) — эффект/школа/время каста хардкожены в `SpellHandlers.Spells`.
+
+### Что сделано
+- **Опкоды**: `CMSG_CAST_SPELL 0x12E`, `CMSG_CANCEL_CAST 0x12F`, `SMSG_SPELL_START 0x131`,
+  `SMSG_SPELL_GO 0x132`, `SMSG_SPELL_FAILURE 0x133`, `SMSG_SPELLNONMELEEDAMAGELOG 0x250`. Лейауты сверены с reference.
+- **`Handlers/SpellHandlers`**: `OnCastSpell` (cast_count u8 + spell u32 + castFlags u8 + SpellCastTargets:
+  target_flags u32, UNIT→packed guid). Мгновенный → сразу `CompleteCast`; с временем → `SPELL_START` (каст-бар)
+  + **точное завершение `Task.Delay(castMs)`** (поколение `CastGeneration` против отмены/перебивания) → `SPELL_GO`
+  (кастеру = снаряд; соседям = `BroadcastToNeighborsAsync`) + урон (`WorldState.ApplyCreatureDamage`, общий с мили)
+  + `SMSG_SPELLNONMELEEDAMAGELOG`.
+- **Гранты**: Fireball(133)/Frostbolt(116) rank 1 в `SMSG_INITIAL_SPELLS` (req level 1).
+- **Прерывание движением**: сдвиг >0.5 ярда → `InterruptOnMoveAsync` + `SMSG_SPELL_FAILURE INTERRUPTED 0x28`.
+- **Рефактор M6.3**: общий `WorldState.ApplyCreatureDamage(creature, dmg)`.
+
+### Грабли / уроки
+- **`UNIT_MOD_CAST_SPEED` (0x50, float, дефолт 1.0)** — без него клиент читает 0.0 → **анимация каста ломается**
+  (масштаб ×0: не стартует). Ставим 1.0 в `PlayerSpawn`. Индекс сверен с reference (калибровка по NPC_FLAGS=0x52).
+- **Школа в `SMSG_SPELLNONMELEEDAMAGELOG` — МАСКА (u8), не индекс**: Fire=0x4, Frost=0x10. Слали 2 → «Holy» (маска 0x2).
+- **Завершение каста — точно по времени** (Task.Delay): через 250-мс тик GO опаздывал, клиент слал CANCEL_CAST.
+- `SPELL_GO` flags=0x100 (как CMaNGOS), `SPELL_START` flags=0 — без conditional-полей.
+
+### 🔴 Открытый баг (вынесен в M7): анимация ЗАВЕРШЕНИЯ каста у кастера не сбрасывается
+Поза каста + кнопка не «отжимаются» (снимается прыжком/ESC). Пакеты SPELL_START/GO байт-в-байт верны
+(декодированы), тайминг точный, cast-speed/школа/флаги корректны — причина НЕ в спелл-пакетах. Вероятно
+не хватает ещё поля юнита (упрощённая модель игрока). Нужен реф-дамп реального каста с CMaNGOS.
+
+### Проверка
+✅ Клиент (маг «Магтест»): Fireball/Frostbolt → каст-бар → числа урона (огонь/лёд), HP↓, смерть, респаун;
+прерывание движением. 🔴 анимация завершения каста — баг M7.
 
 ## M6.3 — бой (мили) + серверный тик (✅ проверено клиентом)
 
