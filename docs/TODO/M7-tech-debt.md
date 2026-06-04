@@ -53,16 +53,21 @@
 
 ---
 
-## БАГ/чистота: лишние (тестовые) вендоры у старта
+## Чистота: лишние тест/кастом-NPC у старта (вендоры, арена-мастера и пр.)
 
 **Статус:** 🟡 открыт.
-**Симптом:** у стартовой зоны (Долина Северозёмья) кучей стоят generic-NPC **«Weapons Vendor»**
-(и, вероятно, другие generic-торговцы) без личного имени — тест-контент дампа CMaNGOS, как ранее
-вычищенные generic-тренеры/`[DND]` (см. M5.6b).
-**Фикс:** расширить фильтр спавна существ в `WorldDatabase.GetCreaturesNearAsync` — исключать
-generic-вендоров без subname (напр. `Name LIKE '% Vendor' AND COALESCE(SubName,'')=''`), по аналогии
-с фильтром тренеров; при необходимости — точечный список entry. Проверить, что настоящие именованные
-торговцы остаются.
+**Симптом:** у стартовой зоны (Долина Северозёмья) кучей стоят кастом/тест-NPC дампа CMaNGOS,
+которых не должно быть в ванильном старте:
+- generic-вендоры **«Weapons Vendor»** без личного имени;
+- **«Arena Battlemaster» / Arena Organizer / Arena Vendor** и пр. арена-NPC (кастом CMaNGOS,
+  заспавнены «в каждом городе»; subname `Arena Battlemaster` и т.п.).
+Аналогично ранее вычищенным generic-тренерам/`[DND]` и точечно исключённым арена-entry (M5.6b,
+`WorldDatabase.ExcludedCreatureEntries` = 26012/26075/26760).
+**Фикс:** расширить фильтр спавна в `WorldDatabase.GetCreaturesNearAsync`:
+- generic-вендоры без subname (`Name LIKE '% Vendor' AND COALESCE(SubName,'')=''`);
+- арена-NPC по subname (`SubName LIKE 'Arena %'` → Battlemaster/Organizer/Vendor, + Brutal/Test Arena);
+- при необходимости дополнить `ExcludedCreatureEntries` точечными id.
+Проверить, что настоящие именованные торговцы/мастера остаются.
 
 ## Прочий техдолг
 
