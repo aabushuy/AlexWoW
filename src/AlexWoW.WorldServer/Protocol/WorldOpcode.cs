@@ -67,6 +67,15 @@ public enum WorldOpcode : uint
     CmsgListInventory = 0x19E,
     SmsgListInventory = 0x19F,
 
+    // Бой (M6.3)
+    CmsgSetSelection = 0x13D,
+    CmsgAttackSwing = 0x141,      // Guid victim (plain u64)
+    CmsgAttackStop = 0x142,       // пустое тело
+    SmsgAttackStart = 0x143,      // u64 attacker + u64 victim
+    SmsgAttackStop = 0x144,       // packed player + packed enemy + u32 0
+    SmsgAttackSwingNotInRange = 0x145, // пустое — цель вне мили-радиуса
+    SmsgAttackerStateUpdate = 0x14A,
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,

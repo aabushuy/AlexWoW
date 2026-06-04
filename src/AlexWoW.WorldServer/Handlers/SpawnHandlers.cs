@@ -46,16 +46,27 @@ public static class SpawnHandlers
             return;
         }
 
-        var newSet = new Dictionary<ulong, NpcSpawn>(rows.Count);
+        var newSet = new Dictionary<ulong, World.WorldCreature>(rows.Count);
         foreach (var row in rows)
         {
             if (row.DisplayId == 0)
                 continue; // нет модели — не отрисуется
-            var template = new CreatureTemplate(
-                row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
-                row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
-            newSet[Npcs.UnitGuid(row.Entry, row.Guid)] = new NpcSpawn(
-                Npcs.UnitGuid(row.Entry, row.Guid), template, row.X, row.Y, row.Z, row.O);
+            var guid = Npcs.UnitGuid(row.Entry, row.Guid);
+            // M6.3: одна авторитетная сущность на GUID для всех наблюдателей (общее HP/смерть/респавн).
+            var creature = session.World.GetOrAddCreature(guid, () =>
+            {
+                var template = new CreatureTemplate(
+                    row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
+                    row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
+                var maxHealth = World.WorldCreature.MaxHealthFor(row.MinLevel);
+                return new World.WorldCreature
+                {
+                    Guid = guid, Map = map, Template = template,
+                    X = row.X, Y = row.Y, Z = row.Z, O = row.O,
+                    MaxHealth = maxHealth, Health = maxHealth,
+                };
+            });
+            newSet[guid] = creature;
         }
 
         var time = (uint)Environment.TickCount;
@@ -66,17 +77,17 @@ public static class SpawnHandlers
         {
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-            session.VisibleNpcs.Remove(guid);
+            session.VisibleNpcs.TryRemove(guid, out _);
         }
 
         // Новые в зоне → CREATE.
         var added = 0;
-        foreach (var (guid, spawn) in newSet)
+        foreach (var (guid, creature) in newSet)
         {
             if (session.VisibleNpcs.ContainsKey(guid))
                 continue;
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(spawn, time), ct);
-            session.VisibleNpcs[guid] = spawn;
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(creature, time), ct);
+            session.VisibleNpcs[guid] = creature;
             added++;
         }
 
@@ -160,11 +171,20 @@ public static class SpawnHandlers
 
     private static async Task SendTestNpcAsync(WorldSession session, float x, float y, float z, CancellationToken ct)
     {
-        var spawn = new NpcSpawn(
-            Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1), Npcs.TestDummy, x + 4f, y, z, MathF.PI);
-        session.VisibleNpcs[spawn.Guid] = spawn;
+        var guid = Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1);
+        var creature = session.World.GetOrAddCreature(guid, () =>
+        {
+            var maxHealth = World.WorldCreature.MaxHealthFor(Npcs.TestDummy.Level);
+            return new World.WorldCreature
+            {
+                Guid = guid, Map = session.Character?.Map ?? 0, Template = Npcs.TestDummy,
+                X = x + 4f, Y = y, Z = z, O = MathF.PI,
+                MaxHealth = maxHealth, Health = maxHealth,
+            };
+        });
+        session.VisibleNpcs[guid] = creature;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            CreatureUpdate.BuildCreateObject(spawn, (uint)Environment.TickCount), ct);
+            CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCreatureQuery)]

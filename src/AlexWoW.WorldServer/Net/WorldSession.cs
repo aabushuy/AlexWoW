@@ -72,8 +72,11 @@ public sealed class WorldSession
     /// <summary>Деньги персонажа (медь) в мире. Загружается при входе, меняется торговлей. M6.2.</summary>
     internal uint Money { get; set; }
 
-    /// <summary>Существа (NPC), показанные клиенту этой сессии (guid → спавн). M5.</summary>
-    internal Dictionary<ulong, NpcSpawn> VisibleNpcs { get; } = new();
+    /// <summary>
+    /// Существа (NPC), показанные клиенту этой сессии (guid → авторитетная сущность). M5/M6.3.
+    /// Потокобезопасный: пишет поток сессии (видимость), читает поток тика (рассылка боя/HP).
+    /// </summary>
+    internal System.Collections.Concurrent.ConcurrentDictionary<ulong, WorldCreature> VisibleNpcs { get; } = new();
 
     /// <summary>Гейм-объекты, показанные клиенту этой сессии (guid → спавн). M5.6b.</summary>
     internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
@@ -87,6 +90,18 @@ public sealed class WorldSession
     /// <summary>Позиция последнего пересчёта видимости NPC (троттлинг по дистанции). M5.6.</summary>
     internal float LastVisX { get; set; }
     internal float LastVisY { get; set; }
+
+    /// <summary>Текущая цель (CMSG_SET_SELECTION). 0 — нет. M6.3.</summary>
+    internal ulong SelectionGuid { get; set; }
+
+    /// <summary>GUID существа, по которому идёт авто-атака (0 — не в бою). Читается тиком. M6.3.</summary>
+    internal ulong CombatTargetGuid { get; set; }
+
+    /// <summary>Время следующего мили-свинга (<see cref="Environment.TickCount64"/>, мс). M6.3.</summary>
+    internal long NextMeleeSwingMs { get; set; }
+
+    /// <summary>Послали ли клиенту «вне радиуса» для текущего эпизода (анти-спам). M6.3.</summary>
+    internal bool MeleeNotInRangeNotified { get; set; }
 
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
@@ -125,6 +140,8 @@ public sealed class WorldSession
             return;
         Player = null;
         InWorldGuid = 0;
+        CombatTargetGuid = 0; // M6.3: вне мира боя нет
+        SelectionGuid = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();
