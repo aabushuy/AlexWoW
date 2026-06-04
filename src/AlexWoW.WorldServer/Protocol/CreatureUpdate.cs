@@ -1,10 +1,11 @@
 using AlexWoW.Common.Network;
+using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Protocol;
 
 /// <summary>
-/// Сборка <c>SMSG_UPDATE_OBJECT</c> для спавна существа (NPC) — <c>UPDATETYPE_CREATE_OBJECT2</c>,
-/// <c>TYPEID_UNIT</c>, без флага Self. Минимум полей, достаточный для отображения NPC у клиента.
+/// Сборка <c>SMSG_UPDATE_OBJECT</c> для существа (NPC): полный спавн (<c>CREATE_OBJECT2</c>,
+/// <c>TYPEID_UNIT</c>) и частичные VALUES-апдейты (здоровье в бою, M6.3).
 /// </summary>
 public static class CreatureUpdate
 {
@@ -19,30 +20,44 @@ public static class CreatureUpdate
     private const float TurnRate = 3.141594f;
     private const float PitchRate = 3.141594f;
 
-    public static byte[] BuildCreateObject(NpcSpawn spawn, uint serverTimeMs)
+    public static byte[] BuildCreateObject(WorldCreature creature, uint serverTimeMs)
     {
         var w = new ByteWriter(192);
 
         w.UInt32(1);                       // количество блоков
         w.UInt8(UpdateType.CreateObject2);
-        PackedGuid.Write(w, spawn.Guid);
+        PackedGuid.Write(w, creature.Guid);
         w.UInt8(TypeId.Unit);
 
-        WriteMovementBlock(w, spawn, serverTimeMs);
-        BuildValues(spawn).WriteTo(w);
+        WriteMovementBlock(w, creature, serverTimeMs);
+        BuildValues(creature).WriteTo(w);
 
         return w.ToArray();
     }
 
-    private static void WriteMovementBlock(ByteWriter w, NpcSpawn spawn, uint serverTimeMs)
+    /// <summary>VALUES-апдейт здоровья существа (UNIT_FIELD_HEALTH) — в бою/при смерти/респавне. M6.3.</summary>
+    public static byte[] BuildHealthUpdate(ulong guid, uint health)
+    {
+        var m = new UpdateMask();
+        m.SetUInt32(UpdateField.UnitHealth, health);
+
+        var w = new ByteWriter(32);
+        w.UInt32(1);
+        w.UInt8(UpdateType.Values);
+        PackedGuid.Write(w, guid);
+        m.WriteTo(w);
+        return w.ToArray();
+    }
+
+    private static void WriteMovementBlock(ByteWriter w, WorldCreature creature, uint serverTimeMs)
     {
         w.UInt16((ushort)ObjectUpdateFlags.Living); // Living, но без Self
 
         w.UInt32(0)            // movement flags
          .UInt16(0)            // movement flags 2
          .UInt32(serverTimeMs) // time
-         .Single(spawn.X).Single(spawn.Y).Single(spawn.Z)
-         .Single(spawn.O)      // orientation
+         .Single(creature.X).Single(creature.Y).Single(creature.Z)
+         .Single(creature.O)   // orientation
          .UInt32(0);           // fall time
 
         w.Single(WalkSpeed).Single(RunSpeed).Single(RunBackSpeed)
@@ -51,19 +66,19 @@ public static class CreatureUpdate
          .Single(TurnRate).Single(PitchRate);
     }
 
-    private static UpdateMask BuildValues(NpcSpawn spawn)
+    private static UpdateMask BuildValues(WorldCreature creature)
     {
-        var t = spawn.Template;
+        var t = creature.Template;
 
         var m = new UpdateMask();
-        m.SetUInt64(UpdateField.ObjectGuid, spawn.Guid);
+        m.SetUInt64(UpdateField.ObjectGuid, creature.Guid);
         m.SetUInt32(UpdateField.ObjectEntry, t.Entry);
         m.SetUInt32(UpdateField.ObjectType, TypeMask.UnitObject);
         m.SetFloat(UpdateField.ObjectScaleX, t.Scale);
 
         m.SetBytes(UpdateField.UnitBytes0, 0, t.UnitClass, 0, 0); // race=0|class|gender=0|powertype=0
-        m.SetUInt32(UpdateField.UnitHealth, 100);
-        m.SetUInt32(UpdateField.UnitMaxHealth, 100);
+        m.SetUInt32(UpdateField.UnitHealth, creature.Health);
+        m.SetUInt32(UpdateField.UnitMaxHealth, creature.MaxHealth);
         m.SetUInt32(UpdateField.UnitLevel, t.Level);
         m.SetUInt32(UpdateField.UnitFactionTemplate, t.Faction);
         m.SetUInt32(UpdateField.UnitNpcFlags, t.NpcFlags);

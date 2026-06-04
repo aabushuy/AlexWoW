@@ -16,7 +16,25 @@ public sealed class WorldState(ILogger<WorldState> logger)
     /// <summary>Радиус видимости (ярды). Грубо — как дефолтная зона интереса в WoW.</summary>
     public const float VisibilityRange = 100f;
 
+    /// <summary>Через сколько мс после смерти существо респавнится (тест). M6.3.</summary>
+    private const long RespawnDelayMs = 30_000;
+
     private readonly ConcurrentDictionary<ulong, WorldPlayer> _players = new();
+
+    /// <summary>
+    /// Авторитетные существа по GUID — общие для всех наблюдателей (здоровье/смерть/респавн). M6.3.
+    /// Лениво создаются из тех же DB-строк, что и видимость (см. <see cref="GetOrAddCreature"/>).
+    /// Пока без эвикции (статические спавны мира; чистку добавим в M6.8).
+    /// </summary>
+    private readonly ConcurrentDictionary<ulong, WorldCreature> _creatures = new();
+
+    /// <summary>Существо по GUID (или null, если ещё не материализовано). M6.3.</summary>
+    public WorldCreature? FindCreature(ulong guid)
+        => _creatures.TryGetValue(guid, out var c) ? c : null;
+
+    /// <summary>Берёт существо из реестра или создаёт его лениво (одно на GUID для всех). M6.3.</summary>
+    public WorldCreature GetOrAddCreature(ulong guid, Func<WorldCreature> factory)
+        => _creatures.GetOrAdd(guid, _ => factory());
 
     /// <summary>
     /// Игрок вошёл в мир: регистрируем и спавним с соседями. Соседи (уже загружены) надёжно видят
@@ -121,6 +139,70 @@ public sealed class WorldState(ILogger<WorldState> logger)
         foreach (var other in PlayersInRangeOf(mover))
             await other.Session.SendAsync(opcode, body, ct);
     }
+
+    /// <summary>
+    /// Тик мира (M6.3): продвигает мили-свинги атакующих игроков и респавнит мёртвых существ.
+    /// Вызывается из <see cref="WorldUpdateLoop"/> ~раз в 250 мс. Исключения по отдельной сессии
+    /// не должны валить весь тик — ловим их поштучно.
+    /// </summary>
+    public async Task UpdateAsync(CancellationToken ct)
+    {
+        var now = Environment.TickCount64;
+
+        foreach (var player in _players.Values)
+        {
+            try
+            {
+                await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug("Тик боя '{User}': {Msg}", player.Character.Name, ex.Message);
+            }
+        }
+
+        foreach (var creature in _creatures.Values)
+        {
+            if (creature.IsAlive || creature.RespawnAtMs is not { } at || now < at)
+                continue;
+            try
+            {
+                await RespawnCreatureAsync(creature, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug("Респавн существа {Guid}: {Msg}", creature.Guid, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>Воскрешает существо (полное HP) и шлёт наблюдателям апдейт здоровья. M6.3.</summary>
+    private async Task RespawnCreatureAsync(WorldCreature creature, CancellationToken ct)
+    {
+        creature.Health = creature.MaxHealth;
+        creature.RespawnAtMs = null;
+        await BroadcastCreatureHealthAsync(creature, ct);
+        logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось", creature.Template.Name, creature.Guid);
+    }
+
+    /// <summary>Наблюдатели существа: игроки на его карте, у кого оно в видимом наборе. M6.3.</summary>
+    public IEnumerable<WorldPlayer> ObserversOf(WorldCreature creature)
+        => _players.Values.Where(p => p.Map == creature.Map && p.Session.VisibleNpcs.ContainsKey(creature.Guid));
+
+    /// <summary>Рассылка пакета всем наблюдателям существа (бой/смерть/HP). M6.3.</summary>
+    public async Task BroadcastToObserversAsync(WorldCreature creature, WorldOpcode opcode, byte[] body, CancellationToken ct)
+    {
+        foreach (var observer in ObserversOf(creature).ToList())
+            await observer.Session.SendAsync(opcode, body, ct);
+    }
+
+    /// <summary>Рассылка текущего здоровья существа наблюдателям (VALUES-апдейт UNIT_FIELD_HEALTH). M6.3.</summary>
+    public Task BroadcastCreatureHealthAsync(WorldCreature creature, CancellationToken ct)
+        => BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
+            CreatureUpdate.BuildHealthUpdate(creature.Guid, creature.Health), ct);
+
+    /// <summary>Длительность респавна существа (мс). M6.3.</summary>
+    public static long RespawnDelay => RespawnDelayMs;
 
     /// <summary>Игроки на той же карте в радиусе видимости (исключая самого center).</summary>
     private IEnumerable<WorldPlayer> PlayersInRangeOf(WorldPlayer center)

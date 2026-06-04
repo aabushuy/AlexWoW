@@ -9,13 +9,67 @@
 |---|---|---|
 | M6.1 Стартовая экипировка и инвентарь | [TODO/M6.1](../TODO/M6.1-starting-gear.md) | 🟡 в работе |
 | M6.2 Торговля с NPC | [TODO/M6.2](../TODO/M6.2-vendor.md) | ⬜ |
-| M6.3 Бой (мили) | [TODO/M6.3](../TODO/M6.3-combat.md) | ⬜ |
+| M6.3 Бой (мили) + серверный тик | [TODO/M6.3](../TODO/M6.3-combat.md) | 🟡 реализовано (часть 1: бой), ждёт клиента |
 | M6.4 Спеллы | [TODO/M6.4](../TODO/M6.4-spells.md) | ⬜ |
 | M6.5 Квесты | [TODO/M6.5](../TODO/M6.5-quests.md) | ⬜ |
 | M6.6 Лут | [TODO/M6.6](../TODO/M6.6-loot.md) | ⬜ |
 | M6.7 ИИ существ | [TODO/M6.7](../TODO/M6.7-ai.md) | ⬜ |
 
 ---
+
+## M6.3 — бой (мили) + серверный тик (🟡 часть 1 реализована, ждёт проверки клиентом)
+
+Авто-атака по враждебному NPC: числа урона, падение HP, смерть (труп) и респавн. Вводит
+**авторитетные сущности существ** и **серверный тик** — фундамент под спеллы/ИИ/реген.
+
+### Архитектура (вводится здесь)
+- **`World/WorldCreature`** — авторитетная сущность существа: мутабельное `Health`/`MaxHealth`,
+  `IsAlive`, `RespawnAtMs`; одна на GUID для всех наблюдателей. Прежний per-session immutable
+  `NpcSpawn` удалён; `WorldSession.VisibleNpcs` → `ConcurrentDictionary<ulong, WorldCreature>`
+  (читает поток тика, пишет поток сессии).
+- **Реестр в `WorldState`** (`_creatures`, ConcurrentDictionary): `GetOrAddCreature(guid, factory)` —
+  лениво материализует существо из той же DB-строки, что и видимость (`SpawnHandlers`). HP по уровню:
+  `WorldCreature.MaxHealthFor(level) = 25 + max(1,level)*12` (упрощённо; точные статы из
+  creature_classlevelstats — позже). Без эвикции пока (статические спавны; чистка в M6.8).
+- **`World/WorldUpdateLoop : BackgroundService`** — серверный тик `PeriodicTimer` 250 мс →
+  `WorldState.UpdateAsync(ct)`: продвигает свинги атакующих игроков, респавнит мёртвых существ.
+  Зарегистрирован hosted-сервисом в `Program.cs` перед `WorldListener`.
+
+### Бой (`Handlers/CombatHandlers`)
+- `CMSG_SET_SELECTION 0x13D` (plain u64) — хранит `session.SelectionGuid`.
+- `CMSG_ATTACKSWING 0x141` (**plain** u64 victim) → `SMSG_ATTACKSTART 0x143` (u64 attacker + u64
+  victim); ставит `CombatTargetGuid`, первый свинг — на ближайшем тике.
+- `CMSG_ATTACKSTOP 0x142` (пустое) → `SMSG_ATTACKSTOP 0x144` (**packed** player + packed enemy + u32 0).
+- Тик `TickMeleeAsync`: раз в `SwingIntervalMs=2000` наносит урон (`8+lvl .. 14+lvl*2`),
+  уменьшает `creature.Health`, рассылает наблюдателям `SMSG_ATTACKERSTATEUPDATE 0x14A` + VALUES-апдейт
+  `UNIT_FIELD_HEALTH`. На `Health=0` — таймер респавна (`now+30с`) + `SMSG_ATTACKSTOP`.
+- `SMSG_ATTACKERSTATEUPDATE`: hit_info=`AFFECTS_VICTIM 0x2` (НЕ `UNK1 0x1` — иначе требуется длинный
+  хвост структуры!), attacker(packed)+target(packed)+total_damage+overkill+count(1)+
+  [school=1(физ)+dmg_float+dmg_uint]+victim_state=HIT(1)+u32 0+u32 0. Без absorb/resist/block —
+  conditional-поля опущены. Лейауты сверены с `reference/wow_messages`.
+- Рассылка боя/HP — `WorldState.BroadcastToObserversAsync`/`BroadcastCreatureHealthAsync`
+  (наблюдатели = игроки на карте существа, у кого оно в `VisibleNpcs`); атакующий входит в их число.
+- HP игрока в спавне — по уровню (`80 + lvl*20`, упрощённо). NPC в M6.3 не отвечает (ответный удар/
+  преследование — M6.7).
+
+### Решения / грабли
+- `CMSG_ATTACKSWING`/`CMSG_SET_SELECTION`/`SMSG_ATTACKSTART` — **plain** Guid (u64), а `SMSG_ATTACKSTOP`/
+  `ATTACKERSTATEUPDATE` — **packed** (сверено по wowm-тестам в reference).
+- Существо материализуется в общий реестр при видимости — новый наблюдатель видит правильное текущее HP
+  (в т.ч. труп health=0); респавн воскрешает у тех, кто ещё рядом, VALUES-апдейтом.
+- Боевое состояние сбрасывается при выходе из мира (`CombatTargetGuid/SelectionGuid = 0`).
+- Атаковать можно только враждебного по фракции NPC (клиент сам шлёт ATTACKSWING). Тест-цыплёнок
+  (faction 35) дружелюбен — для проверки нужен волк/враг из дампа.
+
+### Часть 2 (отдельным коммитом, после проверки боя клиентом)
+Нормализация времени движения соседей (плавность) на серверный тик: периодический `SMSG_TIME_SYNC_REQ`
+из тика, расчёт дельты часов клиента по `CMSG_TIME_SYNC_RESP`, переписывание поля `time` в
+ретранслируемых MSG_MOVE_*. Вынесено, чтобы не регрессить рабочий путь движения в одном цикле проверки.
+
+### Проверка
+- ✅ Сборка решения чистая (0 предупреждений), тесты 12/12.
+- ⏳ **Живой клиент**: таргет на враждебного NPC → авто-атака → числа урона, HP падает, NPC умирает
+  (труп) → через ~30 с респавн. Второй клиент видит бой/смерть/респавн.
 
 ## M6.9 — управление инвентарём (🟡 реализовано, ждёт проверки клиентом)
 

@@ -52,6 +52,7 @@ builder.Services.AddSingleton(sp =>
     return new Navmesh(options.MmapsPath);
 });
 builder.Services.AddSingleton<WorldState>();
+builder.Services.AddHostedService<WorldUpdateLoop>();
 builder.Services.AddHostedService<WorldListener>();
 
 var host = builder.Build();

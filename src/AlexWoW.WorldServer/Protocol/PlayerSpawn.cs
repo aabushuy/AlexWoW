@@ -121,8 +121,11 @@ public static class PlayerSpawn
         m.SetFloat(UpdateField.ObjectScaleX, 1.0f);
 
         m.SetBytes(UpdateField.UnitBytes0, c.Race, c.Class, c.Gender, powerType);
-        m.SetUInt32(UpdateField.UnitHealth, 100);
-        m.SetUInt32(UpdateField.UnitMaxHealth, 100);
+        // Здоровье игрока — упрощённо по уровню (точные статы по классу/уровню позже). NPC в M6.3
+        // не отвечает ударом, так что для боя важнее HP существа; player HP — для правдоподобной полоски.
+        var maxHealth = (uint)(80 + Math.Max((byte)1, c.Level) * 20);
+        m.SetUInt32(UpdateField.UnitHealth, maxHealth);
+        m.SetUInt32(UpdateField.UnitMaxHealth, maxHealth);
         m.SetUInt32(UpdateField.UnitPower1, 100);
         m.SetUInt32(UpdateField.UnitMaxPower1, 100);
         m.SetUInt32(UpdateField.UnitLevel, c.Level);
