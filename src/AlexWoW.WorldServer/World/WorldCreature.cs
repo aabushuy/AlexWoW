@@ -28,6 +28,12 @@ public sealed class WorldCreature
     /// <summary>Момент респавна (<see cref="Environment.TickCount64"/>, мс); null — пока жив.</summary>
     public long? RespawnAtMs { get; set; }
 
+    // --- Ответный бой (M6.7 инкр.1): существо бьёт того, кто его атаковал, пока тот в мили-радиусе. ---
+    /// <summary>GUID игрока, по которому существо отвечает (0 — не в бою). Читает/пишет серверный тик.</summary>
+    public ulong CombatTargetGuid { get; set; }
+    /// <summary>Момент следующего свинга существа (<see cref="Environment.TickCount64"/>, мс).</summary>
+    public long NextSwingMs { get; set; }
+
     /// <summary>
     /// Здоровье существа по уровню (упрощённо — точные статы из creature_classlevelstats позже, M6+).
     /// Достаточно для убедимой полоски HP и боя в несколько свингов на низких уровнях.

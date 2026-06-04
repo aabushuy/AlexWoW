@@ -35,6 +35,10 @@ public sealed class WorldState(ILogger<WorldState> logger)
     public WorldCreature? FindCreature(ulong guid)
         => _creatures.TryGetValue(guid, out var c) ? c : null;
 
+    /// <summary>Онлайн-игрок по GUID (или null). M6.7.</summary>
+    public WorldPlayer? FindPlayer(ulong guid)
+        => _players.TryGetValue(guid, out var p) ? p : null;
+
     /// <summary>Берёт существо из реестра или создаёт его лениво (одно на GUID для всех). M6.3.</summary>
     public WorldCreature GetOrAddCreature(ulong guid, Func<WorldCreature> factory)
         => _creatures.GetOrAdd(guid, _ => factory());
@@ -192,15 +196,21 @@ public sealed class WorldState(ILogger<WorldState> logger)
 
         foreach (var creature in _creatures.Values)
         {
-            if (creature.IsAlive || creature.RespawnAtMs is not { } at || now < at)
-                continue;
             try
             {
-                await RespawnCreatureAsync(creature, ct);
+                // M6.7: живое существо в бою бьёт в ответ; мёртвое — ждёт респавна.
+                if (creature.IsAlive)
+                {
+                    if (creature.CombatTargetGuid != 0)
+                        await Handlers.CombatHandlers.TickCreatureCombatAsync(this, creature, now, ct);
+                    continue;
+                }
+                if (creature.RespawnAtMs is { } at && now >= at)
+                    await RespawnCreatureAsync(creature, ct);
             }
             catch (Exception ex)
             {
-                logger.LogDebug("Респавн существа {Guid}: {Msg}", creature.Guid, ex.Message);
+                logger.LogDebug("Тик существа {Guid}: {Msg}", creature.Guid, ex.Message);
             }
         }
     }
@@ -258,6 +268,32 @@ public sealed class WorldState(ILogger<WorldState> logger)
 
     /// <summary>Длительность респавна существа (мс). M6.3.</summary>
     public static long RespawnDelay => RespawnDelayMs;
+
+    /// <summary>Наблюдатели игрока для боя/HP: сам игрок + соседи в радиусе. M6.7.</summary>
+    public async Task BroadcastToPlayerObserversAsync(WorldPlayer player, WorldOpcode opcode, byte[] body, CancellationToken ct)
+    {
+        await player.Session.SendAsync(opcode, body, ct);
+        foreach (var other in PlayersInRangeOf(player))
+            await other.Session.SendAsync(opcode, body, ct);
+    }
+
+    /// <summary>Рассылка текущего HP игрока (VALUES UNIT_FIELD_HEALTH) себе и соседям. M6.7.</summary>
+    public Task BroadcastPlayerHealthAsync(WorldPlayer player, CancellationToken ct)
+        => BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate(player.Guid,
+                m => m.SetUInt32(UpdateField.UnitHealth, player.Session.Health)), ct);
+
+    /// <summary>
+    /// Урон игроку (от существа, M6.7): уменьшает авторитетный HP. Возвращает фактический урон и
+    /// факт смерти. Рассылку combat-log/HP и обработку смерти делает вызывающий (CombatHandlers).
+    /// </summary>
+    public (uint Dealt, bool Died) ApplyPlayerDamage(WorldPlayer player, uint damage)
+    {
+        var s = player.Session;
+        var dealt = Math.Min(damage, s.Health);
+        s.Health -= dealt;
+        return (dealt, s.Health == 0);
+    }
 
     /// <summary>Игроки на той же карте в радиусе видимости (исключая самого center).</summary>
     private IEnumerable<WorldPlayer> PlayersInRangeOf(WorldPlayer center)

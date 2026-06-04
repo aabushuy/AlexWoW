@@ -52,4 +52,11 @@ public static class DisplayData
     /// </summary>
     public static uint MaxManaForClass(byte charClass, byte level)
         => PowerTypeForClass(charClass) == 0 ? 150u : 0u;
+
+    /// <summary>
+    /// Макс. здоровье игрока по уровню (M6.7). Упрощённо (флэт по уровню) — точные статы по
+    /// классу/выносливости позже. Достаточно, чтобы существо убивало игрока за несколько свингов.
+    /// </summary>
+    public static uint MaxHealthForLevel(byte level)
+        => (uint)(80 + Math.Max((byte)1, level) * 20);
 }
