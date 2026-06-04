@@ -140,9 +140,12 @@ public sealed class AuthSession(
         if (!_srp.TryVerifyProof(clientA, clientM1, out var sessionKey, out var serverM2))
         {
             logger.LogInformation("Неверный пароль для '{User}'", _username);
+            // Эталоны (CMaNGOS/TrinityCore) на неверный пароль шлют WOW_FAIL_UNKNOWN_ACCOUNT (0x04),
+            // а не INCORRECT_PASSWORD (0x05): код 0x05 оставляет клиент в состоянии, из которого
+            // повторная попытка логина виснет (окно «Авторизация» не отвечает). См. M7 #17.
             var fail = new ByteWriter(4)
                 .UInt8((byte)AuthCommand.LogonProof)
-                .UInt8((byte)AuthResult.FailIncorrectPassword)
+                .UInt8((byte)AuthResult.FailUnknownAccount)
                 .UInt16(0);
             await SendAsync(fail.ToArray(), ct);
             return;
