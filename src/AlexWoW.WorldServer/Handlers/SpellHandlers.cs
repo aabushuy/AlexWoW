@@ -21,18 +21,32 @@ public static class SpellHandlers
     private const byte SchoolFire = 0x04;
     private const byte SchoolFrost = 0x10;
 
-    /// <summary>Минимальный «справочник спеллов» (эффект): id → школа, урон, время каста (мс).</summary>
-    private sealed record SpellInfo(byte School, int MinDamage, int MaxDamage, int CastMs);
+    /// <summary>
+    /// Минимальный «справочник спеллов» (эффект): id → школа, урон, время каста (мс), стоимость маны,
+    /// кулдаун (мс; 0 — только GCD на стороне клиента). Значения rank-1 как в WotLK. M6.4.
+    /// </summary>
+    private sealed record SpellInfo(byte School, int MinDamage, int MaxDamage, int CastMs, uint ManaCost, int CooldownMs);
 
     private static readonly Dictionary<uint, SpellInfo> Spells = new()
     {
-        [133] = new(SchoolFire, 14, 22, 1500),   // Fireball rank 1 (req level 1)
-        [116] = new(SchoolFrost, 14, 20, 1500),  // Frostbolt rank 1 (req level 1)
-        [2136] = new(SchoolFire, 24, 32, 0),     // Fire Blast rank 1 (мгновенный; req level 6)
+        [133] = new(SchoolFire, 14, 22, 1500, ManaCost: 30, CooldownMs: 0),     // Fireball rank 1
+        [116] = new(SchoolFrost, 14, 20, 1500, ManaCost: 25, CooldownMs: 0),    // Frostbolt rank 1
+        [2136] = new(SchoolFire, 24, 32, 0, ManaCost: 40, CooldownMs: 8000),    // Fire Blast rank 1 (мгновенный, КД 8с)
     };
 
-    /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4 инкремент 1.</summary>
-    public static readonly int[] GrantedCombatSpells = { 133, 116 };
+    /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4.</summary>
+    public static readonly int[] GrantedCombatSpells = { 133, 116, 2136 };
+
+    // --- SpellCastResult (3.3.5a, сверено с reference world/common.wowm) ---
+    private const byte CastResultNotReady = 0x43; // спелл на кулдауне
+    private const byte CastResultNoPower = 0x55;  // не хватает маны
+
+    /// <summary>Реген маны вне «правила 5 секунд»: прибавка за тик регена. M6.4.</summary>
+    private const uint ManaRegenPerSec = 20;
+    /// <summary>Кадэнс регена маны (мс) — реже тика мира, чтобы не спамить апдейтами. M6.4.</summary>
+    private const long ManaRegenIntervalMs = 1000;
+    /// <summary>«Правило 5 секунд»: после каста реген маны паузится. M6.4.</summary>
+    private const long FiveSecondRuleMs = 5000;
 
     // --- CastFlags: START без HAS_TRAJECTORY (0x2 держал бы каст «в полёте» у снарядов и не завершал);
     //     GO = 0x100 (UNKNOWN9, как CMaNGOS). Ни один не требует conditional-полей в 3.3.5. ---
@@ -59,6 +73,23 @@ public static class SpellHandlers
         {
             // Неизвестный спелл — не ломаем клиент: шлём GO без эффекта (снимает «каст»).
             await SendSpellGoAsync(session, spellId, 0, ct);
+            return;
+        }
+
+        // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
+        if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && Environment.TickCount64 < readyAt)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                BuildCastFailed(castCount, spellId, CastResultNotReady), ct);
+            return;
+        }
+
+        // Мана: не хватает на каст → отказ (NO_POWER → «Недостаточно маны» у клиента). Списываем при
+        // завершении (CompleteCast), а проверяем на старте — между ними мана только регенится.
+        if (session.MaxMana > 0 && session.Mana < info.ManaCost)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
             return;
         }
 
@@ -138,11 +169,92 @@ public static class SpellHandlers
             .UInt8(result)
             .ToArray();
 
-    /// <summary>Завершение каста: SPELL_GO + применение эффекта (урон цели) + лог.</summary>
+    /// <summary>
+    /// SMSG_CAST_FAILED (3.3.5): отказ каста. u8 cast_count + u32 spell + u8 result + u8 multiple_casts.
+    /// Для NOT_READY/NO_POWER conditional-полей нет.
+    /// </summary>
+    private static byte[] BuildCastFailed(byte castCount, uint spellId, byte result)
+        => new ByteWriter(8)
+            .UInt8(castCount)
+            .UInt32(spellId)
+            .UInt8(result)
+            .UInt8(0) // multiple_casts = false
+            .ToArray();
+
+    /// <summary>
+    /// SMSG_SPELL_COOLDOWN (3.3.5): u64 guid + u8 flags + [{u32 spell, u32 cooldown_ms}] (массив до конца).
+    /// Запускает кулдаун-полоску на кнопке у клиента.
+    /// </summary>
+    private static byte[] BuildSpellCooldown(ulong caster, uint spellId, uint cooldownMs)
+        => new ByteWriter(17)
+            .UInt64(caster)
+            .UInt8(0)          // flags
+            .UInt32(spellId)
+            .UInt32(cooldownMs)
+            .ToArray();
+
+    /// <summary>
+    /// Реген маны в серверном тике (M6.4): вне «правила 5 секунд» прибавляет ManaRegenPerSec раз в
+    /// ManaRegenIntervalMs, апдейтит полоску. Зовётся из <see cref="World.WorldState.UpdateAsync"/>.
+    /// </summary>
+    internal static async Task TickManaRegenAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        if (session.MaxMana == 0 || session.Mana >= session.MaxMana || session.InWorldGuid == 0)
+            return;
+        if (now - session.LastSpellCastMs < FiveSecondRuleMs)        // правило 5 секунд — реген на паузе
+            return;
+        if (now - session.LastManaRegenMs < ManaRegenIntervalMs)
+            return;
+
+        session.LastManaRegenMs = now;
+        session.Mana = Math.Min(session.MaxMana, session.Mana + ManaRegenPerSec);
+        await SendManaUpdateAsync(session, ct);
+    }
+
+    /// <summary>
+    /// Шлёт текущую ману себе двумя путями: VALUES-апдейт <c>UNIT_FIELD_POWER1</c> (консистентность поля)
+    /// + <c>SMSG_POWER_UPDATE</c> (0x480) — именно он надёжно двигает полоску ресурса у клиента 3.3.5a
+    /// (как TrinityCore на каждом изменении power). Одного VALUES-апдейта собственному юниту не хватает. M6.4.
+    /// </summary>
+    private static async Task SendManaUpdateAsync(WorldSession session, CancellationToken ct)
+    {
+        var guid = (ulong)session.InWorldGuid;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject, PlayerSpawn.BuildPowerUpdate(guid, session.Mana), ct);
+        await session.SendAsync(WorldOpcode.SmsgPowerUpdate, BuildPowerUpdatePacket(guid, session.Mana), ct);
+    }
+
+    /// <summary>SMSG_POWER_UPDATE (3.3.5): PackedGuid unit + u8 power(MANA=0) + u32 amount.</summary>
+    private static byte[] BuildPowerUpdatePacket(ulong guid, uint amount)
+    {
+        var w = new ByteWriter(16);
+        PackedGuid.Write(w, guid);
+        w.UInt8(0);          // Power: MANA
+        w.UInt32(amount);
+        return w.ToArray();
+    }
+
+    /// <summary>Завершение каста: SPELL_GO + расход маны + кулдаун + применение эффекта (урон цели) + лог.</summary>
     private static async Task CompleteCastAsync(WorldSession session, uint spellId, SpellInfo info,
         ulong targetGuid, CancellationToken ct)
     {
         await SendSpellGoAsync(session, spellId, targetGuid, ct);
+
+        // Расход маны (правило 5 секунд: реген паузится от LastSpellCastMs) + апдейт полоски себе.
+        var now = Environment.TickCount64;
+        session.LastSpellCastMs = now;
+        if (session.MaxMana > 0 && info.ManaCost > 0)
+        {
+            session.Mana = session.Mana > info.ManaCost ? session.Mana - info.ManaCost : 0;
+            await SendManaUpdateAsync(session, ct);
+        }
+
+        // Кулдаун: запускаем у клиента (полоска на кнопке) и запоминаем для отказа при раннем рекасте.
+        if (info.CooldownMs > 0)
+        {
+            session.SpellCooldowns[spellId] = now + info.CooldownMs;
+            await session.SendAsync(WorldOpcode.SmsgSpellCooldown,
+                BuildSpellCooldown((ulong)session.InWorldGuid, spellId, (uint)info.CooldownMs), ct);
+        }
 
         var creature = targetGuid != 0 ? session.World.FindCreature(targetGuid) : null;
         if (creature is null || !creature.IsAlive)

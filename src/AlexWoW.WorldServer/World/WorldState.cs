@@ -176,7 +176,9 @@ public sealed class WorldState(ILogger<WorldState> logger)
             try
             {
                 await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
-                // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике.
+                // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике;
+                // здесь — реген маны (вне «правила 5 секунд»).
+                await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)

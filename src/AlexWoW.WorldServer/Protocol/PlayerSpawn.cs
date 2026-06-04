@@ -73,6 +73,10 @@ public static class PlayerSpawn
     public static byte[] BuildCoinageUpdate(ulong guid, uint money)
         => BuildPlayerValuesUpdate(guid, m => m.SetUInt32(UpdateField.PlayerFieldCoinage, money));
 
+    /// <summary>VALUES-апдейт текущей маны (UNIT_FIELD_POWER1) — после каста/регена, только себе. M6.4.</summary>
+    public static byte[] BuildPowerUpdate(ulong guid, uint power)
+        => BuildPlayerValuesUpdate(guid, m => m.SetUInt32(UpdateField.UnitPower1, power));
+
     /// <summary>VALUES-апдейт с GUID предмета в слоте-контейнере (slot 0..38; 0 = пусто). M6.2.</summary>
     public static byte[] BuildInvSlotUpdate(ulong guid, int slot, ulong itemGuid)
         => BuildPlayerValuesUpdate(guid, m => m.SetUInt64(UpdateField.InvSlotGuid(slot), itemGuid));
@@ -126,8 +130,13 @@ public static class PlayerSpawn
         var maxHealth = (uint)(80 + Math.Max((byte)1, c.Level) * 20);
         m.SetUInt32(UpdateField.UnitHealth, maxHealth);
         m.SetUInt32(UpdateField.UnitMaxHealth, maxHealth);
-        m.SetUInt32(UpdateField.UnitPower1, 100);
-        m.SetUInt32(UpdateField.UnitMaxPower1, 100);
+        // M6.4: мана-классам — пул из MaxManaForClass (расход спеллами, реген в тике); rage/energy
+        // (powertype != 0) сохраняют дефолтные 100 (точная модель ресурсов — позже).
+        var maxPower = DisplayData.MaxManaForClass(c.Class, c.Level);
+        if (maxPower == 0)
+            maxPower = 100;
+        m.SetUInt32(UpdateField.UnitPower1, maxPower);
+        m.SetUInt32(UpdateField.UnitMaxPower1, maxPower);
         m.SetUInt32(UpdateField.UnitLevel, c.Level);
         m.SetUInt32(UpdateField.UnitFactionTemplate, DisplayData.FactionForRace(c.Race));
         m.SetUInt32(UpdateField.UnitDisplayId, model);

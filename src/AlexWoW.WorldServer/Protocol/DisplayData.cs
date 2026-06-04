@@ -44,4 +44,12 @@ public static class DisplayData
         6 => 6,  // Death Knight — runic power
         _ => 0,  // остальные — mana
     };
+
+    /// <summary>
+    /// Макс. мана для класса (M6.4). Только мана-классы (powertype 0); rage/energy/runic → 0
+    /// (мана-система к ним не применяется — кастуют без расхода). Значение упрощённое (флэт), точные
+    /// статы по классу/уровню/интеллекту — позже. 150 хватает на ~5 кастов rank-1 → видимый OOM.
+    /// </summary>
+    public static uint MaxManaForClass(byte charClass, byte level)
+        => PowerTypeForClass(charClass) == 0 ? 150u : 0u;
 }

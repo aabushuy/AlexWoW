@@ -54,6 +54,13 @@ public static class WorldEntryHandlers
         session.Inventory.Clear();
         session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
+
+        // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
+        session.MaxMana = DisplayData.MaxManaForClass(character.Class, character.Level);
+        session.Mana = session.MaxMana;
+        session.LastSpellCastMs = 0;
+        session.LastManaRegenMs = Environment.TickCount64;
+        session.SpellCooldowns.Clear();
         if (session.Inventory.Count > 0)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);
