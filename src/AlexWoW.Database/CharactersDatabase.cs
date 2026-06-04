@@ -201,6 +201,27 @@ public sealed class CharactersDatabase(string connectionString)
         });
     }
 
+    /// <summary>
+    /// GUID'ы персонажей (из набора), у кого заданы непустые склонения имени. Для флага
+    /// CHARACTER_FLAG_DECLINED в SMSG_CHAR_ENUM — иначе ruRU-клиент спрашивает склонения каждый вход. M7 #16.
+    /// </summary>
+    public async Task<HashSet<uint>> GetGuidsWithDeclinedNamesAsync(
+        IReadOnlyCollection<uint> guids, CancellationToken ct = default)
+    {
+        var result = new HashSet<uint>();
+        if (guids.Count == 0)
+            return result;
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<uint>(new CommandDefinition("""
+            SELECT owner_guid FROM character_declined_names
+            WHERE owner_guid IN @guids
+              AND (n0 <> '' OR n1 <> '' OR n2 <> '' OR n3 <> '' OR n4 <> '');
+            """, new { guids }, cancellationToken: ct));
+        foreach (var g in rows)
+            result.Add(g);
+        return result;
+    }
+
     /// <summary>5 склонений имени персонажа или null, если не заданы.</summary>
     public async Task<string[]?> GetDeclinedNamesAsync(uint ownerGuid, CancellationToken ct = default)
     {

@@ -15,8 +15,20 @@ public static class CharScreenHandlers
     {
         var list = await session.Characters.GetByAccountAsync(session.AccountId, ct);
         var equipment = await BuildPaperdollAsync(session, list, ct);
-        await session.SendAsync(WorldOpcode.SmsgCharEnum, CharEnum.BuildBody(list, equipment), ct);
-        session.Logger.LogInformation("CHAR_ENUM: {Count} персонажей для '{User}'", list.Count, session.Account);
+
+        // M7 #16: персонажи с заданными склонениями → флаг CHARACTER_FLAG_DECLINED в enum,
+        // иначе ruRU-клиент показывает диалог склонений при каждом заходе на экран выбора.
+        IReadOnlySet<uint> declined;
+        try { declined = await session.Characters.GetGuidsWithDeclinedNamesAsync(list.Select(c => c.Guid).ToList(), ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("CHAR_ENUM declined-флаги: {Msg}", ex.Message);
+            declined = new HashSet<uint>();
+        }
+
+        await session.SendAsync(WorldOpcode.SmsgCharEnum, CharEnum.BuildBody(list, equipment, declined), ct);
+        session.Logger.LogInformation("CHAR_ENUM: {Count} персонажей для '{User}' (со склонениями: {Decl})",
+            list.Count, session.Account, declined.Count);
     }
 
     /// <summary>
