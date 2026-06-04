@@ -47,6 +47,16 @@ public enum WorldOpcode : uint
     CmsgItemQuerySingle = 0x056,
     SmsgItemQuerySingleResponse = 0x058,
 
+    // Управление инвентарём (M6.9)
+    CmsgAutoEquipItem = 0x10A,
+    CmsgAutostoreBagItem = 0x10B,
+    CmsgSwapItem = 0x10C,
+    CmsgSwapInvItem = 0x10D,
+    CmsgSplitItem = 0x10E,
+    CmsgAutoEquipItemSlot = 0x10F,
+    CmsgDestroyItem = 0x111,
+    SmsgInventoryChangeFailure = 0x112,
+
     // Торговля с NPC (M6.2)
     CmsgGossipHello = 0x17B,
     CmsgSellItem = 0x1A0,

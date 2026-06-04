@@ -14,6 +14,26 @@ public static class InventorySlots
     public const int BackpackStart = 23;   // INVENTORY_SLOT_ITEM_START
     public const int BackpackEnd = 39;     // INVENTORY_SLOT_ITEM_END (слоты 23..38)
 
+    /// <summary>Слот экипировки (0..18)?</summary>
+    public static bool IsEquipmentSlot(int slot) => slot >= EquipmentStart && slot < EquipmentEnd;
+
+    /// <summary>Слот основного рюкзака (23..38)?</summary>
+    public static bool IsBackpackSlot(int slot) => slot >= BackpackStart && slot < BackpackEnd;
+
+    /// <summary>Можно ли надеть предмет данного InventoryType в конкретный слот экипировки.</summary>
+    public static bool CanEquipInSlot(uint inventoryType, int slot)
+    {
+        if (EquipSlotFor(inventoryType) == slot)
+            return true;
+        return inventoryType switch
+        {
+            11 => slot is 10 or 11,          // FINGER → любое кольцо
+            12 => slot is 12 or 13,          // TRINKET → любой тринкет
+            13 or 21 => slot is 15 or 16,    // 1H/MAINHAND → осн./доп. рука
+            _ => false,
+        };
+    }
+
     /// <summary>InventoryType из item_template → слот экипировки (0..18), либо -1 (не экипируется).</summary>
     public static int EquipSlotFor(uint inventoryType) => inventoryType switch
     {

@@ -31,6 +31,19 @@ public static class ItemObject
         return w.ToArray();
     }
 
+    /// <summary>VALUES-апдейт размера стопки на уже созданном предмете (ITEM_FIELD_STACK_COUNT). M6.9.</summary>
+    public static byte[] BuildStackUpdate(ulong itemGuid, uint stackCount)
+    {
+        var m = new UpdateMask();
+        m.SetUInt32(UpdateField.ItemStackCount, stackCount);
+        var w = new ByteWriter(32);
+        w.UInt32(1);
+        w.UInt8(UpdateType.Values);
+        PackedGuid.Write(w, itemGuid);
+        m.WriteTo(w);
+        return w.ToArray();
+    }
+
     private static void WriteCreateBlock(ByteWriter w, ulong itemGuid, uint entry, ulong owner,
         uint stackCount, uint maxDurability)
     {

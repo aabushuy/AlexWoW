@@ -10,9 +10,9 @@ public sealed class InventoryItem
     public uint ItemGuid { get; init; }   // low-counter; полный GUID = HIGHGUID_ITEM | ItemGuid
     public uint OwnerGuid { get; init; }
     public uint ItemEntry { get; init; }
-    public byte Bag { get; init; } = 255;
-    public byte Slot { get; init; }
-    public uint StackCount { get; init; } = 1;
+    public byte Bag { get; set; } = 255;            // меняется при перемещении (M6.9)
+    public byte Slot { get; set; }
+    public uint StackCount { get; set; } = 1;
 }
 
 /// <summary>Товар вендора (npc_vendor ⨝ item_template) — для SMSG_LIST_INVENTORY и покупки. M6.2.</summary>

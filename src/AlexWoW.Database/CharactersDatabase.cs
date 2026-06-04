@@ -228,6 +228,22 @@ public sealed class CharactersDatabase(string connectionString)
         await db.ExecuteAsync("DELETE FROM character_items WHERE item_guid = @itemGuid;", new { itemGuid });
     }
 
+    /// <summary>Перемещает предмет в другой контейнер/слот. M6.9.</summary>
+    public async Task MoveItemAsync(uint itemGuid, byte bag, byte slot, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("UPDATE character_items SET bag = @bag, slot = @slot WHERE item_guid = @itemGuid;",
+            new { itemGuid, bag, slot });
+    }
+
+    /// <summary>Меняет размер стопки предмета. M6.9.</summary>
+    public async Task SetItemStackAsync(uint itemGuid, uint stackCount, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("UPDATE character_items SET stack_count = @stackCount WHERE item_guid = @itemGuid;",
+            new { itemGuid, stackCount });
+    }
+
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>
     public async Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default)
     {
