@@ -63,9 +63,13 @@
   заспавнены «в каждом городе»; subname `Arena Battlemaster` и т.п.).
 Аналогично ранее вычищенным generic-тренерам/`[DND]` и точечно исключённым арена-entry (M5.6b,
 `WorldDatabase.ExcludedCreatureEntries` = 26012/26075/26760).
-**Фикс:** расширить фильтр спавна в `WorldDatabase.GetCreaturesNearAsync`:
+**Фикс:** расширить фильтр спавна в `WorldDatabase.GetCreaturesNearAsync` (и аналогично для
+гейм-объектов в `GetGameObjectsNearAsync`):
 - generic-вендоры без subname (`Name LIKE '% Vendor' AND COALESCE(SubName,'')=''`);
 - арена-NPC по subname (`SubName LIKE 'Arena %'` → Battlemaster/Organizer/Vendor, + Brutal/Test Arena);
+- **`[DND]` в любом месте имени** (сейчас фильтр ловит только ведущий `[`, а есть, напр.,
+  «Lottery Commissioner [DND]» и [DND] в середине; ~8 таких гейм-объектов): заменить
+  `Name NOT LIKE '[%'` на также `Name NOT LIKE '%[DND]%'` (плюс `%[PH]%`/`%[UNUSED]%`);
 - при необходимости дополнить `ExcludedCreatureEntries` точечными id.
 Проверить, что настоящие именованные торговцы/мастера остаются.
 

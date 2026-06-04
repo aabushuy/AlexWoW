@@ -58,6 +58,9 @@ public static class VendorHandlers
         var vi = items.FirstOrDefault(x => x.ItemId == itemEntry);
         if (vi is null) { await FailAsync(BuyResult.CantFindItem); return; }
 
+        // amount — число «лотов»; цена за лот = BuyPrice, предметов в лоте = BuyCount.
+        var buyCount = vi.BuyCount == 0 ? 1u : vi.BuyCount;
+        var qty = amount * buyCount;          // сколько физических предметов выдать
         var cost = vi.BuyPrice * amount;
         if (session.Money < cost) { await FailAsync(BuyResult.NotEnoughMoney); return; }
 
@@ -66,11 +69,11 @@ public static class VendorHandlers
 
         var ownerGuid = session.InWorldGuid;
         var itemLow = await session.Characters.AddItemAsync(ownerGuid, itemEntry,
-            InventorySlots.MainBag, (byte)slot, amount, ct);
+            InventorySlots.MainBag, (byte)slot, qty, ct);
         var item = new InventoryItem
         {
             ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
-            Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = amount,
+            Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = qty,
         };
         session.Inventory.Add(item);
 
@@ -89,10 +92,10 @@ public static class VendorHandlers
             .UInt64(vendorGuid)
             .UInt32(vi.Slot + 1)
             .UInt32(vi.MaxCount == 0 ? 0xFFFFFFFFu : vi.MaxCount)
-            .UInt32(amount);
+            .UInt32(qty);
         await session.SendAsync(WorldOpcode.SmsgBuyItem, buy.ToArray(), ct);
-        session.Logger.LogInformation("BUY '{User}': item={Item} x{Amt} за {Cost}, осталось {Money}",
-            session.Account, itemEntry, amount, cost, session.Money);
+        session.Logger.LogInformation("BUY '{User}': item={Item} x{Qty} (лотов {Amt}) за {Cost}, осталось {Money}",
+            session.Account, itemEntry, qty, amount, cost, session.Money);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSellItem)]
