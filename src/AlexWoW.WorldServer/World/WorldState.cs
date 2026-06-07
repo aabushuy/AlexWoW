@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using AlexWoW.Common.Network;
+using AlexWoW.DataStores.Navigation;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -11,8 +12,11 @@ namespace AlexWoW.WorldServer.World;
 /// Доступ из множества сессий-потоков — отсюда потокобезопасный словарь и сериализация
 /// отправки на уровне каждой сессии (см. WorldSession.SendAsync).
 /// </summary>
-public sealed class WorldState(ILogger<WorldState> logger)
+public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh)
 {
+    /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
+    private int _splineId;
+
     /// <summary>Радиус видимости (ярды). Грубо — как дефолтная зона интереса в WoW.</summary>
     public const float VisibilityRange = 100f;
 
@@ -183,6 +187,7 @@ public sealed class WorldState(ILogger<WorldState> logger)
                 // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике;
                 // здесь — реген маны (вне «правила 5 секунд»).
                 await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
+                await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
@@ -198,11 +203,15 @@ public sealed class WorldState(ILogger<WorldState> logger)
         {
             try
             {
-                // M6.7: живое существо в бою бьёт в ответ; мёртвое — ждёт респавна.
+                // M6.7: живое существо — ИИ (возврат/преследование+бой/реген); мёртвое — ждёт респавна.
                 if (creature.IsAlive)
                 {
-                    if (creature.CombatTargetGuid != 0)
+                    if (creature.Evading)
+                        await Handlers.CombatHandlers.TickEvadeAsync(this, creature, now, ct);
+                    else if (creature.CombatTargetGuid != 0)
                         await Handlers.CombatHandlers.TickCreatureCombatAsync(this, creature, now, ct);
+                    else
+                        await Handlers.CombatHandlers.TickRegenAsync(this, creature, now, ct);
                     continue;
                 }
                 if (creature.RespawnAtMs is { } at && now >= at)
@@ -221,6 +230,11 @@ public sealed class WorldState(ILogger<WorldState> logger)
         creature.Health = creature.MaxHealth;
         creature.RespawnAtMs = null;
         creature.CombatTargetGuid = 0;
+        creature.Evading = false;       // M6.7: вернуть на спавн при респавне
+        creature.X = creature.HomeX;
+        creature.Y = creature.HomeY;
+        creature.Z = creature.HomeZ;
+        creature.O = creature.HomeO;
         var wasLootable = creature.Lootable; // M6.6: труп больше не lootable
         creature.Lootable = false;
         creature.Loot = null;
@@ -230,6 +244,30 @@ public sealed class WorldState(ILogger<WorldState> logger)
                 CreatureUpdate.BuildDynamicFlagsUpdate(creature.Guid, 0), ct);
         logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось", creature.Template.Name, creature.Guid);
     }
+
+    /// <summary>
+    /// Двигает существо в точку (M6.7): шлёт наблюдателям SMSG_MONSTER_MOVE (сплайн из текущей позиции),
+    /// затем обновляет авторитетную позицию и фейсинг. <paramref name="durationMs"/> — время анимации хода.
+    /// </summary>
+    public async Task MoveCreatureAsync(WorldCreature creature, float nx, float ny, float nz, uint durationMs, CancellationToken ct)
+    {
+        float sx = creature.X, sy = creature.Y, sz = creature.Z;
+        var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
+        await BroadcastToObserversAsync(creature, WorldOpcode.SmsgMonsterMove,
+            MonsterMove.Build(creature.Guid, sx, sy, sz, nx, ny, nz, durationMs, splineId), ct);
+
+        creature.X = nx;
+        creature.Y = ny;
+        creature.Z = nz;
+        float dx = nx - sx, dy = ny - sy;
+        if (dx * dx + dy * dy > 1e-6f)
+            creature.O = MathF.Atan2(dy, dx);
+    }
+
+    /// <summary>Путь по навмешу (mmaps) в игровых координатах или null (нет навмеша/пути). M6.7.</summary>
+    public IReadOnlyList<(float X, float Y, float Z)>? FindGroundPath(uint map,
+        float sx, float sy, float sz, float ex, float ey, float ez)
+        => navmesh.FindPath(map, sx, sy, sz, ex, ey, ez);
 
     /// <summary>Наблюдатели существа: игроки на его карте, у кого оно в видимом наборе. M6.3.</summary>
     public IEnumerable<WorldPlayer> ObserversOf(WorldCreature creature)

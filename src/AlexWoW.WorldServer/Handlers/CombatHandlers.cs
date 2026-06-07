@@ -109,6 +109,7 @@ public static class CombatHandlers
         }
         session.MeleeNotInRangeNotified = false;
         session.NextMeleeSwingMs = now + SwingIntervalMs;
+        session.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
@@ -143,6 +144,16 @@ public static class CombatHandlers
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
 
+    // --- Преследование/возврат (M6.7 инкр.2) ---
+    /// <summary>Скорость бега существа (ярды/с) — совпадает с RunSpeed в create-блоке существа.</summary>
+    private const float CreatureRunSpeed = 7.0f;
+    /// <summary>Кадэнс шага движения (мс) — троттлинг сплайнов SMSG_MONSTER_MOVE.</summary>
+    private const long MoveIntervalMs = 500;
+    /// <summary>Leash: если существо удалилось от дома дальше — выходит из боя и возвращается.</summary>
+    private const float LeashRadius = 50f;
+    /// <summary>Прибыл домой (ярды²) — порог завершения возврата (evade).</summary>
+    private const float HomeArriveSq = 1.0f;
+
     /// <summary>
     /// Существо входит/остаётся в ответном бою с этим игроком. Идемпотентно: если уже в бою — no-op.
     /// <paramref name="roar"/> — слать ли рык агро (первый вход; на «удержании» — нет). M6.7.
@@ -152,6 +163,7 @@ public static class CombatHandlers
         if (creature.CombatTargetGuid != 0)
             return;
         creature.CombatTargetGuid = (ulong)session.InWorldGuid;
+        creature.Evading = false; // атаковали — прерываем возврат на спавн, снова в бой
         creature.NextSwingMs = Environment.TickCount64 + SwingIntervalMs; // первый ответный — через интервал
         if (roar)
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAiReaction,
@@ -167,46 +179,166 @@ public static class CombatHandlers
     internal static async Task TickCreatureCombatAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
     {
         var player = world.FindPlayer(creature.CombatTargetGuid);
-        // Нет цели / вне мира / мертва / на другой карте / отошла из мили — выходим из боя (без преследования).
-        if (player is null || player.Session.InWorldGuid == 0 || player.Session.IsDead
-            || player.Map != creature.Map || !InMeleeRangeOfCreature(creature, player))
+        // Цель пропала/вне мира/мертва/на другой карте — возврат на спавн (evade + реген).
+        if (player is null || player.Session.InWorldGuid == 0 || player.Session.IsDead || player.Map != creature.Map)
         {
-            await EndCreatureCombatAsync(world, creature, ct);
+            await BeginEvadeAsync(world, creature, ct);
             return;
         }
 
-        if (now < creature.NextSwingMs)
+        // Leash: ушли от дома слишком далеко (игрок «утащил») — выходим из боя и возвращаемся.
+        var hx = creature.X - creature.HomeX;
+        var hy = creature.Y - creature.HomeY;
+        var hz = creature.Z - creature.HomeZ;
+        if (hx * hx + hy * hy + hz * hz > LeashRadius * LeashRadius)
+        {
+            await BeginEvadeAsync(world, creature, ct);
             return;
-        creature.NextSwingMs = now + SwingIntervalMs;
+        }
 
-        var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
-        var (_, died) = world.ApplyPlayerDamage(player, damage);
+        // В мили-радиусе — бьём; иначе преследуем по навмешу (троттлинг шагов).
+        if (InMeleeRangeOfCreature(creature, player))
+        {
+            if (now < creature.NextSwingMs)
+                return;
+            creature.NextSwingMs = now + SwingIntervalMs;
 
-        await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
-            BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0), ct);
-        await world.BroadcastPlayerHealthAsync(player, ct);
+            var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
+            var (_, died) = world.ApplyPlayerDamage(player, damage);
+            player.Session.LastCombatMs = now; // M6.7: получил урон → пауза регена
 
-        if (died)
-            await HandlePlayerDeathAsync(world, player, creature, ct);
+            await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
+                BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0), ct);
+            await world.BroadcastPlayerHealthAsync(player, ct);
+
+            if (died)
+                await HandlePlayerDeathAsync(world, player, creature, ct);
+            return;
+        }
+
+        if (now < creature.NextMoveMs)
+            return;
+        creature.NextMoveMs = now + MoveIntervalMs;
+        await StepTowardAsync(world, creature, player.X, player.Y, player.Z, ct);
     }
 
-    /// <summary>Существо выходит из боя (evade): сбрасывает цель и шлёт наблюдателям ATTACKSTOP.</summary>
-    private static async Task EndCreatureCombatAsync(WorldState world, WorldCreature creature, CancellationToken ct)
+    /// <summary>Тик возврата на спавн (evade): шагаем домой, по прибытии — полный реген HP. M6.7.</summary>
+    internal static async Task TickEvadeAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
+    {
+        var dx = creature.HomeX - creature.X;
+        var dy = creature.HomeY - creature.Y;
+        var dz = creature.HomeZ - creature.Z;
+        if (dx * dx + dy * dy + dz * dz <= HomeArriveSq)
+        {
+            creature.Evading = false;
+            creature.X = creature.HomeX;
+            creature.Y = creature.HomeY;
+            creature.Z = creature.HomeZ;
+            creature.O = creature.HomeO;
+            if (creature.Health < creature.MaxHealth)
+            {
+                creature.Health = creature.MaxHealth; // вернулся на спавн — полное здоровье
+                await world.BroadcastCreatureHealthAsync(creature, ct);
+            }
+            return;
+        }
+
+        if (now < creature.NextMoveMs)
+            return;
+        creature.NextMoveMs = now + MoveIntervalMs;
+        await StepTowardAsync(world, creature, creature.HomeX, creature.HomeY, creature.HomeZ, ct);
+    }
+
+    /// <summary>Задержка после боя до старта внебоевого регена HP игрока (мс).</summary>
+    private const long OutOfCombatRegenDelayMs = 5000;
+    /// <summary>Кадэнс регена HP игрока (мс).</summary>
+    private const long HealthRegenIntervalMs = 1000;
+
+    /// <summary>
+    /// Внебоевой реген HP игрока (M6.7): спустя 5 с после последней боевой активности восстанавливает
+    /// ~10% макс. HP в секунду до полного. Зовётся из серверного тика (рядом с реген-маны M6.4).
+    /// </summary>
+    internal static async Task TickPlayerRegenAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0 || session.IsDead || session.Health >= session.MaxHealth)
+            return;
+        if (now - session.LastCombatMs < OutOfCombatRegenDelayMs)       // ещё «в бою» — реген на паузе
+            return;
+        if (now - session.LastHealthRegenMs < HealthRegenIntervalMs)
+            return;
+
+        session.LastHealthRegenMs = now;
+        session.Health = Math.Min(session.MaxHealth, session.Health + Math.Max(1u, session.MaxHealth / 10));
+        if (session.Player is { } player)
+            await session.World.BroadcastPlayerHealthAsync(player, ct);
+    }
+
+    /// <summary>Реген HP существа вне боя (если повреждено и стоит дома). Низкий кадэнс. M6.7.</summary>
+    internal static async Task TickRegenAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
+    {
+        if (creature.Health >= creature.MaxHealth || now < creature.NextRegenMs)
+            return;
+        creature.NextRegenMs = now + 1000;
+        creature.Health = Math.Min(creature.MaxHealth, creature.Health + Math.Max(1, creature.MaxHealth / 20));
+        await world.BroadcastCreatureHealthAsync(creature, ct);
+    }
+
+    /// <summary>
+    /// Один шаг движения к цели (мс-кадэнс): направление берём по навмешу (первая точка пути — обход
+    /// препятствий), длина шага = скорость × интервал. Двигаем существо (SMSG_MONSTER_MOVE + позиция).
+    /// </summary>
+    private static async Task StepTowardAsync(WorldState world, WorldCreature creature,
+        float gx, float gy, float gz, CancellationToken ct)
+    {
+        float tx = gx, ty = gy, tz = gz;
+        var path = world.FindGroundPath(creature.Map, creature.X, creature.Y, creature.Z, gx, gy, gz);
+        if (path is { Count: >= 2 })
+            (tx, ty, tz) = path[1]; // path[0] — текущая точка; идём к следующей вершине пути
+
+        var dx = tx - creature.X;
+        var dy = ty - creature.Y;
+        var dz = tz - creature.Z;
+        var dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < 1e-3f)
+            return;
+
+        var stepLen = CreatureRunSpeed * MoveIntervalMs / 1000f;
+        float nx, ny, nz;
+        uint durationMs;
+        if (dist <= stepLen)
+        {
+            nx = tx; ny = ty; nz = tz;
+            durationMs = (uint)MathF.Max(1f, dist / CreatureRunSpeed * 1000f);
+        }
+        else
+        {
+            var f = stepLen / dist;
+            nx = creature.X + dx * f;
+            ny = creature.Y + dy * f;
+            nz = creature.Z + dz * f;
+            durationMs = (uint)MoveIntervalMs;
+        }
+        await world.MoveCreatureAsync(creature, nx, ny, nz, durationMs, ct);
+    }
+
+    /// <summary>Существо выходит из боя и переходит в возврат на спавн (evade): ATTACKSTOP + флаг. M6.7.</summary>
+    private static async Task BeginEvadeAsync(WorldState world, WorldCreature creature, CancellationToken ct)
     {
         var target = creature.CombatTargetGuid;
-        if (target == 0)
-            return;
         creature.CombatTargetGuid = 0;
-        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStop,
-            BuildAttackStop(creature.Guid, target), ct);
+        creature.Evading = true;
+        creature.NextMoveMs = 0; // шагнуть сразу
+        if (target != 0)
+            await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStop,
+                BuildAttackStop(creature.Guid, target), ct);
     }
 
-    /// <summary>Смерть игрока: помечаем мёртвым, гасим оба боя; HP=0 уже разослан убившим свингом.</summary>
+    /// <summary>Смерть игрока: помечаем мёртвым, существо уходит в evade, игрок прекращает атаку. M6.7.</summary>
     private static async Task HandlePlayerDeathAsync(WorldState world, WorldPlayer player, WorldCreature killer, CancellationToken ct)
     {
         var session = player.Session;
         session.IsDead = true;
-        await EndCreatureCombatAsync(world, killer, ct);          // существо прекращает бить труп
+        await BeginEvadeAsync(world, killer, ct);                  // существо возвращается на спавн
         if (session.CombatTargetGuid != 0)                         // игрок прекращает свою атаку
             await StopAttackAsync(session, session.CombatTargetGuid, ct);
         await session.SendAsync(WorldOpcode.SmsgForcedDeathUpdate, [], ct); // сброс таймера release

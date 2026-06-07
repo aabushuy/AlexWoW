@@ -77,6 +77,7 @@ public enum WorldOpcode : uint
     SmsgAttackerStateUpdate = 0x14A,
 
     // ИИ существ / смерть игрока (M6.7)
+    SmsgMonsterMove = 0x0DD,      // packed guid + сплайн движения существа (преследование)
     SmsgAiReaction = 0x13C,       // Guid + u32 reaction (HOSTILE=2 — рык агро)
     CmsgRepopRequest = 0x15A,     // пустое — «отпустить дух» после смерти
     SmsgForcedDeathUpdate = 0x37A, // пустое — сброс таймера release у клиента

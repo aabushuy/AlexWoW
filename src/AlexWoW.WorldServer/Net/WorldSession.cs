@@ -97,6 +97,10 @@ public sealed class WorldSession
     /// <summary>Авторитетное здоровье игрока (UNIT_FIELD_HEALTH). Меняется уроном существ. M6.7.</summary>
     internal uint Health { get; set; }
     internal uint MaxHealth { get; set; }
+    /// <summary>Время последней боевой активности (нанёс/получил урон) — для внебоевого регена HP. M6.7.</summary>
+    internal long LastCombatMs { get; set; }
+    /// <summary>Время последнего тика регена HP (кадэнс 1 с). M6.7.</summary>
+    internal long LastHealthRegenMs { get; set; }
     /// <summary>Игрок мёртв (HP=0, ждёт release/возрождения). M6.7.</summary>
     internal bool IsDead { get; set; }
 

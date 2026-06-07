@@ -13,10 +13,17 @@ public sealed class WorldCreature
     public required ulong Guid { get; init; }
     public required uint Map { get; init; }
     public required CreatureTemplate Template { get; init; }
-    public required float X { get; init; }
-    public required float Y { get; init; }
-    public required float Z { get; init; }
-    public required float O { get; init; }
+
+    // Позиция мутабельна (M6.7 инкр.2: существо двигается при преследовании). Дом — точка спавна.
+    public required float X { get; set; }
+    public required float Y { get; set; }
+    public required float Z { get; set; }
+    public required float O { get; set; }
+
+    public required float HomeX { get; init; }
+    public required float HomeY { get; init; }
+    public required float HomeZ { get; init; }
+    public required float HomeO { get; init; }
 
     public required uint MaxHealth { get; init; }
 
@@ -33,6 +40,14 @@ public sealed class WorldCreature
     public ulong CombatTargetGuid { get; set; }
     /// <summary>Момент следующего свинга существа (<see cref="Environment.TickCount64"/>, мс).</summary>
     public long NextSwingMs { get; set; }
+
+    // --- Преследование/возврат (M6.7 инкр.2): движение по навмешу, leash на дом, реген. ---
+    /// <summary>Существо возвращается на спавн (evade) — потеряло цель/ушло за leash. Регенит по прибытии.</summary>
+    public bool Evading { get; set; }
+    /// <summary>Момент следующего шага движения (троттлинг сплайнов). <see cref="Environment.TickCount64"/>, мс.</summary>
+    public long NextMoveMs { get; set; }
+    /// <summary>Момент следующего тика регена HP вне боя. <see cref="Environment.TickCount64"/>, мс.</summary>
+    public long NextRegenMs { get; set; }
 
     // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
     /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
