@@ -14,6 +14,12 @@ if (args.Length >= 1 && args[0].Equals("create-account", StringComparison.Ordina
     return await AccountCreator.RunAsync(args);
 }
 
+// CLI: массовая смена пароля — reset-all-passwords <password>
+if (args.Length >= 1 && args[0].Equals("reset-all-passwords", StringComparison.OrdinalIgnoreCase))
+{
+    return await PasswordReset.RunAsync(args);
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
