@@ -90,6 +90,24 @@ public sealed class AuthDatabase(string connectionString)
             """, new { username = username.ToUpperInvariant(), salt, verifier });
     }
 
+    /// <summary>Все имена аккаунтов (для массовых операций, напр. сброса пароля).</summary>
+    public async Task<IReadOnlyList<string>> GetAllUsernamesAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<string>("SELECT username FROM account;");
+        return rows.AsList();
+    }
+
+    /// <summary>Меняет пароль аккаунта (новые соль+верификатор SRP6); сбрасывает session_key (форс ре-логин).</summary>
+    public async Task UpdatePasswordAsync(string username, byte[] salt, byte[] verifier, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("""
+            UPDATE account SET salt = @salt, verifier = @verifier, session_key = NULL
+            WHERE username = @username;
+            """, new { username = username.ToUpperInvariant(), salt, verifier });
+    }
+
     public async Task SetSessionKeyAsync(uint accountId, byte[] sessionKey, string? ip, CancellationToken ct = default)
     {
         await using var db = await OpenAsync(ct);
