@@ -59,6 +59,7 @@ public static class WorldEntryHandlers
         session.MaxHealth = DisplayData.MaxHealthForLevel(character.Level);
         session.Health = session.MaxHealth;
         session.IsDead = false;
+        session.LastCombatMs = 0;
 
         // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
         session.MaxMana = DisplayData.MaxManaForClass(character.Class, character.Level);

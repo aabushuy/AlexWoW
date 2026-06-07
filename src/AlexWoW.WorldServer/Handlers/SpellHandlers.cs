@@ -269,6 +269,7 @@ public static class SpellHandlers
         if (creature is null || !creature.IsAlive)
             return; // цель пропала/мертва — спелл «впустую»
 
+        session.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
         var damage = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
