@@ -12,10 +12,14 @@ namespace AlexWoW.WorldServer.World;
 /// Доступ из множества сессий-потоков — отсюда потокобезопасный словарь и сериализация
 /// отправки на уровне каждой сессии (см. WorldSession.SendAsync).
 /// </summary>
-public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh)
+public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions)
 {
     /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
     private int _splineId;
+
+    /// <summary>Враждебна ли фракция существа к фракции игрока (авто-агро M6.7).</summary>
+    public bool IsHostile(uint creatureFactionTemplate, uint playerFactionTemplate)
+        => factions.IsHostile(creatureFactionTemplate, playerFactionTemplate);
 
     /// <summary>Радиус видимости (ярды). Грубо — как дефолтная зона интереса в WoW.</summary>
     public const float VisibilityRange = 100f;
@@ -178,6 +182,7 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh)
     public async Task UpdateAsync(CancellationToken ct)
     {
         var now = Environment.TickCount64;
+        await factions.EnsureLoadedAsync(ct); // M6.7: ленивая загрузка реакций фракций (один раз)
 
         foreach (var player in _players.Values)
         {
@@ -188,6 +193,7 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh)
                 // здесь — реген маны (вне «правила 5 секунд»).
                 await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
                 await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
+                await Handlers.CombatHandlers.TickAggroScanAsync(this, player, now, ct);      // M6.7: авто-агро по фракции
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
@@ -262,6 +268,14 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh)
         float dx = nx - sx, dy = ny - sy;
         if (dx * dx + dy * dy > 1e-6f)
             creature.O = MathF.Atan2(dy, dx);
+    }
+
+    /// <summary>Доворот существа лицом к цели (без перемещения) — для страфа игрока в мили. M6.7.</summary>
+    public async Task FaceCreatureAsync(WorldCreature creature, ulong targetGuid, CancellationToken ct)
+    {
+        var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
+        await BroadcastToObserversAsync(creature, WorldOpcode.SmsgMonsterMove,
+            MonsterMove.BuildFaceTarget(creature.Guid, creature.X, creature.Y, creature.Z, targetGuid, splineId), ct);
     }
 
     /// <summary>Путь по навмешу (mmaps) в игровых координатах или null (нет навмеша/пути). M6.7.</summary>

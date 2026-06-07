@@ -29,6 +29,8 @@ vmaps-test/
 mmaps-test/
 mmaps-map0/
 out-charstartoutfit.sql
+charstartoutfit.sql
+factiontemplate.sql
 
 # MCP-конфиг проекта содержит API-токен Vikunja — в репозиторий не кладём
 .mcp.json

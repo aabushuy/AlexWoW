@@ -158,18 +158,60 @@ public static class CombatHandlers
     /// Существо входит/остаётся в ответном бою с этим игроком. Идемпотентно: если уже в бою — no-op.
     /// <paramref name="roar"/> — слать ли рык агро (первый вход; на «удержании» — нет). M6.7.
     /// </summary>
-    private static async Task EnsureCreatureRetaliationAsync(WorldSession session, WorldCreature creature, bool roar, CancellationToken ct)
+    private static Task EnsureCreatureRetaliationAsync(WorldSession session, WorldCreature creature, bool roar, CancellationToken ct)
+        => EnterCreatureCombatAsync(session.World, creature, (ulong)session.InWorldGuid, roar, ct);
+
+    /// <summary>
+    /// Существо входит в бой с целью (ответка M6.7 инкр.1 или авто-агро инкр.2b): сброс evade,
+    /// рык агро (опц.) + ATTACKSTART наблюдателям, шаг — сразу. Идемпотентно (уже в бою → no-op).
+    /// </summary>
+    private static async Task EnterCreatureCombatAsync(WorldState world, WorldCreature creature, ulong targetGuid, bool roar, CancellationToken ct)
     {
         if (creature.CombatTargetGuid != 0)
             return;
-        creature.CombatTargetGuid = (ulong)session.InWorldGuid;
-        creature.Evading = false; // атаковали — прерываем возврат на спавн, снова в бой
-        creature.NextSwingMs = Environment.TickCount64 + SwingIntervalMs; // первый ответный — через интервал
+        creature.CombatTargetGuid = targetGuid;
+        creature.Evading = false;
+        creature.NextSwingMs = Environment.TickCount64 + SwingIntervalMs;
+        creature.NextMoveMs = 0;
         if (roar)
-            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAiReaction,
+            await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAiReaction,
                 BuildAiReaction(creature.Guid, AiReactionHostile), ct);
-        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStart,
-            BuildAttackStart(creature.Guid, (ulong)session.InWorldGuid), ct);
+        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStart,
+            BuildAttackStart(creature.Guid, targetGuid), ct);
+    }
+
+    /// <summary>Базовый радиус агро (ярды) враждебного существа к подошедшему игроку. M6.7 инкр.2b.</summary>
+    private const float AggroRadius = 18f;
+
+    /// <summary>
+    /// Скан авто-агро (M6.7 инкр.2b): враждебное по фракции существо рядом с живым игроком и не в бою —
+    /// само входит в бой (рык + преследование). Идём по видимым существам игрока (набор ограничен).
+    /// </summary>
+    internal static async Task TickAggroScanAsync(WorldState world, WorldPlayer player, long now, CancellationToken ct)
+    {
+        var session = player.Session;
+        if (session.IsDead || session.InWorldGuid == 0)
+            return;
+        var playerFt = DisplayData.FactionForRace(player.Character.Race);
+
+        foreach (var creature in session.VisibleNpcs.Values)
+        {
+            if (!creature.IsAlive || creature.CombatTargetGuid != 0 || creature.Evading)
+                continue;
+            if (!InAggroRange(creature, player))
+                continue;
+            if (!world.IsHostile(creature.Template.Faction, playerFt))
+                continue;
+            await EnterCreatureCombatAsync(world, creature, player.Guid, roar: true, ct);
+        }
+    }
+
+    private static bool InAggroRange(WorldCreature creature, WorldPlayer player)
+    {
+        var dx = creature.X - player.X;
+        var dy = creature.Y - player.Y;
+        var dz = creature.Z - player.Z;
+        return dx * dx + dy * dy + dz * dz <= AggroRadius * AggroRadius;
     }
 
     /// <summary>
@@ -199,6 +241,16 @@ public static class CombatHandlers
         // В мили-радиусе — бьём; иначе преследуем по навмешу (троттлинг шагов).
         if (InMeleeRangeOfCreature(creature, player))
         {
+            // Доворот к игроку при страфе (троттлинг + порог изменения угла) — иначе моб стоит «боком».
+            var desiredO = MathF.Atan2(player.Y - creature.Y, player.X - creature.X);
+            if (now >= creature.NextFaceMs
+                && MathF.Abs((float)Math.IEEERemainder(desiredO - creature.O, 2 * Math.PI)) > 0.2f)
+            {
+                creature.NextFaceMs = now + 400;
+                creature.O = desiredO;
+                await world.FaceCreatureAsync(creature, player.Guid, ct);
+            }
+
             if (now < creature.NextSwingMs)
                 return;
             creature.NextSwingMs = now + SwingIntervalMs;

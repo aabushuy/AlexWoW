@@ -21,6 +21,14 @@ if (args.Length >= 3 && args[0].Equals("charstartoutfit", StringComparison.Ordin
     return;
 }
 
+// Реакции фракций: factiontemplate <dataDir> <out.sql> — FactionTemplate.dbc → SQL для авто-агро (M6.7).
+if (args.Length >= 3 && args[0].Equals("factiontemplate", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqF = new MpqChain(args[1]);
+    FactionTemplateExtract.ExtractToSql(mpqF, args[2]);
+    return;
+}
+
 // Проверка vmap: vmapverify <dataDir> <mapDir> <adtX> <adtY> — список WMO в тайле + AABB (игровые коорд.).
 if (args.Length >= 5 && args[0].Equals("vmapverify", StringComparison.OrdinalIgnoreCase))
 {
