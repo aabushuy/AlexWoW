@@ -51,6 +51,7 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new Navmesh(options.MmapsPath);
 });
+builder.Services.AddSingleton<FactionStore>();
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldUpdateLoop>();
 builder.Services.AddHostedService<WorldListener>();

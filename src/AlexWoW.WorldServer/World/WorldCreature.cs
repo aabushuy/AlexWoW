@@ -48,6 +48,8 @@ public sealed class WorldCreature
     public long NextMoveMs { get; set; }
     /// <summary>Момент следующего тика регена HP вне боя. <see cref="Environment.TickCount64"/>, мс.</summary>
     public long NextRegenMs { get; set; }
+    /// <summary>Троттлинг доворота к цели в мили (фейсинг). <see cref="Environment.TickCount64"/>, мс. M6.7.</summary>
+    public long NextFaceMs { get; set; }
 
     // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
     /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
