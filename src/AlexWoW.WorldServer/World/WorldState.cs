@@ -12,13 +12,17 @@ namespace AlexWoW.WorldServer.World;
 /// Доступ из множества сессий-потоков — отсюда потокобезопасный словарь и сериализация
 /// отправки на уровне каждой сессии (см. WorldSession.SendAsync).
 /// </summary>
-public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions, QuestStore quests)
+public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
+    QuestStore quests, LevelStore levels)
 {
     /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
     private int _splineId;
 
     /// <summary>Реестр квест-связей (иконки !/?). M6.5.</summary>
     public QuestStore Quests => quests;
+
+    /// <summary>Прогрессия (кривая XP + XP за килл). M9.1.</summary>
+    public LevelStore Levels => levels;
 
     /// <summary>Враждебна ли фракция существа к фракции игрока (авто-агро M6.7).</summary>
     public bool IsHostile(uint creatureFactionTemplate, uint playerFactionTemplate)

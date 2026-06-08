@@ -205,6 +205,22 @@ public sealed class WorldDatabase(string connectionString)
         return rows.AsList();
     }
 
+    /// <summary>Кривая опыта: lvl → xp_for_next_level (player_xp_for_level). M9.1.</summary>
+    public async Task<IReadOnlyDictionary<uint, uint>> GetXpForLevelTableAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT lvl, xp_for_next_level FROM player_xp_for_level;", cancellationToken: ct));
+        var map = new Dictionary<uint, uint>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            var lvl = Convert.ToUInt32(d["lvl"], CultureInfo.InvariantCulture);
+            map[lvl] = Convert.ToUInt32(d["xp_for_next_level"], CultureInfo.InvariantCulture);
+        }
+        return map;
+    }
+
     /// <summary>Entry существ, дающих квесты (distinct creature_questrelation.id) — для иконок «!». M6.5.</summary>
     public async Task<IReadOnlyList<uint>> GetQuestGiverEntriesAsync(CancellationToken ct = default)
     {

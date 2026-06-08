@@ -97,6 +97,8 @@ public sealed class WorldSession
     /// <summary>Авторитетное здоровье игрока (UNIT_FIELD_HEALTH). Меняется уроном существ. M6.7.</summary>
     internal uint Health { get; set; }
     internal uint MaxHealth { get; set; }
+    /// <summary>Текущий опыт на уровне (PLAYER_XP). Прокачка M9.1.</summary>
+    internal uint Xp { get; set; }
     /// <summary>Время последней боевой активности (нанёс/получил урон) — для внебоевого регена HP. M6.7.</summary>
     internal long LastCombatMs { get; set; }
     /// <summary>Время последнего тика регена HP (кадэнс 1 с). M6.7.</summary>

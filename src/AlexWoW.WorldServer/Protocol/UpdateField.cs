@@ -46,6 +46,10 @@ public static class UpdateField
     public const int GoBytes1 = 0x0011;           // state|type|artKit|animProgress
 
     // PLAYER
+    /// <summary>Текущий опыт (UNIT_END 0x94 + 0x1E6). M9.1.</summary>
+    public const int PlayerXp = 0x027A;
+    /// <summary>Опыт до следующего уровня (0x94 + 0x1E7). M9.1.</summary>
+    public const int PlayerNextLevelXp = 0x027B;
     /// <summary>Начало блока навыков (128 слотов × 3 поля). UNIT_END(0x94) + 0x1E8.</summary>
     public const int PlayerSkillInfo11 = 0x027C;
 

@@ -65,6 +65,7 @@ public static class WorldEntryHandlers
         // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
         session.MaxMana = DisplayData.MaxManaForClass(character.Class, character.Level);
         session.Mana = session.MaxMana;
+        session.Xp = character.Xp; // M9.1: текущий опыт на уровне
         session.LastSpellCastMs = 0;
         session.LastManaRegenMs = Environment.TickCount64;
         session.SpellCooldowns.Clear();
@@ -83,6 +84,15 @@ public static class WorldEntryHandlers
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
         await SendTimeSyncReqAsync(session, ct);
+
+        // M9.1: XP-бар — текущий опыт + порог следующего уровня.
+        await session.World.Levels.EnsureLoadedAsync(ct);
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.PlayerXp, session.Xp);
+                m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(character.Level));
+            }), ct);
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);

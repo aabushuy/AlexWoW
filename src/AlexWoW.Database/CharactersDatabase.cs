@@ -102,6 +102,13 @@ public sealed class CharactersDatabase(string connectionString)
                 "ALTER TABLE characters ADD COLUMN money INT UNSIGNED NOT NULL DEFAULT 1000000;");
         }
         catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
+
+        // M9.1: текущий опыт на уровне (xp_for_next_level в player_xp_for_level).
+        try
+        {
+            await db.ExecuteAsync("ALTER TABLE characters ADD COLUMN xp INT UNSIGNED NOT NULL DEFAULT 0;");
+        }
+        catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
     }
 
     /// <summary>Есть ли у персонажа хоть один предмет (для выдачи стартового набора голым персонажам).</summary>
@@ -144,7 +151,7 @@ public sealed class CharactersDatabase(string connectionString)
         var rows = await db.QueryAsync<Character>("""
             SELECT guid AS Guid, account_id AS AccountId, name AS Name, race AS Race, class AS Class,
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
-                   hair_color AS HairColor, facial_hair AS FacialHair, level AS Level,
+                   hair_color AS HairColor, facial_hair AS FacialHair, level AS Level, xp AS Xp,
                    zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
                    money AS Money
             FROM characters WHERE account_id = @accountId ORDER BY guid;
@@ -158,7 +165,7 @@ public sealed class CharactersDatabase(string connectionString)
         return await db.QuerySingleOrDefaultAsync<Character>("""
             SELECT guid AS Guid, account_id AS AccountId, name AS Name, race AS Race, class AS Class,
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
-                   hair_color AS HairColor, facial_hair AS FacialHair, level AS Level,
+                   hair_color AS HairColor, facial_hair AS FacialHair, level AS Level, xp AS Xp,
                    zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
                    money AS Money
             FROM characters WHERE guid = @guid;
@@ -258,6 +265,14 @@ public sealed class CharactersDatabase(string connectionString)
     {
         await using var db = await OpenAsync(ct);
         await db.ExecuteAsync("UPDATE characters SET money = @money WHERE guid = @guid;", new { guid, money });
+    }
+
+    /// <summary>Сохраняет уровень и текущий опыт персонажа (M9.1 — прокачка).</summary>
+    public async Task SetLevelXpAsync(uint guid, byte level, uint xp, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("UPDATE characters SET level = @level, xp = @xp WHERE guid = @guid;",
+            new { guid, level, xp });
     }
 
     /// <summary>Удаляет предмет персонажа по его low-counter GUID (продажа/перемещение). M6.2.</summary>
