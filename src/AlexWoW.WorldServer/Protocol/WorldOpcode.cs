@@ -154,6 +154,11 @@ public enum WorldOpcode : uint
     SmsgTimeSyncReq = 0x390,
     CmsgTimeSyncResp = 0x391,
 
+    // Календарь (минимум): отвечаем на запрос числа ожидающих приглашений (0), чтобы индикатор
+    // на часах миникарты не висел и опкод не сыпал «без обработчика». (Taint TimeManager лечит SMSG_ADDON_INFO.)
+    CmsgCalendarGetNumPending = 0x447,
+    SmsgCalendarSendNumPending = 0x448,
+
     // Keep-alive
     CmsgPing = 0x1DC,
     SmsgPong = 0x1DD,
@@ -162,6 +167,9 @@ public enum WorldOpcode : uint
     SmsgAuthChallenge = 0x1EC,
     CmsgAuthSession = 0x1ED,
     SmsgAuthResponse = 0x1EE,
+    // Ответ на список аддонов из CMSG_AUTH_SESSION. Без него клиент считает Blizzard-аддоны
+    // (TimeManager/Calendar) не доверенными → taint → блокировка защищённого действия по Esc.
+    SmsgAddonInfo = 0x2EF,
 
     // Прочее, что шлёт клиент на экране персонажей / при входе
     SmsgFeatureSystemStatus = 0x3C9,
