@@ -72,8 +72,13 @@ public static class WorldEntryHandlers
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);
 
+        // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
+        // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
+        await QuestHandlers.LoadQuestStateAsync(session, ct);
+
         var spawn = PlayerSpawn.BuildCreateObject(character,
-            character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true, session.Inventory);
+            character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
+            session.Inventory, session.QuestSlots);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).

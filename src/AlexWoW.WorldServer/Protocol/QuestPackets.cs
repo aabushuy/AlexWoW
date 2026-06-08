@@ -151,7 +151,8 @@ public static class QuestPackets
         w.UInt32(q.Entry);
         w.CString(q.Title);
         w.CString(string.IsNullOrEmpty(q.OfferRewardText) ? q.Details : q.OfferRewardText);
-        w.UInt32(1);                 // auto_finish (Bool32) — можно завершить
+        w.UInt8(1);                  // auto_finish — u8 (НЕ u32! сверено с TrinityCore: uint8(AutoLaunched));
+                                     // лишние 3 байта сдвигали весь хвост → money врал (напр. «41943 золота»)
         w.UInt32(ClientFlags(q.QuestFlags));
         w.UInt32(q.SuggestedPlayers);
         w.UInt32(0);                 // amount_of_emotes

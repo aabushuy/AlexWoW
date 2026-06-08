@@ -45,6 +45,8 @@ public static class InventoryGrant
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid), ct);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
+
+        await QuestHandlers.OnItemGainedAsync(session, itemEntry, ct); // M6.10: зачёт item-целей квестов
         return item;
     }
 }
