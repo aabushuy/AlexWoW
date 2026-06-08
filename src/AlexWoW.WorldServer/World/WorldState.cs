@@ -203,6 +203,7 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
                 // здесь — реген маны (вне «правила 5 секунд»).
                 await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
                 await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
+                await Handlers.Auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
                 await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
                 await Handlers.CombatHandlers.TickAggroScanAsync(this, player, now, ct);      // M6.7: авто-агро по фракции
 

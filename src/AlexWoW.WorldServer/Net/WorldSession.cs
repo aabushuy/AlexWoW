@@ -177,6 +177,11 @@ public sealed class WorldSession
     /// HasSpell-проверок тренера и анти-дубля. Загружается при входе в мир. M9.3.</summary>
     internal HashSet<uint> KnownSpells { get; } = new();
 
+    /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
+    internal List<World.ActiveAura> Auras { get; } = new();
+    /// <summary>Текущая форма шейпшифта (стойка воина/форма друида); 0 — нет формы. UNIT_FIELD_BYTES_2 байт 3. M6.11.</summary>
+    internal byte ShapeshiftForm { get; set; }
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)
@@ -223,6 +228,8 @@ public sealed class WorldSession
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
         KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
+        Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
+        ShapeshiftForm = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();
