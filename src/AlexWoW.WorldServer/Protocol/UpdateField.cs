@@ -56,6 +56,12 @@ public static class UpdateField
     public const int QuestLogSlots = 25;
     /// <summary>Поле «id квеста» для слота журнала 0..24.</summary>
     public static int QuestLogSlotId(int slot) => PlayerQuestLog11 + slot * QuestLogSlotSize;
+    /// <summary>Поле «состояние» слота (флаги; бит завершения).</summary>
+    public static int QuestLogSlotState(int slot) => QuestLogSlotId(slot) + 1;
+    /// <summary>Поле счётчиков целей 0/1 (две u16: obj0 low, obj1 high).</summary>
+    public static int QuestLogSlotCounters01(int slot) => QuestLogSlotId(slot) + 2;
+    /// <summary>Поле счётчиков целей 2/3 (две u16: obj2 low, obj3 high).</summary>
+    public static int QuestLogSlotCounters23(int slot) => QuestLogSlotId(slot) + 3;
     public const int PlayerFlags = 0x0096;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState

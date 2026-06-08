@@ -228,10 +228,22 @@ public sealed class WorldDatabase(string connectionString)
     {
         await using var db = await OpenAsync(ct);
         var rows = await db.QueryAsync<GiverQuest>(new CommandDefinition("""
-            SELECT q.entry AS QuestId, q.QuestLevel AS QuestLevel, q.QuestFlags AS QuestFlags, q.Title AS Title
+            SELECT q.entry AS QuestId, q.QuestLevel AS QuestLevel, q.QuestFlags AS QuestFlags, q.Title AS Title,
+                   q.MinLevel AS MinLevel, q.RequiredRaces AS RequiredRaces, q.RequiredClasses AS RequiredClasses,
+                   q.PrevQuestId AS PrevQuestId
             FROM creature_questrelation r JOIN quest_template q ON q.entry = r.quest
             WHERE r.id = @creatureEntry ORDER BY q.entry;
             """, new { creatureEntry }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Id квестов, которые ПРИНИМАЕТ существо (creature_involvedrelation). Для сдачи. M6.5.</summary>
+    public async Task<IReadOnlyList<uint>> GetEnderQuestIdsAsync(uint creatureEntry, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<uint>(new CommandDefinition(
+            "SELECT quest FROM creature_involvedrelation WHERE id = @creatureEntry;",
+            new { creatureEntry }, cancellationToken: ct));
         return rows.AsList();
     }
 

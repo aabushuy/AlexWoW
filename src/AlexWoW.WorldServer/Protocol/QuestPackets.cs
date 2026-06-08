@@ -142,6 +142,66 @@ public static class QuestPackets
         return w.ToArray();
     }
 
+    /// <summary>SMSG_QUESTGIVER_OFFER_REWARD (3.3.5) — окно сдачи квеста с наградами.</summary>
+    public static byte[] BuildOfferReward(ulong npcGuid, QuestTemplateData q,
+        IReadOnlyDictionary<uint, (uint DisplayId, byte InvType)> displays)
+    {
+        var w = new ByteWriter(256);
+        w.UInt64(npcGuid);
+        w.UInt32(q.Entry);
+        w.CString(q.Title);
+        w.CString(string.IsNullOrEmpty(q.OfferRewardText) ? q.Details : q.OfferRewardText);
+        w.UInt32(1);                 // auto_finish (Bool32) — можно завершить
+        w.UInt32(ClientFlags(q.QuestFlags));
+        w.UInt32(q.SuggestedPlayers);
+        w.UInt32(0);                 // amount_of_emotes
+        WriteRewardItems(w, q.RewChoiceItemId, q.RewChoiceItemCount, displays);
+        WriteRewardItems(w, q.RewItemId, q.RewItemCount, displays);
+        w.UInt32(q.RewOrReqMoney > 0 ? (uint)q.RewOrReqMoney : 0u); // money_reward
+        w.UInt32(0);                 // experience_reward
+        w.UInt32(0);                 // honor_reward
+        w.Single(0f);                // honor_reward_multiplier
+        w.UInt32(0);                 // unknown1
+        w.UInt32(q.RewSpell);        // reward_spell
+        w.UInt32(q.RewSpellCast);    // reward_spell_cast
+        w.UInt32(0);                 // title_reward
+        w.UInt32(0);                 // reward_talents
+        w.UInt32(0);                 // reward_arena_points
+        w.UInt32(0);                 // reward_reputation_mask
+        for (var i = 0; i < 5; i++) w.UInt32(0); // reward_factions
+        for (var i = 0; i < 5; i++) w.UInt32(0); // reward_reputations
+        for (var i = 0; i < 5; i++) w.UInt32(0); // reward_reputations_override
+        return w.ToArray();
+    }
+
+    /// <summary>SMSG_QUESTGIVER_QUEST_COMPLETE (3.3.5) — квест завершён (награда выдана).</summary>
+    public static byte[] BuildQuestComplete(QuestTemplateData q)
+    {
+        var w = new ByteWriter(48);
+        w.UInt32(q.Entry);
+        w.UInt32(0);                 // unknown
+        w.UInt32(0);                 // experience_reward
+        w.UInt32(q.RewOrReqMoney > 0 ? (uint)q.RewOrReqMoney : 0u); // money_reward
+        w.UInt32(0);                 // honor_reward
+        w.UInt32(0);                 // talent_reward
+        w.UInt32(0);                 // arena_point_reward
+        var n = 0;
+        for (var i = 0; i < 4; i++) if (q.RewItemId[i] != 0) n++;
+        w.UInt32((uint)n);
+        for (var i = 0; i < 4; i++)
+            if (q.RewItemId[i] != 0)
+                w.UInt32(q.RewItemId[i]).UInt32(q.RewItemCount[i] == 0 ? 1u : q.RewItemCount[i]);
+        return w.ToArray();
+    }
+
+    /// <summary>SMSG_QUESTUPDATE_ADD_KILL (3.3.5): прогресс цели-убийства/разговора.</summary>
+    public static byte[] BuildAddKill(uint questId, uint creatureId, uint count, uint required, ulong creatureGuid)
+        => new ByteWriter(28).UInt32(questId).UInt32(creatureId).UInt32(count).UInt32(required).UInt64(creatureGuid).ToArray();
+
+    /// <summary>SMSG_QUESTUPDATE_COMPLETE (3.3.5): цель квеста выполнена.</summary>
+    public static byte[] BuildUpdateComplete(uint questId)
+        => new ByteWriter(4).UInt32(questId).ToArray();
+
     private static void WriteRewardItems(ByteWriter w, uint[] ids, uint[] counts,
         IReadOnlyDictionary<uint, (uint DisplayId, byte InvType)> displays)
     {

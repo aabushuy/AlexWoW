@@ -26,6 +26,9 @@ public static class LootHandlers
     /// </summary>
     internal static async Task OnCreatureKilledAsync(WorldSession session, WorldCreature creature, CancellationToken ct)
     {
+        // M6.5: зачёт убийства в цели активных квестов.
+        await QuestHandlers.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
+
         Database.Models.CreatureLootData? data;
         try
         {

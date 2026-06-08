@@ -54,6 +54,10 @@ public sealed class GiverQuest
     public int QuestLevel { get; init; }
     public uint QuestFlags { get; init; }
     public string Title { get; init; } = string.Empty;
+    public int MinLevel { get; init; }
+    public uint RequiredRaces { get; init; }
+    public uint RequiredClasses { get; init; }
+    public uint PrevQuestId { get; init; }
 }
 
 /// <summary>Шаблон квеста (quest_template) — нужные поля для деталей/награды/целей. M6.5.</summary>
