@@ -146,6 +146,7 @@ public enum WorldOpcode : uint
     // Вход в мир (M4)
     SmsgLoginSetTimeSpeed = 0x042,
     SmsgInitialSpells = 0x12A,
+    SmsgInitializeFactions = 0x122, // список репутаций при входе (M7 #11) — инициализирует rep-менеджер клиента
     SmsgTutorialFlags = 0x0FD,
     SmsgUpdateObject = 0x0A9,
     SmsgDestroyObject = 0x0AA,

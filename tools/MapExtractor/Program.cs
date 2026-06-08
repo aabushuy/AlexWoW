@@ -29,6 +29,16 @@ if (args.Length >= 3 && args[0].Equals("factiontemplate", StringComparison.Ordin
     return;
 }
 
+// Диагностика Faction.dbc: faction <dataDir> <id> [id2 ...] — печать reputationListID и base standing.
+if (args.Length >= 3 && args[0].Equals("faction", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqFd = new MpqChain(args[1]);
+    var fids = args.Skip(2).Select(uint.Parse).ToArray();
+    FactionDump.Print(mpqFd, fids);
+    FactionDump.PrintTemplates(mpqFd, fids);
+    return;
+}
+
 // Проверка vmap: vmapverify <dataDir> <mapDir> <adtX> <adtY> — список WMO в тайле + AABB (игровые коорд.).
 if (args.Length >= 5 && args[0].Equals("vmapverify", StringComparison.OrdinalIgnoreCase))
 {

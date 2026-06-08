@@ -46,6 +46,7 @@ public static class WorldEntryHandlers
         await session.SendAsync(WorldOpcode.SmsgTutorialFlags, tutorials.ToArray(), ct);
 
         await SendLoginTimeSpeedAsync(session, ct);
+        await SendInitializeFactionsAsync(session, ct);
 
         // M6.1: инвентарь — выдать стартовый набор голым персонажам, загрузить и создать item-объекты
         // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
@@ -171,6 +172,24 @@ public static class WorldEntryHandlers
             w.UInt32((uint)spell).UInt16(0); // 3.3.5: spellId — u32 + u16
         w.UInt16(0); // нет кулдаунов
         await session.SendAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
+    }
+
+    /// <summary>
+    /// SMSG_INITIALIZE_FACTIONS (0x122) — инициализирует менеджер репутаций клиента (M7 #11). Без него
+    /// клиент не отдаёт корректную НЕЙТРАЛЬНУЮ реакцию для существ, чьи фракции не имеют явных
+    /// hostile/friendly масок (напр. нейтральные мобы Элвинна) — и блокирует атаку по ним. Шлём 128
+    /// слотов (Wrath) с нулевым флагом/standing'ом: персонаж на базовой репутации, список просто
+    /// «существует». Точные standing'и/at-war по Faction.dbc — задел на полноценную репутацию (квест-награды).
+    /// Структура (wow_messages, vers.3): u32 count + count×(u8 flag + u32 standing).
+    /// </summary>
+    private static async Task SendInitializeFactionsAsync(WorldSession session, CancellationToken ct)
+    {
+        const int factionCount = 128; // mangostwo (wrath) = 0x80
+        var w = new ByteWriter(4 + factionCount * 5);
+        w.UInt32(factionCount);
+        for (var i = 0; i < factionCount; i++)
+            w.UInt8(0).UInt32(0); // flag=0 (невидима/не-at-war), standing=0 (база)
+        await session.SendAsync(WorldOpcode.SmsgInitializeFactions, w.ToArray(), ct);
     }
 
     private static async Task SendLoginTimeSpeedAsync(WorldSession session, CancellationToken ct)

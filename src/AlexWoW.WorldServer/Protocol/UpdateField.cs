@@ -81,6 +81,14 @@ public static class UpdateField
     public static int InvSlotGuid(int slot) => PlayerFieldInvSlotHead + slot * 2;
 }
 
+/// <summary>Флаги UNIT_FIELD_FLAGS (3.3.5a). Значения сверены с TrinityCore/CMaNGOS.</summary>
+public static class UnitFlags
+{
+    /// <summary>UNIT_FLAG_PLAYER_CONTROLLED — юнит под управлением игрока. Клиент по нему выбирает
+    /// ветку реакции/атаки PvC vs CvC; без него игрок считается существом и не может бить нейтралов.</summary>
+    public const uint PlayerControlled = 0x00000008;
+}
+
 /// <summary>Типы объектов (OBJECT_FIELD_TYPE — битовая маска).</summary>
 public static class TypeMask
 {
