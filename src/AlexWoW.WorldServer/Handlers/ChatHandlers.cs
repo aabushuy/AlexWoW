@@ -23,8 +23,12 @@ public static class ChatHandlers
             return;
         var msg = rest[..len].ToArray(); // сырые байты — без перекодировки (кириллица ок)
 
-        session.Logger.LogInformation("CHAT '{User}' type={Type}: {Msg}",
-            session.Account, type, Encoding.UTF8.GetString(msg));
+        var text = Encoding.UTF8.GetString(msg);
+        session.Logger.LogInformation("CHAT '{User}' type={Type}: {Msg}", session.Account, type, text);
+
+        // M9.4: дев-команды (.level/.xp/.additem) — не уходят в чат.
+        if (await DevCommands.TryHandleAsync(session, text, ct))
+            return;
 
         // Эхо отправителю (для одного игрока этого достаточно).
         var w = new ByteWriter(40 + msg.Length)
