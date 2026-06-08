@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 747 / 859 опкодов НЕ реализовано — 87.0%** (реализовано: 112 — 13.0%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 726 / 860 опкодов НЕ реализовано — 84.4%** (реализовано: 134 — 15.6%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -21,8 +21,6 @@
 | `0x0055` | SMSG_GUILD_QUERY_RESPONSE | Query |
 | `0x005A` | CMSG_PAGE_TEXT_QUERY | Query |
 | `0x005B` | SMSG_PAGE_TEXT_QUERY_RESPONSE | Query |
-| `0x005C` | CMSG_QUEST_QUERY | Query |
-| `0x005D` | SMSG_QUEST_QUERY_RESPONSE | Quest |
 | `0x0062` | CMSG_WHO | Social |
 | `0x0063` | SMSG_WHO | Social |
 | `0x0064` | CMSG_WHOIS | Social |
@@ -142,7 +140,6 @@
 | `0x011F` | CMSG_SET_TRADE_GOLD | Trade |
 | `0x0120` | SMSG_TRADE_STATUS | Trade |
 | `0x0121` | SMSG_TRADE_STATUS_EXTENDED | Trade |
-| `0x0122` | SMSG_INITIALIZE_FACTIONS | Faction |
 | `0x0123` | SMSG_SET_FACTION_VISIBLE | Faction |
 | `0x0124` | SMSG_SET_FACTION_STANDING | Faction |
 | `0x0125` | CMSG_SET_FACTION_ATWAR | Faction |
@@ -193,27 +190,14 @@
 | `0x017E` | SMSG_GOSSIP_COMPLETE | Gossip |
 | `0x017F` | CMSG_NPC_TEXT_QUERY | Query |
 | `0x0180` | SMSG_NPC_TEXT_UPDATE | Gossip |
-| `0x0182` | CMSG_QUESTGIVER_STATUS_QUERY | Query |
-| `0x0184` | CMSG_QUESTGIVER_HELLO | Quest |
-| `0x0185` | SMSG_QUESTGIVER_QUEST_LIST | Quest |
-| `0x0186` | CMSG_QUESTGIVER_QUERY_QUEST | Query |
 | `0x0187` | CMSG_QUESTGIVER_QUEST_AUTOLAUNCH | Quest |
-| `0x0188` | SMSG_QUESTGIVER_QUEST_DETAILS | Quest |
-| `0x0189` | CMSG_QUESTGIVER_ACCEPT_QUEST | Quest |
-| `0x018A` | CMSG_QUESTGIVER_COMPLETE_QUEST | Quest |
 | `0x018B` | SMSG_QUESTGIVER_REQUEST_ITEMS | Quest |
-| `0x018C` | CMSG_QUESTGIVER_REQUEST_REWARD | Quest |
-| `0x018D` | SMSG_QUESTGIVER_OFFER_REWARD | Quest |
-| `0x018E` | CMSG_QUESTGIVER_CHOOSE_REWARD | Quest |
 | `0x0190` | CMSG_QUESTGIVER_CANCEL | Quest |
-| `0x0191` | SMSG_QUESTGIVER_QUEST_COMPLETE | Quest |
 | `0x0193` | CMSG_QUESTLOG_SWAP_QUEST | Quest |
 | `0x0194` | CMSG_QUESTLOG_REMOVE_QUEST | Quest |
 | `0x0195` | SMSG_QUESTLOG_FULL | Quest |
 | `0x0196` | SMSG_QUESTUPDATE_FAILED | Quest |
 | `0x0197` | SMSG_QUESTUPDATE_FAILEDTIMER | Quest |
-| `0x0198` | SMSG_QUESTUPDATE_COMPLETE | Quest |
-| `0x0199` | SMSG_QUESTUPDATE_ADD_KILL | Quest |
 | `0x019A` | SMSG_QUESTUPDATE_ADD_ITEM | Quest |
 | `0x019B` | CMSG_QUEST_CONFIRM_ACCEPT | Quest |
 | `0x019C` | SMSG_QUEST_CONFIRM_ACCEPT | Quest |
@@ -449,7 +433,6 @@
 | `0x02EC` | SMSG_BATTLEGROUND_PLAYER_JOINED | Battleground |
 | `0x02ED` | SMSG_BATTLEGROUND_PLAYER_LEFT | Calendar |
 | `0x02EE` | CMSG_BATTLEMASTER_JOIN | Battleground |
-| `0x02EF` | SMSG_ADDON_INFO | Login |
 | `0x02F0` | CMSG_PET_UNLEARN | Pet |
 | `0x02F1` | SMSG_PET_UNLEARN_CONFIRM | Pet |
 | `0x02F2` | SMSG_PARTY_MEMBER_STATS_FULL | Social |
@@ -601,8 +584,6 @@
 | `0x0412` | SMSG_OVERRIDE_LIGHT | Cinematic |
 | `0x0413` | SMSG_TOTEM_CREATED | Spell |
 | `0x0414` | CMSG_TOTEM_DESTROYED | Spell |
-| `0x0417` | CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY | Quest |
-| `0x0418` | SMSG_QUESTGIVER_STATUS_MULTIPLE | Quest |
 | `0x041E` | SMSG_SEND_UNLEARN_SPELLS | Spell |
 | `0x041F` | SMSG_PROPOSE_LEVEL_GRANT | Social |
 | `0x0420` | CMSG_ACCEPT_LEVEL_GRANT | GM |
@@ -641,8 +622,6 @@
 | `0x0444` | SMSG_CALENDAR_EVENT_UPDATED_ALERT | Calendar |
 | `0x0445` | SMSG_CALENDAR_EVENT_MODERATOR_STATUS_ALERT | Calendar |
 | `0x0446` | CMSG_CALENDAR_COMPLAIN | Calendar |
-| `0x0447` | CMSG_CALENDAR_GET_NUM_PENDING | Calendar |
-| `0x0448` | SMSG_CALENDAR_SEND_NUM_PENDING | Character |
 | `0x045C` | SMSG_FORCE_PITCH_RATE_CHANGE | Movement |
 | `0x0460` | SMSG_CALENDAR_EVENT_INVITE_NOTES | Calendar |
 | `0x0461` | SMSG_CALENDAR_EVENT_INVITE_NOTES_ALERT | Calendar |
