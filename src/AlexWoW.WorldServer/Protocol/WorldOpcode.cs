@@ -104,6 +104,19 @@ public enum WorldOpcode : uint
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
 
+    // Квесты (M6.5)
+    CmsgQuestQuery = 0x05C,                     // u32 quest_id — данные квеста для журнала
+    SmsgQuestQueryResponse = 0x05D,            // полные данные квеста (текст/цели/награды)
+    CmsgQuestgiverHello = 0x184,               // Guid npc — открыть квесты NPC
+    SmsgQuestgiverQuestList = 0x185,           // список квестов NPC
+    CmsgQuestgiverQueryQuest = 0x186,          // Guid + quest_id — запрос деталей
+    SmsgQuestgiverQuestDetails = 0x188,        // окно деталей квеста (accept)
+    CmsgQuestgiverAcceptQuest = 0x189,         // Guid + quest_id — принять квест
+    CmsgQuestgiverStatusQuery = 0x182,         // Guid npc — статус одного квестгивера
+    SmsgQuestgiverStatus = 0x183,              // Guid + u32 status (иконка !/?)
+    CmsgQuestgiverStatusMultipleQuery = 0x417, // пустое — статусы всех видимых
+    SmsgQuestgiverStatusMultiple = 0x418,      // u32 count + [u64 guid + u8 status]
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,
