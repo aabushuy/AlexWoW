@@ -22,15 +22,16 @@ maps/
 vmaps/
 mmaps/
 
-# Локальный вывод экстрактора карт (большие бинарники, не в репозиторий)
-maps-test/
-out-maps/
-vmaps-test/
-mmaps-test/
-mmaps-map0/
-out-charstartoutfit.sql
+# Локальные артефакты экстрактора (большие бинарники, не в репозиторий)
+# data/ — хранимые данные (out-maps и т.п.); tests/extractor-output/ — пробные/тестовые выгрузки
+data/
+tests/extractor-output/
+
+# Сгенерированные SQL-дампы экстрактора (tools/scripts/quest-test-reset.sql — рукописный, остаётся в репо)
+tools/scripts/factiontemplate.sql
+tools/scripts/out-charstartoutfit.sql
+tools/scripts/charstartoutfit.sql
 charstartoutfit.sql
-factiontemplate.sql
 
 # MCP-конфиг проекта содержит API-токен Vikunja — в репозиторий не кладём
 .mcp.json

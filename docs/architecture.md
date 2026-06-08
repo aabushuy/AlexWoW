@@ -33,7 +33,7 @@
 | Служба | Аналог в mangos | Назначение | Статус |
 |---|---|---|---|
 | **AuthServer** | `realmd` | SRP6-логин, выдача списка реалмов | ✅ M1 |
-| **WorldServer** | `mangosd` | Сессии игроков, мир, бой, спеллы, БД | 🟡 M2 (handshake) |
+| **WorldServer** | `mangosd` | Сессии игроков, мир, бой, спеллы, квесты, БД | ✅ M2–M6 (квесты M6.5 — в работе) |
 
 Процессная модель на старте — два процесса (auth + world), как в оригинале. Позже можно вынести в отдельные сервисы/контейнеры.
 
@@ -104,16 +104,20 @@ AlexWoW.slnx
 ├─ src/
 │  ├─ AlexWoW.Common        ✅ утилиты, бинарные примитивы пакетов (ByteReader/Writer)
 │  ├─ AlexWoW.Cryptography  ✅ SRP6, RC4 header crypt, auth digest, хэши
-│  ├─ AlexWoW.Database      ✅ MySqlConnector/Dapper, репозитории, схема
+│  ├─ AlexWoW.Database      ✅ MySqlConnector/Dapper, репозитории, схема (auth/characters/world)
+│  ├─ AlexWoW.DataStores    ✅ загрузка maps (рельеф), vmaps (LoS), mmaps (навмеш); DBC
 │  ├─ AlexWoW.AuthServer    ✅ exe: realmd (логин + список реалмов)
-│  ├─ AlexWoW.WorldServer   🟡 exe: mangosd. WorldSession=транспорт+состояние;
-│  │                           обработчики опкодов — реестр Handlers/ ([WorldOpcodeHandler])
-│  ├─ AlexWoW.DataStores    🔜 парсеры DBC, загрузка maps/vmaps/mmaps
-│  └─ AlexWoW.Game          🔜 игровая логика: сущности, грид, бой, спеллы
+│  ├─ AlexWoW.WorldServer   ✅ exe: mangosd. WorldSession=транспорт+состояние; мир/бой/
+│  │                           спеллы/квесты; опкоды — реестр Handlers/ ([WorldOpcodeHandler])
+│  └─ AlexWoW.Game          🔜 (опц.) выделение игровой логики в отдельный проект — пока в WorldServer
 ├─ tools/
-│  └─ MapExtractor          🔜 извлечение DBC/maps/vmaps/mmaps из клиента
+│  ├─ MapExtractor          ✅ извлечение DBC/maps/vmaps из клиента (.NET, Foole.Mpq)
+│  ├─ MmapGen               ✅ генерация навмеша (mmaps) на DotRecast
+│  └─ scripts/              SQL-хелперы и сгенерированные дампы (дампы — в .gitignore)
+├─ data/                    локальные хранимые данные (out-maps и т.п.; в .gitignore)
 └─ tests/
-   └─ AlexWoW.Cryptography.Tests ✅ round-trip тесты SRP6
+   ├─ AlexWoW.Cryptography.Tests ✅ round-trip тесты SRP6
+   └─ extractor-output/     локальные пробные выгрузки экстрактора (в .gitignore)
 ```
 
 ---

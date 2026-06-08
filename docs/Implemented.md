@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 112 / 859 опкодов реализовано — 13.0%** (не реализовано: 747 — 87.0%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 134 / 860 опкодов реализовано — 15.6%** (не реализовано: 726 — 84.4%, см. [NotImplemented.md](NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -23,6 +23,8 @@
 | `0x0051` | SMSG_NAME_QUERY_RESPONSE | Query |
 | `0x0056` | CMSG_ITEM_QUERY_SINGLE | Query |
 | `0x0058` | SMSG_ITEM_QUERY_SINGLE_RESPONSE | Query |
+| `0x005C` | CMSG_QUEST_QUERY | Query |
+| `0x005D` | SMSG_QUEST_QUERY_RESPONSE | Quest |
 | `0x005E` | CMSG_GAMEOBJECT_QUERY | Query |
 | `0x005F` | SMSG_GAMEOBJECT_QUERY_RESPONSE | Query |
 | `0x0060` | CMSG_CREATURE_QUERY | Query |
@@ -63,6 +65,7 @@
 | `0x010F` | CMSG_AUTOEQUIP_ITEM_SLOT | Item |
 | `0x0111` | CMSG_DESTROYITEM | Item |
 | `0x0112` | SMSG_INVENTORY_CHANGE_FAILURE | Item |
+| `0x0122` | SMSG_INITIALIZE_FACTIONS | Faction |
 | `0x012A` | SMSG_INITIAL_SPELLS | Spell |
 | `0x012E` | CMSG_CAST_SPELL | Spell |
 | `0x012F` | CMSG_CANCEL_CAST | Spell |
@@ -89,6 +92,20 @@
 | `0x0162` | SMSG_LOOT_REMOVED | Loot |
 | `0x0165` | SMSG_LOOT_CLEAR_MONEY | Loot |
 | `0x017B` | CMSG_GOSSIP_HELLO | Gossip |
+| `0x0182` | CMSG_QUESTGIVER_STATUS_QUERY | Query |
+| `0x0183` | SMSG_QUESTGIVER_STATUS | Quest |
+| `0x0184` | CMSG_QUESTGIVER_HELLO | Quest |
+| `0x0185` | SMSG_QUESTGIVER_QUEST_LIST | Quest |
+| `0x0186` | CMSG_QUESTGIVER_QUERY_QUEST | Query |
+| `0x0188` | SMSG_QUESTGIVER_QUEST_DETAILS | Quest |
+| `0x0189` | CMSG_QUESTGIVER_ACCEPT_QUEST | Quest |
+| `0x018A` | CMSG_QUESTGIVER_COMPLETE_QUEST | Quest |
+| `0x018C` | CMSG_QUESTGIVER_REQUEST_REWARD | Quest |
+| `0x018D` | SMSG_QUESTGIVER_OFFER_REWARD | Quest |
+| `0x018E` | CMSG_QUESTGIVER_CHOOSE_REWARD | Quest |
+| `0x0191` | SMSG_QUESTGIVER_QUEST_COMPLETE | Quest |
+| `0x0198` | SMSG_QUESTUPDATE_COMPLETE | Quest |
+| `0x0199` | SMSG_QUESTUPDATE_ADD_KILL | Quest |
 | `0x019E` | CMSG_LIST_INVENTORY | Item |
 | `0x019F` | SMSG_LIST_INVENTORY | Item |
 | `0x01A0` | CMSG_SELL_ITEM | Item |
@@ -107,14 +124,19 @@
 | `0x020B` | CMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x0236` | SMSG_LOGIN_VERIFY_WORLD | Character |
 | `0x0250` | SMSG_SPELLNONMELEEDAMAGELOG | Spell |
+| `0x02EF` | SMSG_ADDON_INFO | Login |
 | `0x037A` | SMSG_FORCED_DEATH_UPDATE | Resurrect |
 | `0x038B` | SMSG_REALM_SPLIT | Character |
 | `0x038C` | CMSG_REALM_SPLIT | Character |
 | `0x0390` | SMSG_TIME_SYNC_REQ | Login |
 | `0x0391` | CMSG_TIME_SYNC_RESP | Login |
 | `0x03C9` | SMSG_FEATURE_SYSTEM_STATUS | Social |
+| `0x0417` | CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY | Quest |
+| `0x0418` | SMSG_QUESTGIVER_STATUS_MULTIPLE | Quest |
 | `0x0419` | CMSG_SET_PLAYER_DECLINED_NAMES | Social |
 | `0x041A` | SMSG_SET_PLAYER_DECLINED_NAMES_RESULT | Social |
+| `0x0447` | CMSG_CALENDAR_GET_NUM_PENDING | Calendar |
+| `0x0448` | SMSG_CALENDAR_SEND_NUM_PENDING | Character |
 | `0x0463` | SMSG_UPDATE_ACCOUNT_DATA_COMPLETE | Login |
 | `0x0480` | SMSG_POWER_UPDATE | Spell |
 | `0x04FF` | CMSG_READY_FOR_ACCOUNT_DATA_TIMES | Character |

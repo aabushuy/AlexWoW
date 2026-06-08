@@ -11,11 +11,19 @@
 ```
 src/
   AlexWoW.Common         — бинарные примитивы пакетов (ByteReader/Writer)
-  AlexWoW.Cryptography   — SRP6 (сервер/клиент), session key
-  AlexWoW.Database       — доступ к MySQL (Dapper), схема auth
-  AlexWoW.AuthServer     — логин-сервер (exe) + CLI создания аккаунтов
+  AlexWoW.Cryptography   — SRP6 (сервер/клиент), session key, RC4 header crypt
+  AlexWoW.Database       — доступ к MySQL (Dapper): auth, characters, world
+  AlexWoW.DataStores     — загрузка клиентских данных (maps/vmaps/mmaps), DBC
+  AlexWoW.AuthServer     — логин-сервер (exe) + CLI (create-account, reset-all-passwords)
+  AlexWoW.WorldServer    — world-сервер (exe): сессии, мир, бой, спеллы, квесты
+tools/
+  MapExtractor           — .NET-экстрактор DBC/maps/vmaps из клиента (MPQ)
+  MmapGen                — генератор навмеша (mmaps) на DotRecast
+  scripts/               — SQL-хелперы и сгенерированные дампы (дампы — в .gitignore)
 tests/
   AlexWoW.Cryptography.Tests — round-trip тесты SRP6
+  extractor-output/      — локальные пробные выгрузки экстрактора (в .gitignore)
+data/                    — локальные хранимые данные (out-maps и т.п.; в .gitignore)
 ```
 
 ## Поднять MySQL
