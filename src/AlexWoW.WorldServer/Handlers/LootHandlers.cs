@@ -29,6 +29,14 @@ public static class LootHandlers
         // M6.5: зачёт убийства в цели активных квестов.
         await QuestHandlers.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
 
+        // M9.1: опыт за убийство (убийце).
+        if (session.Character is { } pc && pc.Level < World.LevelStore.MaxLevel)
+        {
+            var xp = session.World.Levels.KillXp(pc.Level, creature.Template.Level);
+            if (xp > 0)
+                await Progression.GiveXpAsync(session, xp, ct);
+        }
+
         Database.Models.CreatureLootData? data;
         try
         {

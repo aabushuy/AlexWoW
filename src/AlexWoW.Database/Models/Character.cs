@@ -14,7 +14,8 @@ public sealed class Character
     public byte HairStyle { get; init; }
     public byte HairColor { get; init; }
     public byte FacialHair { get; init; }
-    public byte Level { get; init; }
+    public byte Level { get; set; }    // M9.1: меняется при повышении уровня
+    public uint Xp { get; set; }        // M9.1: текущий опыт на уровне
     public uint Zone { get; init; }
     public uint Map { get; init; }
     public float X { get; init; }

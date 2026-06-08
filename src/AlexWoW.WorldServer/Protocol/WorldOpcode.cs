@@ -124,6 +124,9 @@ public enum WorldOpcode : uint
     CmsgQuestgiverStatusMultipleQuery = 0x417, // пустое — статусы всех видимых
     SmsgQuestgiverStatusMultiple = 0x418,      // u32 count + [u64 guid + u8 status]
 
+    // Прогрессия (M9.1)
+    SmsgLevelupInfo = 0x1D4,       // new_level + health + 7 powers + 5 stats (диффы) — сплеш «ding»
+
     // Видимость / NPC (M5)
     CmsgCreatureQuery = 0x060,
     SmsgCreatureQueryResponse = 0x061,
