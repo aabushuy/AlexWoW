@@ -15,13 +15,15 @@ public static class VendorHandlers
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
 
-    [WorldOpcodeHandler(WorldOpcode.CmsgGossipHello, WorldOpcode.CmsgListInventory)]
+    [WorldOpcodeHandler(WorldOpcode.CmsgListInventory)]
     public static async Task OnListInventory(WorldSession session, IncomingPacket packet, CancellationToken ct)
-    {
-        var reader = packet.Reader();
-        var vendorGuid = reader.UInt64();
-        var entry = CreatureEntry(vendorGuid);
+        => await SendVendorListAsync(session, packet.Reader().UInt64(), ct);
 
+    /// <summary>Шлёт окно товаров вендора (SMSG_LIST_INVENTORY), если у NPC есть ассортимент. M6.2.
+    /// Вынесено для переиспользования из госсипа квестов (M6.5).</summary>
+    internal static async Task SendVendorListAsync(WorldSession session, ulong vendorGuid, CancellationToken ct)
+    {
+        var entry = CreatureEntry(vendorGuid);
         IReadOnlyList<VendorItem> items;
         try { items = await session.WorldDb.GetVendorItemsAsync(entry, ct); }
         catch (Exception ex)

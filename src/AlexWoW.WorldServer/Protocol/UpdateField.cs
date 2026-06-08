@@ -48,6 +48,14 @@ public static class UpdateField
     // PLAYER
     /// <summary>Начало блока навыков (128 слотов × 3 поля). UNIT_END(0x94) + 0x1E8.</summary>
     public const int PlayerSkillInfo11 = 0x027C;
+
+    /// <summary>Журнал квестов: 25 слотов × 5 полей (id, state, counters×2, time). 0x9E + 25*5 = 0x11B
+    /// (= PlayerVisibleItem1 — сверка). M6.5.</summary>
+    public const int PlayerQuestLog11 = 0x009E;
+    public const int QuestLogSlotSize = 5;
+    public const int QuestLogSlots = 25;
+    /// <summary>Поле «id квеста» для слота журнала 0..24.</summary>
+    public static int QuestLogSlotId(int slot) => PlayerQuestLog11 + slot * QuestLogSlotSize;
     public const int PlayerFlags = 0x0096;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
