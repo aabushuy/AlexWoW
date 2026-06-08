@@ -104,6 +104,7 @@ public static class Progression
             }
             catch { /* БД мира недоступна — безоружный фолбэк */ }
         }
+        session.MainHandSpeedMs = attackTime; // M6.12: для формулы ярости
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
