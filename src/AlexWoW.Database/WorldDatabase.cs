@@ -101,6 +101,61 @@ public sealed class WorldDatabase(string connectionString)
         return rows.AsList();
     }
 
+    /// <summary>Стартовые спеллы по расе/классу (playercreateinfo_spell). Изучены на 1 уровне. M9.3.</summary>
+    public async Task<IReadOnlyList<uint>> GetStartSpellsAsync(byte race, byte cls, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<uint>(new CommandDefinition(
+            "SELECT Spell FROM playercreateinfo_spell WHERE race = @race AND class = @cls;",
+            new { race, cls }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>
+    /// Данные тренера по entry существа (M9.3): тип/класс/раса из creature_template + ассортимент из
+    /// npc_trainer (прямой) ∪ npc_trainer_template (по TrainerTemplateId) + приветствие (trainer_greeting).
+    /// null, если существо не тренер (TrainerType=0 И нет ассортимента). reqlevel из строки тренера.
+    /// </summary>
+    public async Task<TrainerData?> GetTrainerAsync(uint entry, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+
+        var head = await db.QuerySingleOrDefaultAsync(new CommandDefinition(
+            "SELECT TrainerType, TrainerClass, TrainerRace, TrainerTemplateId FROM creature_template WHERE Entry = @entry;",
+            new { entry }, cancellationToken: ct));
+        if (head is null)
+            return null;
+        var h = (IDictionary<string, object>)head;
+        byte trainerType = Convert.ToByte(h["TrainerType"], CultureInfo.InvariantCulture);
+        byte trainerClass = Convert.ToByte(h["TrainerClass"], CultureInfo.InvariantCulture);
+        byte trainerRace = Convert.ToByte(h["TrainerRace"], CultureInfo.InvariantCulture);
+        uint templateId = Convert.ToUInt32(h["TrainerTemplateId"], CultureInfo.InvariantCulture);
+
+        var spells = (await db.QueryAsync<TrainerSpell>(new CommandDefinition("""
+            SELECT spell AS Spell, spellcost AS SpellCost, reqskill AS ReqSkill,
+                   reqskillvalue AS ReqSkillValue, reqlevel AS ReqLevel,
+                   COALESCE(ReqAbility1, 0) AS ReqAbility1, COALESCE(ReqAbility2, 0) AS ReqAbility2,
+                   COALESCE(ReqAbility3, 0) AS ReqAbility3
+            FROM npc_trainer WHERE entry = @entry
+            UNION
+            SELECT spell, spellcost, reqskill, reqskillvalue, reqlevel,
+                   COALESCE(ReqAbility1, 0), COALESCE(ReqAbility2, 0), COALESCE(ReqAbility3, 0)
+            FROM npc_trainer_template WHERE @templateId <> 0 AND entry = @templateId;
+            """, new { entry, templateId }, cancellationToken: ct))).AsList();
+
+        if (trainerType == 0 && spells.Count == 0)
+            return null; // не тренер
+
+        var greeting = await db.ExecuteScalarAsync<string?>(new CommandDefinition(
+            "SELECT Text FROM trainer_greeting WHERE Entry = @entry;", new { entry }, cancellationToken: ct));
+
+        return new TrainerData
+        {
+            TrainerType = trainerType, TrainerClass = trainerClass, TrainerRace = trainerRace,
+            Greeting = greeting ?? string.Empty, Spells = spells,
+        };
+    }
+
     /// <summary>displayid + InventoryType по набору entry (для paperdoll в SMSG_CHAR_ENUM).</summary>
     public async Task<IReadOnlyDictionary<uint, (uint DisplayId, byte InventoryType)>> GetItemDisplaysAsync(
         IReadOnlyCollection<uint> entries, CancellationToken ct = default)

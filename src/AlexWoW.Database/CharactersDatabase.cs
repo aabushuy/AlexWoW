@@ -94,6 +94,18 @@ public sealed class CharactersDatabase(string connectionString)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
+        // M9.3: изученные спеллы персонажа (стартовые по классу + купленные у тренера).
+        // Стартовые спеллы из playercreateinfo_spell в эту таблицу НЕ пишем (выдаём по классу при входе);
+        // храним только то, что выучено сверх стартового набора (у тренера). PK (owner, spell).
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_spell (
+                owner_guid INT UNSIGNED NOT NULL,
+                spell      INT UNSIGNED NOT NULL,
+                PRIMARY KEY (owner_guid, spell),
+                KEY ix_spell_owner (owner_guid)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
         // M6.2: деньги персонажа (медь). Стартовый баланс — тестовый (100g), чтобы было что тратить.
         // MySQL не поддерживает ADD COLUMN IF NOT EXISTS — глушим ошибку «дубликат столбца» (1060).
         try
@@ -275,6 +287,25 @@ public sealed class CharactersDatabase(string connectionString)
             new { guid, level, xp });
     }
 
+    /// <summary>Изученные у тренера спеллы персонажа (сверх стартового набора по классу). M9.3.</summary>
+    public async Task<IReadOnlyList<uint>> GetLearnedSpellsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<uint>(new CommandDefinition(
+            "SELECT spell FROM character_spell WHERE owner_guid = @ownerGuid;",
+            new { ownerGuid }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Сохраняет изученный спелл (идемпотентно — повторное изучение игнорируется). M9.3.</summary>
+    public async Task AddLearnedSpellAsync(uint ownerGuid, uint spell, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync(
+            "INSERT IGNORE INTO character_spell (owner_guid, spell) VALUES (@ownerGuid, @spell);",
+            new { ownerGuid, spell });
+    }
+
     /// <summary>Удаляет предмет персонажа по его low-counter GUID (продажа/перемещение). M6.2.</summary>
     public async Task RemoveItemAsync(uint itemGuid, CancellationToken ct = default)
     {
@@ -336,6 +367,7 @@ public sealed class CharactersDatabase(string connectionString)
             await db.ExecuteAsync("DELETE FROM character_items WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_declined_names WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_queststatus WHERE owner_guid = @guid;", new { guid });
+            await db.ExecuteAsync("DELETE FROM character_spell WHERE owner_guid = @guid;", new { guid });
         }
         return affected > 0;
     }

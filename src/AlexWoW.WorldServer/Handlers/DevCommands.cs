@@ -47,8 +47,13 @@ public static class DevCommands
                     await ReplyAsync(session, item is null ? "Нет места в сумке" : $"Выдан предмет {itemId} x{qty}", ct);
                     return true;
 
+                case "learn" when parts.Length >= 2 && uint.TryParse(parts[1], out var spellId):
+                    await LearnSpellAsync(session, spellId, ct);
+                    await ReplyAsync(session, $"Изучен спелл {spellId}", ct);
+                    return true;
+
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count]", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL", ct);
                     return true;
 
                 default:
@@ -62,6 +67,16 @@ public static class DevCommands
             await ReplyAsync(session, $"Ошибка: {ex.Message}", ct);
             return true;
         }
+    }
+
+    /// <summary>Выучить спелл без тренера (M9.4/M9.3): персист + грант клиенту (SMSG_LEARNED_SPELL).</summary>
+    private static async Task LearnSpellAsync(WorldSession session, uint spellId, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0 || !session.KnownSpells.Add(spellId))
+            return; // вне мира или уже известен
+        await session.Characters.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
+        await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
+            new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
     }
 
     /// <summary>.xp 500 или .xp add 500.</summary>

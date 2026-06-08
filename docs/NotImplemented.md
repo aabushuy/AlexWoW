@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 726 / 860 опкодов НЕ реализовано — 84.4%** (реализовано: 134 — 15.6%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 716 / 860 опкодов НЕ реализовано — 83.3%** (реализовано: 144 — 16.7%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -146,7 +146,6 @@
 | `0x0127` | SMSG_SET_PROFICIENCY | Item |
 | `0x0128` | CMSG_SET_ACTION_BUTTON | Login |
 | `0x0129` | SMSG_ACTION_BUTTONS | Login |
-| `0x012B` | SMSG_LEARNED_SPELL | Spell |
 | `0x012C` | SMSG_SUPERCEDED_SPELL | Spell |
 | `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
 | `0x0136` | CMSG_CANCEL_AURA | Spell |
@@ -185,11 +184,7 @@
 | `0x0178` | SMSG_PET_NAME_INVALID | Pet |
 | `0x0179` | SMSG_PET_SPELLS | Pet |
 | `0x017A` | SMSG_PET_MODE | Pet |
-| `0x017C` | CMSG_GOSSIP_SELECT_OPTION | Gossip |
-| `0x017D` | SMSG_GOSSIP_MESSAGE | Gossip |
 | `0x017E` | SMSG_GOSSIP_COMPLETE | Gossip |
-| `0x017F` | CMSG_NPC_TEXT_QUERY | Query |
-| `0x0180` | SMSG_NPC_TEXT_UPDATE | Gossip |
 | `0x0187` | CMSG_QUESTGIVER_QUEST_AUTOLAUNCH | Quest |
 | `0x018B` | SMSG_QUESTGIVER_REQUEST_ITEMS | Quest |
 | `0x0190` | CMSG_QUESTGIVER_CANCEL | Quest |
@@ -210,11 +205,6 @@
 | `0x01AD` | CMSG_ACTIVATETAXI | Movement |
 | `0x01AE` | SMSG_ACTIVATETAXIREPLY | Movement |
 | `0x01AF` | SMSG_NEW_TAXI_PATH | Movement |
-| `0x01B0` | CMSG_TRAINER_LIST | Spell |
-| `0x01B1` | SMSG_TRAINER_LIST | Spell |
-| `0x01B2` | CMSG_TRAINER_BUY_SPELL | Spell |
-| `0x01B3` | SMSG_TRAINER_BUY_SUCCEEDED | Spell |
-| `0x01B4` | SMSG_TRAINER_BUY_FAILED | Spell |
 | `0x01B5` | CMSG_BINDER_ACTIVATE | Item |
 | `0x01B7` | CMSG_BANKER_ACTIVATE | Item |
 | `0x01B8` | SMSG_SHOW_BANK | Item |

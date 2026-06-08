@@ -59,6 +59,10 @@ public enum WorldOpcode : uint
 
     // Торговля с NPC (M6.2)
     CmsgGossipHello = 0x17B,
+    CmsgGossipSelectOption = 0x17C,             // выбор пункта меню госсипа (напр. «обучиться»)
+    SmsgGossipMessage = 0x17D,                  // меню госсипа (greeting + пункты) — M9.3
+    CmsgNpcTextQuery = 0x17F,                   // запрос текста greeting'а по title_text_id — M9.3
+    SmsgNpcTextUpdate = 0x180,                  // ответ с текстом greeting'а (8 блоков) — M9.3
     CmsgSellItem = 0x1A0,
     SmsgSellItem = 0x1A1,
     CmsgBuyItem = 0x1A2,
@@ -103,6 +107,14 @@ public enum WorldOpcode : uint
     SmsgSpellHealLog = 0x150,
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
+
+    // Тренеры классов (M9.3): список абилок у тренера + покупка
+    CmsgTrainerList = 0x1B0,                     // Guid npc — открыть список тренера
+    SmsgTrainerList = 0x1B1,                     // guid + trainer_type + спеллы + greeting
+    CmsgTrainerBuySpell = 0x1B2,                 // Guid npc + spell — изучить абилку
+    SmsgTrainerBuySucceeded = 0x1B3,             // guid + spell — изучено
+    SmsgTrainerBuyFailed = 0x1B4,                // guid + spell + reason (только консоль клиента)
+    SmsgLearnedSpell = 0x12B,                    // spell + u16 — добавить абилку в книгу
 
     // Квесты (M6.5)
     CmsgQuestQuery = 0x05C,                     // u32 quest_id — данные квеста для журнала

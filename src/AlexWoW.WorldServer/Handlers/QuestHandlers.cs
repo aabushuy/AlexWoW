@@ -219,7 +219,14 @@ public static class QuestHandlers
             }
         }
 
-        // Не квестгивер (или без доступных квестов) — попробуем как вендора.
+        // Тренер класса (M9.3): если NPC — тренер, подходящий игроку, открыть меню госсипа с пунктом
+        // «обучиться» (приоритет над вендором — классовые тренеры обычно не торгуют). У тренеров флаг
+        // GOSSIP → клиент ждёт меню, прямой SMSG_TRAINER_LIST игнорирует; список — на выбор пункта.
+        if (TrainerHandlers.IsTrainerNpc(session, npcGuid)
+            && await TrainerHandlers.TrySendTrainerGossipAsync(session, npcGuid, ct))
+            return;
+
+        // Не квестгивер/тренер (или без доступных квестов) — попробуем как вендора.
         await VendorHandlers.SendVendorListAsync(session, npcGuid, ct);
     }
 
