@@ -107,8 +107,10 @@ public sealed class WorldSession
     /// <summary>GUID трупа с открытым окном лута (0 — окно закрыто). M6.6.</summary>
     internal ulong LootGuid { get; set; }
 
-    /// <summary>Журнал квестов: слот (0..24) → questId (0 — пусто). Персист — позже. M6.5.</summary>
-    internal uint[] QuestLog { get; } = new uint[Protocol.UpdateField.QuestLogSlots];
+    /// <summary>Журнал квестов: слот (0..24) → прогресс (null — пусто). Персист — позже. M6.5.</summary>
+    internal World.QuestProgress?[] QuestSlots { get; } = new World.QuestProgress?[Protocol.UpdateField.QuestLogSlots];
+    /// <summary>Сданные квесты (для предусловий PrevQuestId и анти-повтора). Персист — позже. M6.5.</summary>
+    internal HashSet<uint> CompletedQuests { get; } = new();
 
     /// <summary>GUID существа, по которому идёт авто-атака (0 — не в бою). Читается тиком. M6.3.</summary>
     internal ulong CombatTargetGuid { get; set; }
@@ -199,7 +201,8 @@ public sealed class WorldSession
         SelectionGuid = 0;
         IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
         LootGuid = 0;         // M6.6: окно лута закрыто
-        Array.Clear(QuestLog); // M6.5: журнал квестов (в памяти) сбрасывается при выходе
+        Array.Clear(QuestSlots); // M6.5: журнал квестов (в памяти) сбрасывается при выходе
+        CompletedQuests.Clear();
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля

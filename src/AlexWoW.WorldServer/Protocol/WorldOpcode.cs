@@ -112,6 +112,13 @@ public enum WorldOpcode : uint
     CmsgQuestgiverQueryQuest = 0x186,          // Guid + quest_id — запрос деталей
     SmsgQuestgiverQuestDetails = 0x188,        // окно деталей квеста (accept)
     CmsgQuestgiverAcceptQuest = 0x189,         // Guid + quest_id — принять квест
+    CmsgQuestgiverCompleteQuest = 0x18A,       // Guid + quest_id — сдать (открыть награду)
+    CmsgQuestgiverRequestReward = 0x18C,       // Guid + quest_id — запрос окна награды
+    SmsgQuestgiverOfferReward = 0x18D,         // окно сдачи квеста (награды)
+    CmsgQuestgiverChooseReward = 0x18E,        // Guid + quest_id + reward — выбор награды
+    SmsgQuestgiverQuestComplete = 0x191,       // квест завершён (награда выдана)
+    SmsgQuestupdateComplete = 0x198,           // quest_id — цель выполнена
+    SmsgQuestupdateAddKill = 0x199,            // прогресс убийства цели
     CmsgQuestgiverStatusQuery = 0x182,         // Guid npc — статус одного квестгивера
     SmsgQuestgiverStatus = 0x183,              // Guid + u32 status (иконка !/?)
     CmsgQuestgiverStatusMultipleQuery = 0x417, // пустое — статусы всех видимых
