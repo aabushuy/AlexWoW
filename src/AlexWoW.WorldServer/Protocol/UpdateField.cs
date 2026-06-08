@@ -28,6 +28,9 @@ public static class UpdateField
     public const int UnitStat4 = 0x0058;          // дух
     public const int UnitBaseMana = 0x0078;       // OBJECT_END + 0x72
     public const int UnitBaseHealth = 0x0079;     // OBJECT_END + 0x73
+    /// <summary>UNIT_FIELD_BYTES_2: sheath|pvpFlags|petFlags|shapeshiftForm. Байт 3 (старший) — форма
+    /// (стойки воина/формы друида). M6.11.</summary>
+    public const int UnitBytes2 = 0x007A;
     public const int UnitFlags = 0x003B;
     // Боевые поля (M9.2): чтобы чарпейн не показывал NaN-урон. BASEATTACKTIME size 2 (main 0x3E, off 0x3F).
     public const int UnitBaseAttackTime = 0x003E;

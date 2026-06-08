@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 716 / 860 опкодов НЕ реализовано — 83.3%** (реализовано: 144 — 16.7%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 715 / 860 опкодов НЕ реализовано — 83.1%** (реализовано: 145 — 16.9%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -651,7 +651,6 @@
 | `0x0493` | CMSG_ENABLETAXI | Movement |
 | `0x0494` | SMSG_PRE_RESURRECT | Resurrect |
 | `0x0495` | SMSG_AURA_UPDATE_ALL | Spell |
-| `0x0496` | SMSG_AURA_UPDATE | Spell |
 | `0x0498` | SMSG_SERVER_FIRST_ACHIEVEMENT | Achievement |
 | `0x0499` | SMSG_PET_LEARNED_SPELL | Spell |
 | `0x049A` | SMSG_PET_UNLEARNED_SPELL | Spell |

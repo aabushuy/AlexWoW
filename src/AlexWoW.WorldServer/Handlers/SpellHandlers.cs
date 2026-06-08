@@ -40,6 +40,18 @@ public static class SpellHandlers
     /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4.</summary>
     public static readonly int[] GrantedCombatSpells = { 133, 116, 2136, 2050 };
 
+    /// <summary>
+    /// Спеллы-стойки воина → форма шейпшифта (M6.12, через систему аур M6.11). Каст стойки мгновенный,
+    /// без маны/цели: накладывает аура-форму (UNIT_FIELD_BYTES_2) → клиент меняет набор кнопок и
+    /// подсвечивает активную стойку. Формы: Battle=17, Defensive=18, Berserker=19. Друид-формы — позже.
+    /// </summary>
+    private static readonly Dictionary<uint, byte> ShapeshiftSpells = new()
+    {
+        [2457] = 17, // Battle Stance
+        [71] = 18,   // Defensive Stance
+        [2458] = 19, // Berserker Stance
+    };
+
     // --- SpellCastResult (3.3.5a, сверено с reference world/common.wowm) ---
     private const byte CastResultNotReady = 0x43; // спелл на кулдауне
     private const byte CastResultNoPower = 0x55;  // не хватает маны
@@ -71,6 +83,15 @@ public static class SpellHandlers
 
         session.CastCount = castCount;
         session.CastTargetGuid = targetGuid;
+
+        // M6.12: стойки воина — мгновенная аура-форма (через систему аур M6.11), без маны/цели/кулдауна.
+        if (ShapeshiftSpells.TryGetValue(spellId, out var form))
+        {
+            await SendSpellGoAsync(session, spellId, 0, ct); // завершить каст у клиента
+            await Auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, form, ct);
+            session.Logger.LogDebug("STANCE '{User}': spell={Spell} → форма {Form}", session.Account, spellId, form);
+            return;
+        }
 
         if (!Spells.TryGetValue(spellId, out var info))
         {

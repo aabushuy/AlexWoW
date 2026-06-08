@@ -107,6 +107,7 @@ public enum WorldOpcode : uint
     SmsgSpellHealLog = 0x150,
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
+    SmsgAuraUpdate = 0x496,                      // одна аура на слоте (баффы/дебаффы/формы) — M6.11
 
     // Тренеры классов (M9.3): список абилок у тренера + покупка
     CmsgTrainerList = 0x1B0,                     // Guid npc — открыть список тренера

@@ -52,8 +52,19 @@ public static class DevCommands
                     await ReplyAsync(session, $"Изучен спелл {spellId}", ct);
                     return true;
 
+                case "buff" when parts.Length >= 2 && uint.TryParse(parts[1], out var buffSpell):
+                    var secs = parts.Length >= 3 && uint.TryParse(parts[2], out var sv) ? sv : 120u;
+                    await Auras.ApplyAsync(session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
+                    await ReplyAsync(session, $"Бафф {buffSpell} на {secs}с", ct);
+                    return true;
+
+                case "unbuff" when parts.Length >= 2 && uint.TryParse(parts[1], out var offSpell):
+                    await Auras.RemoveAsync(session, offSpell, ct);
+                    await ReplyAsync(session, $"Снят бафф {offSpell}", ct);
+                    return true;
+
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .buff SPELL [сек] | .unbuff SPELL", ct);
                     return true;
 
                 default:
