@@ -1,5 +1,6 @@
 using AlexWoW.Common.Network;
 using AlexWoW.Database.Models;
+using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Protocol;
 
@@ -27,7 +28,8 @@ public static class PlayerSpawn
     /// модель у всех; guid'ы слотов (private) проставляются только себе.
     /// </summary>
     public static byte[] BuildCreateObject(Character c, float x, float y, float z, float o,
-        uint serverTimeMs, bool isSelf, IReadOnlyList<InventoryItem>? inventory = null)
+        uint serverTimeMs, bool isSelf, IReadOnlyList<InventoryItem>? inventory = null,
+        IReadOnlyList<QuestProgress?>? questSlots = null)
     {
         var w = new ByteWriter(256);
 
@@ -37,7 +39,7 @@ public static class PlayerSpawn
         w.UInt8(TypeId.Player);
 
         WriteMovementBlock(w, x, y, z, o, serverTimeMs, isSelf);
-        BuildValues(c, inventory, isSelf).WriteTo(w);
+        BuildValues(c, inventory, isSelf, questSlots).WriteTo(w);
 
         return w.ToArray();
     }
@@ -114,7 +116,8 @@ public static class PlayerSpawn
          .Single(TurnRate).Single(PitchRate);
     }
 
-    private static UpdateMask BuildValues(Character c, IReadOnlyList<InventoryItem>? inventory, bool isSelf)
+    private static UpdateMask BuildValues(Character c, IReadOnlyList<InventoryItem>? inventory, bool isSelf,
+        IReadOnlyList<QuestProgress?>? questSlots = null)
     {
         var powerType = DisplayData.PowerTypeForClass(c.Class);
         var model = DisplayData.ModelForRace(c.Race, c.Gender);
@@ -178,6 +181,22 @@ public static class PlayerSpawn
 
                 if (isSelf && item.Bag == InventorySlots.MainBag)
                     m.SetUInt64(UpdateField.InvSlotGuid(item.Slot), ItemObject.ItemGuid(item.ItemGuid));
+            }
+
+        // M6.10: журнал квестов в НАЧАЛЬНОМ спавне (private) — иначе досылка отдельным VALUES-апдейтом
+        // воспринимается клиентом как новое взятие квеста (звук + «Получено задание») при релоге.
+        if (isSelf && questSlots is not null)
+            for (var slot = 0; slot < questSlots.Count; slot++)
+            {
+                var p = questSlots[slot];
+                if (p is null)
+                    continue;
+                m.SetUInt32(UpdateField.QuestLogSlotId(slot), p.QuestId);
+                m.SetUInt32(UpdateField.QuestLogSlotState(slot), p.Complete ? 1u : 0u);
+                m.SetUInt32(UpdateField.QuestLogSlotCounters01(slot),
+                    (p.Count[0] & 0xFFFF) | ((p.Count[1] & 0xFFFF) << 16));
+                m.SetUInt32(UpdateField.QuestLogSlotCounters23(slot),
+                    (p.Count[2] & 0xFFFF) | ((p.Count[3] & 0xFFFF) << 16));
             }
 
         return m;

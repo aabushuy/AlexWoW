@@ -153,9 +153,9 @@ public sealed class WorldDatabase(string connectionString)
 
     /// <summary>
     /// Лут-определение существа (M6.6): деньги (creature_template.MinLootGold/MaxLootGold) + кандидаты-
-    /// предметы из creature_loot_template по LootId существа ⨝ item_template (для displayid). Только обычные
-    /// предметы: ChanceOrQuestChance &gt; 0 (квест-предметы &lt; 0 — позже) и mincountOrRef &gt; 0
-    /// (отрицательное — ссылка на reference_loot_template, пропускаем). Возвращает null, если у существа нет лута.
+    /// предметы из creature_loot_template по LootId существа ⨝ item_template (для displayid). Берём обычные
+    /// (ChanceOrQuestChance &gt; 0) И квест-предметы (&lt; 0 — |chance|%, падают только держателю квеста, M6.10);
+    /// mincountOrRef &gt; 0 (отрицательное — ссылка на reference_loot_template, пропускаем). null, если лута нет.
     /// </summary>
     public async Task<CreatureLootData?> GetCreatureLootAsync(uint creatureEntry, CancellationToken ct = default)
     {
@@ -179,7 +179,7 @@ public sealed class WorldDatabase(string connectionString)
                        lt.mincountOrRef AS MinCount, lt.maxcount AS MaxCount, it.displayid AS DisplayId
                 FROM creature_loot_template lt
                 JOIN item_template it ON it.entry = lt.item
-                WHERE lt.entry = @lootId AND lt.ChanceOrQuestChance > 0 AND lt.mincountOrRef > 0;
+                WHERE lt.entry = @lootId AND lt.ChanceOrQuestChance <> 0 AND lt.mincountOrRef > 0;
                 """, new { lootId }, cancellationToken: ct));
             drops = rows.AsList();
         }
@@ -220,6 +220,24 @@ public sealed class WorldDatabase(string connectionString)
         await using var db = await OpenAsync(ct);
         var rows = await db.QueryAsync<uint>(new CommandDefinition(
             "SELECT DISTINCT id FROM creature_involvedrelation;", cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Все связи «дающий→квест» (creature_questrelation) — для кэша статуса иконок. M6.10.</summary>
+    public async Task<IReadOnlyList<QuestRelation>> GetQuestGiverRelationsAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<QuestRelation>(new CommandDefinition(
+            "SELECT id AS Id, quest AS Quest FROM creature_questrelation;", cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Все связи «приёмщик→квест» (creature_involvedrelation) — для кэша статуса иконок. M6.10.</summary>
+    public async Task<IReadOnlyList<QuestRelation>> GetQuestEnderRelationsAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<QuestRelation>(new CommandDefinition(
+            "SELECT id AS Id, quest AS Quest FROM creature_involvedrelation;", cancellationToken: ct));
         return rows.AsList();
     }
 

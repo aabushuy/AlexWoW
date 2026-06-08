@@ -50,7 +50,10 @@ public static class LootHandlers
         byte index = 0;
         foreach (var d in data.Drops)
         {
-            if (Random.Shared.NextDouble() * 100.0 >= d.Chance)
+            // M6.10: квест-предметы (Chance < 0) падают только держателю нужного квеста, по |chance|%.
+            if (d.Chance < 0 && !QuestHandlers.NeedsQuestItem(session, d.ItemId))
+                continue;
+            if (Random.Shared.NextDouble() * 100.0 >= Math.Abs(d.Chance))
                 continue; // не выпал
             var lo = (uint)Math.Max(1, d.MinCount);
             var hi = Math.Max(lo, d.MaxCount);

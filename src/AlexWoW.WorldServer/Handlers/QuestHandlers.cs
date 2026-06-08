@@ -12,26 +12,143 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 public static class QuestHandlers
 {
-    // QuestGiverStatus (3.3.5): иконки. AVAILABLE=8 («!» жёлтый), REWARD=10 («?» жёлтый), NONE=0.
+    // QuestGiverStatus (3.3.5, сверено с TrinityCore QuestDef.h): NONE=0, INCOMPLETE=5 (серый «?»),
+    // AVAILABLE=8 («!» жёлтый), REWARD=10 («?» жёлтый — можно сдать).
     private const byte StatusNone = 0;
+    private const byte StatusIncomplete = 5;
     private const byte StatusAvailable = 8;
+    private const byte StatusReward = 10;
+
+    // M6.10: статус строки character_queststatus. 0 = активен (в журнале), 1 = сдан.
+    private const byte QuestStatusActive = 0;
+    private const byte QuestStatusRewarded = 1;
+
+    /// <summary>Сохраняет активный квест (id/слот/счётчики) в character_queststatus. M6.10.</summary>
+    private static Task PersistActiveAsync(WorldSession session, int slot, World.QuestProgress p, CancellationToken ct)
+        => session.Characters.UpsertQuestStatusAsync(session.InWorldGuid, p.QuestId, (byte)slot, QuestStatusActive,
+            (ushort)p.Count[0], (ushort)p.Count[1], (ushort)p.Count[2], (ushort)p.Count[3], ct);
+
+    /// <summary>
+    /// Нужен ли игроку этот предмет для активного квеста (квест-дроп с трупа, M6.10): есть незавершённый
+    /// квест с item-целью на <paramref name="itemId"/>, по которой ещё не набрано нужное количество.
+    /// </summary>
+    internal static bool NeedsQuestItem(WorldSession session, uint itemId)
+    {
+        foreach (var p in session.QuestSlots)
+        {
+            if (p is null || p.Complete)
+                continue;
+            for (var i = 0; i < 4; i++)
+                if (p.ReqItem[i] == itemId && CountItem(session, itemId) < p.ReqItemCount[i])
+                    return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Списывает <paramref name="count"/> предметов entry из сумок (квест-предметы при сдаче, M6.10):
+    /// целые предметы удаляет (DestroyObject + очистка слота), частичную стопку уменьшает
+    /// (ITEM_FIELD_STACK_COUNT), с персистом. Освобождает слоты под награду.
+    /// </summary>
+    private static async Task ConsumeItemsAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
+    {
+        var ownerGuid = session.InWorldGuid;
+        var remaining = count;
+        foreach (var item in session.Inventory.Where(i => i.ItemEntry == itemEntry).ToList())
+        {
+            if (remaining == 0)
+                break;
+            if (item.StackCount <= remaining)
+            {
+                remaining -= item.StackCount;
+                session.Inventory.Remove(item);
+                await session.Characters.RemoveItemAsync(item.ItemGuid, ct);
+                await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+                    new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
+                if (item.Bag == InventorySlots.MainBag)
+                    await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                        PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
+            }
+            else
+            {
+                item.StackCount -= remaining;
+                remaining = 0;
+                await session.Characters.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
+            }
+        }
+    }
+
+    /// <summary>Сколько предметов entry в сумках игрока (для item-целей). M6.10.</summary>
+    private static uint CountItem(WorldSession session, uint itemEntry)
+    {
+        uint total = 0;
+        foreach (var it in session.Inventory)
+            if (it.ItemEntry == itemEntry)
+                total += it.StackCount;
+        return total;
+    }
+
+    /// <summary>
+    /// Зачёт получения предмета (лут/выдача) в item-цели квестов: если новый предмет завершил квест —
+    /// помечаем выполненным (SMSG_QUESTUPDATE_COMPLETE + персист). Прогресс-счётчик клиент рисует сам
+    /// по сумкам. Зовётся из InventoryGrant.TryGiveAsync. M6.10.
+    /// </summary>
+    internal static async Task OnItemGainedAsync(WorldSession session, uint itemEntry, CancellationToken ct)
+    {
+        for (var slot = 0; slot < session.QuestSlots.Length; slot++)
+        {
+            var p = session.QuestSlots[slot];
+            if (p is null || p.Complete || Array.IndexOf(p.ReqItem, itemEntry) < 0)
+                continue;
+            if (!p.ObjectivesMet(e => CountItem(session, e)))
+                continue;
+            p.Complete = true;
+            await session.SendAsync(WorldOpcode.SmsgQuestupdateComplete, QuestPackets.BuildUpdateComplete(p.QuestId), ct);
+            await PersistActiveAsync(session, slot, p, ct);
+        }
+    }
 
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
 
     /// <summary>
-    /// Статус квестгивера для существа (инкремент 1 — без журнала квестов): даёт квест → «!»
-    /// (AVAILABLE); приём/в процессе появятся с журналом квестов (инкр.2+).
+    /// Статус иконки над существом (M6.10): приёмщик с выполненным квестом в журнале → «?» REWARD;
+    /// дающий с доступным (берущимся) квестом → «!» AVAILABLE; приёмщик с квестом в процессе → серый «?»
+    /// INCOMPLETE. Приоритет: сдача → взять → в процессе.
     /// </summary>
-    private static byte StatusFor(WorldSession session, uint entry)
-        => session.World.Quests.IsGiver(entry) ? StatusAvailable : StatusNone;
+    private static async Task<byte> StatusForAsync(WorldSession session, uint entry, CancellationToken ct)
+    {
+        var quests = session.World.Quests;
+        var hasIncomplete = false;
+        if (quests.IsEnder(entry))
+        {
+            var enderIds = quests.EnderQuestIds(entry);
+            foreach (var p in session.QuestSlots)
+            {
+                if (p is null || Array.IndexOf(enderIds, p.QuestId) < 0)
+                    continue;
+                if (p.Complete)
+                    return StatusReward;   // можно сдать → жёлтый «?»
+                hasIncomplete = true;      // взят, но не выполнен → серый «?»
+            }
+        }
+        if (quests.IsGiver(entry))
+        {
+            var all = await session.WorldDb.GetGiverQuestsAsync(entry, ct);
+            if (all.Any(q => CanTakeQuest(session, q)))
+                return StatusAvailable;    // есть берущийся квест → «!»
+        }
+        return hasIncomplete ? StatusIncomplete : StatusNone;
+    }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgQuestgiverStatusQuery)]
     public static async Task OnStatusQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         await session.World.Quests.EnsureLoadedAsync(ct);
         var guid = packet.Reader().UInt64();
-        var status = StatusFor(session, CreatureEntry(guid));
+        var status = await StatusForAsync(session, CreatureEntry(guid), ct);
         await session.SendAsync(WorldOpcode.SmsgQuestgiverStatus,
             new ByteWriter(12).UInt64(guid).UInt32(status).ToArray(), ct);
     }
@@ -44,7 +161,7 @@ public static class QuestHandlers
         var reports = new List<(ulong Guid, byte Status)>();
         foreach (var (guid, creature) in session.VisibleNpcs)
         {
-            var status = StatusFor(session, creature.Template.Entry);
+            var status = await StatusForAsync(session, creature.Template.Entry, ct);
             if (status != StatusNone)
                 reports.Add((guid, status));
         }
@@ -164,9 +281,12 @@ public static class QuestHandlers
         {
             prog.Creature[i] = quest.ReqCreatureOrGoId[i];
             prog.Required[i] = quest.ReqCreatureOrGoCount[i];
+            prog.ReqItem[i] = quest.ReqItemId[i];
+            prog.ReqItemCount[i] = quest.ReqItemCount[i];
         }
-        prog.Complete = !prog.HasItemObjectives && prog.CreatureObjectivesMet();
+        prog.Complete = prog.ObjectivesMet(e => CountItem(session, e)); // M6.10: учёт item-целей по инвентарю
         session.QuestSlots[slot] = prog;
+        await PersistActiveAsync(session, slot, prog, ct); // M6.10: персист
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
@@ -213,6 +333,11 @@ public static class QuestHandlers
         if (quest is null)
             return;
 
+        // M6.10: списать квест-предметы цели (освобождает слоты под предметы-награды).
+        for (var i = 0; i < 4; i++)
+            if (quest.ReqItemId[i] != 0 && quest.ReqItemCount[i] > 0)
+                await ConsumeItemsAsync(session, quest.ReqItemId[i], quest.ReqItemCount[i], ct);
+
         // Деньги-награда.
         if (quest.RewOrReqMoney > 0)
         {
@@ -232,6 +357,8 @@ public static class QuestHandlers
         // Убрать из журнала, пометить сданным.
         session.QuestSlots[slot] = null;
         session.CompletedQuests.Add(questId);
+        await session.Characters.UpsertQuestStatusAsync(session.InWorldGuid, questId, 0, QuestStatusRewarded,
+            0, 0, 0, 0, ct); // M6.10: персист сдачи
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
@@ -290,13 +417,59 @@ public static class QuestHandlers
                     m.SetUInt32(UpdateField.QuestLogSlotCounters01(slot), c01);
                     m.SetUInt32(UpdateField.QuestLogSlotCounters23(slot), c23);
                 }), ct);
+            await PersistActiveAsync(session, slot, p, ct); // M6.10: персист прогресса
 
-            if (!p.HasItemObjectives && p.CreatureObjectivesMet())
+            if (!p.Complete && p.ObjectivesMet(e => CountItem(session, e)))
             {
                 p.Complete = true;
                 await session.SendAsync(WorldOpcode.SmsgQuestupdateComplete, QuestPackets.BuildUpdateComplete(p.QuestId), ct);
             }
         }
+    }
+
+    /// <summary>
+    /// Восстанавливает СОСТОЯНИЕ квестов персонажа из БД (M6.10): сданные → CompletedQuests; активные →
+    /// QuestProgress в журнал (счётчики из БД, Complete рекомпьютится из quest_template + инвентаря).
+    /// Без клиентских пакетов — поля журнала кладутся в НАЧАЛЬНЫЙ спавн (PlayerSpawn), иначе клиент
+    /// принимает их за новое взятие квеста (звук + «Получено задание»). Зовётся ДО спавна в OnPlayerLogin.
+    /// </summary>
+    internal static async Task LoadQuestStateAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return;
+        var rows = await session.Characters.GetQuestStatusesAsync(session.InWorldGuid, ct);
+        foreach (var row in rows)
+        {
+            if (row.Status == QuestStatusRewarded)
+            {
+                session.CompletedQuests.Add(row.QuestId);
+                continue;
+            }
+            if (row.Slot >= session.QuestSlots.Length)
+                continue;
+            var quest = await session.WorldDb.GetQuestAsync(row.QuestId, ct);
+            if (quest is null)
+                continue;
+
+            var prog = new World.QuestProgress
+            {
+                QuestId = row.QuestId,
+                HasItemObjectives = quest.ReqItemId.Any(id => id != 0),
+            };
+            for (var i = 0; i < 4; i++)
+            {
+                prog.Creature[i] = quest.ReqCreatureOrGoId[i];
+                prog.Required[i] = quest.ReqCreatureOrGoCount[i];
+                prog.ReqItem[i] = quest.ReqItemId[i];
+                prog.ReqItemCount[i] = quest.ReqItemCount[i];
+            }
+            prog.Count[0] = row.Counter0; prog.Count[1] = row.Counter1;
+            prog.Count[2] = row.Counter2; prog.Count[3] = row.Counter3;
+            prog.Complete = prog.ObjectivesMet(e => CountItem(session, e)); // M6.10: + item-цели
+            session.QuestSlots[row.Slot] = prog;
+        }
+        session.Logger.LogInformation("QUEST LOAD '{User}': {Active} активных, {Done} сданных",
+            session.Account, session.QuestSlots.Count(s => s is not null), session.CompletedQuests.Count);
     }
 
     /// <summary>Грузит квест + displayId предметов-наград и шлёт SMSG_QUESTGIVER_QUEST_DETAILS.</summary>

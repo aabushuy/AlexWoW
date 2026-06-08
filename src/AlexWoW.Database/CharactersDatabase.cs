@@ -76,6 +76,24 @@ public sealed class CharactersDatabase(string connectionString)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
+        // M6.10 (добивка M6.5): персист квестов. status: 0=активен (в журнале), 1=сдан (rewarded).
+        // counter0..3 — прогресс целей-существ (kill/talk). Complete/HasItemObjectives рекомпьютятся
+        // при входе из quest_template (не храним). PK (owner_guid, quest_id) — один статус на квест.
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_queststatus (
+                owner_guid INT UNSIGNED NOT NULL,
+                quest_id   INT UNSIGNED NOT NULL,
+                slot       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                status     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                counter0   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                counter1   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                counter2   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                counter3   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                PRIMARY KEY (owner_guid, quest_id),
+                KEY ix_qs_owner (owner_guid)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
         // M6.2: деньги персонажа (медь). Стартовый баланс — тестовый (100g), чтобы было что тратить.
         // MySQL не поддерживает ADD COLUMN IF NOT EXISTS — глушим ошибку «дубликат столбца» (1060).
         try
@@ -265,6 +283,32 @@ public sealed class CharactersDatabase(string connectionString)
             new { itemGuid, stackCount });
     }
 
+    /// <summary>Статусы квестов персонажа (активные + сданные). M6.10.</summary>
+    public async Task<IReadOnlyList<QuestStatusRow>> GetQuestStatusesAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<QuestStatusRow>(new CommandDefinition("""
+            SELECT quest_id AS QuestId, slot AS Slot, status AS Status,
+                   counter0 AS Counter0, counter1 AS Counter1, counter2 AS Counter2, counter3 AS Counter3
+            FROM character_queststatus WHERE owner_guid = @ownerGuid;
+            """, new { ownerGuid }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
+    /// <summary>Создаёт/обновляет статус квеста (accept/прогресс/сдача). M6.10.</summary>
+    public async Task UpsertQuestStatusAsync(uint ownerGuid, uint questId, byte slot, byte status,
+        ushort c0, ushort c1, ushort c2, ushort c3, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("""
+            INSERT INTO character_queststatus
+                (owner_guid, quest_id, slot, status, counter0, counter1, counter2, counter3)
+            VALUES (@ownerGuid, @questId, @slot, @status, @c0, @c1, @c2, @c3)
+            ON DUPLICATE KEY UPDATE
+                slot=@slot, status=@status, counter0=@c0, counter1=@c1, counter2=@c2, counter3=@c3;
+            """, new { ownerGuid, questId, slot, status, c0, c1, c2, c3 });
+    }
+
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>
     public async Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default)
     {
@@ -276,6 +320,7 @@ public sealed class CharactersDatabase(string connectionString)
         {
             await db.ExecuteAsync("DELETE FROM character_items WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_declined_names WHERE owner_guid = @guid;", new { guid });
+            await db.ExecuteAsync("DELETE FROM character_queststatus WHERE owner_guid = @guid;", new { guid });
         }
         return affected > 0;
     }
