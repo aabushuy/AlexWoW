@@ -72,6 +72,11 @@ public static class WorldEntryHandlers
         session.LastSpellCastMs = 0;
         session.LastManaRegenMs = Environment.TickCount64;
         session.SpellCooldowns.Clear();
+
+        // M6.12: боевые ресурсы. Воин — ярость 0 (копится в бою); разбойник — энергия полная (регенит).
+        session.Rage = 0;
+        session.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
+        session.LastResourceTickMs = Environment.TickCount64;
         if (session.Inventory.Count > 0)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);

@@ -113,6 +113,7 @@ public static class CombatHandlers
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
+        await CombatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за удар
 
         var attackerGuid = (ulong)session.InWorldGuid;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
@@ -258,6 +259,7 @@ public static class CombatHandlers
             var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.LastCombatMs = now; // M6.7: получил урон → пауза регена
+            await CombatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
                 BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0), ct);

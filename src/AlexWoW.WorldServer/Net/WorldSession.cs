@@ -159,6 +159,17 @@ public sealed class WorldSession
     internal long LastSpellCastMs { get; set; }
     /// <summary>Время последнего тика регена маны (кадэнс 1 с). M6.4.</summary>
     internal long LastManaRegenMs { get; set; }
+
+    // --- Боевые ресурсы: ярость/энергия (M6.12) ---
+    /// <summary>Ярость воина/друида (UNIT_FIELD_POWER1+1). Хранится ×10 (0..1000 = 0..100 у клиента).
+    /// Копится от мили-урона, распадается вне боя. 0 у не-ярость-классов. M6.12.</summary>
+    internal uint Rage { get; set; }
+    /// <summary>Энергия разбойника (UNIT_FIELD_POWER1+3), 0..100. Реген ~постоянный. M6.12.</summary>
+    internal uint Energy { get; set; }
+    /// <summary>Скорость оружия главной руки (мс) — для формулы ярости. Ставится в RefreshMeleeAsync. M6.12.</summary>
+    internal uint MainHandSpeedMs { get; set; } = 2000;
+    /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
+    internal long LastResourceTickMs { get; set; }
     /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
     internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = new();
 

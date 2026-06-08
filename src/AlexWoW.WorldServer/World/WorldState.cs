@@ -202,6 +202,7 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
                 // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике;
                 // здесь — реген маны (вне «правила 5 секунд»).
                 await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
+                await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
                 await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
                 await Handlers.CombatHandlers.TickAggroScanAsync(this, player, now, ct);      // M6.7: авто-агро по фракции
 
