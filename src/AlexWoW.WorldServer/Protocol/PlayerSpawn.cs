@@ -139,6 +139,10 @@ public static class PlayerSpawn
         m.SetUInt32(UpdateField.UnitMaxPower1, maxPower);
         m.SetUInt32(UpdateField.UnitLevel, c.Level);
         m.SetUInt32(UpdateField.UnitFactionTemplate, DisplayData.FactionForRace(c.Race));
+        // UNIT_FLAG_PLAYER_CONTROLLED (0x8): без него клиент идёт по ветке CvC (существо-vs-существо) в
+        // CanAttack и разрешает атаку лишь по ВРАЖДЕБНЫМ целям → нейтральных мобов нельзя бить (M7 #11).
+        // С флагом — ветка PvC, нейтралы атакуемы. Сверено с TrinityCore IsValidAttackTarget (зеркало клиента).
+        m.SetUInt32(UpdateField.UnitFlags, UnitFlags.PlayerControlled);
         m.SetUInt32(UpdateField.UnitDisplayId, model);
         m.SetUInt32(UpdateField.UnitNativeDisplayId, model);
         m.SetFloat(UpdateField.UnitBoundingRadius, 0.306f);

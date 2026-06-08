@@ -52,7 +52,8 @@ namespace Foole.Mpq
 
 		public MpqArchive(string filename)
 		{
-			BaseStream = File.Open(filename, FileMode.Open, FileAccess.Read);
+			// FileShare.ReadWrite: позволяет читать MPQ, пока клиент WoW держит файл открытым (тестовый прогон).
+			BaseStream = File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 			try {
 				Init();
 			} catch {
