@@ -1,0 +1,90 @@
+using System.Text;
+using AlexWoW.Common.Network;
+using AlexWoW.WorldServer.Net;
+using AlexWoW.WorldServer.Protocol;
+using Microsoft.Extensions.Logging;
+
+namespace AlexWoW.WorldServer.Handlers;
+
+/// <summary>
+/// Дев/тест-команды через чат (M9.4): сообщение, начинающееся с '.', не уходит в чат, а выполняет
+/// команду (прокачка/выдача предметов для теста). Гейт — env <c>WORLD_DEV_COMMANDS</c> (по умолчанию ВКЛ;
+/// "0" — выкл). ⚠️ Для прод-сервера гейтить по gmlevel аккаунта (сейчас — тестовый сервер).
+/// Команды: <c>.level N</c>, <c>.xp [add] N</c>, <c>.additem ID [count]</c>, <c>.help</c>.
+/// </summary>
+public static class DevCommands
+{
+    public static readonly bool Enabled = Environment.GetEnvironmentVariable("WORLD_DEV_COMMANDS") != "0";
+
+    /// <summary>Выполнить, если это дев-команда. true → обработано (в чат не слать).</summary>
+    public static async Task<bool> TryHandleAsync(WorldSession session, string text, CancellationToken ct)
+    {
+        if (!Enabled || string.IsNullOrEmpty(text) || text[0] != '.')
+            return false;
+
+        var parts = text[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+            return false;
+        var cmd = parts[0].ToLowerInvariant();
+
+        try
+        {
+            switch (cmd)
+            {
+                case "level" or "lvl" when parts.Length >= 2 && byte.TryParse(parts[1], out var lvl):
+                    await Progression.SetLevelAsync(session, lvl, ct);
+                    await ReplyAsync(session, $"Уровень: {Math.Clamp(lvl, (byte)1, World.LevelStore.MaxLevel)}", ct);
+                    return true;
+
+                case "xp" when TryParseXp(parts, out var amount):
+                    await Progression.GiveXpAsync(session, amount, ct);
+                    await ReplyAsync(session, $"Опыт +{amount}", ct);
+                    return true;
+
+                case "additem" or "item" when parts.Length >= 2 && uint.TryParse(parts[1], out var itemId):
+                    var qty = parts.Length >= 3 && uint.TryParse(parts[2], out var q) ? q : 1u;
+                    var item = await InventoryGrant.TryGiveAsync(session, itemId, qty, ct);
+                    await ReplyAsync(session, item is null ? "Нет места в сумке" : $"Выдан предмет {itemId} x{qty}", ct);
+                    return true;
+
+                case "help" or "commands":
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count]", ct);
+                    return true;
+
+                default:
+                    await ReplyAsync(session, $"Неизвестная команда: .{cmd} (.help)", ct);
+                    return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogWarning("DEV команда '.{Cmd}' ошибка: {Msg}", cmd, ex.Message);
+            await ReplyAsync(session, $"Ошибка: {ex.Message}", ct);
+            return true;
+        }
+    }
+
+    /// <summary>.xp 500 или .xp add 500.</summary>
+    private static bool TryParseXp(string[] parts, out uint amount)
+    {
+        amount = 0;
+        var idx = parts.Length >= 3 && parts[1].Equals("add", StringComparison.OrdinalIgnoreCase) ? 2 : 1;
+        return parts.Length > idx && uint.TryParse(parts[idx], out amount);
+    }
+
+    /// <summary>Системное сообщение в чат игроку (CHAT_MSG_SYSTEM).</summary>
+    private static Task ReplyAsync(WorldSession session, string text, CancellationToken ct)
+    {
+        var msg = Encoding.UTF8.GetBytes(text);
+        var w = new ByteWriter(40 + msg.Length)
+            .UInt8(0)                       // CHAT_MSG_SYSTEM
+            .UInt32(0)                      // LANG_UNIVERSAL
+            .UInt64(0)                      // sender (система)
+            .UInt32(0)                      // chat flags
+            .UInt64(0)                      // target
+            .UInt32((uint)(msg.Length + 1))
+            .Bytes(msg).UInt8(0)
+            .UInt8(0);                      // chat tag
+        return session.SendAsync(WorldOpcode.SmsgMessageChat, w.ToArray(), ct);
+    }
+}

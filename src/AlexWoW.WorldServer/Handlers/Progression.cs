@@ -50,6 +50,42 @@ public static class Progression
         await session.Characters.SetLevelXpAsync(session.InWorldGuid, c.Level, session.Xp, ct);
     }
 
+    /// <summary>
+    /// Выставляет уровень напрямую (дев-команда M9.4): пересчёт HP, фулл-хил, сброс опыта, апдейт полей +
+    /// SMSG_LEVELUP_INFO. Клампится 1..80.
+    /// </summary>
+    internal static async Task SetLevelAsync(WorldSession session, byte level, CancellationToken ct)
+    {
+        var c = session.Character;
+        if (c is null || session.InWorldGuid == 0)
+            return;
+        level = Math.Clamp(level, (byte)1, LevelStore.MaxLevel);
+        await session.World.Levels.EnsureLoadedAsync(ct);
+
+        var oldMaxHp = session.MaxHealth;
+        c.Level = level;
+        session.MaxHealth = DisplayData.MaxHealthForLevel(level);
+        session.Health = session.MaxHealth;
+        session.Xp = 0;
+        var hpDiff = session.MaxHealth > oldMaxHp ? session.MaxHealth - oldMaxHp : 0;
+
+        var w = new ByteWriter(56).UInt32(level).UInt32(hpDiff);
+        for (var i = 0; i < 12; i++) w.UInt32(0); // 7 powers + 5 статов
+        await session.SendAsync(WorldOpcode.SmsgLevelupInfo, w.ToArray(), ct);
+
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.UnitLevel, level);
+                m.SetUInt32(UpdateField.UnitMaxHealth, session.MaxHealth);
+                m.SetUInt32(UpdateField.UnitHealth, session.Health);
+                m.SetUInt32(UpdateField.PlayerXp, 0);
+                m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(level));
+            }), ct);
+        await session.Characters.SetLevelXpAsync(session.InWorldGuid, level, 0, ct);
+        session.Logger.LogInformation("DEV SETLEVEL '{User}' → {Level}", session.Account, level);
+    }
+
     /// <summary>Повышение на один уровень: пересчёт HP (флэт по уровню), фулл-хил, SMSG_LEVELUP_INFO + поля.</summary>
     private static async Task ApplyLevelUpAsync(WorldSession session, CancellationToken ct)
     {
