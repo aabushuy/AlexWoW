@@ -29,7 +29,7 @@ public static class PlayerSpawn
     /// </summary>
     public static byte[] BuildCreateObject(Character c, float x, float y, float z, float o,
         uint serverTimeMs, bool isSelf, IReadOnlyList<InventoryItem>? inventory = null,
-        IReadOnlyList<QuestProgress?>? questSlots = null)
+        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null)
     {
         var w = new ByteWriter(256);
 
@@ -39,7 +39,7 @@ public static class PlayerSpawn
         w.UInt8(TypeId.Player);
 
         WriteMovementBlock(w, x, y, z, o, serverTimeMs, isSelf);
-        BuildValues(c, inventory, isSelf, questSlots).WriteTo(w);
+        BuildValues(c, inventory, isSelf, questSlots, stats).WriteTo(w);
 
         return w.ToArray();
     }
@@ -117,7 +117,7 @@ public static class PlayerSpawn
     }
 
     private static UpdateMask BuildValues(Character c, IReadOnlyList<InventoryItem>? inventory, bool isSelf,
-        IReadOnlyList<QuestProgress?>? questSlots = null)
+        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null)
     {
         var powerType = DisplayData.PowerTypeForClass(c.Class);
         var model = DisplayData.ModelForRace(c.Race, c.Gender);
@@ -128,18 +128,30 @@ public static class PlayerSpawn
         m.SetFloat(UpdateField.ObjectScaleX, 1.0f);
 
         m.SetBytes(UpdateField.UnitBytes0, c.Race, c.Class, c.Gender, powerType);
-        // Здоровье игрока — упрощённо по уровню (точные статы по классу/уровню позже). M6.7: существо
-        // отвечает ударом, текущий HP меняется в бою (VALUES-апдейты); в create спавним полным.
-        var maxHealth = DisplayData.MaxHealthForLevel(c.Level);
+        // M9.2: HP/мана по классу/уровню (player_levelstats); фолбэк — флэт по уровню. В create — полным.
+        var maxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(c.Level);
         m.SetUInt32(UpdateField.UnitHealth, maxHealth);
         m.SetUInt32(UpdateField.UnitMaxHealth, maxHealth);
-        // M6.4: мана-классам — пул из MaxManaForClass (расход спеллами, реген в тике); rage/energy
-        // (powertype != 0) сохраняют дефолтные 100 (точная модель ресурсов — позже).
-        var maxPower = DisplayData.MaxManaForClass(c.Class, c.Level);
-        if (maxPower == 0)
-            maxPower = 100;
-        m.SetUInt32(UpdateField.UnitPower1, maxPower);
-        m.SetUInt32(UpdateField.UnitMaxPower1, maxPower);
+        // M9.2: ресурс по типу класса (ярость/энергия/мана) в правильный слот POWER — иначе у воина
+        // показывалась мана. Мана-классам — пул (computed/флэт).
+        var mana = stats?.MaxMana ?? DisplayData.MaxManaForClass(c.Class, c.Level);
+        var (powerField, maxPowerField, curPower, maxPower) = DisplayData.PowerFor(powerType, mana);
+        m.SetUInt32(powerField, curPower);
+        m.SetUInt32(maxPowerField, maxPower);
+        // Боевые поля (урон/скорость) шлются отдельно после спавна из экипированного оружия
+        // (Progression.RefreshMeleeAsync) — иначе слот-тултип оружия показывает NaN/INF. M9.2.
+
+        // M9.2: первичные статы (str/agi/sta/int/spi) — приватные, только себе (paperdoll).
+        if (isSelf && stats is { } s)
+        {
+            m.SetUInt32(UpdateField.UnitStat0, s.Str);
+            m.SetUInt32(UpdateField.UnitStat1, s.Agi);
+            m.SetUInt32(UpdateField.UnitStat2, s.Sta);
+            m.SetUInt32(UpdateField.UnitStat3, s.Int);
+            m.SetUInt32(UpdateField.UnitStat4, s.Spi);
+            m.SetUInt32(UpdateField.UnitBaseHealth, s.MaxHealth);
+            m.SetUInt32(UpdateField.UnitBaseMana, s.MaxMana);
+        }
         m.SetUInt32(UpdateField.UnitLevel, c.Level);
         m.SetUInt32(UpdateField.UnitFactionTemplate, DisplayData.FactionForRace(c.Race));
         // UNIT_FLAG_PLAYER_CONTROLLED (0x8): без него клиент идёт по ветке CvC (существо-vs-существо) в

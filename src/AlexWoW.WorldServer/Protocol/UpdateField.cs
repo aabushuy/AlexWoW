@@ -20,7 +20,19 @@ public static class UpdateField
     public const int UnitMaxPower1 = 0x0021;
     public const int UnitLevel = 0x0036;
     public const int UnitFactionTemplate = 0x0037;
+    // Первичные статы (OBJECT_END 0x06 + 0x4E..0x52). STAT2 = выносливость, STAT3 = интеллект. M9.2.
+    public const int UnitStat0 = 0x0054;          // сила
+    public const int UnitStat1 = 0x0055;          // ловкость
+    public const int UnitStat2 = 0x0056;          // выносливость
+    public const int UnitStat3 = 0x0057;          // интеллект
+    public const int UnitStat4 = 0x0058;          // дух
+    public const int UnitBaseMana = 0x0078;       // OBJECT_END + 0x72
+    public const int UnitBaseHealth = 0x0079;     // OBJECT_END + 0x73
     public const int UnitFlags = 0x003B;
+    // Боевые поля (M9.2): чтобы чарпейн не показывал NaN-урон. BASEATTACKTIME size 2 (main 0x3E, off 0x3F).
+    public const int UnitBaseAttackTime = 0x003E;
+    public const int UnitMinDamage = 0x0046;      // float
+    public const int UnitMaxDamage = 0x0047;      // float
     public const int UnitDynamicFlags = 0x004F;   // UNIT_DYNAMIC_FLAGS — LOOTABLE(0x1) и пр. (труп-лут M6.6)
     public const int UnitNpcFlags = 0x0052;       // OBJECT_END(0x06)+0x4C — иконки госсипа/вендора/квестов
     public const int UnitBoundingRadius = 0x0041; // float
