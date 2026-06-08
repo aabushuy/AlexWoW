@@ -162,6 +162,10 @@ public sealed class WorldSession
     /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
     internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = new();
 
+    /// <summary>Известные игроку спеллы (стартовые по классу + языковые + изученные у тренера). Для
+    /// HasSpell-проверок тренера и анти-дубля. Загружается при входе в мир. M9.3.</summary>
+    internal HashSet<uint> KnownSpells { get; } = new();
+
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
     public async Task RunAsync(CancellationToken ct)
@@ -207,6 +211,7 @@ public sealed class WorldSession
         CompletedQuests.Clear();
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
+        KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();

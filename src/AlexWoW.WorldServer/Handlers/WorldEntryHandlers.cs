@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -38,7 +39,7 @@ public static class WorldEntryHandlers
         await session.SendAsync(WorldOpcode.SmsgFeatureSystemStatus,
             new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
 
-        await SendInitialSpellsAsync(session, character.Race, ct);
+        await SendInitialSpellsAsync(session, character, ct);
 
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)
@@ -181,17 +182,51 @@ public static class WorldEntryHandlers
         await session.SendAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(counter).ToArray(), ct);
     }
 
-    private static async Task SendInitialSpellsAsync(WorldSession session, byte race, CancellationToken ct)
+    /// <summary>
+    /// SMSG_INITIAL_SPELLS (M9.3): книга заклинаний при входе. Набор = языковые спеллы расы ∪ стартовые
+    /// абилки класса (playercreateinfo_spell) ∪ изученное у тренера (character_spell). Хардкод маг-спеллов
+    /// из M6.4 (Fireball/Frostbolt/…) выдаём ТОЛЬКО магу (класс 8) — у остальных классов их в книге быть
+    /// не должно. Заполняет session.KnownSpells (для HasSpell-проверок тренера). БД мира недоступна → фолбэк
+    /// на языковые + (магу) боевые.
+    /// </summary>
+    private const byte ClassMage = 8;
+
+    private static async Task SendInitialSpellsAsync(WorldSession session, Character character, CancellationToken ct)
     {
-        // Языковые навыки + спеллы для каста (M6.4): Fireball/Frostbolt/Fire Blast + Lesser Heal (rank 1).
-        var spells = LanguageSpells.ForRace(race).Concat(SpellHandlers.GrantedCombatSpells).ToList();
-        var w = new ByteWriter(8 + spells.Count * 6)
+        var known = session.KnownSpells;
+        known.Clear();
+        foreach (var s in LanguageSpells.ForRace(character.Race))
+            known.Add((uint)s);
+
+        try
+        {
+            foreach (var s in await session.WorldDb.GetStartSpellsAsync(character.Race, character.Class, ct))
+                known.Add(s);
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("INITIAL_SPELLS '{User}': стартовые спеллы из БД недоступны ({Msg})",
+                session.Account, ex.Message);
+        }
+
+        // M6.4: боевые спеллы-заглушки умеет кастовать только маг (их эффекты хардкожены под мага).
+        if (character.Class == ClassMage)
+            foreach (var s in SpellHandlers.GrantedCombatSpells)
+                known.Add((uint)s);
+
+        // Изученное у тренера (персист).
+        foreach (var s in await session.Characters.GetLearnedSpellsAsync(character.Guid, ct))
+            known.Add(s);
+
+        var w = new ByteWriter(8 + known.Count * 6)
             .UInt8(0)
-            .UInt16((ushort)spells.Count);
-        foreach (var spell in spells)
-            w.UInt32((uint)spell).UInt16(0); // 3.3.5: spellId — u32 + u16
+            .UInt16((ushort)known.Count);
+        foreach (var spell in known)
+            w.UInt32(spell).UInt16(0); // 3.3.5: spellId — u32 + u16
         w.UInt16(0); // нет кулдаунов
         await session.SendAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
+        session.Logger.LogDebug("INITIAL_SPELLS '{User}': {Count} спеллов (класс {Class})",
+            session.Account, known.Count, character.Class);
     }
 
     /// <summary>

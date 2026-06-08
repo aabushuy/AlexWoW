@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 134 / 860 опкодов реализовано — 15.6%** (не реализовано: 726 — 84.4%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 144 / 860 опкодов реализовано — 16.7%** (не реализовано: 716 — 83.3%, см. [NotImplemented.md](NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -67,6 +67,7 @@
 | `0x0112` | SMSG_INVENTORY_CHANGE_FAILURE | Item |
 | `0x0122` | SMSG_INITIALIZE_FACTIONS | Faction |
 | `0x012A` | SMSG_INITIAL_SPELLS | Spell |
+| `0x012B` | SMSG_LEARNED_SPELL | Spell |
 | `0x012E` | CMSG_CAST_SPELL | Spell |
 | `0x012F` | CMSG_CANCEL_CAST | Spell |
 | `0x0130` | SMSG_CAST_FAILED | Spell |
@@ -92,6 +93,10 @@
 | `0x0162` | SMSG_LOOT_REMOVED | Loot |
 | `0x0165` | SMSG_LOOT_CLEAR_MONEY | Loot |
 | `0x017B` | CMSG_GOSSIP_HELLO | Gossip |
+| `0x017C` | CMSG_GOSSIP_SELECT_OPTION | Gossip |
+| `0x017D` | SMSG_GOSSIP_MESSAGE | Gossip |
+| `0x017F` | CMSG_NPC_TEXT_QUERY | Gossip |
+| `0x0180` | SMSG_NPC_TEXT_UPDATE | Gossip |
 | `0x0182` | CMSG_QUESTGIVER_STATUS_QUERY | Query |
 | `0x0183` | SMSG_QUESTGIVER_STATUS | Quest |
 | `0x0184` | CMSG_QUESTGIVER_HELLO | Quest |
@@ -113,6 +118,11 @@
 | `0x01A2` | CMSG_BUY_ITEM | Item |
 | `0x01A4` | SMSG_BUY_ITEM | Item |
 | `0x01A5` | SMSG_BUY_FAILED | Item |
+| `0x01B0` | CMSG_TRAINER_LIST | Spell |
+| `0x01B1` | SMSG_TRAINER_LIST | Spell |
+| `0x01B2` | CMSG_TRAINER_BUY_SPELL | Spell |
+| `0x01B3` | SMSG_TRAINER_BUY_SUCCEEDED | Spell |
+| `0x01B4` | SMSG_TRAINER_BUY_FAILED | Spell |
 | `0x01CE` | CMSG_QUERY_TIME | Query |
 | `0x01CF` | SMSG_QUERY_TIME_RESPONSE | Query |
 | `0x01DC` | CMSG_PING | Keepalive |
