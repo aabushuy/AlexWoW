@@ -56,14 +56,16 @@ public static class WorldEntryHandlers
         session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
 
-        // M6.7: авторитетное здоровье (полное при входе) — существо отвечает ударом, игрок может умереть.
-        session.MaxHealth = DisplayData.MaxHealthForLevel(character.Level);
+        // M9.2: статы/HP/мана по классу+уровню (player_levelstats); фолбэк — флэт. Полное HP при входе.
+        await session.World.Stats.EnsureLoadedAsync(ct);
+        var stats = session.World.Stats.Compute(character.Race, character.Class, character.Level);
+        session.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(character.Level);
         session.Health = session.MaxHealth;
         session.IsDead = false;
         session.LastCombatMs = 0;
 
         // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
-        session.MaxMana = DisplayData.MaxManaForClass(character.Class, character.Level);
+        session.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(character.Class, character.Level);
         session.Mana = session.MaxMana;
         session.Xp = character.Xp; // M9.1: текущий опыт на уровне
         session.LastSpellCastMs = 0;
@@ -79,7 +81,7 @@ public static class WorldEntryHandlers
 
         var spawn = PlayerSpawn.BuildCreateObject(character,
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
-            session.Inventory, session.QuestSlots);
+            session.Inventory, session.QuestSlots, stats);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
@@ -93,6 +95,9 @@ public static class WorldEntryHandlers
                 m.SetUInt32(UpdateField.PlayerXp, session.Xp);
                 m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(character.Level));
             }), ct);
+
+        // M9.2: боевые поля (урон/скорость) из экипированного оружия — чтобы чарпейн не показывал INF.
+        await Progression.RefreshMeleeAsync(session, ct);
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);

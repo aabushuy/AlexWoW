@@ -13,8 +13,11 @@ namespace AlexWoW.WorldServer.World;
 /// отправки на уровне каждой сессии (см. WorldSession.SendAsync).
 /// </summary>
 public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
-    QuestStore quests, LevelStore levels)
+    QuestStore quests, LevelStore levels, StatStore stats)
 {
+    /// <summary>Характеристики по расе/классу/уровню (HP/мана/статы). M9.2.</summary>
+    public StatStore Stats => stats;
+
     /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
     private int _splineId;
 

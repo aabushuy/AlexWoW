@@ -205,6 +205,49 @@ public sealed class WorldDatabase(string connectionString)
         return rows.AsList();
     }
 
+    /// <summary>Базовые HP/мана по классу+уровню (player_classlevelstats). M9.2.</summary>
+    public async Task<IReadOnlyDictionary<(byte Class, byte Level), (uint Hp, uint Mana)>>
+        GetClassLevelStatsAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT class, level, basehp, basemana FROM player_classlevelstats;", cancellationToken: ct));
+        var map = new Dictionary<(byte, byte), (uint, uint)>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            byte cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
+            byte lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
+            map[(cls, lvl)] = (Convert.ToUInt32(d["basehp"], CultureInfo.InvariantCulture),
+                               Convert.ToUInt32(d["basemana"], CultureInfo.InvariantCulture));
+        }
+        return map;
+    }
+
+    /// <summary>Базовые статы (str/agi/sta/int/spi) по расе+классу+уровню (player_levelstats). M9.2.</summary>
+    public async Task<IReadOnlyDictionary<(byte Race, byte Class, byte Level), (uint Str, uint Agi, uint Sta, uint Int, uint Spi)>>
+        GetLevelStatsAsync(CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT race, class, level, str, agi, sta, inte, spi FROM player_levelstats;", cancellationToken: ct));
+        var map = new Dictionary<(byte, byte, byte), (uint, uint, uint, uint, uint)>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            byte race = Convert.ToByte(d["race"], CultureInfo.InvariantCulture);
+            byte cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
+            byte lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
+            map[(race, cls, lvl)] = (
+                Convert.ToUInt32(d["str"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["agi"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["sta"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["inte"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["spi"], CultureInfo.InvariantCulture));
+        }
+        return map;
+    }
+
     /// <summary>Кривая опыта: lvl → xp_for_next_level (player_xp_for_level). M9.1.</summary>
     public async Task<IReadOnlyDictionary<uint, uint>> GetXpForLevelTableAsync(CancellationToken ct = default)
     {

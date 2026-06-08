@@ -54,6 +54,7 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<FactionStore>();
 builder.Services.AddSingleton<QuestStore>();
 builder.Services.AddSingleton<LevelStore>();
+builder.Services.AddSingleton<StatStore>();
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddHostedService<WorldUpdateLoop>();
 builder.Services.AddHostedService<WorldListener>();

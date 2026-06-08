@@ -46,6 +46,24 @@ public static class DisplayData
     };
 
     /// <summary>
+    /// Поля и значения текущего ресурса по типу (M9.2): индекс POWER/MAXPOWER (= 0x19/0x21 + powerType)
+    /// и стартовые cur/max. Ярость 0/1000 (отображается /10), энергия 100/100, мана — переданный пул.
+    /// Без этого у воина показывалась мана (мы писали в слот POWER1=мана для всех классов).
+    /// </summary>
+    public static (int Field, int MaxField, uint Cur, uint Max) PowerFor(byte powerType, uint mana)
+    {
+        var (cur, max) = powerType switch
+        {
+            0 => (mana, mana),    // мана
+            1 => (0u, 1000u),     // ярость (клиент делит на 10 → 0/100)
+            3 => (100u, 100u),    // энергия
+            6 => (0u, 1000u),     // сила рун
+            _ => (100u, 100u),
+        };
+        return (UpdateField.UnitPower1 + powerType, UpdateField.UnitMaxPower1 + powerType, cur, max);
+    }
+
+    /// <summary>
     /// Макс. мана для класса (M6.4). Только мана-классы (powertype 0); rage/energy/runic → 0
     /// (мана-система к ним не применяется — кастуют без расхода). Значение упрощённое (флэт), точные
     /// статы по классу/уровню/интеллекту — позже. 150 хватает на ~5 кастов rank-1 → видимый OOM.
