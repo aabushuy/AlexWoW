@@ -229,6 +229,8 @@ public sealed class WorldSession
         var player = Player;
         if (player is null)
             return;
+        // M10.5: сохранить временны́е баффы/HoT с остатком длительности ДО очистки (InWorldGuid ещё валиден).
+        await Handlers.Auras.SaveTimedAurasAsync(this, InWorldGuid, ct);
         Player = null;
         InWorldGuid = 0;
         CombatTargetGuid = 0; // M6.3: вне мира боя нет

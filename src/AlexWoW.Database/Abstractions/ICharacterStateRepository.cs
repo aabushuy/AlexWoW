@@ -14,14 +14,19 @@ public interface ICharacterStateRepository
     /// <summary>Сохраняет изученный спелл (идемпотентно).</summary>
     Task AddLearnedSpellAsync(uint ownerGuid, uint spell, CancellationToken ct = default);
 
-    /// <summary>Сохранённые перманентные ауры-переключатели персонажа: (spell, form).</summary>
-    Task<IReadOnlyList<(uint Spell, byte Form)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default);
+    /// <summary>Сохранённые ауры персонажа: (spell, form, remainingMs). remainingMs=0 — перманентный
+    /// переключатель; &gt;0 — временны́й бафф/HoT с остатком длительности (M10.5).</summary>
+    Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default);
 
-    /// <summary>Сохраняет активную ауру-переключатель (идемпотентно).</summary>
+    /// <summary>Сохраняет активную ауру-переключатель (перманентную, идемпотентно).</summary>
     Task AddAuraAsync(uint ownerGuid, uint spell, byte form, CancellationToken ct = default);
 
     /// <summary>Убирает сохранённую ауру-переключатель.</summary>
     Task RemoveAuraAsync(uint ownerGuid, uint spell, CancellationToken ct = default);
+
+    /// <summary>Перезаписывает временны́е ауры (remainingMs&gt;0) персонажа при выходе: удаляет прежние
+    /// временны́е и пишет текущие (переключатели не трогает). M10.5.</summary>
+    Task SaveTimedAurasAsync(uint ownerGuid, IReadOnlyList<(uint Spell, uint RemainingMs)> auras, CancellationToken ct = default);
 
     /// <summary>Ярлыки панелей персонажа: button → packed_data.</summary>
     Task<IReadOnlyDictionary<byte, uint>> GetActionButtonsAsync(uint ownerGuid, CancellationToken ct = default);

@@ -29,16 +29,18 @@ public sealed class PeriodicEffect
 /// </summary>
 public static class Periodics
 {
-    /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.</summary>
+    /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
+    /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо полной длительности (восстановление с остатком, M10.5).</summary>
     internal static async Task ApplyAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
-        ulong targetCreatureGuid, CancellationToken ct)
+        ulong targetCreatureGuid, CancellationToken ct, int durationOverrideMs = 0)
     {
         if (!info.Periodic || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
             return;
 
+        var dur = durationOverrideMs > 0 ? durationOverrideMs : info.AuraDurationMs;
         var interval = info.TickIntervalMs > 0 ? info.TickIntervalMs : 3000;
         var now = Environment.TickCount64;
-        var expires = now + info.AuraDurationMs;
+        var expires = now + dur;
         var caster = (ulong)session.InWorldGuid;
         var level = (byte)(session.Character?.Level ?? 1);
 
@@ -46,7 +48,7 @@ public static class Periodics
         {
             // HoT на себя: бафф-иконка — через систему аур (M6.11), тик хила — здесь.
             session.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);
-            await Auras.ApplyAsync(session, spellId, info.AuraDurationMs, positive: true, form: 0, ct);
+            await Auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct);
             session.Periodics.Add(new PeriodicEffect
             {
                 SpellId = spellId, TargetGuid = 0, SchoolMask = info.School, Amount = info.TickAmount,
@@ -68,7 +70,7 @@ public static class Periodics
 
         const byte flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, info.AuraDurationMs), ct);
+            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, dur), ct);
         session.Periodics.Add(new PeriodicEffect
         {
             SpellId = spellId, TargetGuid = targetCreatureGuid, SchoolMask = info.School, Amount = info.TickAmount,
@@ -83,19 +85,20 @@ public static class Periodics
     /// +макс.HP (MOD_INCREASE_HEALTH); прочие стат-моды визуальны (боевая модель упрощена).
     /// </summary>
     internal static async Task ApplyAuraEffectAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
-        ulong targetCreatureGuid, CancellationToken ct)
+        ulong targetCreatureGuid, CancellationToken ct, int durationOverrideMs = 0)
     {
         if (!info.AuraBuff || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
             return;
+        var dur = durationOverrideMs > 0 ? durationOverrideMs : info.AuraDurationMs;
         var now = Environment.TickCount64;
-        var expires = now + info.AuraDurationMs;
+        var expires = now + dur;
         var caster = (ulong)session.InWorldGuid;
         var level = (byte)(session.Character?.Level ?? 1);
 
         if (info.AuraPositive)
         {
             // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP) — здесь, со снятием по истечении.
-            await Auras.ApplyAsync(session, spellId, info.AuraDurationMs, positive: true, form: 0, ct);
+            await Auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct);
             if (info.HealthBonus > 0)
             {
                 session.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);
@@ -123,12 +126,33 @@ public static class Periodics
 
         const byte flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, info.AuraDurationMs), ct);
+            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, dur), ct);
         session.Periodics.Add(new PeriodicEffect
         {
             SpellId = spellId, TargetGuid = targetCreatureGuid, ExpiresAtMs = expires, DoesTick = false,
             OwnsVisual = true, Slot = slot,
         });
+    }
+
+    /// <summary>
+    /// Восстанавливает временну́ю свою ауру при входе (M10.5) с остатком длительности: по данным spell_template
+    /// решает — HoT (тик хила), бафф с +макс.HP, или просто бафф-иконка. Дебаффы/DoT на врагах не персистятся.
+    /// </summary>
+    internal static async Task RestoreTimedAuraAsync(WorldSession session, uint spellId, int remainingMs, CancellationToken ct)
+    {
+        if (remainingMs <= 0)
+            return;
+        SpellCatalog.SpellInfo? info;
+        try { info = await SpellCatalog.GetAsync(session.WorldDb, spellId, ct: ct); }
+        catch { info = null; }
+
+        if (info is { Periodic: true, PeriodicHeal: true })
+            await ApplyAsync(session, spellId, info, targetCreatureGuid: 0, ct, durationOverrideMs: remainingMs);
+        else if (info is { AuraBuff: true, AuraPositive: true })
+            await ApplyAuraEffectAsync(session, spellId, info, targetCreatureGuid: 0, ct, durationOverrideMs: remainingMs);
+        else
+            // Прочий временны́й бафф (напр. через .buff) — только иконка с остатком длительности.
+            await Auras.ApplyAsync(session, spellId, remainingMs, positive: true, form: 0, ct);
     }
 
     /// <summary>Тик периодических эффектов (из WorldState.UpdateAsync): применяет урон/хил, снимает истёкшие.</summary>
