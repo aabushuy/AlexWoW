@@ -1,5 +1,5 @@
 using AlexWoW.Common.Network;
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -117,7 +117,7 @@ public static class CharScreenHandlers
             return CharResponse.CreateFailed;
         if (name.Length is < 2 or > 12)   // лимит имени WoW — 12 символов (столбец name VARCHAR(12))
             return CharResponse.CreateFailed;
-        if (await session.Characters.CountByAccountAsync(session.AccountId, ct) >= CharactersDatabase.MaxCharactersPerAccount)
+        if (await session.Characters.CountByAccountAsync(session.AccountId, ct) >= ICharacterRepository.MaxCharactersPerAccount)
             return CharResponse.CreateServerLimit;
         if (await session.Characters.NameExistsAsync(name, ct))
             return CharResponse.CreateNameInUse;

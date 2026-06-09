@@ -8,6 +8,9 @@ namespace AlexWoW.Database.Abstractions;
 /// </summary>
 public interface ICharacterRepository
 {
+    /// <summary>Максимум персонажей на аккаунт (на реалм).</summary>
+    const int MaxCharactersPerAccount = 10;
+
     Task EnsureSchemaAsync(CancellationToken ct = default);
 
     Task<IReadOnlyList<Character>> GetByAccountAsync(uint accountId, CancellationToken ct = default);
