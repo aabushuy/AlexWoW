@@ -184,6 +184,10 @@ public static class PlayerSpawn
             m.SetUInt32(UpdateField.PlayerFieldCoinage, c.Money);
             // M7 #17: маска видимых доп. панелей (PLAYER_FIELD_BYTES байт 2) — восстановить при входе.
             m.SetBytes(UpdateField.PlayerFieldBytes, 0, 0, c.ActionBars, 0);
+            // M7 #16: множитель урона по школам = 1.0 (это «percent» в клиентском UnitDamage). Без него
+            // слот-тултип оружия делит на 0 → «Урон: 1.#INF». 7 школ.
+            for (var school = 0; school < 7; school++)
+                m.SetFloat(UpdateField.PlayerFieldModDamageDonePct + school, 1.0f);
         }
 
         // M6.1: экипировка. Видимые предметы (entry) одевают модель — у всех наблюдателей;

@@ -23,6 +23,7 @@ public static class WorldEntryHandlers
         }
 
         session.InWorldGuid = character.Guid;
+        session.Character = character; // M7 #16: нужен в RefreshMeleeAsync (AP по статам) — ставим РАНО
         session.PosX = character.X;
         session.PosY = character.Y;
         session.PosZ = character.Z;
@@ -124,6 +125,9 @@ public static class WorldEntryHandlers
         var player = new World.WorldPlayer { Guid = character.Guid, Character = character, Session = session };
         session.Player = player;
         await session.World.EnterWorldAsync(player, ct);
+
+        // M7 #21: восстановить сохранённые переключатели (стойка воина/аура паладина/аспект охотника).
+        await Auras.ReapplyPersistedAsync(session, ct);
 
         // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
         // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).

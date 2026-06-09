@@ -15,26 +15,28 @@ public static class Auras
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
     /// <summary>
-    /// Накладывает ауру (M6.11). <paramref name="form"/> != 0 — аура-форма (стойка): снимает предыдущую
-    /// форму и выставляет новую в UNIT_FIELD_BYTES_2. <paramref name="positive"/> — бафф (cancellable) vs
-    /// дебафф (negative). <paramref name="durationMs"/> = 0 — перманентная. Повторное наложение того же
-    /// спелла обновляет ауру (рефреш).
+    /// Накладывает ауру (M6.11/M7 #21). <paramref name="form"/> != 0 — аура-форма (стойка/форма друида):
+    /// выставляет UNIT_FIELD_BYTES_2. <paramref name="group"/> != 0 — эксклюзивная группа-переключатель
+    /// (стойки/формы, ауры паладина, аспекты охотника): новый снимает прочие той же группы.
+    /// <paramref name="durationMs"/> = 0 — перманентная (переключатель) → персистится через релог
+    /// (если <paramref name="persist"/>). Повтор того же спелла — рефреш.
     /// </summary>
     internal static async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
-        bool positive, byte form, CancellationToken ct)
+        bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false)
     {
         if (session.InWorldGuid == 0)
             return;
 
-        // Форма эксклюзивна: снять прочие аура-формы (другую стойку) перед наложением новой.
-        if (form != 0)
-            foreach (var f in session.Auras.Where(a => a.ShapeshiftForm != 0).ToList())
-                await RemoveInternalAsync(session, f, ct);
+        // Эксклюзивность переключателя: снять прочие ауры той же группы. Форму НЕ сбрасываем в 0, если новая
+        // тоже задаёт форму (resetForm:false) — иначе подсветка стойки мигает/запаздывает (M7 #21).
+        if (group != 0)
+            foreach (var g in session.Auras.Where(a => a.Group == group).ToList())
+                await RemoveInternalAsync(session, g, resetForm: form == 0, ct);
 
         // Рефреш: повтор того же спелла — снять старый экземпляр.
         var dup = session.Auras.FirstOrDefault(a => a.SpellId == spellId);
         if (dup is not null)
-            await RemoveInternalAsync(session, dup, ct);
+            await RemoveInternalAsync(session, dup, resetForm: true, ct);
 
         // Само-каст (SELF_CAST) обязателен — иначе клиент ждёт PackedGuid кастера и десинхронит поток.
         byte flags = (byte)(AuraFlags.Effect1 | AuraFlags.SelfCast);
@@ -42,16 +44,25 @@ public static class Auras
         if (durationMs > 0)
             flags |= AuraFlags.Duration;
 
+        var doPersist = persist && durationMs == 0; // персистим только перманентные переключатели
         var aura = new ActiveAura
         {
             SpellId = spellId,
             Slot = FirstFreeSlot(session),
             Flags = flags,
             ShapeshiftForm = form,
+            Group = group,
+            Persist = doPersist,
             DurationMs = durationMs,
             ExpiresAtMs = durationMs > 0 ? Environment.TickCount64 + durationMs : 0,
         };
         session.Auras.Add(aura);
+
+        // Сначала аура (SMSG_AURA_UPDATE), затем форма (UNIT_FIELD_BYTES_2) — порядок как в CMaNGOS,
+        // чтобы клиент сразу подсветил активную стойку (M7 #21).
+        var level = (byte)(session.Character?.Level ?? 1);
+        await session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildApply((ulong)session.InWorldGuid, aura.Slot, spellId, flags, level, 1, durationMs), ct);
 
         if (form != 0)
         {
@@ -59,9 +70,41 @@ public static class Auras
             await BroadcastFormAsync(session, ct);
         }
 
+        if (doPersist)
+            try { await session.Characters.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
+            catch { /* персист не критичен для текущей сессии */ }
+    }
+
+    /// <summary>
+    /// Восстанавливает сохранённые ауры-переключатели при входе (M7 #21): применяет каждую без повторного
+    /// персиста и без снятия (они уже были эксклюзивны при сохранении). Зовётся после спавна в OnPlayerLogin.
+    /// </summary>
+    internal static async Task ReapplyPersistedAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return;
+        IReadOnlyList<(uint Spell, byte Form)> saved;
+        try { saved = await session.Characters.GetAurasAsync(session.InWorldGuid, ct); }
+        catch { return; }
+
         var level = (byte)(session.Character?.Level ?? 1);
-        await session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApply((ulong)session.InWorldGuid, aura.Slot, spellId, flags, level, 1, durationMs), ct);
+        foreach (var (spell, form) in saved)
+        {
+            byte flags = (byte)(AuraFlags.Effect1 | AuraFlags.SelfCast | AuraFlags.Positive);
+            var aura = new ActiveAura
+            {
+                SpellId = spell, Slot = FirstFreeSlot(session), Flags = flags,
+                ShapeshiftForm = form, Persist = true, DurationMs = 0, ExpiresAtMs = 0,
+            };
+            session.Auras.Add(aura);
+            await session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgAuraUpdate,
+                AuraPackets.BuildApply((ulong)session.InWorldGuid, aura.Slot, spell, flags, level, 1, 0), ct);
+            if (form != 0)
+            {
+                session.ShapeshiftForm = form;
+                await BroadcastFormAsync(session, ct);
+            }
+        }
     }
 
     /// <summary>Снимает ауру по spellId, если есть (M6.11).</summary>
@@ -69,7 +112,7 @@ public static class Auras
     {
         var aura = session.Auras.FirstOrDefault(a => a.SpellId == spellId);
         if (aura is not null)
-            await RemoveInternalAsync(session, aura, ct);
+            await RemoveInternalAsync(session, aura, resetForm: true, ct);
     }
 
     /// <summary>Тик истечения аур (M6.11): снимает ауры с вышедшим таймером. Из WorldState.UpdateAsync.</summary>
@@ -78,17 +121,24 @@ public static class Auras
         if (session.Auras.Count == 0)
             return;
         foreach (var aura in session.Auras.Where(a => a.ExpiresAtMs != 0 && now >= a.ExpiresAtMs).ToList())
-            await RemoveInternalAsync(session, aura, ct);
+            await RemoveInternalAsync(session, aura, resetForm: true, ct);
     }
 
-    private static async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, CancellationToken ct)
+    /// <summary>
+    /// Снимает ауру (M6.11). <paramref name="resetForm"/>=false — НЕ сбрасывать форму в 0 (при смене стойки
+    /// новая форма выставится сразу следом, без промежуточного «нет стойки» → без мигания подсветки, M7 #21).
+    /// </summary>
+    private static async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, bool resetForm, CancellationToken ct)
     {
         session.Auras.Remove(aura);
-        if (aura.ShapeshiftForm != 0 && session.ShapeshiftForm == aura.ShapeshiftForm)
+        if (resetForm && aura.ShapeshiftForm != 0 && session.ShapeshiftForm == aura.ShapeshiftForm)
         {
             session.ShapeshiftForm = 0;
             await BroadcastFormAsync(session, ct);
         }
+        if (aura.Persist)
+            try { await session.Characters.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
+            catch { /* персист не критичен */ }
         if (session.Player is { } player)
             await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,
                 AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
