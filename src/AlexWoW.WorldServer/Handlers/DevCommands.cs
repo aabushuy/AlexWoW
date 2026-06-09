@@ -12,7 +12,9 @@ namespace AlexWoW.WorldServer.Handlers;
 /// "0" — выкл). ⚠️ Для прод-сервера гейтить по gmlevel аккаунта (сейчас — тестовый сервер).
 /// Команды: <c>.level N</c>, <c>.xp [add] N</c>, <c>.additem ID [count]</c>, <c>.learn SPELL</c>,
 /// <c>.learnall</c> (все доступные по уровню абилки у ближайшего тренера), <c>.buff/.unbuff SPELL</c>,
-/// <c>.dummy</c>, <c>.help</c>.
+/// <c>.dummy</c>; dev-сущности (веха Devcommands): <c>.trainer &lt;class&gt;|off</c>,
+/// <c>.proftrainer &lt;prof&gt;|off</c>, <c>.craft anvil|forge|cookfire|mailbox|off</c>,
+/// <c>.reagentvendor [off]</c>, <c>.devclean</c>; <c>.help</c>.
 /// </summary>
 public static class DevCommands
 {
@@ -103,6 +105,10 @@ public static class DevCommands
                     await CraftCommandAsync(session, parts[1].ToLowerInvariant(), ct);
                     return true;
 
+                case "reagentvendor" or "rvendor":
+                    await ReagentVendorCommandAsync(session, parts.Length >= 2 ? parts[1].ToLowerInvariant() : "", ct);
+                    return true;
+
                 case "devclean":
                     if (session.InWorldGuid == 0)
                         await ReplyAsync(session, "Доступно только в мире", ct);
@@ -114,7 +120,7 @@ public static class DevCommands
                     return true;
 
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .proftrainer <prof>|off | .craft anvil|forge|cookfire|mailbox|off | .devclean", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .proftrainer <prof>|off | .craft anvil|forge|cookfire|mailbox|off | .reagentvendor [off] | .devclean", ct);
                     return true;
 
                 default:
@@ -270,6 +276,33 @@ public static class DevCommands
 
         var ok = await session.World.SummonDevGoAsync(session, entry, arg, ct);
         await ReplyAsync(session, ok ? $"Станок '{arg}' поставлен" : "Не удалось поставить станок", ct);
+    }
+
+    /// <summary>Entry вендора реагентов: «Tradesman Kontor» (Trade Supplies, NpcFlags=128 без госсипа —
+    /// окно торговли открывается сразу). Продаёт нитки/флюс/краску/флаконы/пергамент/инструменты. D4.</summary>
+    private const uint ReagentVendorEntry = 27021;
+
+    /// <summary>
+    /// <c>.reagentvendor</c> — поставить вендора реагентов у игрока (только 1, повтор заменяет);
+    /// <c>.reagentvendor off</c> — снять. Реюз каркаса D1; покупка — через существующий VendorHandlers
+    /// (резолв по entry из GUID). D4.
+    /// </summary>
+    private static async Task ReagentVendorCommandAsync(WorldSession session, string arg, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+        {
+            await ReplyAsync(session, "Доступно только в мире", ct);
+            return;
+        }
+        if (arg == "off")
+        {
+            var removed = await session.World.DespawnDevNpcAsync(session, World.DevSlot.ReagentVendor, ct);
+            await ReplyAsync(session, removed ? "Вендор реагентов снят" : "Вендор реагентов не поставлен", ct);
+            return;
+        }
+
+        var ok = await session.World.SummonDevNpcAsync(session, ReagentVendorEntry, World.DevSlot.ReagentVendor, ct);
+        await ReplyAsync(session, ok ? "Вендор реагентов поставлен" : "Не удалось поставить вендора", ct);
     }
 
     /// <summary>.xp 500 или .xp add 500.</summary>
