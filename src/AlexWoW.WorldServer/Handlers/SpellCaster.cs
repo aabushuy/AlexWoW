@@ -14,10 +14,14 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 public static class SpellCaster
 {
-    // --- SpellCastResult (3.3.5a, сверено с reference world/common.wowm) ---
-    private const byte CastResultNotReady = 0x43; // спелл на кулдауне
-    private const byte CastResultNoPower = 0x55;  // не хватает маны
+    // --- SpellCastResult (3.3.5a, сверено с CMaNGOS SpellDefines.h) ---
+    private const byte CastResultNotReady = 0x43;        // 67  — спелл на кулдауне/GCD
+    private const byte CastResultNoPower = 0x55;         // 85  — не хватает маны
+    private const byte CastResultSpellInProgress = 0x69; // 105 — уже идёт другой каст
     private const byte SpellFailedInterrupted = 0x28;
+
+    /// <summary>Толеранс GCD-гейта (мс): не режем каст у границы GCD из-за скью клиент/сервер. M10.3.</summary>
+    private const long GcdToleranceMs = 250;
 
     /// <summary>Дистанция (ярды²) сдвига, прерывающая каст (поворот на месте не считается). M6.4.</summary>
     private const float InterruptMoveSq = 0.25f; // ~0.5 ярда
@@ -41,6 +45,16 @@ public static class SpellCaster
         if (await SpellToggles.TryToggleAsync(session, spellId, ct))
             return;
 
+        // M10.3: уже идёт каст-тайм спелл → новый каст нельзя (как на оффе: кнопка блокируется, текущий
+        // каст сбивается только движением/прыжком). Без этого в окне «GCD истёк, но каст ещё идёт»
+        // (каст > 1.5с) клиент перезапускал каст по повторному нажатию.
+        if (session.CastingSpellId != 0)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultSpellInProgress), ct);
+            return;
+        }
+
         // M10.2: эффект спелла из spell_template (с кэшем; фолбэк — легаси-словарь при недоступности БД).
         var info = await SpellCatalog.GetAsync(session.WorldDb, spellId, session.Logger, ct);
         if (info is null)
@@ -52,10 +66,21 @@ public static class SpellCaster
             return;
         }
 
+        var now = Environment.TickCount64;
         var manaCost = EffectiveManaCost(session, info);
 
         // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
-        if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && Environment.TickCount64 < readyAt)
+        if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && now < readyAt)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultNotReady), ct);
+            return;
+        }
+
+        // GCD (M10.3): глобальный кулдаун от предыдущего каста (StartRecoveryTime, обычно 1500мс). Клиент
+        // его предсказывает сам, поэтому это анти-спам; толеранс — против скью клиент/сервер (не режем
+        // легитимный каст у границы GCD, только явный спам).
+        if (info.GcdMs > 0 && session.GcdEndMs - now > GcdToleranceMs)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNotReady), ct);
@@ -70,6 +95,10 @@ public static class SpellCaster
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
             return;
         }
+
+        // Запускаем GCD от этого каста (для последующих).
+        if (info.GcdMs > 0)
+            session.GcdEndMs = now + info.GcdMs;
 
         if (info.CastMs <= 0)
         {

@@ -7,4 +7,7 @@ public interface ISpellTemplateRepository
 {
     /// <summary>Данные спелла по id или null, если такого спелла нет в дампе.</summary>
     Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default);
+
+    /// <summary>Предыдущий ранг спелла из spell_chain (0 — ранг 1 / вне цепочки). Для SUPERCEDED. M10.3.</summary>
+    Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default);
 }

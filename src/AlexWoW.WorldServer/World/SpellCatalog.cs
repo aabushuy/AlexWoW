@@ -31,7 +31,7 @@ public static class SpellCatalog
     /// кастера), кулдаун (мс), хил-ли. Иммутабельно → кэшируется по spellId.
     /// </summary>
     public sealed record SpellInfo(byte School, int MinAmount, int MaxAmount, int CastMs, uint ManaCost,
-        int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0);
+        int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0);
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -93,7 +93,7 @@ public static class SpellCatalog
         var manaFlat = t.PowerType == powerMana ? t.ManaCost : 0;
         var manaPct = t.PowerType == powerMana ? t.ManaCostPercentage : 0;
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
-            manaFlat, cooldown, isHeal, manaPct);
+            manaFlat, cooldown, isHeal, manaPct, t.StartRecoveryTime);
     }
 
     /// <summary>

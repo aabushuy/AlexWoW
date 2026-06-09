@@ -17,6 +17,8 @@ public sealed record SpellTemplateData
     public uint ManaCostPercentage { get; init; }
     public uint RecoveryTime { get; init; }
     public uint CategoryRecoveryTime { get; init; }
+    /// <summary>Время глобального кулдауна (GCD) в мс — обычно 1500. M10.3.</summary>
+    public uint StartRecoveryTime { get; init; }
     public int Effect1 { get; init; }
     public int Effect2 { get; init; }
     public int Effect3 { get; init; }

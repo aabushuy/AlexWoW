@@ -108,15 +108,9 @@ public static class DevCommands
         }
     }
 
-    /// <summary>Выучить спелл без тренера (M9.4/M9.3): персист + грант клиенту (SMSG_LEARNED_SPELL).</summary>
-    private static async Task LearnSpellAsync(WorldSession session, uint spellId, CancellationToken ct)
-    {
-        if (session.InWorldGuid == 0 || !session.KnownSpells.Add(spellId))
-            return; // вне мира или уже известен
-        await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
-        await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
-            new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
-    }
+    /// <summary>Выучить спелл без тренера (M9.4/M9.3/M10.3): персист + грант клиенту (LEARNED или SUPERCEDED).</summary>
+    private static Task LearnSpellAsync(WorldSession session, uint spellId, CancellationToken ct)
+        => SpellLearn.GrantAsync(session, spellId, ct);
 
     /// <summary>.xp 500 или .xp add 500.</summary>
     private static bool TryParseXp(string[] parts, out uint amount)
