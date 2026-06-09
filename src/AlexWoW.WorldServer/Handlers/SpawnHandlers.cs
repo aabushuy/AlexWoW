@@ -75,8 +75,9 @@ public static class SpawnHandlers
 
         var time = (uint)Environment.TickCount;
 
-        // Ушедшие из зоны → DESTROY.
-        var gone = session.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
+        // Ушедшие из зоны → DESTROY. Dev-сущности (.trainer и т.п.) «липкие» — не из БД, при пересчёте
+        // их нет в newSet; не сносим, иначе пропадали бы при ходьбе (D1).
+        var gone = session.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g) && !session.IsDevNpc(g)).ToArray();
         foreach (var guid in gone)
         {
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,

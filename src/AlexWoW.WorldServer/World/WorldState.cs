@@ -94,6 +94,17 @@ public sealed class WorldState
     public WorldCreature GetOrAddCreature(ulong guid, Func<WorldCreature> factory)
         => _creatures.GetOrAdd(guid, _ => factory());
 
+    /// <summary>Удаляет существо из реестра (снятие dev-сущности: <c>.trainer off</c>/<c>.devclean</c>). D1.</summary>
+    public bool RemoveCreature(ulong guid) => _creatures.TryRemove(guid, out _);
+
+    /// <summary>Монотонный счётчик спавнов dev-сущностей. База в верхней части 24-битного counter'а
+    /// (выше реальных creature.guid из дампа) — чтобы GUID dev-спавна не сталкивался с реальным. D1.</summary>
+    private int _devSpawnCounter;
+
+    /// <summary>Уникальный counter для GUID dev-спавна (см. <see cref="Npcs.UnitGuid"/>). D1.</summary>
+    public uint NextDevSpawnCounter()
+        => 0xDE0000u | (uint)(System.Threading.Interlocked.Increment(ref _devSpawnCounter) & 0xFFFF);
+
     /// <summary>Регистрирует онлайн-игрока (вход в мир). #30.</summary>
     public void RegisterPlayer(WorldPlayer player) => _players[player.Guid] = player;
 
@@ -228,6 +239,18 @@ public sealed class WorldState
     /// <inheritdoc cref="CreatureDirector.SummonTrainingDummyAsync"/>
     public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
         => _director.SummonTrainingDummyAsync(session, ct);
+
+    /// <inheritdoc cref="CreatureDirector.SummonDevNpcAsync"/>
+    public Task<bool> SummonDevNpcAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
+        => _director.SummonDevNpcAsync(session, entry, slot, ct);
+
+    /// <inheritdoc cref="CreatureDirector.DespawnDevNpcAsync"/>
+    public Task<bool> DespawnDevNpcAsync(WorldSession session, string slot, CancellationToken ct)
+        => _director.DespawnDevNpcAsync(session, slot, ct);
+
+    /// <inheritdoc cref="CreatureDirector.DevCleanAsync"/>
+    public Task DevCleanAsync(WorldSession session, CancellationToken ct)
+        => _director.DevCleanAsync(session, ct);
 
     /// <inheritdoc cref="WorldTick.UpdateAsync"/>
     public Task UpdateAsync(CancellationToken ct) => _tick.UpdateAsync(ct);

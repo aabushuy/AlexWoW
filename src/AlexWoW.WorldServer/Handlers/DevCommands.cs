@@ -91,8 +91,22 @@ public static class DevCommands
                     }
                     return true;
 
+                case "trainer" when parts.Length >= 2:
+                    await TrainerCommandAsync(session, parts[1].ToLowerInvariant(), ct);
+                    return true;
+
+                case "devclean":
+                    if (session.InWorldGuid == 0)
+                        await ReplyAsync(session, "Доступно только в мире", ct);
+                    else
+                    {
+                        await session.World.DevCleanAsync(session, ct);
+                        await ReplyAsync(session, "Все dev-сущности сняты", ct);
+                    }
+                    return true;
+
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .devclean", ct);
                     return true;
 
                 default:
@@ -111,6 +125,55 @@ public static class DevCommands
     /// <summary>Выучить спелл без тренера (M9.4/M9.3/M10.3): персист + грант клиенту (LEARNED или SUPERCEDED).</summary>
     private static Task LearnSpellAsync(WorldSession session, uint spellId, CancellationToken ct)
         => SpellLearn.GrantAsync(session, spellId, ct);
+
+    /// <summary>Имена классов → id (WotLK). Для <c>.trainer &lt;class&gt;</c>. D1.</summary>
+    private static readonly Dictionary<string, byte> ClassByName = new()
+    {
+        ["warrior"] = 1, ["paladin"] = 2, ["hunter"] = 3, ["rogue"] = 4, ["priest"] = 5,
+        ["dk"] = 6, ["deathknight"] = 6, ["shaman"] = 7, ["mage"] = 8, ["warlock"] = 9, ["druid"] = 11,
+    };
+
+    /// <summary>
+    /// <c>.trainer &lt;class&gt;</c> — поставить классового тренера у игрока (только 1, повтор заменяет);
+    /// <c>.trainer off</c> — снять. Entry резолвится data-driven (<c>GetClassTrainerEntryAsync</c>),
+    /// спавн — через каркас dev-сущностей (<see cref="World.CreatureDirector.SummonDevNpcAsync"/>). D1.
+    /// </summary>
+    private static async Task TrainerCommandAsync(WorldSession session, string arg, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+        {
+            await ReplyAsync(session, "Доступно только в мире", ct);
+            return;
+        }
+        if (arg == "off")
+        {
+            var removed = await session.World.DespawnDevNpcAsync(session, World.DevSlot.Trainer, ct);
+            await ReplyAsync(session, removed ? "Тренер снят" : "Тренер не поставлен", ct);
+            return;
+        }
+        if (!ClassByName.TryGetValue(arg, out var classId))
+        {
+            await ReplyAsync(session, "Класс: warrior/paladin/hunter/rogue/priest/dk/shaman/mage/warlock/druid (или off)", ct);
+            return;
+        }
+
+        uint? entry;
+        try { entry = await session.WorldDb.GetClassTrainerEntryAsync(classId, ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("TRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
+            await ReplyAsync(session, "БД мира недоступна", ct);
+            return;
+        }
+        if (entry is null)
+        {
+            await ReplyAsync(session, $"Тренер класса '{arg}' не найден в БД", ct);
+            return;
+        }
+
+        var ok = await session.World.SummonDevNpcAsync(session, entry.Value, World.DevSlot.Trainer, ct);
+        await ReplyAsync(session, ok ? $"Тренер класса '{arg}' поставлен" : "Не удалось поставить тренера", ct);
+    }
 
     /// <summary>.xp 500 или .xp add 500.</summary>
     private static bool TryParseXp(string[] parts, out uint amount)

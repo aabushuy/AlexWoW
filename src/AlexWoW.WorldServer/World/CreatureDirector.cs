@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -123,5 +124,76 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         session.VisibleNpcs[dummy.Guid] = dummy;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildCreateObject(dummy, (uint)Environment.TickCount), ct);
+    }
+
+    /// <summary>
+    /// Дев-команда (D1, каркас): спавнит существо <paramref name="entry"/> у игрока, лицом к нему, и
+    /// показывает только вызвавшему (in-memory, не из БД). GUID кодирует entry → TrainerHandlers/VendorHandlers
+    /// резолвят тип по нему (госсип/список/покупка работают «бесплатно»). Регистрируется в per-session реестре
+    /// dev-сущностей по слоту <paramref name="slot"/> (replace: повтор в тот же слот заменяет старую) — реестр
+    /// делает сущность «липкой» в видимости (не сносится при ходьбе) и снимаемой через <c>.devclean</c>.
+    /// Возвращает false, если шаблон существа не найден в БД мира. D1.
+    /// </summary>
+    public async Task<bool> SummonDevNpcAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
+    {
+        CreatureTemplateData? row;
+        try { row = await session.WorldDb.GetCreatureTemplateAsync(entry, ct); }
+        catch (Exception ex)
+        {
+            logger.LogDebug("DEV summon entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            return false;
+        }
+        if (row is null)
+            return false;
+
+        var template = new CreatureTemplate(
+            row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId1,
+            row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
+
+        // Заменить прежнюю сущность в этом слоте (только 1 тренер/вендор и т.п.).
+        await DespawnDevNpcAsync(session, slot, ct);
+
+        var map = session.Character?.Map ?? 0;
+        float x = session.PosX + 3f * MathF.Cos(session.PosO);
+        float y = session.PosY + 3f * MathF.Sin(session.PosO);
+        float z = session.PosZ;
+        float o = session.PosO + MathF.PI;             // лицом к игроку
+
+        var guid = Npcs.UnitGuid(entry, world.NextDevSpawnCounter());
+        var hp = WorldCreature.MaxHealthFor(template.Level);
+        var creature = world.GetOrAddCreature(guid, () => new WorldCreature
+        {
+            Guid = guid, Map = map, Template = template,
+            X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
+            MaxHealth = hp, Health = hp,
+        });
+
+        session.VisibleNpcs[guid] = creature;
+        session.DevNpcs[slot] = guid;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
+        logger.LogDebug("DEV summon '{User}': slot={Slot} entry={Entry} guid={Guid}",
+            session.Account, slot, entry, guid);
+        return true;
+    }
+
+    /// <summary>Снимает dev-сущность из слота <paramref name="slot"/> (DESTROY вызвавшему + чистка реестров).
+    /// Возвращает true, если что-то было снято. D1.</summary>
+    public async Task<bool> DespawnDevNpcAsync(WorldSession session, string slot, CancellationToken ct)
+    {
+        if (!session.DevNpcs.Remove(slot, out var guid))
+            return false;
+        await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+            new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
+        session.VisibleNpcs.TryRemove(guid, out _);
+        world.RemoveCreature(guid);
+        return true;
+    }
+
+    /// <summary>Снимает ВСЕ dev-сущности игрока (<c>.devclean</c>). Манекен <c>.dummy</c> не затронут. D1.</summary>
+    public async Task DevCleanAsync(WorldSession session, CancellationToken ct)
+    {
+        foreach (var slot in session.DevNpcs.Keys.ToList())
+            await DespawnDevNpcAsync(session, slot, ct);
     }
 }
