@@ -194,10 +194,67 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         return true;
     }
 
-    /// <summary>Снимает ВСЕ dev-сущности игрока (<c>.devclean</c>). Манекен <c>.dummy</c> не затронут. D1.</summary>
+    /// <summary>
+    /// Дев-команда <c>.craft</c> (D3): спавнит гейм-объект <paramref name="entry"/> (крафт-станок/почта) у
+    /// игрока. Прямая посылка SMSG_UPDATE_OBJECT — НЕ кладём в VisibleGos, поэтому пересчёт видимости его не
+    /// трогает (липкость). Регистрируется в per-session реестре dev-GO по слоту <paramref name="slot"/>
+    /// (replace). Возвращает false, если шаблон GO не найден. D3.
+    /// </summary>
+    public async Task<bool> SummonDevGoAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
+    {
+        Database.Models.GameObjectTemplateData? t;
+        try { t = await session.WorldDb.GetGameObjectTemplateAsync(entry, ct); }
+        catch (Exception ex)
+        {
+            logger.LogDebug("DEV craft entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            return false;
+        }
+        if (t is null)
+            return false;
+
+        await DespawnDevGoAsync(session, slot, ct);
+
+        float x = session.PosX + 2f * MathF.Cos(session.PosO);
+        float y = session.PosY + 2f * MathF.Sin(session.PosO);
+        float z = session.PosZ;
+        float o = session.PosO + MathF.PI;             // лицом к игроку
+        // Поворот вокруг Z на угол o: кватернион (0,0,sin(o/2),cos(o/2)).
+        float rz = MathF.Sin(o / 2f), rw = MathF.Cos(o / 2f);
+
+        var guid = GameObjects.GameObjectGuid(entry, world.NextDevSpawnCounter());
+        var template = new GoTemplate(t.Entry, t.Type, t.DisplayId, t.Name, 0, 0, t.Size <= 0 ? 1f : t.Size);
+        var go = new GoSpawn(guid, template, x, y, z, o, 0f, 0f, rz, rw);
+
+        session.DevGos[slot] = guid;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject, GameObjectUpdate.BuildCreateObject(go), ct);
+        logger.LogDebug("DEV craft '{User}': slot={Slot} entry={Entry} guid={Guid}",
+            session.Account, slot, entry, guid);
+        return true;
+    }
+
+    /// <summary>Снимает dev-GO из слота <paramref name="slot"/> (DESTROY вызвавшему). true, если что-то снято. D3.</summary>
+    public async Task<bool> DespawnDevGoAsync(WorldSession session, string slot, CancellationToken ct)
+    {
+        if (!session.DevGos.Remove(slot, out var guid))
+            return false;
+        await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+            new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
+        return true;
+    }
+
+    /// <summary>Снимает все dev-станки игрока (<c>.craft off</c>). D3.</summary>
+    public async Task DevCleanGosAsync(WorldSession session, CancellationToken ct)
+    {
+        foreach (var slot in session.DevGos.Keys.ToList())
+            await DespawnDevGoAsync(session, slot, ct);
+    }
+
+    /// <summary>Снимает ВСЕ dev-сущности игрока — существа и станки (<c>.devclean</c>). Манекен <c>.dummy</c>
+    /// не затронут. D1/D3.</summary>
     public async Task DevCleanAsync(WorldSession session, CancellationToken ct)
     {
         foreach (var slot in session.DevNpcs.Keys.ToList())
             await DespawnDevNpcAsync(session, slot, ct);
+        await DevCleanGosAsync(session, ct);
     }
 }
