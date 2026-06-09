@@ -112,7 +112,7 @@ public static class VendorHandlers
         var ownerGuid = session.InWorldGuid;
         var gain = t.SellPrice * Math.Max(1u, item.StackCount);
 
-        await session.Characters.RemoveItemAsync(itemLow, ct);
+        await session.Items.RemoveItemAsync(itemLow, ct);
         session.Inventory.Remove(item);
         session.Money += gain;
         await session.Characters.SetMoneyAsync(ownerGuid, session.Money, ct);

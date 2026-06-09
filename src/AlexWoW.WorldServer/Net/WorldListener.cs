@@ -15,7 +15,10 @@ namespace AlexWoW.WorldServer.Net;
 public sealed class WorldListener(
     IOptions<WorldServerOptions> options,
     IAccountRepository database,
-    ICharacterStore characters,
+    ICharacterRepository characters,
+    IInventoryRepository items,
+    IQuestRepository quests,
+    ICharacterStateRepository charState,
     IWorldRepository worldDatabase,
     TerrainMaps terrain,
     Vmaps vmaps,
@@ -59,7 +62,8 @@ public sealed class WorldListener(
             client.NoDelay = true;
 
             _ = Task.Run(
-                () => new WorldSession(client, database, characters, worldDatabase, terrain, world, _options, logger)
+                () => new WorldSession(client, database, characters, items, quests, charState,
+                        worldDatabase, terrain, world, _options, logger)
                     .RunAsync(stoppingToken),
                 stoppingToken);
         }

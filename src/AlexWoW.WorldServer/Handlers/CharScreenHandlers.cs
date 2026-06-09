@@ -42,7 +42,7 @@ public static class CharScreenHandlers
         var entries = new HashSet<uint>();
         foreach (var c in characters)
         {
-            var items = await session.Characters.GetItemsAsync(c.Guid, ct);
+            var items = await session.Items.GetItemsAsync(c.Guid, ct);
             var equipped = items.Where(i => i.Bag == InventorySlots.MainBag
                 && i.Slot < InventorySlots.EquipmentEnd).ToList();
             if (equipped.Count == 0)
@@ -265,7 +265,7 @@ public static class CharScreenHandlers
         var (ownerId, isChar) = OwnerFor(session, dataType);
         if (ownerId != 0)
         {
-            try { await session.Characters.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
+            try { await session.CharState.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
             catch (Exception ex) { session.Logger.LogDebug("UPDATE_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
         }
 
@@ -286,7 +286,7 @@ public static class CharScreenHandlers
         {
             try
             {
-                var stored = await session.Characters.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
+                var stored = await session.CharState.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
                 if (stored is { } s) { time = s.Time; blob = s.Data; }
             }
             catch (Exception ex) { session.Logger.LogDebug("REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
@@ -319,9 +319,9 @@ public static class CharScreenHandlers
         try
         {
             if (session.AccountId != 0)
-                accountTimes = await session.Characters.GetAccountDataTimesAsync(session.AccountId, false, ct);
+                accountTimes = await session.CharState.GetAccountDataTimesAsync(session.AccountId, false, ct);
             if (session.InWorldGuid != 0)
-                charTimes = await session.Characters.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
+                charTimes = await session.CharState.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
         }
         catch (Exception ex) { session.Logger.LogDebug("ACCOUNT_DATA_TIMES: {Msg}", ex.Message); }
 

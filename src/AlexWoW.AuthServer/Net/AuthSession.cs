@@ -15,6 +15,7 @@ namespace AlexWoW.AuthServer.Net;
 public sealed class AuthSession(
     Socket socket,
     IAccountRepository database,
+    IRealmRepository realms,
     ILogger logger)
 {
     private const ushort ExpectedBuild = 12340; // WotLK 3.3.5a
@@ -169,12 +170,12 @@ public sealed class AuthSession(
         var unused = new byte[4];
         await _stream.ReadExactlyAsync(unused, ct);
 
-        var realms = await database.GetRealmsAsync(ct);
+        var realmList = await realms.GetRealmsAsync(ct);
 
         var inner = new ByteWriter(128);
         inner.UInt32(0)                          // unused
-             .UInt16((ushort)realms.Count);
-        foreach (var realm in realms)
+             .UInt16((ushort)realmList.Count);
+        foreach (var realm in realmList)
         {
             inner.UInt8(realm.Type)
                  .UInt8(0x00)                    // lock
@@ -195,7 +196,7 @@ public sealed class AuthSession(
             .Bytes(innerBytes);
 
         await SendAsync(packet.ToArray(), ct);
-        logger.LogInformation("Отправлен список из {Count} реалмов на {Ip}", realms.Count, _remoteIp);
+        logger.LogInformation("Отправлен список из {Count} реалмов на {Ip}", realmList.Count, _remoteIp);
     }
 
     private async Task SendChallengeErrorAsync(AuthResult result, CancellationToken ct)

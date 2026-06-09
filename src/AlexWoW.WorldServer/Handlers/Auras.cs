@@ -71,7 +71,7 @@ public static class Auras
         }
 
         if (doPersist)
-            try { await session.Characters.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
+            try { await session.CharState.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
             catch { /* персист не критичен для текущей сессии */ }
     }
 
@@ -84,7 +84,7 @@ public static class Auras
         if (session.InWorldGuid == 0)
             return;
         IReadOnlyList<(uint Spell, byte Form)> saved;
-        try { saved = await session.Characters.GetAurasAsync(session.InWorldGuid, ct); }
+        try { saved = await session.CharState.GetAurasAsync(session.InWorldGuid, ct); }
         catch { return; }
 
         var level = (byte)(session.Character?.Level ?? 1);
@@ -137,7 +137,7 @@ public static class Auras
             await BroadcastFormAsync(session, ct);
         }
         if (aura.Persist)
-            try { await session.Characters.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
+            try { await session.CharState.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
             catch { /* персист не критичен */ }
         if (session.Player is { } player)
             await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,

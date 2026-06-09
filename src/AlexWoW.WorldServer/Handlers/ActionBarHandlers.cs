@@ -25,7 +25,7 @@ public static class ActionBarHandlers
         var button = r.UInt8();
         // Клиент шлёт button(u8) + packedData(u32) = action(24)|type(8). packed=0 → снять ярлык.
         var packed = r.UInt32();
-        try { await session.Characters.SetActionButtonAsync(session.InWorldGuid, button, packed, ct); }
+        try { await session.CharState.SetActionButtonAsync(session.InWorldGuid, button, packed, ct); }
         catch (Exception ex) { session.Logger.LogDebug("SET_ACTION_BUTTON {Btn}: {Msg}", button, ex.Message); }
     }
 
@@ -52,7 +52,7 @@ public static class ActionBarHandlers
     internal static async Task SendInitialActionButtonsAsync(WorldSession session, CancellationToken ct)
     {
         IReadOnlyDictionary<byte, uint> buttons;
-        try { buttons = await session.Characters.GetActionButtonsAsync(session.InWorldGuid, ct); }
+        try { buttons = await session.CharState.GetActionButtonsAsync(session.InWorldGuid, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("ACTION_BUTTONS load '{User}': {Msg}", session.Account, ex.Message);

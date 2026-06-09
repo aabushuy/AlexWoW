@@ -53,10 +53,10 @@ public static class WorldEntryHandlers
 
         // M6.1: инвентарь — выдать стартовый набор голым персонажам, загрузить и создать item-объекты
         // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
-        if (!await session.Characters.HasItemsAsync(character.Guid, ct))
+        if (!await session.Items.HasItemsAsync(character.Guid, ct))
             await StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
         session.Inventory.Clear();
-        session.Inventory.AddRange(await session.Characters.GetItemsAsync(character.Guid, ct));
+        session.Inventory.AddRange(await session.Items.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
 
         // M9.2: статы/HP/мана по классу+уровню (player_levelstats); фолбэк — флэт. Полное HP при входе.
@@ -225,7 +225,7 @@ public static class WorldEntryHandlers
                 known.Add((uint)s);
 
         // Изученное у тренера (персист).
-        foreach (var s in await session.Characters.GetLearnedSpellsAsync(character.Guid, ct))
+        foreach (var s in await session.CharState.GetLearnedSpellsAsync(character.Guid, ct))
             known.Add(s);
 
         var w = new ByteWriter(8 + known.Count * 6)

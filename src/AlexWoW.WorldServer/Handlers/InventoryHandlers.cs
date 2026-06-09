@@ -109,9 +109,9 @@ public static class InventoryHandlers
 
         var owner = session.InWorldGuid;
         item.StackCount -= amount;
-        await session.Characters.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+        await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
 
-        var newLow = await session.Characters.AddItemAsync(owner, item.ItemEntry,
+        var newLow = await session.Items.AddItemAsync(owner, item.ItemEntry,
             InventorySlots.MainBag, (byte)dst, amount, ct);
         var newItem = new InventoryItem
         {
@@ -141,7 +141,7 @@ public static class InventoryHandlers
 
         if (amount == 0 || amount >= item.StackCount)
         {
-            await session.Characters.RemoveItemAsync(item.ItemGuid, ct);
+            await session.Items.RemoveItemAsync(item.ItemGuid, ct);
             session.Inventory.Remove(item);
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
@@ -150,7 +150,7 @@ public static class InventoryHandlers
         else
         {
             item.StackCount -= amount;
-            await session.Characters.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+            await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
         }
@@ -174,11 +174,11 @@ public static class InventoryHandlers
         { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
 
         src.Slot = (byte)dstSlot;
-        await session.Characters.MoveItemAsync(src.ItemGuid, InventorySlots.MainBag, (byte)dstSlot, ct);
+        await session.Items.MoveItemAsync(src.ItemGuid, InventorySlots.MainBag, (byte)dstSlot, ct);
         if (dst is not null)
         {
             dst.Slot = (byte)srcSlot;
-            await session.Characters.MoveItemAsync(dst.ItemGuid, InventorySlots.MainBag, (byte)srcSlot, ct);
+            await session.Items.MoveItemAsync(dst.ItemGuid, InventorySlots.MainBag, (byte)srcSlot, ct);
         }
         await ReassertAsync(session, ct, srcSlot, dstSlot);
 

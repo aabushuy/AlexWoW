@@ -34,9 +34,10 @@ public static class AccountCreator
             return 1;
         }
 
-        var database = CliRepository.CreateAccountRepository(options.ConnectionString);
-        await database.EnsureSchemaAsync(ToRealm(options.DefaultRealm));
+        await CliRepository.CreateSchemaInitializer(options.ConnectionString)
+            .EnsureSchemaAsync(ToRealm(options.DefaultRealm));
 
+        var database = CliRepository.CreateAccountRepository(options.ConnectionString);
         if (await database.AccountExistsAsync(username))
         {
             Console.Error.WriteLine($"Аккаунт '{username.ToUpperInvariant()}' уже существует.");

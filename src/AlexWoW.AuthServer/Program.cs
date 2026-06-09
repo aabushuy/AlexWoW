@@ -50,6 +50,8 @@ builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
     o.UseMySql(options.ConnectionString, ServerVersion.Create(new Version(8, 4, 0), ServerType.MySql));
 });
 builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
+builder.Services.AddSingleton<IRealmRepository, EfRealmRepository>();
+builder.Services.AddSingleton<ISchemaInitializer, AuthSchemaInitializer>();
 builder.Services.AddHostedService<AuthListener>();
 
 var host = builder.Build();

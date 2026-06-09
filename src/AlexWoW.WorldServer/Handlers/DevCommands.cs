@@ -89,7 +89,7 @@ public static class DevCommands
     {
         if (session.InWorldGuid == 0 || !session.KnownSpells.Add(spellId))
             return; // вне мира или уже известен
-        await session.Characters.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
+        await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
         await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
             new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
     }

@@ -26,13 +26,17 @@ public sealed class WorldSession
     private readonly WorldHeaderCrypt _crypt = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1); // сериализация отправки (RC4 — stateful)
 
-    public WorldSession(Socket socket, IAccountRepository database, ICharacterStore characters,
+    public WorldSession(Socket socket, IAccountRepository database, ICharacterRepository characters,
+        IInventoryRepository items, IQuestRepository quests, ICharacterStateRepository charState,
         IWorldRepository worldDatabase, TerrainMaps terrain, WorldState world, WorldServerOptions options, ILogger logger)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
         Database = database;
         Characters = characters;
+        Items = items;
+        Quests = quests;
+        CharState = charState;
         WorldDb = worldDatabase;
         Terrain = terrain;
         World = world;
@@ -42,7 +46,10 @@ public sealed class WorldSession
 
     // --- Контекст для обработчиков ---
     internal IAccountRepository Database { get; }
-    internal ICharacterStore Characters { get; }
+    internal ICharacterRepository Characters { get; }
+    internal IInventoryRepository Items { get; }
+    internal IQuestRepository Quests { get; }
+    internal ICharacterStateRepository CharState { get; }
     internal IWorldRepository WorldDb { get; }
     internal TerrainMaps Terrain { get; }
     internal WorldState World { get; }
