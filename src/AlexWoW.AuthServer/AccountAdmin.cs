@@ -1,5 +1,3 @@
-using AlexWoW.Database;
-using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Configuration;
 
 namespace AlexWoW.AuthServer;
@@ -34,7 +32,7 @@ public static class AccountAdmin
             return 1;
         }
 
-        IAccountRepository database = new AuthDatabase(options.ConnectionString);
+        var database = CliRepository.CreateAccountRepository(options.ConnectionString);
         var affected = await database.SetAdminAsync(username, isAdmin);
         if (affected == 0)
         {

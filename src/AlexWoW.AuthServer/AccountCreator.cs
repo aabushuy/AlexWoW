@@ -1,7 +1,5 @@
 using System.Security.Cryptography;
 using AlexWoW.Cryptography;
-using AlexWoW.Database;
-using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using Microsoft.Extensions.Configuration;
 
@@ -36,7 +34,7 @@ public static class AccountCreator
             return 1;
         }
 
-        IAccountRepository database = new AuthDatabase(options.ConnectionString);
+        var database = CliRepository.CreateAccountRepository(options.ConnectionString);
         await database.EnsureSchemaAsync(ToRealm(options.DefaultRealm));
 
         if (await database.AccountExistsAsync(username))
