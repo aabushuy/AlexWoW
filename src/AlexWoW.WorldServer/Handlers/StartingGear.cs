@@ -48,7 +48,7 @@ public static class StartingGear
             }
 
             var count = (uint)Math.Max(1, (int)item.Amount);
-            await session.Characters.AddItemAsync(charGuid, item.ItemId, InventorySlots.MainBag, (byte)slot, count, ct);
+            await session.Items.AddItemAsync(charGuid, item.ItemId, InventorySlots.MainBag, (byte)slot, count, ct);
             given++;
         }
 

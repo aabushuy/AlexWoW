@@ -25,7 +25,7 @@ public static class QuestHandlers
 
     /// <summary>Сохраняет активный квест (id/слот/счётчики) в character_queststatus. M6.10.</summary>
     private static Task PersistActiveAsync(WorldSession session, int slot, World.QuestProgress p, CancellationToken ct)
-        => session.Characters.UpsertQuestStatusAsync(session.InWorldGuid, p.QuestId, (byte)slot, QuestStatusActive,
+        => session.Quests.UpsertQuestStatusAsync(session.InWorldGuid, p.QuestId, (byte)slot, QuestStatusActive,
             (ushort)p.Count[0], (ushort)p.Count[1], (ushort)p.Count[2], (ushort)p.Count[3], ct);
 
     /// <summary>
@@ -62,7 +62,7 @@ public static class QuestHandlers
             {
                 remaining -= item.StackCount;
                 session.Inventory.Remove(item);
-                await session.Characters.RemoveItemAsync(item.ItemGuid, ct);
+                await session.Items.RemoveItemAsync(item.ItemGuid, ct);
                 await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                     new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
                 if (item.Bag == InventorySlots.MainBag)
@@ -73,7 +73,7 @@ public static class QuestHandlers
             {
                 item.StackCount -= remaining;
                 remaining = 0;
-                await session.Characters.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+                await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
             }
@@ -397,7 +397,7 @@ public static class QuestHandlers
         // Убрать из журнала, пометить сданным.
         session.QuestSlots[slot] = null;
         session.CompletedQuests.Add(questId);
-        await session.Characters.UpsertQuestStatusAsync(session.InWorldGuid, questId, 0, QuestStatusRewarded,
+        await session.Quests.UpsertQuestStatusAsync(session.InWorldGuid, questId, 0, QuestStatusRewarded,
             0, 0, 0, 0, ct); // M6.10: персист сдачи
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
@@ -479,7 +479,7 @@ public static class QuestHandlers
     {
         if (session.InWorldGuid == 0)
             return;
-        var rows = await session.Characters.GetQuestStatusesAsync(session.InWorldGuid, ct);
+        var rows = await session.Quests.GetQuestStatusesAsync(session.InWorldGuid, ct);
         foreach (var row in rows)
         {
             if (row.Status == QuestStatusRewarded)

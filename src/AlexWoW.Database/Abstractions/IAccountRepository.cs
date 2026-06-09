@@ -3,15 +3,12 @@ using AlexWoW.Database.Models;
 namespace AlexWoW.Database.Abstractions;
 
 /// <summary>
-/// Репозиторий БД аутентификации (аккаунты + список реалмов, БД <c>alexwow_auth</c>).
-/// Срез 1 рефактора DAL (#23): абстракция поверх существующей Dapper-реализации
-/// (<see cref="AuthDatabase"/>); поведение не меняется.
+/// Репозиторий аккаунтов (таблица account, БД <c>alexwow_auth</c>) — только операции с аккаунтами.
+/// Список реалмов вынесен в <see cref="IRealmRepository"/>, инициализация схемы — в
+/// <see cref="ISchemaInitializer"/> (SRP, рефактор #24).
 /// </summary>
 public interface IAccountRepository
 {
-    /// <summary>Создаёт таблицы, если их нет, и сидирует реалм по умолчанию.</summary>
-    Task EnsureSchemaAsync(Realm defaultRealm, CancellationToken ct = default);
-
     Task<Account?> GetAccountByUsernameAsync(string username, CancellationToken ct = default);
 
     Task<bool> AccountExistsAsync(string username, CancellationToken ct = default);
@@ -28,6 +25,4 @@ public interface IAccountRepository
 
     /// <summary>Ставит/снимает флаг администратора аккаунту. Возвращает число затронутых строк.</summary>
     Task<int> SetAdminAsync(string username, bool isAdmin, CancellationToken ct = default);
-
-    Task<IReadOnlyList<Realm>> GetRealmsAsync(CancellationToken ct = default);
 }

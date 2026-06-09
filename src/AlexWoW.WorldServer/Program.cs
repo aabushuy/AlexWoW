@@ -33,14 +33,12 @@ builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
     o.UseMySql(options.ConnectionString, ServerVersion.Create(new Version(8, 4, 0), ServerType.MySql));
 });
 builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
-// Срез 4 рефактора DAL (#23): персонажи на EF. EfCharacterStore поверх пул-фабрики AuthDbContext
-// (зарегистрирована выше). Фасад + сегрегированные интерфейсы — алиасы на один singleton.
-builder.Services.AddSingleton<EfCharacterStore>();
-builder.Services.AddSingleton<ICharacterStore>(sp => sp.GetRequiredService<EfCharacterStore>());
-builder.Services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
-builder.Services.AddSingleton<IInventoryRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
-builder.Services.AddSingleton<IQuestRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
-builder.Services.AddSingleton<ICharacterStateRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
+// Персонажи на EF, разбито по SRP (#24): focused-репозиторий на свою область поверх пул-фабрики
+// AuthDbContext (зарегистрирована выше). Потребители зависят от узких интерфейсов (ISP).
+builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
+builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
+builder.Services.AddSingleton<IQuestRepository, EfQuestRepository>();
+builder.Services.AddSingleton<ICharacterStateRepository, EfCharacterStateRepository>();
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;

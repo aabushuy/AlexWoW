@@ -2,40 +2,16 @@ using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Entities;
 using Microsoft.EntityFrameworkCore;
 using ModelAccount = AlexWoW.Database.Models.Account;
-using ModelRealm = AlexWoW.Database.Models.Realm;
 
 namespace AlexWoW.Database.Repositories;
 
 /// <summary>
-/// EF Core реализация <see cref="IAccountRepository"/> поверх <see cref="AuthDbContext"/> (БД alexwow_auth).
-/// Срез 3 рефактора DAL (#23): заменяет Dapper-путь auth. Контекст берётся из пула на КАЖДУЮ операцию
-/// (<see cref="IDbContextFactory{TContext}"/>) — это потокобезопасно (репозиторий — singleton, а сессии
-/// многопоточны) и повторяет прежнюю модель «короткое подключение на запрос» Dapper.
+/// EF-репозиторий аккаунтов (таблица account, БД alexwow_auth) — только операции с аккаунтами.
+/// SRP-часть DAL (#24): реалмы — в <see cref="EfRealmRepository"/>, инициализация схемы — в
+/// <see cref="AuthSchemaInitializer"/>. Контекст из пула на КАЖДУЮ операцию (singleton-safe).
 /// </summary>
 public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory) : IAccountRepository
 {
-    /// <summary>Применяет EF-миграции (создаёт схему на чистой БД; на проде — no-op после baseline) и
-    /// сидирует реалм по умолчанию, если список пуст. Заменяет ручной EnsureSchemaAsync.</summary>
-    public async Task EnsureSchemaAsync(ModelRealm defaultRealm, CancellationToken ct = default)
-    {
-        await using var db = await factory.CreateDbContextAsync(ct);
-        await db.Database.MigrateAsync(ct);
-        if (!await db.Realms.AnyAsync(ct))
-        {
-            db.Realms.Add(new Realm
-            {
-                Name = defaultRealm.Name,
-                Address = defaultRealm.Address,
-                Port = defaultRealm.Port,
-                Type = defaultRealm.Type,
-                Flags = defaultRealm.Flags,
-                Timezone = defaultRealm.Timezone,
-                Population = defaultRealm.Population,
-            });
-            await db.SaveChangesAsync(ct);
-        }
-    }
-
     public async Task<ModelAccount?> GetAccountByUsernameAsync(string username, CancellationToken ct = default)
     {
         var u = username.ToUpperInvariant();
@@ -73,7 +49,7 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
     {
         var u = username.ToUpperInvariant();
         await using var db = await factory.CreateDbContextAsync(ct);
-        // Сброс session_key форсит ре-логин (как в Dapper-версии).
+        // Сброс session_key форсит ре-логин.
         await db.Accounts.Where(x => x.Username == u).ExecuteUpdateAsync(s => s
             .SetProperty(x => x.Salt, salt)
             .SetProperty(x => x.Verifier, verifier)
@@ -94,17 +70,6 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         await using var db = await factory.CreateDbContextAsync(ct);
         return await db.Accounts.Where(x => x.Username == u)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.IsAdmin, (byte)(isAdmin ? 1 : 0)), ct);
-    }
-
-    public async Task<IReadOnlyList<ModelRealm>> GetRealmsAsync(CancellationToken ct = default)
-    {
-        await using var db = await factory.CreateDbContextAsync(ct);
-        var rows = await db.Realms.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct);
-        return rows.Select(x => new ModelRealm
-        {
-            Id = x.Id, Name = x.Name, Address = x.Address, Port = x.Port,
-            Type = x.Type, Flags = x.Flags, Timezone = x.Timezone, Population = x.Population,
-        }).ToList();
     }
 
     private static ModelAccount ToModel(Account a) => new()

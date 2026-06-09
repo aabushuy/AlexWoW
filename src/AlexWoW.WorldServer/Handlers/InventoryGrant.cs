@@ -58,7 +58,7 @@ public static class InventoryGrant
                 var add = Math.Min(remaining, maxStack - stack.StackCount);
                 stack.StackCount += add;
                 remaining -= add;
-                await session.Characters.SetItemStackAsync(stack.ItemGuid, stack.StackCount, ct);
+                await session.Items.SetItemStackAsync(stack.ItemGuid, stack.StackCount, ct);
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     ItemObject.BuildStackUpdate(ItemObject.ItemGuid(stack.ItemGuid), stack.StackCount), ct);
                 last = stack;
@@ -72,7 +72,7 @@ public static class InventoryGrant
             if (slot < 0)
                 break; // нет места — остаток не выдан (bag-full → почта, M7 #14)
             var portion = Math.Min(remaining, maxStack);
-            var itemLow = await session.Characters.AddItemAsync(ownerGuid, itemEntry, InventorySlots.MainBag, (byte)slot, portion, ct);
+            var itemLow = await session.Items.AddItemAsync(ownerGuid, itemEntry, InventorySlots.MainBag, (byte)slot, portion, ct);
             var item = new InventoryItem
             {
                 ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,

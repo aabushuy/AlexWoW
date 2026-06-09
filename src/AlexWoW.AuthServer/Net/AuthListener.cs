@@ -10,7 +10,9 @@ namespace AlexWoW.AuthServer.Net;
 /// <summary>Принимает TCP-соединения логин-протокола и запускает <see cref="AuthSession"/> на каждое.</summary>
 public sealed class AuthListener(
     IOptions<AuthServerOptions> options,
-    IAccountRepository database,
+    IAccountRepository account,
+    IRealmRepository realms,
+    ISchemaInitializer schema,
     ILogger<AuthListener> logger) : BackgroundService
 {
     private readonly AuthServerOptions _options = options.Value;
@@ -38,7 +40,7 @@ public sealed class AuthListener(
             }
 
             // Каждую сессию обрабатываем независимо, не блокируя accept-цикл.
-            _ = Task.Run(() => new AuthSession(client, database, logger).RunAsync(stoppingToken), stoppingToken);
+            _ = Task.Run(() => new AuthSession(client, account, realms, logger).RunAsync(stoppingToken), stoppingToken);
         }
     }
 
@@ -54,7 +56,7 @@ public sealed class AuthListener(
         {
             try
             {
-                await database.EnsureSchemaAsync(realm, ct);
+                await schema.EnsureSchemaAsync(realm, ct);
                 return;
             }
             catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)

@@ -236,7 +236,7 @@ public static class TrainerHandlers
 
         // Выучить: персист + клиентский грант (SMSG_LEARNED_SPELL добавляет абилку в книгу).
         session.KnownSpells.Add(spellId);
-        await session.Characters.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
+        await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
         await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
             new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
         await session.SendAsync(WorldOpcode.SmsgTrainerBuySucceeded,
