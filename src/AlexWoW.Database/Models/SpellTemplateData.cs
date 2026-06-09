@@ -19,6 +19,8 @@ public sealed record SpellTemplateData
     public uint CategoryRecoveryTime { get; init; }
     /// <summary>Время глобального кулдауна (GCD) в мс — обычно 1500. M10.3.</summary>
     public uint StartRecoveryTime { get; init; }
+    /// <summary>Индекс длительности ауры → SpellDuration.dbc (для DoT/HoT). M10.4b.</summary>
+    public uint DurationIndex { get; init; }
     public int Effect1 { get; init; }
     public int Effect2 { get; init; }
     public int Effect3 { get; init; }
@@ -28,4 +30,12 @@ public sealed record SpellTemplateData
     public int EffectDieSides1 { get; init; }
     public int EffectDieSides2 { get; init; }
     public int EffectDieSides3 { get; init; }
+    /// <summary>Тип ауры эффекта (SPELL_AURA_*): 3=PERIODIC_DAMAGE, 8=PERIODIC_HEAL. M10.4b.</summary>
+    public int EffectApplyAuraName1 { get; init; }
+    public int EffectApplyAuraName2 { get; init; }
+    public int EffectApplyAuraName3 { get; init; }
+    /// <summary>Интервал тика периодической ауры (мс). M10.4b.</summary>
+    public int EffectAmplitude1 { get; init; }
+    public int EffectAmplitude2 { get; init; }
+    public int EffectAmplitude3 { get; init; }
 }

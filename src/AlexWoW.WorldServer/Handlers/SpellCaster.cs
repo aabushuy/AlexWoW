@@ -218,10 +218,15 @@ public static class SpellCaster
                 SpellPackets.BuildSpellCooldown((ulong)session.InWorldGuid, spellId, (uint)info.CooldownMs), ct);
         }
 
+        // Прямой эффект: хил, либо урон (если есть прямой урон — чистый DoT без прямого числа не шлём).
         if (info.IsHeal)
             await SpellEffects.ApplyHealAsync(session, spellId, info, targetGuid, ct);
-        else
+        else if (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0)
             await SpellEffects.ApplyDamageAsync(session, spellId, info, targetGuid, now, ct);
+
+        // M10.4b: периодическая аура (DoT/HoT) — поверх прямого эффекта (напр. Immolate: удар + DoT).
+        if (info.Periodic)
+            await Periodics.ApplyAsync(session, spellId, info, targetGuid, ct);
     }
 
     /// <summary>

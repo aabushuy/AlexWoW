@@ -28,6 +28,7 @@ public sealed class WorldTick(WorldState world, CreatureDirector creatures, Fact
                 await Handlers.ManaRegen.TickAsync(player.Session, now, ct);
                 await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
                 await Handlers.Auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
+                await Handlers.Periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
                 await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
                 await Handlers.CombatHandlers.TickAggroScanAsync(world, player, now, ct);     // M6.7: авто-агро по фракции
 

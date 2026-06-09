@@ -9,6 +9,8 @@
 .vs/
 .idea/
 .vscode/
+Backup/
+UpgradeLog.htm
 
 # Локальные секреты/конфиги
 .env
