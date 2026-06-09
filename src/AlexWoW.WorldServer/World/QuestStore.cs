@@ -8,7 +8,7 @@ namespace AlexWoW.WorldServer.World;
 /// ПРИНИМАЮТ (creature_involvedrelation) квесты — для иконок «!»/«?». Ленивая загрузка один раз.
 /// Полные тексты/цели/награды квестов придут в следующих инкрементах.
 /// </summary>
-public sealed class QuestStore(IWorldRepository worldDb, ILogger<QuestStore> logger)
+public sealed class QuestStore(IQuestTemplateRepository worldDb, ILogger<QuestStore> logger)
 {
     private static readonly uint[] None = [];
     private volatile bool _loaded;
