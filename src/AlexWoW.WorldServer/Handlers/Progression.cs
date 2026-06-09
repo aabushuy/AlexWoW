@@ -105,6 +105,8 @@ public static class Progression
             catch { /* БД мира недоступна — безоружный фолбэк */ }
         }
         session.MainHandSpeedMs = attackTime; // M6.12: для формулы ярости
+        session.WeaponMinDamage = min;        // M10.4a: для мили-абилок (WEAPON_DAMAGE)
+        session.WeaponMaxDamage = max;
 
         // M7 #16: attack power (по статам класса). Без этих полей клиентский UnitDamage даёт percent=0 →
         // слот-тултип оружия показывает 1.#INF. Формула — CMaNGOS Player::UpdateAttackPowerAndDamage.

@@ -147,12 +147,8 @@ public sealed class WorldSession
     // --- Каст спелла (M6.4) ---
     /// <summary>Спелл, который сейчас кастуется (0 — нет каста). Завершается в тике.</summary>
     internal uint CastingSpellId { get; set; }
-    /// <summary>cast_count из CMSG_CAST_SPELL (эхо в SPELL_START/GO).</summary>
-    internal byte CastCount { get; set; }
-    /// <summary>GUID цели каста (0 — без цели / на себя).</summary>
-    internal ulong CastTargetGuid { get; set; }
-    /// <summary>Момент завершения каста (<see cref="Environment.TickCount64"/>, мс).</summary>
-    internal long CastCompleteMs { get; set; }
+    // cast_count и target теперь протаскиваются параметрами каста (не через сессию) — повторное нажатие
+    // во время каста не перезатирает счётчик завершаемого каста (M10.4a фикс залипания завершения).
     /// <summary>Позиция в начале каста — для прерывания при сдвиге (движение, не поворот). M6.4.</summary>
     internal float CastStartX { get; set; }
     internal float CastStartY { get; set; }
@@ -179,6 +175,9 @@ public sealed class WorldSession
     internal uint Energy { get; set; }
     /// <summary>Скорость оружия главной руки (мс) — для формулы ярости. Ставится в RefreshMeleeAsync. M6.12.</summary>
     internal uint MainHandSpeedMs { get; set; } = 2000;
+    /// <summary>Урон оружия главной руки (min/max) — для мили-абилок (WEAPON_DAMAGE). RefreshMeleeAsync. M10.4a.</summary>
+    internal float WeaponMinDamage { get; set; } = 1f;
+    internal float WeaponMaxDamage { get; set; } = 2f;
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
     /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>

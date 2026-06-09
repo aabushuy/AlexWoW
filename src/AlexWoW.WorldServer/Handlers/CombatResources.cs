@@ -87,6 +87,25 @@ public static class CombatResources
     }
 
     /// <summary>
+    /// Списывает ресурс (ярость/энергия) на каст мили-абилки и двигает полоску. Мана списывается отдельно
+    /// (SpellCaster, правило 5 секунд). M10.4a.
+    /// </summary>
+    internal static async Task SpendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
+    {
+        switch (powerType)
+        {
+            case PowerRage:
+                session.Rage = session.Rage > amount ? session.Rage - amount : 0;
+                await SendPowerAsync(session, PowerRage, session.Rage, ct);
+                break;
+            case PowerEnergy:
+                session.Energy = session.Energy > amount ? session.Energy - amount : 0;
+                await SendPowerAsync(session, PowerEnergy, session.Energy, ct);
+                break;
+        }
+    }
+
+    /// <summary>
     /// Шлёт текущее значение ресурса себе: VALUES-апдейт <c>UNIT_FIELD_POWER1+powerType</c> (консистентность
     /// поля) + SMSG_POWER_UPDATE (двигает полоску у клиента 3.3.5a). Аналог регена маны в SpellHandlers.
     /// </summary>
