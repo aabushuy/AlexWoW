@@ -170,6 +170,9 @@ public static class CombatHandlers
     /// </summary>
     private static async Task EnterCreatureCombatAsync(WorldState world, WorldCreature creature, ulong targetGuid, bool roar, CancellationToken ct)
     {
+        // #28: тренировочный манекен пассивен — никогда не входит в бой (ни ответка, ни авто-агро).
+        if (Protocol.Npcs.IsTrainingDummy(creature.Template.Entry))
+            return;
         if (creature.CombatTargetGuid != 0)
             return;
         creature.CombatTargetGuid = targetGuid;

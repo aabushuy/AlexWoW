@@ -58,7 +58,10 @@ public static class SpawnHandlers
                 var template = new CreatureTemplate(
                     row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
                     row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
-                var maxHealth = World.WorldCreature.MaxHealthFor(row.MinLevel);
+                // Манекен (#28) — большой фиксированный HP, чтобы переживал тесты; остальные — по уровню.
+                var maxHealth = Npcs.IsTrainingDummy(row.Entry)
+                    ? Npcs.TrainingDummyHealth
+                    : World.WorldCreature.MaxHealthFor(row.MinLevel);
                 return new World.WorldCreature
                 {
                     Guid = guid, Map = map, Template = template,
