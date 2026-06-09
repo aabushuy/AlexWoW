@@ -95,6 +95,10 @@ public static class DevCommands
                     await TrainerCommandAsync(session, parts[1].ToLowerInvariant(), ct);
                     return true;
 
+                case "proftrainer" when parts.Length >= 2:
+                    await ProfTrainerCommandAsync(session, parts[1].ToLowerInvariant(), ct);
+                    return true;
+
                 case "devclean":
                     if (session.InWorldGuid == 0)
                         await ReplyAsync(session, "Доступно только в мире", ct);
@@ -106,7 +110,7 @@ public static class DevCommands
                     return true;
 
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .devclean", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .proftrainer <prof>|off | .devclean", ct);
                     return true;
 
                 default:
@@ -173,6 +177,57 @@ public static class DevCommands
 
         var ok = await session.World.SummonDevNpcAsync(session, entry.Value, World.DevSlot.Trainer, ct);
         await ReplyAsync(session, ok ? $"Тренер класса '{arg}' поставлен" : "Не удалось поставить тренера", ct);
+    }
+
+    /// <summary>Имена профессий → ключевое слово в SubName тренера (нет skill_line_ability). Для
+    /// <c>.proftrainer &lt;prof&gt;</c>. D2.</summary>
+    private static readonly Dictionary<string, string> ProfKeyword = new()
+    {
+        ["tailoring"] = "Tailor", ["blacksmithing"] = "Blacksmith", ["leatherworking"] = "Leatherwork",
+        ["alchemy"] = "Alchem", ["enchanting"] = "Enchant", ["engineering"] = "Engineer",
+        ["jewelcrafting"] = "Jewelcraft", ["mining"] = "Mining", ["herbalism"] = "Herbalism",
+        ["skinning"] = "Skinning", ["cooking"] = "Cooking", ["firstaid"] = "First Aid", ["fishing"] = "Fishing",
+    };
+
+    /// <summary>
+    /// <c>.proftrainer &lt;prof&gt;</c> — поставить тренера профессии у игрока (только 1, повтор заменяет);
+    /// <c>.proftrainer off</c> — снять. Реюз каркаса dev-сущностей (D1); резолв entry — по подписи (D2). D2.
+    /// </summary>
+    private static async Task ProfTrainerCommandAsync(WorldSession session, string arg, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+        {
+            await ReplyAsync(session, "Доступно только в мире", ct);
+            return;
+        }
+        if (arg == "off")
+        {
+            var removed = await session.World.DespawnDevNpcAsync(session, World.DevSlot.ProfTrainer, ct);
+            await ReplyAsync(session, removed ? "Тренер профессии снят" : "Тренер профессии не поставлен", ct);
+            return;
+        }
+        if (!ProfKeyword.TryGetValue(arg, out var keyword))
+        {
+            await ReplyAsync(session, "Профессия: tailoring/blacksmithing/leatherworking/alchemy/enchanting/engineering/jewelcrafting/mining/herbalism/skinning/cooking/firstaid/fishing (или off)", ct);
+            return;
+        }
+
+        uint? entry;
+        try { entry = await session.WorldDb.GetProfessionTrainerEntryAsync(keyword, ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("PROFTRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
+            await ReplyAsync(session, "БД мира недоступна", ct);
+            return;
+        }
+        if (entry is null)
+        {
+            await ReplyAsync(session, $"Тренер профессии '{arg}' не найден в БД", ct);
+            return;
+        }
+
+        var ok = await session.World.SummonDevNpcAsync(session, entry.Value, World.DevSlot.ProfTrainer, ct);
+        await ReplyAsync(session, ok ? $"Тренер профессии '{arg}' поставлен" : "Не удалось поставить тренера", ct);
     }
 
     /// <summary>.xp 500 или .xp add 500.</summary>
