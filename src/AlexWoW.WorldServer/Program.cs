@@ -1,14 +1,17 @@
 using AlexWoW.Database;
 using AlexWoW.Database.Abstractions;
+using AlexWoW.Database.Repositories;
 using AlexWoW.DataStores.Collision;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Serilog;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -22,12 +25,14 @@ builder.Services.AddSerilog();
 
 builder.Services.Configure<WorldServerOptions>(
     builder.Configuration.GetSection(WorldServerOptions.SectionName));
-builder.Services.AddSingleton(sp =>
+// Срез 3 рефактора DAL (#23): auth-чтения world-сессии (валидация session key) через EF. Миграции
+// в world НЕ запускаются (EnsureSchema зовёт только CharactersDatabase ниже) — мигрирует один auth-сервер.
+builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
-    return new AuthDatabase(options.ConnectionString);
+    o.UseMySql(options.ConnectionString, ServerVersion.Create(new Version(8, 4, 0), ServerType.MySql));
 });
-builder.Services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<AuthDatabase>());
+builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;

@@ -2,10 +2,13 @@ using AlexWoW.AuthServer;
 using AlexWoW.AuthServer.Net;
 using AlexWoW.Database;
 using AlexWoW.Database.Abstractions;
+using AlexWoW.Database.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Serilog;
 
 // Вспомогательный CLI: создание аккаунта без запуска сервера.
@@ -38,12 +41,15 @@ builder.Services.AddSerilog();
 
 builder.Services.Configure<AuthServerOptions>(
     builder.Configuration.GetSection(AuthServerOptions.SectionName));
-builder.Services.AddSingleton(sp =>
+// Срез 3 рефактора DAL (#23): auth-путь на EF Core. Пул-фабрика контекста (singleton-safe, контекст
+// на операцию) + EF-репозиторий вместо Dapper-AuthDatabase. Фиксированная ServerVersion — без коннекта
+// при старте DI (готовность MySQL обеспечивает retry в AuthListener.EnsureSchemaWithRetryAsync).
+builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
 {
     var options = sp.GetRequiredService<IOptions<AuthServerOptions>>().Value;
-    return new AuthDatabase(options.ConnectionString);
+    o.UseMySql(options.ConnectionString, ServerVersion.Create(new Version(8, 4, 0), ServerType.MySql));
 });
-builder.Services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<AuthDatabase>());
+builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
 builder.Services.AddHostedService<AuthListener>();
 
 var host = builder.Build();
