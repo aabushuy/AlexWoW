@@ -53,8 +53,24 @@ public static class Npcs
     /// <summary>HP манекена — заведомо много, чтобы переживал любые тесты (не из формулы по уровню). #28.</summary>
     public const uint TrainingDummyHealth = 50_000_000;
 
+    /// <summary>Counter (creature.guid в БД) статичного спавна манекена в Нортшире. #28/#29.</summary>
+    public const uint TrainingDummySpawnId = 9000020;
+
+    /// <summary>GUID существа манекена — тот же, что у БД-спавна; дев-команда .dummy двигает его. #29.</summary>
+    public static readonly ulong TrainingDummyGuid = UnitGuid(TrainingDummyEntry, TrainingDummySpawnId);
+
     /// <summary>Существо — тренировочный манекен (пассивная высоко-HP цель). #28.</summary>
     public static bool IsTrainingDummy(uint entry) => entry == TrainingDummyEntry;
+
+    /// <summary>Шаблон манекена — фоллбэк для дев-команды .dummy, если он ещё не закэширован из БД. #29.</summary>
+    public static readonly CreatureTemplate TrainingDummy = new(
+        Entry: TrainingDummyEntry,
+        Name: "Тренировочный манекен",
+        SubName: "Уровень 80 — проверка навыков",
+        DisplayId: 3019,
+        Level: 80,
+        Faction: 7,    // нейтральный (жёлтый) — атакуемый, не авто-враждебный
+        UnitType: 7);  // Humanoid
 
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()
     {
