@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using AlexWoW.Common.Network;
 using AlexWoW.DataStores.Navigation;
+using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -268,6 +269,55 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
                 CreatureUpdate.BuildCreateObject(creature, time), ct);
         }
         logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось на спавне", creature.Template.Name, creature.Guid);
+    }
+
+    /// <summary>
+    /// Дев-команда <c>.dummy</c> (#29): телепортирует тренировочный манекен (тот же GUID, что у статичного
+    /// БД-спавна в Нортшире) на ~3 ярда перед игроком, лицом к нему. DESTROY+CREATE наблюдателям; HP и
+    /// боевое состояние сбрасываются. В пределах видимости БД-точки (вся Долина Североземья) остаётся;
+    /// дальше может пропасть при обновлении видимости — тогда позвать заново.
+    /// </summary>
+    public async Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
+    {
+        var map = session.Character?.Map ?? 0;
+        float x = session.PosX + 3f * MathF.Cos(session.PosO);
+        float y = session.PosY + 3f * MathF.Sin(session.PosO);
+        float z = session.PosZ;
+        float o = session.PosO + MathF.PI;            // лицом к игроку
+
+        var dummy = GetOrAddCreature(Npcs.TrainingDummyGuid, () =>
+        {
+            var hp = Npcs.TrainingDummyHealth;
+            return new WorldCreature
+            {
+                Guid = Npcs.TrainingDummyGuid, Map = map, Template = Npcs.TrainingDummy,
+                X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
+                MaxHealth = hp, Health = hp,
+            };
+        });
+
+        // Убрать со старого места у всех, кто его видит (включая вызвавшего — ниже пере-создадим).
+        var destroy = new ByteWriter(9).UInt64(dummy.Guid).UInt8(0).ToArray();
+        foreach (var observer in ObserversOf(dummy).ToList())
+        {
+            await observer.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
+            observer.Session.VisibleNpcs.TryRemove(dummy.Guid, out _);
+        }
+
+        // Переставить (X/Y/Z мутабельны; Home — init, и не нужен: манекен пассивен, не евейдит/респавнит)
+        // + полный сброс боевого состояния (как свежий манекен).
+        dummy.X = x; dummy.Y = y; dummy.Z = z; dummy.O = o;
+        dummy.Health = dummy.MaxHealth;
+        dummy.CombatTargetGuid = 0;
+        dummy.Evading = false;
+        dummy.RespawnAtMs = null;
+        dummy.Lootable = false;
+        dummy.Loot = null;
+
+        // Показать вызвавшему на новом месте.
+        session.VisibleNpcs[dummy.Guid] = dummy;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            CreatureUpdate.BuildCreateObject(dummy, (uint)Environment.TickCount), ct);
     }
 
     /// <summary>

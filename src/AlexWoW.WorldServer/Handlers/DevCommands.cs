@@ -67,8 +67,18 @@ public static class DevCommands
                     await ReplyAsync(session, $"Снят бафф {offSpell}", ct);
                     return true;
 
+                case "dummy":
+                    if (session.InWorldGuid == 0)
+                        await ReplyAsync(session, "Доступно только в мире", ct);
+                    else
+                    {
+                        await session.World.SummonTrainingDummyAsync(session, ct);
+                        await ReplyAsync(session, "Тренировочный манекен перемещён к вам", ct);
+                    }
+                    return true;
+
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .buff SPELL [сек] | .unbuff SPELL", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .buff SPELL [сек] | .unbuff SPELL | .dummy", ct);
                     return true;
 
                 default:
