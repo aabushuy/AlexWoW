@@ -29,9 +29,10 @@ public static class SpellCatalog
     private const int EffectWeaponDamage = 58;           // урон оружия + бонус
     private const int EffectNormalizedWeaponDmg = 121;   // нормализованный урон оружия + бонус
     private const int EffectApplyAura = 6;               // наложение ауры (периодика и пр.)
-    // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил.
+    // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
+    private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -44,7 +45,8 @@ public static class SpellCatalog
         int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0,
         byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0,
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
-        int AuraDurationMs = 0);
+        int AuraDurationMs = 0,
+        bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0);
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -119,11 +121,22 @@ public static class SpellCatalog
         var periodicHeal = periodic.Aura == AuraPeriodicHeal;
         var tickAmount = isPeriodic ? periodic.Bp + 1 : 0;          // CMaNGOS: BasePoints+1 за тик
         var tickInterval = isPeriodic ? periodic.Amp : 0;
-        var auraDuration = isPeriodic ? SpellDurations.Get(t.DurationIndex) : 0;
+
+        // Непериодическая аура (бафф/дебафф, M10.4c): прочий APPLY_AURA. Бафф/дебафф различаем по знаку
+        // BasePoints (>=0 — бафф на себя; <0 — дебафф на цель-существо) — надёжнее enum-целей. Простой
+        // механический эффект — только MOD_INCREASE_HEALTH (+макс. HP); прочие стат-моды пока визуальны.
+        var auraBuffEff = Array.Find(effects, e => e.Eff == EffectApplyAura
+            && e.Aura is not (AuraPeriodicDamage or AuraPeriodicHeal) && e.Aura != 0);
+        var auraBuff = auraBuffEff.Eff == EffectApplyAura;
+        var auraPositive = auraBuff && auraBuffEff.Bp >= 0;
+        var hpAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseHealth);
+        var healthBonus = hpAura.Eff == EffectApplyAura ? hpAura.Bp + 1 : 0;
+
+        var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
-            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration);
+            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus);
     }
 
     /// <summary>

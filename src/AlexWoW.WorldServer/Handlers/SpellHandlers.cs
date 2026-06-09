@@ -22,4 +22,16 @@ public static class SpellHandlers
         SpellCaster.CancelCast(session);
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// CMSG_CANCEL_AURA (M10.4c): игрок снял свой бафф правым кликом по иконке (u32 spell). Снимаем ауру-
+    /// иконку (<see cref="Auras"/>) и связанный простой эффект/HoT (<see cref="Periodics"/>, +макс.HP откатим).
+    /// </summary>
+    [WorldOpcodeHandler(WorldOpcode.CmsgCancelAura)]
+    public static async Task OnCancelAura(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var spellId = packet.Reader().UInt32();
+        await Auras.RemoveAsync(session, spellId, ct);
+        await Periodics.CancelSelfAsync(session, spellId, ct);
+    }
 }

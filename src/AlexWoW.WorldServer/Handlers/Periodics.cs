@@ -15,8 +15,10 @@ public sealed class PeriodicEffect
     public long NextTickMs;
     public long ExpiresAtMs;
     public bool IsHeal;
-    public byte Slot;          // слот ауры на цели (для DoT-дебаффа)
-    public bool OwnsVisual;    // true — мы шлём AURA_UPDATE на цель (DoT); HoT-визуал — в системе аур игрока
+    public byte Slot;          // слот ауры на цели (для DoT/дебафф-визуала)
+    public bool OwnsVisual;    // true — мы шлём AURA_UPDATE на цель; визуал на себе — в системе аур игрока
+    public bool DoesTick = true; // false — непериодический бафф/дебафф (только визуал + истечение). M10.4c
+    public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
 }
 
 /// <summary>
@@ -75,6 +77,60 @@ public static class Periodics
         });
     }
 
+    /// <summary>
+    /// Накладывает непериодический бафф/дебафф (M10.4c): по знаку BasePoints — бафф на себя (иконка через
+    /// систему аур M6.11) либо дебафф на цель-существо (AURA_UPDATE с кастером). Механика — только простой
+    /// +макс.HP (MOD_INCREASE_HEALTH); прочие стат-моды визуальны (боевая модель упрощена).
+    /// </summary>
+    internal static async Task ApplyAuraEffectAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
+        ulong targetCreatureGuid, CancellationToken ct)
+    {
+        if (!info.AuraBuff || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
+            return;
+        var now = Environment.TickCount64;
+        var expires = now + info.AuraDurationMs;
+        var caster = (ulong)session.InWorldGuid;
+        var level = (byte)(session.Character?.Level ?? 1);
+
+        if (info.AuraPositive)
+        {
+            // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP) — здесь, со снятием по истечении.
+            await Auras.ApplyAsync(session, spellId, info.AuraDurationMs, positive: true, form: 0, ct);
+            if (info.HealthBonus > 0)
+            {
+                session.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);
+                session.MaxHealth += (uint)info.HealthBonus;
+                session.Health += (uint)info.HealthBonus;
+                if (session.Player is { } pl)
+                    await session.World.BroadcastPlayerHealthAsync(pl, ct);
+                session.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId, TargetGuid = 0, ExpiresAtMs = expires, DoesTick = false,
+                    HealthBonus = info.HealthBonus,
+                });
+            }
+            return;
+        }
+
+        // Дебафф на существо (визуал; стат-эффект пока не моделируется).
+        var creature = targetCreatureGuid != 0 ? session.World.FindCreature(targetCreatureGuid) : null;
+        if (creature is null || !creature.IsAlive)
+            return;
+        var dup = session.Periodics.FirstOrDefault(p => p.SpellId == spellId && p.TargetGuid == targetCreatureGuid);
+        byte slot;
+        if (dup is not null) { slot = dup.Slot; session.Periodics.Remove(dup); }
+        else slot = (byte)session.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
+
+        const byte flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, info.AuraDurationMs), ct);
+        session.Periodics.Add(new PeriodicEffect
+        {
+            SpellId = spellId, TargetGuid = targetCreatureGuid, ExpiresAtMs = expires, DoesTick = false,
+            OwnsVisual = true, Slot = slot,
+        });
+    }
+
     /// <summary>Тик периодических эффектов (из WorldState.UpdateAsync): применяет урон/хил, снимает истёкшие.</summary>
     internal static async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
@@ -84,7 +140,7 @@ public static class Periodics
 
         foreach (var p in session.Periodics.ToList())
         {
-            if (p.NextTickMs <= now && now < p.ExpiresAtMs + p.IntervalMs)
+            if (p.DoesTick && p.NextTickMs <= now && now < p.ExpiresAtMs + p.IntervalMs)
             {
                 p.NextTickMs += p.IntervalMs;
                 if (p.IsHeal)
@@ -132,11 +188,28 @@ public static class Periodics
         await session.World.BroadcastPlayerHealthAsync(player, ct);
     }
 
+    /// <summary>Снимает свой периодический эффект/бафф по spellId (правый клик по иконке, M10.4c) — откат +макс.HP.</summary>
+    internal static async Task CancelSelfAsync(WorldSession session, uint spellId, CancellationToken ct)
+    {
+        foreach (var p in session.Periodics.Where(p => p.TargetGuid == 0 && p.SpellId == spellId).ToList())
+            await RemoveAsync(session, p, ct);
+    }
+
     private static async Task RemoveAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
     {
         session.Periodics.Remove(p);
+
+        // Снять простой бафф +макс.HP (M10.4c) — вернуть HP к норме (текущее не выше нового максимума).
+        if (p.HealthBonus > 0)
+        {
+            session.MaxHealth = session.MaxHealth > (uint)p.HealthBonus ? session.MaxHealth - (uint)p.HealthBonus : 1;
+            session.Health = Math.Min(session.Health, session.MaxHealth);
+            if (session.Player is { } pl)
+                await session.World.BroadcastPlayerHealthAsync(pl, ct);
+        }
+
         if (!p.OwnsVisual)
-            return; // HoT-визуал (бафф-иконка) истечёт сам в Auras.TickAsync (та же длительность)
+            return; // визуал на себе (бафф/HoT-иконка) истечёт сам в Auras.TickAsync (та же длительность)
         var creature = session.World.FindCreature(p.TargetGuid);
         if (creature is not null)
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,

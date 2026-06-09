@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 707 / 860 опкодов НЕ реализовано — 82.2%** (реализовано: 153 — 17.8%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 706 / 860 опкодов НЕ реализовано — 82.1%** (реализовано: 154 — 17.9%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -145,7 +145,6 @@
 | `0x0125` | CMSG_SET_FACTION_ATWAR | Faction |
 | `0x0127` | SMSG_SET_PROFICIENCY | Item |
 | `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
-| `0x0136` | CMSG_CANCEL_AURA | Spell |
 | `0x0138` | SMSG_PET_CAST_FAILED | Pet |
 | `0x013B` | CMSG_CANCEL_CHANNELLING | Chat |
 | `0x013E` | CMSG_DELETEEQUIPMENT_SET | Client |

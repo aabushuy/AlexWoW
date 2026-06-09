@@ -99,6 +99,7 @@ public enum WorldOpcode : uint
     // Спеллы (M6.4)
     CmsgCastSpell = 0x12E,
     CmsgCancelCast = 0x12F,
+    CmsgCancelAura = 0x136,                      // u32 spell — снять свой бафф (правый клик по иконке) M10.4c
     SmsgCastFailed = 0x130,
     SmsgSpellStart = 0x131,
     SmsgSpellGo = 0x132,
