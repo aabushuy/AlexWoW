@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 710 / 860 опкодов НЕ реализовано — 82.6%** (реализовано: 150 — 17.4%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 708 / 860 опкодов НЕ реализовано — 82.3%** (реализовано: 152 — 17.7%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -144,7 +144,6 @@
 | `0x0124` | SMSG_SET_FACTION_STANDING | Faction |
 | `0x0125` | CMSG_SET_FACTION_ATWAR | Faction |
 | `0x0127` | SMSG_SET_PROFICIENCY | Item |
-| `0x012C` | SMSG_SUPERCEDED_SPELL | Spell |
 | `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
 | `0x0136` | CMSG_CANCEL_AURA | Spell |
 | `0x0138` | SMSG_PET_CAST_FAILED | Pet |
@@ -230,7 +229,6 @@
 | `0x01D0` | SMSG_LOG_XPGAIN | Experience |
 | `0x01D2` | CMSG_RECLAIM_CORPSE | Resurrect |
 | `0x01D3` | CMSG_WRAP_ITEM | Item |
-| `0x01D4` | SMSG_LEVELUP_INFO | Experience |
 | `0x01D7` | SMSG_ENCHANTMENTLOG | Item |
 | `0x01D9` | SMSG_START_MIRROR_TIMER | Spell |
 | `0x01DA` | SMSG_PAUSE_MIRROR_TIMER | Spell |

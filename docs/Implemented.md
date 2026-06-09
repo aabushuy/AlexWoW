@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 150 / 860 опкодов реализовано — 17.4%** (не реализовано: 710 — 82.6%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 152 / 860 опкодов реализовано — 17.7%** (не реализовано: 708 — 82.3%, см. [NotImplemented.md](NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -70,6 +70,7 @@
 | `0x0129` | SMSG_ACTION_BUTTONS | Client |
 | `0x012A` | SMSG_INITIAL_SPELLS | Spell |
 | `0x012B` | SMSG_LEARNED_SPELL | Spell |
+| `0x012C` | SMSG_SUPERCEDED_SPELL | Spell |
 | `0x012E` | CMSG_CAST_SPELL | Spell |
 | `0x012F` | CMSG_CANCEL_CAST | Spell |
 | `0x0130` | SMSG_CAST_FAILED | Spell |
@@ -127,6 +128,7 @@
 | `0x01B4` | SMSG_TRAINER_BUY_FAILED | Spell |
 | `0x01CE` | CMSG_QUERY_TIME | Query |
 | `0x01CF` | SMSG_QUERY_TIME_RESPONSE | Query |
+| `0x01D4` | SMSG_LEVELUP_INFO | Experience |
 | `0x01DC` | CMSG_PING | Keepalive |
 | `0x01DD` | SMSG_PONG | Keepalive |
 | `0x01EC` | SMSG_AUTH_CHALLENGE | Character |
