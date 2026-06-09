@@ -43,6 +43,19 @@ public static class Npcs
         Faction: 35,   // «дружелюбен ко всем» — нейтральный, не атакует
         UnitType: 8);  // Critter
 
+    /// <summary>
+    /// Entry кастомного тренировочного манекена (#28): спавнится из БД мира (creature 990020,
+    /// клон Advanced Training Dummy), но код даёт ему большой HP и делает ПАССИВНЫМ (не авто-агрится
+    /// и не отвечает в бою) — стационарная цель для проверки навыков.
+    /// </summary>
+    public const uint TrainingDummyEntry = 990020;
+
+    /// <summary>HP манекена — заведомо много, чтобы переживал любые тесты (не из формулы по уровню). #28.</summary>
+    public const uint TrainingDummyHealth = 50_000_000;
+
+    /// <summary>Существо — тренировочный манекен (пассивная высоко-HP цель). #28.</summary>
+    public static bool IsTrainingDummy(uint entry) => entry == TrainingDummyEntry;
+
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()
     {
         [TestDummy.Entry] = TestDummy,
