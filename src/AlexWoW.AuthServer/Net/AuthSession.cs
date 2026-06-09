@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using AlexWoW.AuthServer.Protocol;
 using AlexWoW.Common.Network;
 using AlexWoW.Cryptography;
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +14,7 @@ namespace AlexWoW.AuthServer.Net;
 /// </summary>
 public sealed class AuthSession(
     Socket socket,
-    AuthDatabase database,
+    IAccountRepository database,
     ILogger logger)
 {
     private const ushort ExpectedBuild = 12340; // WotLK 3.3.5a

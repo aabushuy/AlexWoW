@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,7 +10,7 @@ namespace AlexWoW.AuthServer.Net;
 /// <summary>Принимает TCP-соединения логин-протокола и запускает <see cref="AuthSession"/> на каждое.</summary>
 public sealed class AuthListener(
     IOptions<AuthServerOptions> options,
-    AuthDatabase database,
+    IAccountRepository database,
     ILogger<AuthListener> logger) : BackgroundService
 {
     private readonly AuthServerOptions _options = options.Value;

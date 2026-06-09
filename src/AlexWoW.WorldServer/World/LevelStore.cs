@@ -1,4 +1,4 @@
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -8,7 +8,7 @@ namespace AlexWoW.WorldServer.World;
 /// <c>MaNGOS::XP</c>). Ленивая загрузка таблицы один раз. Формула BaseGain упрощена до content 1-60
 /// (+45) — стартовые зоны; точный content по карте/зоне — позже.
 /// </summary>
-public sealed class LevelStore(WorldDatabase worldDb, ILogger<LevelStore> logger)
+public sealed class LevelStore(IWorldRepository worldDb, ILogger<LevelStore> logger)
 {
     /// <summary>Максимальный уровень (WotLK).</summary>
     public const byte MaxLevel = 80;
