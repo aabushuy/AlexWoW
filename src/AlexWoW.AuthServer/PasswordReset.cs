@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using AlexWoW.Cryptography;
 using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Configuration;
 
 namespace AlexWoW.AuthServer;
@@ -34,7 +35,7 @@ public static class PasswordReset
             return 1;
         }
 
-        var database = new AuthDatabase(options.ConnectionString);
+        IAccountRepository database = new AuthDatabase(options.ConnectionString);
         var users = await database.GetAllUsernamesAsync();
         foreach (var username in users)
         {

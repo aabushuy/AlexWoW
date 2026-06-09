@@ -1,4 +1,5 @@
 using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.DataStores.Collision;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
@@ -26,16 +27,24 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new AuthDatabase(options.ConnectionString);
 });
+builder.Services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<AuthDatabase>());
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new CharactersDatabase(options.ConnectionString);
 });
+// Фасад + сегрегированные интерфейсы — алиасы на один singleton CharactersDatabase.
+builder.Services.AddSingleton<ICharacterStore>(sp => sp.GetRequiredService<CharactersDatabase>());
+builder.Services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
+builder.Services.AddSingleton<IInventoryRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
+builder.Services.AddSingleton<IQuestRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
+builder.Services.AddSingleton<ICharacterStateRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
     return new WorldDatabase(options.WorldConnectionString);
 });
+builder.Services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<WorldDatabase>());
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;

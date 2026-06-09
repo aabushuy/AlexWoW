@@ -1,11 +1,15 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using Dapper;
 using MySqlConnector;
 
 namespace AlexWoW.Database;
 
-/// <summary>Доступ к данным персонажей (таблица characters).</summary>
-public sealed class CharactersDatabase(string connectionString)
+/// <summary>
+/// Доступ к данным персонажей (таблицы characters, character_*, account_data, БД <c>alexwow_auth</c>).
+/// Реализует фасад <see cref="ICharacterStore"/> (DAL-абстракция, срез 1 рефактора #23).
+/// </summary>
+public sealed class CharactersDatabase(string connectionString) : ICharacterStore
 {
     private readonly string _connectionString = connectionString;
 

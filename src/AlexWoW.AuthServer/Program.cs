@@ -1,6 +1,7 @@
 using AlexWoW.AuthServer;
 using AlexWoW.AuthServer.Net;
 using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -42,6 +43,7 @@ builder.Services.AddSingleton(sp =>
     var options = sp.GetRequiredService<IOptions<AuthServerOptions>>().Value;
     return new AuthDatabase(options.ConnectionString);
 });
+builder.Services.AddSingleton<IAccountRepository>(sp => sp.GetRequiredService<AuthDatabase>());
 builder.Services.AddHostedService<AuthListener>();
 
 var host = builder.Build();

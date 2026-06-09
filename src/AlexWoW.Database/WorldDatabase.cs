@@ -1,4 +1,5 @@
 using System.Globalization;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using Dapper;
 using MySqlConnector;
@@ -8,8 +9,9 @@ namespace AlexWoW.Database;
 /// <summary>
 /// Доступ к статической БД мира (дамп CMaNGOS-WotLK: creature, creature_template …).
 /// Только чтение. Координаты в дампе — decimal(40,20); приводим к DOUBLE на стороне MySQL.
+/// Реализует <see cref="IWorldRepository"/> (DAL-абстракция, срез 1 рефактора #23).
 /// </summary>
-public sealed class WorldDatabase(string connectionString)
+public sealed class WorldDatabase(string connectionString) : IWorldRepository
 {
     private readonly string _connectionString = connectionString;
 

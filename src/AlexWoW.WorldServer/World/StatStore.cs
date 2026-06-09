@@ -1,4 +1,4 @@
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -12,7 +12,7 @@ public readonly record struct PlayerStats(
 /// <c>player_classlevelstats</c> (базовые HP/мана). Производные: HP = basehp + бонус_от_стамины,
 /// мана = basemana + бонус_от_интеллекта (формулы CMaNGOS). Ленивая загрузка один раз.
 /// </summary>
-public sealed class StatStore(WorldDatabase worldDb, ILogger<StatStore> logger)
+public sealed class StatStore(IWorldRepository worldDb, ILogger<StatStore> logger)
 {
     private volatile bool _loaded;
     private readonly SemaphoreSlim _lock = new(1, 1);

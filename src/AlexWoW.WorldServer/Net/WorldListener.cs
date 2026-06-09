@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using AlexWoW.Database;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.DataStores.Collision;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
@@ -14,9 +14,9 @@ namespace AlexWoW.WorldServer.Net;
 /// <summary>Принимает world-соединения и запускает <see cref="WorldSession"/> на каждое.</summary>
 public sealed class WorldListener(
     IOptions<WorldServerOptions> options,
-    AuthDatabase database,
-    CharactersDatabase characters,
-    WorldDatabase worldDatabase,
+    IAccountRepository database,
+    ICharacterStore characters,
+    IWorldRepository worldDatabase,
     TerrainMaps terrain,
     Vmaps vmaps,
     Navmesh navmesh,

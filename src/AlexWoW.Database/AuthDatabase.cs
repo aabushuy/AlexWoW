@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using Dapper;
 using MySqlConnector;
@@ -6,8 +7,9 @@ namespace AlexWoW.Database;
 
 /// <summary>
 /// Доступ к базе аутентификации (аккаунты + список реалмов). Использует Dapper поверх MySqlConnector.
+/// Реализует <see cref="IAccountRepository"/> (DAL-абстракция, срез 1 рефактора #23).
 /// </summary>
-public sealed class AuthDatabase(string connectionString)
+public sealed class AuthDatabase(string connectionString) : IAccountRepository
 {
     private readonly string _connectionString = connectionString;
 
