@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 152 / 860 опкодов реализовано — 17.7%** (не реализовано: 708 — 82.3%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 153 / 860 опкодов реализовано — 17.8%** (не реализовано: 707 — 82.2%, см. [NotImplemented.md](NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -139,6 +139,7 @@
 | `0x020B` | CMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x020C` | SMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x0236` | SMSG_LOGIN_VERIFY_WORLD | Character |
+| `0x024E` | SMSG_PERIODICAURALOG | Spell |
 | `0x0250` | SMSG_SPELLNONMELEEDAMAGELOG | Spell |
 | `0x02BF` | CMSG_SET_ACTIONBAR_TOGGLES | Client |
 | `0x02EF` | SMSG_ADDON_INFO | Login |

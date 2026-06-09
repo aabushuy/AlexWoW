@@ -105,6 +105,7 @@ public enum WorldOpcode : uint
     SmsgSpellFailure = 0x133,
     SmsgSpellCooldown = 0x134,
     SmsgSpellHealLog = 0x150,
+    SmsgPeriodicAuraLog = 0x24E,                 // тик DoT/HoT (плавающее число) — M10.4b
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
     SmsgAuraUpdate = 0x496,                      // одна аура на слоте (баффы/дебаффы/формы) — M6.11

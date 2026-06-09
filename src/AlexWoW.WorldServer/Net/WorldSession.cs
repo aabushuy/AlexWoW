@@ -189,6 +189,8 @@ public sealed class WorldSession
 
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
     internal List<World.ActiveAura> Auras { get; } = new();
+    /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
+    internal List<Handlers.PeriodicEffect> Periodics { get; } = new();
     /// <summary>Текущая форма шейпшифта (стойка воина/форма друида); 0 — нет формы. UNIT_FIELD_BYTES_2 байт 3. M6.11.</summary>
     internal byte ShapeshiftForm { get; set; }
 
@@ -239,6 +241,7 @@ public sealed class WorldSession
         SpellCooldowns.Clear();
         KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
+        Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();

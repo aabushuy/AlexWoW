@@ -36,6 +36,31 @@ public static class AuraPackets
         return w.ToArray();
     }
 
+    /// <summary>
+    /// Применение ауры на ЧУЖОЙ юнит (дебафф на существе, M10.4b): caster (игрок) ≠ target → SELF_CAST НЕ
+    /// ставим, пишем реальный <paramref name="casterGuid"/> (иначе клиенту нужен guid кастера, а BuildApply
+    /// подставил бы guid цели).
+    /// </summary>
+    public static byte[] BuildApplyByCaster(ulong unitGuid, ulong casterGuid, byte slot, uint spellId,
+        byte flags, byte level, byte stacks, int durationMs)
+    {
+        var w = new ByteWriter(32);
+        PackedGuid.Write(w, unitGuid);
+        w.UInt8(slot);
+        w.UInt32(spellId);
+        w.UInt8(flags);
+        w.UInt8(level);
+        w.UInt8(stacks);
+        if ((flags & AuraFlags.SelfCast) == 0)
+            PackedGuid.Write(w, casterGuid); // реальный кастер (для дебаффа на цели)
+        if ((flags & AuraFlags.Duration) != 0)
+        {
+            w.UInt32((uint)durationMs);
+            w.UInt32((uint)durationMs);
+        }
+        return w.ToArray();
+    }
+
     /// <summary>Снятие ауры со слота: slot + spell=0 (клиент чистит слот). TrinityCore-формат.</summary>
     public static byte[] BuildRemove(ulong unitGuid, byte slot)
     {
@@ -45,6 +70,34 @@ public static class AuraPackets
         w.UInt32(0); // spell=0 → слот пуст
         return w.ToArray();
     }
+
+    /// <summary>
+    /// SMSG_PERIODICAURALOG (0x24E, 3.3.5): тик DoT/HoT (плавающее число у клиента). Сверено с CMaNGOS
+    /// <c>Unit::SendPeriodicAuraLog</c>: packed target+caster, spell, count=1, auraType, далее по типу —
+    /// урон: dmg+overkill+schoolMask(u32)+absorb+resist+crit(u8); хил: dmg+over+absorb+crit(u8).
+    /// </summary>
+    public static byte[] BuildPeriodicLog(ulong target, ulong caster, uint spellId, bool isHeal,
+        uint amount, uint schoolMask)
+    {
+        var w = new ByteWriter(48);
+        PackedGuid.Write(w, target);
+        PackedGuid.Write(w, caster);
+        w.UInt32(spellId);
+        w.UInt32(1);                                  // count
+        w.UInt32(isHeal ? AuraTypePeriodicHeal : AuraTypePeriodicDamage);
+        w.UInt32(amount);
+        w.UInt32(0);                                  // overkill/overheal
+        if (!isHeal)
+            w.UInt32(schoolMask);                     // только для урона
+        w.UInt32(0);                                  // absorb
+        if (!isHeal)
+            w.UInt32(0);                              // resist (только для урона)
+        w.UInt8(0);                                   // critical
+        return w.ToArray();
+    }
+
+    private const uint AuraTypePeriodicDamage = 3;
+    private const uint AuraTypePeriodicHeal = 8;
 }
 
 /// <summary>Флаги ауры (AFLAG, 3.3.5 — значения из TrinityCore SpellAuraDefines.h, эталон против клиента). M6.11.</summary>

@@ -28,6 +28,10 @@ public static class SpellCatalog
     private const int EffectWeaponPercentDamage = 31;    // % урона оружия (BasePoints = процент)
     private const int EffectWeaponDamage = 58;           // урон оружия + бонус
     private const int EffectNormalizedWeaponDmg = 121;   // нормализованный урон оружия + бонус
+    private const int EffectApplyAura = 6;               // наложение ауры (периодика и пр.)
+    // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил.
+    private const int AuraPeriodicDamage = 3;
+    private const int AuraPeriodicHeal = 8;
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -38,7 +42,9 @@ public static class SpellCatalog
     /// </summary>
     public sealed record SpellInfo(byte School, int MinAmount, int MaxAmount, int CastMs, uint ManaCost,
         int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0,
-        byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0);
+        byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0,
+        bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
+        int AuraDurationMs = 0);
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -72,9 +78,9 @@ public static class SpellCatalog
     {
         var effects = new[]
         {
-            (Eff: t.Effect1, Bp: t.EffectBasePoints1, Ds: t.EffectDieSides1),
-            (Eff: t.Effect2, Bp: t.EffectBasePoints2, Ds: t.EffectDieSides2),
-            (Eff: t.Effect3, Bp: t.EffectBasePoints3, Ds: t.EffectDieSides3),
+            (Eff: t.Effect1, Bp: t.EffectBasePoints1, Ds: t.EffectDieSides1, Aura: t.EffectApplyAuraName1, Amp: t.EffectAmplitude1),
+            (Eff: t.Effect2, Bp: t.EffectBasePoints2, Ds: t.EffectDieSides2, Aura: t.EffectApplyAuraName2, Amp: t.EffectAmplitude2),
+            (Eff: t.Effect3, Bp: t.EffectBasePoints3, Ds: t.EffectDieSides3, Aura: t.EffectApplyAuraName3, Amp: t.EffectAmplitude3),
         };
 
         // Прямой эффект: приоритет хил > школьный урон > урон оружия (мили-абилка); иначе без числа.
@@ -105,8 +111,19 @@ public static class SpellCatalog
         // ресурса; ярость в DBC уже ×10, как у нас). Health-кост (-2) → без стоимости (Math.Max 0). M10.4a.
         var powerType = (byte)Math.Max(0, t.PowerType);
         var manaPct = powerType == 0 ? t.ManaCostPercentage : 0;
+
+        // Периодическая аура (DoT/HoT, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL → тик во времени.
+        var periodic = Array.Find(effects, e => e.Eff == EffectApplyAura
+            && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal);
+        var isPeriodic = periodic.Eff == EffectApplyAura;
+        var periodicHeal = periodic.Aura == AuraPeriodicHeal;
+        var tickAmount = isPeriodic ? periodic.Bp + 1 : 0;          // CMaNGOS: BasePoints+1 за тик
+        var tickInterval = isPeriodic ? periodic.Amp : 0;
+        var auraDuration = isPeriodic ? SpellDurations.Get(t.DurationIndex) : 0;
+
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
-            t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent);
+            t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
+            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration);
     }
 
     /// <summary>

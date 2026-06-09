@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 708 / 860 опкодов НЕ реализовано — 82.3%** (реализовано: 152 — 17.7%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 707 / 860 опкодов НЕ реализовано — 82.2%** (реализовано: 153 — 17.8%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -294,7 +294,6 @@
 | `0x024A` | CMSG_MAIL_CREATE_TEXT_ITEM | Mail |
 | `0x024B` | SMSG_SPELLLOGMISS | Spell |
 | `0x024C` | SMSG_SPELLLOGEXECUTE | Spell |
-| `0x024E` | SMSG_PERIODICAURALOG | Spell |
 | `0x024F` | SMSG_SPELLDAMAGESHIELD | Spell |
 | `0x0251` | CMSG_LEARN_TALENT | Spell |
 | `0x0252` | SMSG_RESURRECT_FAILED | Resurrect |

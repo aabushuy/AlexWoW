@@ -13,10 +13,12 @@ public sealed class SpellTemplateRepository(string connectionString)
         await using var db = await OpenAsync(ct);
         return await db.QuerySingleOrDefaultAsync<SpellTemplateData>(new CommandDefinition("""
             SELECT Id, SchoolMask, CastingTimeIndex, PowerType, ManaCost, ManaCostPercentage,
-                   RecoveryTime, CategoryRecoveryTime, StartRecoveryTime,
+                   RecoveryTime, CategoryRecoveryTime, StartRecoveryTime, DurationIndex,
                    Effect1, Effect2, Effect3,
                    EffectBasePoints1, EffectBasePoints2, EffectBasePoints3,
-                   EffectDieSides1, EffectDieSides2, EffectDieSides3
+                   EffectDieSides1, EffectDieSides2, EffectDieSides3,
+                   EffectApplyAuraName1, EffectApplyAuraName2, EffectApplyAuraName3,
+                   EffectAmplitude1, EffectAmplitude2, EffectAmplitude3
             FROM spell_template WHERE Id = @id;
             """, new { id }, cancellationToken: ct));
     }
