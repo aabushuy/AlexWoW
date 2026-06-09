@@ -40,6 +40,7 @@ public static class WorldEntryHandlers
             new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
 
         await SendInitialSpellsAsync(session, character, ct);
+        await ActionBarHandlers.SendInitialActionButtonsAsync(session, ct); // M7 #17: ярлыки панелей
 
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)

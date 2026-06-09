@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 145 / 860 опкодов реализовано — 16.9%** (не реализовано: 715 — 83.1%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 150 / 860 опкодов реализовано — 17.4%** (не реализовано: 710 — 82.6%, см. [NotImplemented.md](NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -66,6 +66,8 @@
 | `0x0111` | CMSG_DESTROYITEM | Item |
 | `0x0112` | SMSG_INVENTORY_CHANGE_FAILURE | Item |
 | `0x0122` | SMSG_INITIALIZE_FACTIONS | Faction |
+| `0x0128` | CMSG_SET_ACTION_BUTTON | Client |
+| `0x0129` | SMSG_ACTION_BUTTONS | Client |
 | `0x012A` | SMSG_INITIAL_SPELLS | Spell |
 | `0x012B` | SMSG_LEARNED_SPELL | Spell |
 | `0x012E` | CMSG_CAST_SPELL | Spell |
@@ -131,9 +133,12 @@
 | `0x01ED` | CMSG_AUTH_SESSION | Character |
 | `0x01EE` | SMSG_AUTH_RESPONSE | Character |
 | `0x0209` | SMSG_ACCOUNT_DATA_TIMES | Login |
+| `0x020A` | CMSG_REQUEST_ACCOUNT_DATA | Login |
 | `0x020B` | CMSG_UPDATE_ACCOUNT_DATA | Login |
+| `0x020C` | SMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x0236` | SMSG_LOGIN_VERIFY_WORLD | Character |
 | `0x0250` | SMSG_SPELLNONMELEEDAMAGELOG | Spell |
+| `0x02BF` | CMSG_SET_ACTIONBAR_TOGGLES | Client |
 | `0x02EF` | SMSG_ADDON_INFO | Login |
 | `0x037A` | SMSG_FORCED_DEATH_UPDATE | Resurrect |
 | `0x038B` | SMSG_REALM_SPLIT | Character |

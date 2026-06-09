@@ -242,26 +242,100 @@ public static class CharScreenHandlers
     public static Task OnReadyForAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => SendAccountDataTimesAsync(session, 0x15, ct); // GLOBAL_CACHE_MASK
 
+    /// <summary>GLOBAL_CACHE_MASK (типы 0,2,4 — account-wide); остальные (1,3,5,6,7) — per-character. M7 #17.</summary>
+    private const uint GlobalCacheMask = 0x15;
+
+    /// <summary>Глобальный (account-wide) ли тип account-data — иначе per-character. M7 #17.</summary>
+    private static bool IsGlobalType(uint dataType) => dataType < 8 && (GlobalCacheMask & (1u << (int)dataType)) != 0;
+
+    /// <summary>owner_id + is_char для типа: глобальный → account_id, per-character → guid персонажа. M7 #17.</summary>
+    private static (uint OwnerId, bool IsChar) OwnerFor(WorldSession session, uint dataType)
+        => IsGlobalType(dataType) ? (session.AccountId, false) : (session.InWorldGuid, true);
+
     [WorldOpcodeHandler(WorldOpcode.CmsgUpdateAccountData)]
     public static async Task OnUpdateAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        // Подтверждаем приём, иначе клиент зацикливается при входе.
         var reader = packet.Reader();
         var dataType = reader.UInt32();
+        var time = reader.UInt32();
+        // Остаток тела = decompressed_size(u32) + zlib-данные. Храним как есть (кросс-девайс хранилище,
+        // сервер не распаковывает). M7 #17.
+        var blob = packet.Body.Length > 8 ? packet.Body[8..] : Array.Empty<byte>();
+
+        var (ownerId, isChar) = OwnerFor(session, dataType);
+        if (ownerId != 0)
+        {
+            try { await session.Characters.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
+            catch (Exception ex) { session.Logger.LogDebug("UPDATE_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
+        }
+
+        // Подтверждаем приём (иначе клиент зацикливается при входе).
         await session.SendAsync(WorldOpcode.SmsgUpdateAccountDataComplete,
             new ByteWriter(8).UInt32(dataType).UInt32(0).ToArray(), ct);
     }
 
-    /// <summary>Времена кэша аккаунта. Используется на экране персонажей (0x15) и при входе (0xEA).</summary>
+    [WorldOpcodeHandler(WorldOpcode.CmsgRequestAccountData)]
+    public static async Task OnRequestAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var dataType = packet.Reader().UInt32();
+        var (ownerId, isChar) = OwnerFor(session, dataType);
+
+        uint time = 0;
+        byte[] blob = Array.Empty<byte>();
+        if (ownerId != 0)
+        {
+            try
+            {
+                var stored = await session.Characters.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
+                if (stored is { } s) { time = s.Time; blob = s.Data; }
+            }
+            catch (Exception ex) { session.Logger.LogDebug("REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
+        }
+
+        // SMSG_UPDATE_ACCOUNT_DATA (3.3.5, формат CMaNGOS — он эталон против клиента; wow_messages
+        // пропускает guid и time): PackedGuid игрока + u32 type + u32 time + (blob = decompressed_size+zlib).
+        // Пусто → decompressed_size = 0. ⚠️ Без guid/time клиент читает раскладку как мусор → панели ломаются.
+        var w = new ByteWriter(16 + blob.Length);
+        PackedGuid.Write(w, (ulong)session.InWorldGuid); // 0 вне мира → одиночный байт 0x00
+        w.UInt32(dataType);
+        w.UInt32(time);
+        if (blob.Length > 0)
+            w.Bytes(blob);
+        else
+            w.UInt32(0); // decompressed_size = 0 (нет данных)
+        await session.SendAsync(WorldOpcode.SmsgUpdateAccountData, w.ToArray(), ct);
+    }
+
+    /// <summary>
+    /// Времена account-data (SMSG_ACCOUNT_DATA_TIMES). Экран персонажей — глобальная маска (0x15),
+    /// вход в мир — per-character (0xEA). Шлём реальные времена сохранённых блобов, чтобы клиент знал,
+    /// что на сервере есть данные, и запросил их (CMSG_REQUEST_ACCOUNT_DATA). M7 #17.
+    /// </summary>
     internal static async Task SendAccountDataTimesAsync(WorldSession session, uint mask, CancellationToken ct)
     {
+        // Времена: для глобальных типов — по аккаунту, для per-character — по персонажу.
+        IReadOnlyDictionary<byte, uint> accountTimes = new Dictionary<byte, uint>();
+        IReadOnlyDictionary<byte, uint> charTimes = new Dictionary<byte, uint>();
+        try
+        {
+            if (session.AccountId != 0)
+                accountTimes = await session.Characters.GetAccountDataTimesAsync(session.AccountId, false, ct);
+            if (session.InWorldGuid != 0)
+                charTimes = await session.Characters.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
+        }
+        catch (Exception ex) { session.Logger.LogDebug("ACCOUNT_DATA_TIMES: {Msg}", ex.Message); }
+
         var w = new ByteWriter(48)
             .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
             .UInt8(1)
             .UInt32(mask);
         for (var i = 0; i < 8; i++)
-            if ((mask & (1u << i)) != 0)
-                w.UInt32(0);
+        {
+            if ((mask & (1u << i)) == 0)
+                continue;
+            var times = IsGlobalType((uint)i) ? accountTimes : charTimes;
+            w.UInt32(times.TryGetValue((byte)i, out var t) ? t : 0u);
+        }
         await session.SendAsync(WorldOpcode.SmsgAccountDataTimes, w.ToArray(), ct);
     }
 

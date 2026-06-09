@@ -82,6 +82,9 @@ public static class UpdateField
     /// <summary>Поле счётчиков целей 2/3 (две u16: obj2 low, obj3 high).</summary>
     public static int QuestLogSlotCounters23(int slot) => QuestLogSlotId(slot) + 3;
     public const int PlayerFlags = 0x0096;
+    /// <summary>PLAYER_FIELD_BYTES (UNIT_END 0x94 + 0x419). Байт 2 — маска видимых доп. панелей
+    /// (CMSG_SET_ACTIONBAR_TOGGLES). M7 #17.</summary>
+    public const int PlayerFieldBytes = 0x04AD;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
     public const int PlayerBytes3 = 0x009B;       // gender|drunk

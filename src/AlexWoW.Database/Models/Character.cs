@@ -22,4 +22,5 @@ public sealed class Character
     public float Y { get; init; }
     public float Z { get; init; }
     public uint Money { get; init; }   // медь (M6.2)
+    public byte ActionBars { get; set; } // M7 #17: маска видимых доп. панелей (PLAYER_FIELD_BYTES[2])
 }
