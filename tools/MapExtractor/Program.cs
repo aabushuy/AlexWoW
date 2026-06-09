@@ -29,6 +29,14 @@ if (args.Length >= 3 && args[0].Equals("factiontemplate", StringComparison.Ordin
     return;
 }
 
+// Дамп SpellCastTimes.dbc: spellcasttimes <dataDir> — index → base cast time (мс) как C#-инициализатор (M10.2).
+if (args.Length >= 2 && args[0].Equals("spellcasttimes", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqSct = new MpqChain(args[1]);
+    SpellCastTimesDump.Print(mpqSct);
+    return;
+}
+
 // Диагностика Faction.dbc: faction <dataDir> <id> [id2 ...] — печать reputationListID и base standing.
 if (args.Length >= 3 && args[0].Equals("faction", StringComparison.OrdinalIgnoreCase))
 {

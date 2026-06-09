@@ -41,12 +41,18 @@ public static class SpellCaster
         if (await SpellToggles.TryToggleAsync(session, spellId, ct))
             return;
 
-        if (!SpellCatalog.TryGet(spellId, out var info))
+        // M10.2: эффект спелла из spell_template (с кэшем; фолбэк — легаси-словарь при недоступности БД).
+        var info = await SpellCatalog.GetAsync(session.WorldDb, spellId, session.Logger, ct);
+        if (info is null)
         {
             // Неизвестный спелл — не ломаем клиент: шлём GO без эффекта (снимает «каст»).
+            session.Logger.LogDebug("CAST '{User}': spell={Spell} не найден (ни spell_template, ни легаси) → GO без эффекта",
+                session.Account, spellId);
             await SendSpellGoAsync(session, spellId, 0, ct);
             return;
         }
+
+        var manaCost = EffectiveManaCost(session, info);
 
         // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
         if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && Environment.TickCount64 < readyAt)
@@ -58,7 +64,7 @@ public static class SpellCaster
 
         // Мана: не хватает на каст → отказ (NO_POWER → «Недостаточно маны» у клиента). Списываем при
         // завершении (CompleteCast), а проверяем на старте — между ними мана только регенится.
-        if (session.MaxMana > 0 && session.Mana < info.ManaCost)
+        if (session.MaxMana > 0 && session.Mana < manaCost)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
@@ -102,6 +108,20 @@ public static class SpellCaster
         });
     }
 
+    /// <summary>
+    /// Стоимость маны спелла (M10.2): флэтом из spell_template, иначе процентом базовой маны кастера.
+    /// База — текущий MaxMana (приближение CreateMana; бонус от интеллекта при экипировке слегка завышает
+    /// стоимость на высоких уровнях — уточним в M10.3/M10.4). Не-мана-классам стоимость не считаем.
+    /// </summary>
+    private static uint EffectiveManaCost(WorldSession session, SpellCatalog.SpellInfo info)
+    {
+        if (info.ManaCost > 0)
+            return info.ManaCost;
+        if (info.ManaCostPct > 0 && session.MaxMana > 0)
+            return Math.Max(1u, info.ManaCostPct * session.MaxMana / 100);
+        return 0;
+    }
+
     /// <summary>Клиент отменил каст (Esc) — снимаем pending, эффект не применяем.</summary>
     internal static void CancelCast(WorldSession session) => session.CastingSpellId = 0;
 
@@ -134,9 +154,10 @@ public static class SpellCaster
         // Расход маны (правило 5 секунд: реген паузится от LastSpellCastMs) + апдейт полоски себе.
         var now = Environment.TickCount64;
         session.LastSpellCastMs = now;
-        if (session.MaxMana > 0 && info.ManaCost > 0)
+        var manaCost = EffectiveManaCost(session, info);
+        if (session.MaxMana > 0 && manaCost > 0)
         {
-            session.Mana = session.Mana > info.ManaCost ? session.Mana - info.ManaCost : 0;
+            session.Mana = session.Mana > manaCost ? session.Mana - manaCost : 0;
             await ManaRegen.SendManaUpdateAsync(session, ct);
         }
 
