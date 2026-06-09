@@ -58,8 +58,9 @@ public static class CombatHandlers
         await session.SendAsync(WorldOpcode.SmsgAttackStart, start, ct);
         session.Logger.LogDebug("ATTACKSWING '{User}' → существо guid={Guid}", session.Account, victimGuid);
 
-        // M6.7: существо отвечает — входит в бой с атакующим (рык агро при первом входе).
-        await EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
+        // M7 #13: НЕ агрим существо по самой команде атаки (она приходит с любой дистанции) — нейтрал
+        // становится враждебным только по реально нанесённому удару (см. TickMeleeAsync). Враждебные
+        // мобы агрятся независимо через авто-агро по близости (M6.7-2b).
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAttackStop)]
@@ -129,8 +130,9 @@ public static class CombatHandlers
             return;
         }
 
-        // M6.7: пока бьём существо — держим его в ответном бою (если оно сбросилось, напр. отходом).
-        await EnsureCreatureRetaliationAsync(session, creature, roar: false, ct);
+        // M6.7/M7 #13: ответный бой запускается по landed-удару (в мили-радиусе). Рык агро — при первом
+        // входе в бой (EnterCreatureCombatAsync идемпотентен: если уже в бою, roar игнорируется).
+        await EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
     }
 
     private static async Task StopAttackAsync(WorldSession session, ulong enemyGuid, CancellationToken ct)
@@ -159,7 +161,7 @@ public static class CombatHandlers
     /// Существо входит/остаётся в ответном бою с этим игроком. Идемпотентно: если уже в бою — no-op.
     /// <paramref name="roar"/> — слать ли рык агро (первый вход; на «удержании» — нет). M6.7.
     /// </summary>
-    private static Task EnsureCreatureRetaliationAsync(WorldSession session, WorldCreature creature, bool roar, CancellationToken ct)
+    internal static Task EnsureCreatureRetaliationAsync(WorldSession session, WorldCreature creature, bool roar, CancellationToken ct)
         => EnterCreatureCombatAsync(session.World, creature, (ulong)session.InWorldGuid, roar, ct);
 
     /// <summary>

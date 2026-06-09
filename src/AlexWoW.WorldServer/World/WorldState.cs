@@ -253,14 +253,21 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
         creature.Y = creature.HomeY;
         creature.Z = creature.HomeZ;
         creature.O = creature.HomeO;
-        var wasLootable = creature.Lootable; // M6.6: труп больше не lootable
-        creature.Lootable = false;
+        creature.Lootable = false; // M6.6: труп больше не lootable
         creature.Loot = null;
-        await BroadcastCreatureHealthAsync(creature, ct);
-        if (wasLootable)
-            await BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
-                CreatureUpdate.BuildDynamicFlagsUpdate(creature.Guid, 0), ct);
-        logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось", creature.Template.Name, creature.Guid);
+
+        // M7 #15: пере-создать у наблюдателей на ТОЧКЕ СПАВНА (DESTROY+CREATE). Иначе оживший виден на
+        // месте смерти (после погони — далеко от дома): мы сбрасываем позицию на Home, но клиенту об
+        // этом не сообщали. CREATE несёт полное состояние (позиция/HP/флаги), снимая и труп, и lootable.
+        var time = (uint)Environment.TickCount;
+        var destroy = new ByteWriter(9).UInt64(creature.Guid).UInt8(0).ToArray();
+        foreach (var observer in ObserversOf(creature).ToList())
+        {
+            await observer.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
+            await observer.Session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                CreatureUpdate.BuildCreateObject(creature, time), ct);
+        }
+        logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось на спавне", creature.Template.Name, creature.Guid);
     }
 
     /// <summary>
