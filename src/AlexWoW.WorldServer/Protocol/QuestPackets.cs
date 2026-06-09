@@ -96,6 +96,7 @@ public static class QuestPackets
         w.UInt32(0);                 // required_opposite_faction
         w.UInt32(0);                 // required_opposite_reputation_value
         w.UInt32(q.NextQuestId);     // next_quest_in_chain
+        w.UInt32(q.RewXpId);         // reward_xp_id (3.3.x) — БЕЗ него съезжает массив наград (M7 #19)
         w.UInt32(q.RewOrReqMoney > 0 ? (uint)q.RewOrReqMoney : 0u); // money_reward
         w.UInt32(0);                 // max_level_money_reward
         w.UInt32(q.RewSpell);        // reward_spell
@@ -119,8 +120,7 @@ public static class QuestPackets
         w.UInt32(0);                 // point_map_id
         w.Single(0f).Single(0f);     // position
         w.UInt32(0);                 // point_opt
-        w.UInt32(0);                 // ДОП. поле перед строками (wow_messages его не указывает; без него
-                                     // клиент съедает первые 4 байта title — эмпирически найдено). M6.5.
+        // (M7 #19) костыльный лишний u32 убран — недостающие 4 байта были полем reward_xp_id выше.
 
         w.CString(q.Title);
         w.CString(q.Objectives);     // objective_text

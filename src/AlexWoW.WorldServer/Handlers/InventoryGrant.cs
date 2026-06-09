@@ -24,29 +24,70 @@ public static class InventoryGrant
     }
 
     /// <summary>
-    /// Кладёт предмет в первый свободный слот рюкзака: persist (character_items) + сессия + создание
-    /// item-объекта у клиента + привязка к слоту. Возвращает созданный предмет или null, если места нет.
+    /// Кладёт <paramref name="qty"/> предметов в рюкзак (M6.6 + M7 #20): сперва ДОЛИВАЕТ существующие
+    /// стопки того же предмета до лимита (`item_template.stackable`), затем остаток — в новые слоты
+    /// (по лимиту на слот). Persist (character_items) + сессия + апдейты клиенту (stack/create/слот).
+    /// Возвращает последний затронутый предмет или null, если ничего не поместилось (нет места).
     /// </summary>
     public static async Task<InventoryItem?> TryGiveAsync(WorldSession session, uint itemEntry, uint qty, CancellationToken ct)
     {
-        var slot = FreeBackpackSlot(session);
-        if (slot < 0)
-            return null;
-
+        if (qty == 0)
+            qty = 1;
         var ownerGuid = session.InWorldGuid;
-        var itemLow = await session.Characters.AddItemAsync(ownerGuid, itemEntry, InventorySlots.MainBag, (byte)slot, qty, ct);
-        var item = new InventoryItem
+
+        // Лимит стопки из шаблона (нестакающийся → 1). БД мира недоступна — считаем нестакающимся.
+        uint maxStack = 1;
+        try
         {
-            ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
-            Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = qty,
-        };
-        session.Inventory.Add(item);
+            var t = await session.WorldDb.GetItemTemplateAsync(itemEntry, ct);
+            if (t is not null)
+                maxStack = (uint)Math.Max(1, t.Stackable);
+        }
+        catch { /* без шаблона — кладём как нестакающийся */ }
 
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid), ct);
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
+        var remaining = qty;
+        InventoryItem? last = null;
 
-        await QuestHandlers.OnItemGainedAsync(session, itemEntry, ct); // M6.10: зачёт item-целей квестов
-        return item;
+        // 1) Долить существующие стопки того же предмета (только для стакающихся).
+        if (maxStack > 1)
+        {
+            foreach (var stack in session.Inventory.Where(i => i.ItemEntry == itemEntry && i.StackCount < maxStack).ToList())
+            {
+                if (remaining == 0)
+                    break;
+                var add = Math.Min(remaining, maxStack - stack.StackCount);
+                stack.StackCount += add;
+                remaining -= add;
+                await session.Characters.SetItemStackAsync(stack.ItemGuid, stack.StackCount, ct);
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ItemObject.BuildStackUpdate(ItemObject.ItemGuid(stack.ItemGuid), stack.StackCount), ct);
+                last = stack;
+            }
+        }
+
+        // 2) Остаток — в новые слоты (по maxStack на слот).
+        while (remaining > 0)
+        {
+            var slot = FreeBackpackSlot(session);
+            if (slot < 0)
+                break; // нет места — остаток не выдан (bag-full → почта, M7 #14)
+            var portion = Math.Min(remaining, maxStack);
+            var itemLow = await session.Characters.AddItemAsync(ownerGuid, itemEntry, InventorySlots.MainBag, (byte)slot, portion, ct);
+            var item = new InventoryItem
+            {
+                ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
+                Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = portion,
+            };
+            session.Inventory.Add(item);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid), ct);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
+            remaining -= portion;
+            last = item;
+        }
+
+        if (last is not null)
+            await QuestHandlers.OnItemGainedAsync(session, itemEntry, ct); // M6.10: зачёт item-целей квестов
+        return last;
     }
 }

@@ -107,6 +107,7 @@ public static class QuestHandlers
             p.Complete = true;
             await session.SendAsync(WorldOpcode.SmsgQuestupdateComplete, QuestPackets.BuildUpdateComplete(p.QuestId), ct);
             await PersistActiveAsync(session, slot, p, ct);
+            await PushQuestStatusesAsync(session, ct); // M7 #18: «?» появляется у приёмщика
         }
     }
 
@@ -154,8 +155,39 @@ public static class QuestHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgQuestgiverStatusMultipleQuery)]
-    public static async Task OnStatusMultipleQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public static Task OnStatusMultipleQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+        => SendVisibleQuestStatusesAsync(session, ct);
+
+    /// <summary>
+    /// Пушит АКТУАЛЬНЫЕ статусы иконок видимым квест-NPC одиночными SMSG_QUESTGIVER_STATUS (0x183) —
+    /// после изменения состояния квестов (взятие/прогресс/сдача). Шлём по каждому giver/ender, ВКЛЮЧАЯ
+    /// статус None (он очищает иконку у клиента), иначе исчезнувшая «!»/«?» не убирается. Multiple-ответ
+    /// клиент шлёт лишь по своему запросу (или на релоге), поэтому для живого обновления нужен этот push. M7 #18.
+    /// </summary>
+    internal static async Task PushQuestStatusesAsync(WorldSession session, CancellationToken ct)
     {
+        if (session.InWorldGuid == 0)
+            return;
+        await session.World.Quests.EnsureLoadedAsync(ct);
+        foreach (var (guid, creature) in session.VisibleNpcs)
+        {
+            var entry = creature.Template.Entry;
+            if (!session.World.Quests.IsGiver(entry) && !session.World.Quests.IsEnder(entry))
+                continue; // не квест-NPC — иконки и так нет
+            var status = await StatusForAsync(session, entry, ct);
+            await session.SendAsync(WorldOpcode.SmsgQuestgiverStatus,
+                new ByteWriter(12).UInt64(guid).UInt32(status).ToArray(), ct);
+        }
+    }
+
+    /// <summary>
+    /// Шлёт статусы иконок (!/?) всех видимых квестгиверов одним SMSG_QUESTGIVER_STATUS_MULTIPLE —
+    /// ОТВЕТ на запрос клиента (multiple-query) и на релоге; только не-None (клиент стартует без иконок). M6.5.
+    /// </summary>
+    internal static async Task SendVisibleQuestStatusesAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return;
         await session.World.Quests.EnsureLoadedAsync(ct);
 
         var reports = new List<(ulong Guid, byte Status)>();
@@ -300,6 +332,7 @@ public static class QuestHandlers
                 m => m.SetUInt32(UpdateField.QuestLogSlotId(slot), questId)), ct);
         if (prog.Complete) // квест без целей (напр. «поговорить с X», где X — приёмщик) сразу выполнен
             await session.SendAsync(WorldOpcode.SmsgQuestupdateComplete, QuestPackets.BuildUpdateComplete(questId), ct);
+        await PushQuestStatusesAsync(session, ct); // M7 #18: «!» сразу пропадает после взятия
         session.Logger.LogInformation("QUEST ACCEPT '{User}': quest={Quest} → слот {Slot} (complete={C})",
             session.Account, questId, slot, prog.Complete);
     }
@@ -375,6 +408,7 @@ public static class QuestHandlers
                 m.SetUInt32(UpdateField.QuestLogSlotCounters23(slot), 0);
             }), ct);
         await session.SendAsync(WorldOpcode.SmsgQuestgiverQuestComplete, QuestPackets.BuildQuestComplete(quest), ct);
+        await PushQuestStatusesAsync(session, ct); // M7 #18: «?» пропадает после сдачи
         session.Logger.LogInformation("QUEST TURN-IN '{User}': quest={Quest} (деньги {Money})", session.Account, questId, quest.RewOrReqMoney);
     }
 
@@ -430,6 +464,7 @@ public static class QuestHandlers
             {
                 p.Complete = true;
                 await session.SendAsync(WorldOpcode.SmsgQuestupdateComplete, QuestPackets.BuildUpdateComplete(p.QuestId), ct);
+                await PushQuestStatusesAsync(session, ct); // M7 #18: «?» появляется у приёмщика
             }
         }
     }
