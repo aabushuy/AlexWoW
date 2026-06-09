@@ -14,4 +14,7 @@ public sealed record TrainerSpell
     public uint ReqAbility1 { get; init; }
     public uint ReqAbility2 { get; init; }
     public uint ReqAbility3 { get; init; }
+    /// <summary>Уровень изучения ранга из Spell.dbc (spell_template.SpellLevel). В npc_trainer.reqlevel
+    /// дамп почти всегда 0, поэтому реальный гейт ранга по уровню берём отсюда. #27.</summary>
+    public uint SpellLevel { get; init; }
 }
