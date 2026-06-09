@@ -101,6 +101,13 @@ public sealed class WorldSession
     internal bool IsDevNpc(ulong guid) => DevNpcs.Count > 0 && DevNpcs.ContainsValue(guid);
 
     /// <summary>
+    /// Реестр dev-гейм-объектов этой сессии (слот → guid): крафт-станки/почта (<c>.craft</c>). Спавнятся
+    /// прямой посылкой и НЕ кладутся в <see cref="VisibleGos"/> — пересчёт видимости их не трогает (липкость
+    /// «бесплатно»). Снимаются через <c>.craft off</c>/<c>.devclean</c>. D3.
+    /// </summary>
+    internal Dictionary<string, ulong> DevGos { get; } = new();
+
+    /// <summary>
     /// Другие игроки, показанные клиенту этой сессии (set guid'ов). Доступ из нескольких потоков
     /// (сосед спавнит нас из своего потока) — потокобезопасный. Динамическая видимость игроков (M6).
     /// </summary>
@@ -258,6 +265,7 @@ public sealed class WorldSession
         foreach (var guid in DevNpcs.Values) // D1: снять dev-сущности с глобального реестра существ
             World.RemoveCreature(guid);
         DevNpcs.Clear();
+        DevGos.Clear();      // D3: dev-станки (клиент выгрузил мир)
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();

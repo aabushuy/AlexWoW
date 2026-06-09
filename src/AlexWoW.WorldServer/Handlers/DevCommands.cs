@@ -99,6 +99,10 @@ public static class DevCommands
                     await ProfTrainerCommandAsync(session, parts[1].ToLowerInvariant(), ct);
                     return true;
 
+                case "craft" when parts.Length >= 2:
+                    await CraftCommandAsync(session, parts[1].ToLowerInvariant(), ct);
+                    return true;
+
                 case "devclean":
                     if (session.InWorldGuid == 0)
                         await ReplyAsync(session, "Доступно только в мире", ct);
@@ -110,7 +114,7 @@ public static class DevCommands
                     return true;
 
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .proftrainer <prof>|off | .devclean", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy | .trainer <class>|off | .proftrainer <prof>|off | .craft anvil|forge|cookfire|mailbox|off | .devclean", ct);
                     return true;
 
                 default:
@@ -228,6 +232,44 @@ public static class DevCommands
 
         var ok = await session.World.SummonDevNpcAsync(session, entry.Value, World.DevSlot.ProfTrainer, ct);
         await ReplyAsync(session, ok ? $"Тренер профессии '{arg}' поставлен" : "Не удалось поставить тренера", ct);
+    }
+
+    /// <summary>Крафт-станки/почта → канонические entry гейм-объектов (стабильные мировые GO). Anvil/Forge/
+    /// Campfire — spell-focus (type 8) той же группы, что использует клиент для «вы рядом с …»; Mailbox — type 19.
+    /// D3.</summary>
+    private static readonly Dictionary<string, uint> CraftGo = new()
+    {
+        ["anvil"] = 1744,      // Anvil (spell-focus 1)
+        ["forge"] = 1685,      // Forge (spell-focus 3)
+        ["cookfire"] = 1798,   // Campfire (spell-focus 4 — кулинария)
+        ["mailbox"] = 32349,   // Mailbox (type 19)
+    };
+
+    /// <summary>
+    /// <c>.craft anvil|forge|cookfire|mailbox</c> — поставить крафт-станок/почту (гейм-объект) у игрока
+    /// (один на тип, повтор заменяет); <c>.craft off</c> — снять все dev-станки. Реюз каркаса D1/D3. D3.
+    /// </summary>
+    private static async Task CraftCommandAsync(WorldSession session, string arg, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+        {
+            await ReplyAsync(session, "Доступно только в мире", ct);
+            return;
+        }
+        if (arg == "off")
+        {
+            await session.World.DevCleanGosAsync(session, ct);
+            await ReplyAsync(session, "Dev-станки сняты", ct);
+            return;
+        }
+        if (!CraftGo.TryGetValue(arg, out var entry))
+        {
+            await ReplyAsync(session, "Станок: anvil/forge/cookfire/mailbox (или off)", ct);
+            return;
+        }
+
+        var ok = await session.World.SummonDevGoAsync(session, entry, arg, ct);
+        await ReplyAsync(session, ok ? $"Станок '{arg}' поставлен" : "Не удалось поставить станок", ct);
     }
 
     /// <summary>.xp 500 или .xp add 500.</summary>
