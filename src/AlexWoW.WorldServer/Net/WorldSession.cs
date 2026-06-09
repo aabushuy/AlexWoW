@@ -54,6 +54,8 @@ public sealed class WorldSession
     internal uint AuthSeed { get; set; }
     internal string? Account { get; set; }
     internal uint AccountId { get; set; }
+    /// <summary>Аккаунт — администратор (доступ к дев/GM-командам). Ставится при auth. M7.</summary>
+    internal bool IsAdmin { get; set; }
     internal uint InWorldGuid { get; set; } // != 0, пока персонаж в мире
     internal float PosX { get; set; }
     internal float PosY { get; set; }

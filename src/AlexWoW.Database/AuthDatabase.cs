@@ -31,11 +31,19 @@ public sealed class AuthDatabase(string connectionString)
                 verifier    BINARY(32)   NOT NULL,
                 session_key BINARY(40)   NULL,
                 last_ip     VARCHAR(45)  NULL,
+                is_admin    TINYINT UNSIGNED NOT NULL DEFAULT 0,
                 created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
                 UNIQUE KEY uk_account_username (username)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
+
+        // M7: флаг администратора (доступ к DevCommands). Для существующих таблиц — ALTER (1060 = дубликат).
+        try
+        {
+            await db.ExecuteAsync("ALTER TABLE account ADD COLUMN is_admin TINYINT UNSIGNED NOT NULL DEFAULT 0;");
+        }
+        catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
 
         await db.ExecuteAsync("""
             CREATE TABLE IF NOT EXISTS realmlist (
@@ -67,7 +75,7 @@ public sealed class AuthDatabase(string connectionString)
         await using var db = await OpenAsync(ct);
         return await db.QuerySingleOrDefaultAsync<Account>("""
             SELECT id AS Id, username AS Username, salt AS Salt, verifier AS Verifier,
-                   session_key AS SessionKey, last_ip AS LastIp
+                   session_key AS SessionKey, last_ip AS LastIp, is_admin AS IsAdmin
             FROM account WHERE username = @username;
             """, new { username = username.ToUpperInvariant() });
     }
@@ -114,6 +122,14 @@ public sealed class AuthDatabase(string connectionString)
         await db.ExecuteAsync("""
             UPDATE account SET session_key = @sessionKey, last_ip = @ip WHERE id = @accountId;
             """, new { accountId, sessionKey, ip });
+    }
+
+    /// <summary>Ставит/снимает флаг администратора аккаунту. Возвращает число затронутых строк. M7.</summary>
+    public async Task<int> SetAdminAsync(string username, bool isAdmin, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        return await db.ExecuteAsync("UPDATE account SET is_admin = @isAdmin WHERE username = @username;",
+            new { username = username.ToUpperInvariant(), isAdmin = isAdmin ? 1 : 0 });
     }
 
     public async Task<IReadOnlyList<Realm>> GetRealmsAsync(CancellationToken ct = default)

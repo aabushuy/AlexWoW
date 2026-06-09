@@ -20,6 +20,12 @@ if (args.Length >= 1 && args[0].Equals("reset-all-passwords", StringComparison.O
     return await PasswordReset.RunAsync(args);
 }
 
+// CLI: флаг администратора — set-admin <username> [0|1]
+if (args.Length >= 1 && args[0].Equals("set-admin", StringComparison.OrdinalIgnoreCase))
+{
+    return await AccountAdmin.RunAsync(args);
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
