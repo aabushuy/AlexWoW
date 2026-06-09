@@ -54,6 +54,8 @@ public sealed class WorldRepository(
     // ---- ISpellTemplateRepository ----
     public Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default)
         => spells.GetSpellAsync(id, ct);
+    public Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default)
+        => spells.GetPrevRankAsync(spellId, ct);
 
     // ---- ILootRepository ----
     public Task<CreatureLootData?> GetCreatureLootAsync(uint creatureEntry, CancellationToken ct = default)

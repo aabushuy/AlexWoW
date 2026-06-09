@@ -159,6 +159,8 @@ public sealed class WorldSession
     /// <summary>Поколение каста: инкремент на каждый каст; отложенное завершение проверяет совпадение
     /// (чтобы не завершить отменённый/перебитый каст). M6.4.</summary>
     internal int CastGeneration { get; set; }
+    /// <summary>Момент окончания глобального кулдауна (GCD, <see cref="Environment.TickCount64"/>, мс). M10.3.</summary>
+    internal long GcdEndMs { get; set; }
 
     /// <summary>Текущая/макс. мана (UNIT_FIELD_POWER1). MaxMana=0 — класс без маны (rage/energy):
     /// расход не применяется. Инициализируется при входе в мир. M6.4 инкремент 2.</summary>

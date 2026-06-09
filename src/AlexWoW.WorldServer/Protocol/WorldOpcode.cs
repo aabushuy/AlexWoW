@@ -116,6 +116,7 @@ public enum WorldOpcode : uint
     SmsgTrainerBuySucceeded = 0x1B3,             // guid + spell — изучено
     SmsgTrainerBuyFailed = 0x1B4,                // guid + spell + reason (только консоль клиента)
     SmsgLearnedSpell = 0x12B,                    // spell + u16 — добавить абилку в книгу
+    SmsgSupercededSpell = 0x12C,                 // u32 old + u32 new — высший ранг заменяет низший (M10.3)
 
     // Квесты (M6.5)
     CmsgQuestQuery = 0x05C,                     // u32 quest_id — данные квеста для журнала

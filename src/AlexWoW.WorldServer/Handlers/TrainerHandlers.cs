@@ -234,11 +234,8 @@ public static class TrainerHandlers
                 PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Money), ct);
         }
 
-        // Выучить: персист + клиентский грант (SMSG_LEARNED_SPELL добавляет абилку в книгу).
-        session.KnownSpells.Add(spellId);
-        await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
-        await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
-            new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
+        // Выучить: персист + клиентский грант (LEARNED, либо SUPERCEDED для высшего ранга). M10.3.
+        await SpellLearn.GrantAsync(session, spellId, ct);
         await session.SendAsync(WorldOpcode.SmsgTrainerBuySucceeded,
             new ByteWriter(12).UInt64(npcGuid).UInt32(spellId).ToArray(), ct);
         session.Logger.LogInformation("TRAINER BUY '{User}': spell={Spell} за {Cost}, осталось {Money}",
@@ -319,15 +316,14 @@ public static class TrainerHandlers
         if (trainer is null)
             return -1;
 
+        // По возрастанию уровня изучения — чтобы низший ранг учился раньше высшего и SUPERCEDED шёл цепочкой. M10.3.
         var learned = 0;
-        foreach (var s in trainer.Spells)
+        foreach (var s in trainer.Spells.OrderBy(x => x.SpellLevel))
         {
-            if (StateFor(session, c.Level, s) != StateGreen || !session.KnownSpells.Add(s.Spell))
+            if (StateFor(session, c.Level, s) != StateGreen)
                 continue;
-            await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, s.Spell, ct);
-            await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
-                new ByteWriter(6).UInt32(s.Spell).UInt16(0).ToArray(), ct);
-            learned++;
+            if (await SpellLearn.GrantAsync(session, s.Spell, ct))
+                learned++;
         }
         session.Logger.LogInformation("LEARNALL '{User}': выучено {Count} абилок (класс {Class}, ур.{Level})",
             session.Account, learned, c.Class, c.Level);
