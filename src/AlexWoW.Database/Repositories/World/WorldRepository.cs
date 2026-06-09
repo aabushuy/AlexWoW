@@ -52,6 +52,8 @@ public sealed class WorldRepository(
         => trainers.GetTrainerAsync(entry, ct);
     public Task<uint?> GetClassTrainerEntryAsync(byte classId, CancellationToken ct = default)
         => trainers.GetClassTrainerEntryAsync(classId, ct);
+    public Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default)
+        => trainers.GetProfessionTrainerEntryAsync(subnameKeyword, ct);
 
     // ---- ISpellTemplateRepository ----
     public Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default)

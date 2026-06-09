@@ -146,9 +146,13 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         if (row is null)
             return false;
 
+        // Faction → 35 («дружелюбен ко ВСЕМ»): dev-сущность не должна быть враждебной игроку любой
+        // фракции/расы (иначе госсип/торговля не откроются — ПКМ атакует). Так можно брать самого полного
+        // тренера профессии (Grand Master), даже если в дампе он фракционный. D1/D2.
+        const uint DevFriendlyFaction = 35;
         var template = new CreatureTemplate(
             row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId1,
-            row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
+            row.MinLevel, DevFriendlyFaction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
 
         // Заменить прежнюю сущность в этом слоте (только 1 тренер/вендор и т.п.).
         await DespawnDevNpcAsync(session, slot, ct);

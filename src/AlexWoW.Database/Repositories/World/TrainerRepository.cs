@@ -77,4 +77,22 @@ public sealed class TrainerRepository(string connectionString)
             LIMIT 1;
             """, new { classId }, cancellationToken: ct));
     }
+
+    public async Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+
+        // TrainerType=2 (профессия), профессия — по подписи (нет skill_line_ability). Самый полный набор
+        // (прямой npc_trainer + npc_trainer_template) → Grand Master. Фракция не важна (dev-спавн делает
+        // существо дружелюбным ко всем).
+        return await db.QuerySingleOrDefaultAsync<uint?>(new CommandDefinition("""
+            SELECT ct.Entry
+            FROM creature_template ct
+            WHERE ct.TrainerType = 2 AND ct.SubName LIKE CONCAT('%', @kw, '%')
+            ORDER BY ((SELECT COUNT(*) FROM npc_trainer nt WHERE nt.entry = ct.Entry) +
+                      (SELECT COUNT(*) FROM npc_trainer_template ntt WHERE ntt.entry = ct.TrainerTemplateId)) DESC,
+                     ct.Entry ASC
+            LIMIT 1;
+            """, new { kw = subnameKeyword }, cancellationToken: ct));
+    }
 }

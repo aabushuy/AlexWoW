@@ -15,4 +15,12 @@ public interface ITrainerRepository
     /// чтобы команда работала любому персонажу класса (вкл. ДК) независимо от фракции/расы. null — нет тренера.
     /// </summary>
     Task<uint?> GetClassTrainerEntryAsync(byte classId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Entry тренера профессии (TrainerType=2) для дев-команды <c>.proftrainer</c> (D2). В этом дампе нет
+    /// <c>skill_line_ability</c>, поэтому профессию определяем по подписи существа: SubName LIKE
+    /// '%<paramref name="subnameKeyword"/>%' (напр. «Blacksmith»). Берём самого ПОЛНОГО по набору
+    /// (Grand Master) — фракция тренера не важна, dev-спавн делает его дружелюбным ко всем. null — не найден.
+    /// </summary>
+    Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default);
 }
