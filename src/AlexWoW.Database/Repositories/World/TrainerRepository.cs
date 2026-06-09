@@ -56,4 +56,25 @@ public sealed class TrainerRepository(string connectionString)
             Greeting = greeting ?? string.Empty, Spells = spells,
         };
     }
+
+    public async Task<uint?> GetClassTrainerEntryAsync(byte classId, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+
+        // Только тренеры класса с ПРЯМЫМ npc_trainer (наши дев-тренеры Faction=35 кладут спеллы напрямую;
+        // у канонических городских тренеров спеллы в npc_trainer_template — их сюда не берём, чтобы не
+        // спавнить тренера чужой фракции, который для игрока был бы враждебным). Предпочтения:
+        // 1) дружелюбный ко всем (Faction=35), 2) зарезервированный дев-диапазон, 3) самый полный набор.
+        return await db.QuerySingleOrDefaultAsync<uint?>(new CommandDefinition("""
+            SELECT ct.Entry
+            FROM creature_template ct
+            WHERE ct.TrainerType = 0 AND ct.TrainerClass = @classId
+              AND EXISTS (SELECT 1 FROM npc_trainer nt WHERE nt.entry = ct.Entry)
+            ORDER BY (ct.Faction = 35) DESC,
+                     (ct.Entry BETWEEN 990001 AND 990099) DESC,
+                     (SELECT COUNT(*) FROM npc_trainer nt WHERE nt.entry = ct.Entry) DESC,
+                     ct.Entry ASC
+            LIMIT 1;
+            """, new { classId }, cancellationToken: ct));
+    }
 }

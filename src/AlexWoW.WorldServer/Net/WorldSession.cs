@@ -91,6 +91,16 @@ public sealed class WorldSession
     internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
 
     /// <summary>
+    /// Реестр dev-сущностей-существ этой сессии (слот → guid): класс-тренер/проф-тренер/вендор реагентов.
+    /// Per-session (привязаны к месту/виду игрока): replace по слоту, снятие через <c>.devclean</c>, и
+    /// «липкость» в видимости (см. <see cref="IsDevNpc"/>) — не сносятся при ходьбе. D1.
+    /// </summary>
+    internal Dictionary<string, ulong> DevNpcs { get; } = new();
+
+    /// <summary>Является ли NPC dev-сущностью этой сессии — чтобы пересчёт видимости не слал DESTROY. D1.</summary>
+    internal bool IsDevNpc(ulong guid) => DevNpcs.Count > 0 && DevNpcs.ContainsValue(guid);
+
+    /// <summary>
     /// Другие игроки, показанные клиенту этой сессии (set guid'ов). Доступ из нескольких потоков
     /// (сосед спавнит нас из своего потока) — потокобезопасный. Динамическая видимость игроков (M6).
     /// </summary>
@@ -245,6 +255,9 @@ public sealed class WorldSession
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;
+        foreach (var guid in DevNpcs.Values) // D1: снять dev-сущности с глобального реестра существ
+            World.RemoveCreature(guid);
+        DevNpcs.Clear();
         VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
         VisibleGos.Clear();
         VisiblePlayers.Clear();
