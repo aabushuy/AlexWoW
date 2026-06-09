@@ -23,9 +23,9 @@ public sealed class WorldTick(WorldState world, CreatureDirector creatures, Fact
             try
             {
                 await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
-                // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике;
+                // M6.4: завершение каста — точно по времени (Task.Delay в SpellCaster), не в тике;
                 // здесь — реген маны (вне «правила 5 секунд»).
-                await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
+                await Handlers.ManaRegen.TickAsync(player.Session, now, ct);
                 await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
                 await Handlers.Auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
                 await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP

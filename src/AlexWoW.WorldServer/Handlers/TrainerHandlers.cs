@@ -288,4 +288,49 @@ public static class TrainerHandlers
     internal static bool IsTrainerNpc(WorldSession session, ulong npcGuid)
         => session.VisibleNpcs.TryGetValue(npcGuid, out var creature)
            && (creature.Template.NpcFlags & NpcFlagTrainer) != 0;
+
+    /// <summary>
+    /// Дев-команда <c>.learnall</c> (M-абилки): учит ВСЕ доступные по текущему уровню (состояние GREEN)
+    /// абилки у ближайшего подходящего классового тренера — без списания денег. Переиспользует гейтинг
+    /// <see cref="StateFor"/>/<see cref="FitsPlayer"/> (только разрешённые уровнем/предусловиями ранги).
+    /// Возвращает число выученных, либо -1, если рядом нет подходящего тренера. M-абилки (.learnall).
+    /// </summary>
+    internal static async Task<int> LearnAllFromNearbyTrainerAsync(WorldSession session, CancellationToken ct)
+    {
+        var c = session.Character;
+        if (c is null || session.InWorldGuid == 0)
+            return -1;
+
+        // Среди видимых тренеров найти первого, подходящего игроку по классу/расе.
+        TrainerData? trainer = null;
+        foreach (var creature in session.VisibleNpcs.Values)
+        {
+            if ((creature.Template.NpcFlags & NpcFlagTrainer) == 0)
+                continue;
+            TrainerData? t;
+            try { t = await session.WorldDb.GetTrainerAsync(CreatureEntry(creature.Guid), ct); }
+            catch { continue; }
+            if (t is not null && FitsPlayer(session, t))
+            {
+                trainer = t;
+                break;
+            }
+        }
+        if (trainer is null)
+            return -1;
+
+        var learned = 0;
+        foreach (var s in trainer.Spells)
+        {
+            if (StateFor(session, c.Level, s) != StateGreen || !session.KnownSpells.Add(s.Spell))
+                continue;
+            await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, s.Spell, ct);
+            await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
+                new ByteWriter(6).UInt32(s.Spell).UInt16(0).ToArray(), ct);
+            learned++;
+        }
+        session.Logger.LogInformation("LEARNALL '{User}': выучено {Count} абилок (класс {Class}, ур.{Level})",
+            session.Account, learned, c.Class, c.Level);
+        return learned;
+    }
 }

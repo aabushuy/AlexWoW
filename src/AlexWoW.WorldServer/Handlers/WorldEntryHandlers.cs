@@ -221,7 +221,7 @@ public static class WorldEntryHandlers
 
         // M6.4: боевые спеллы-заглушки умеет кастовать только маг (их эффекты хардкожены под мага).
         if (character.Class == ClassMage)
-            foreach (var s in SpellHandlers.GrantedCombatSpells)
+            foreach (var s in World.SpellCatalog.GrantedCombatSpells)
                 known.Add((uint)s);
 
         // Изученное у тренера (персист).

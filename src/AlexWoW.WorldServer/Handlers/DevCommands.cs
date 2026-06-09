@@ -10,7 +10,9 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Дев/тест-команды через чат (M9.4): сообщение, начинающееся с '.', не уходит в чат, а выполняет
 /// команду (прокачка/выдача предметов для теста). Гейт — env <c>WORLD_DEV_COMMANDS</c> (по умолчанию ВКЛ;
 /// "0" — выкл). ⚠️ Для прод-сервера гейтить по gmlevel аккаунта (сейчас — тестовый сервер).
-/// Команды: <c>.level N</c>, <c>.xp [add] N</c>, <c>.additem ID [count]</c>, <c>.help</c>.
+/// Команды: <c>.level N</c>, <c>.xp [add] N</c>, <c>.additem ID [count]</c>, <c>.learn SPELL</c>,
+/// <c>.learnall</c> (все доступные по уровню абилки у ближайшего тренера), <c>.buff/.unbuff SPELL</c>,
+/// <c>.dummy</c>, <c>.help</c>.
 /// </summary>
 public static class DevCommands
 {
@@ -56,6 +58,18 @@ public static class DevCommands
                     await ReplyAsync(session, $"Изучен спелл {spellId}", ct);
                     return true;
 
+                case "learnall":
+                    if (session.InWorldGuid == 0)
+                        await ReplyAsync(session, "Доступно только в мире", ct);
+                    else
+                    {
+                        var n = await TrainerHandlers.LearnAllFromNearbyTrainerAsync(session, ct);
+                        await ReplyAsync(session, n < 0
+                            ? "Рядом нет подходящего классового тренера"
+                            : $"Выучено абилок: {n}", ct);
+                    }
+                    return true;
+
                 case "buff" when parts.Length >= 2 && uint.TryParse(parts[1], out var buffSpell):
                     var secs = parts.Length >= 3 && uint.TryParse(parts[2], out var sv) ? sv : 120u;
                     await Auras.ApplyAsync(session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
@@ -78,7 +92,7 @@ public static class DevCommands
                     return true;
 
                 case "help" or "commands":
-                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .buff SPELL [сек] | .unbuff SPELL | .dummy", ct);
+                    await ReplyAsync(session, "Команды: .level N | .xp [add] N | .additem ID [count] | .learn SPELL | .learnall | .buff SPELL [сек] | .unbuff SPELL | .dummy", ct);
                     return true;
 
                 default:
