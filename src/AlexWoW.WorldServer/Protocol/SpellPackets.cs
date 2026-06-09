@@ -32,13 +32,19 @@ public static class SpellPackets
         return w.ToArray();
     }
 
-    /// <summary>SMSG_SPELL_GO (3.3.5): спелл «пошёл». flags=0x100, без conditional-полей.</summary>
-    public static byte[] BuildSpellGo(ulong caster, uint spellId, ulong targetGuid)
+    /// <summary>
+    /// SMSG_SPELL_GO (3.3.5): спелл «пошёл». flags=0x100. Байт после caster (wow_messages зовёт его
+    /// «extra_casts») = <paramref name="castCount"/> — это <c>m_cast_count</c> из CMaNGOS: клиент по нему
+    /// сопоставляет GO со СВОИМ pending-кастом и закрывает его. Если слать 0, клиент проигрывает визуал
+    /// (снаряд/урон), но НЕ завершает каст → поза/кнопка кастера залипают (#26). Должен совпадать с
+    /// cast_count из CMSG_CAST_SPELL (и из нашего SMSG_SPELL_START).
+    /// </summary>
+    public static byte[] BuildSpellGo(ulong caster, uint spellId, ulong targetGuid, byte castCount)
     {
         var w = new ByteWriter(48);
         PackedGuid.Write(w, caster);   // cast_item
         PackedGuid.Write(w, caster);   // caster
-        w.UInt8(0);                    // extra_casts
+        w.UInt8(castCount);            // m_cast_count (сопоставление с pending-кастом клиента)
         w.UInt32(spellId);
         w.UInt32(GoFlags);
         w.UInt32((uint)Environment.TickCount); // timestamp
