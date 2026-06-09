@@ -15,12 +15,12 @@ public static class SpellToggles
     /// Если spell — переключатель: завершить каст у клиента (SPELL_GO) и наложить перманентную ауру-форму.
     /// Возвращает true, если spell был переключателем и обработан (обычный каст пропускаем).
     /// </summary>
-    internal static async Task<bool> TryToggleAsync(WorldSession session, uint spellId, CancellationToken ct)
+    internal static async Task<bool> TryToggleAsync(WorldSession session, uint spellId, byte castCount, CancellationToken ct)
     {
         if (!SpellCatalog.TryGetToggle(spellId, out var toggle))
             return false;
 
-        await SpellCaster.SendSpellGoAsync(session, spellId, targetGuid: 0, ct); // завершить каст у клиента
+        await SpellCaster.SendSpellGoAsync(session, spellId, targetGuid: 0, castCount, ct); // завершить каст у клиента
         await Auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
             group: toggle.Group, persist: true);
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",

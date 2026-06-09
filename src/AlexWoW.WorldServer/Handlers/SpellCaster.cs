@@ -38,11 +38,8 @@ public static class SpellCaster
         if ((targetFlags & SpellPackets.TargetFlagUnit) != 0)
             targetGuid = r.PackedGuid();
 
-        session.CastCount = castCount;
-        session.CastTargetGuid = targetGuid;
-
         // M6.12/M7 #21: переключатели (стойки/ауры/аспекты) — мгновенная перманентная аура, без маны/цели/КД.
-        if (await SpellToggles.TryToggleAsync(session, spellId, ct))
+        if (await SpellToggles.TryToggleAsync(session, spellId, castCount, ct))
             return;
 
         // M10.3: уже идёт каст-тайм спелл → новый каст нельзя (как на оффе: кнопка блокируется, текущий
@@ -62,12 +59,12 @@ public static class SpellCaster
             // Неизвестный спелл — не ломаем клиент: шлём GO без эффекта (снимает «каст»).
             session.Logger.LogDebug("CAST '{User}': spell={Spell} не найден (ни spell_template, ни легаси) → GO без эффекта",
                 session.Account, spellId);
-            await SendSpellGoAsync(session, spellId, 0, ct);
+            await SendSpellGoAsync(session, spellId, 0, castCount, ct);
             return;
         }
 
         var now = Environment.TickCount64;
-        var manaCost = EffectiveManaCost(session, info);
+        var cost = EffectivePowerCost(session, info);
 
         // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
         if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && now < readyAt)
@@ -87,9 +84,9 @@ public static class SpellCaster
             return;
         }
 
-        // Мана: не хватает на каст → отказ (NO_POWER → «Недостаточно маны» у клиента). Списываем при
-        // завершении (CompleteCast), а проверяем на старте — между ними мана только регенится.
-        if (session.MaxMana > 0 && session.Mana < manaCost)
+        // Ресурс (мана/ярость/энергия): не хватает → отказ (NO_POWER → «Недостаточно …» у клиента). Списываем
+        // при завершении (CompleteCast), а проверяем на старте — между ними ресурс только регенится. M10.4a.
+        if (cost > 0 && CurrentPower(session, info.PowerType) < cost)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
@@ -102,7 +99,7 @@ public static class SpellCaster
 
         if (info.CastMs <= 0)
         {
-            await CompleteCastAsync(session, spellId, info, targetGuid, ct); // мгновенный
+            await CompleteCastAsync(session, spellId, info, targetGuid, castCount, ct); // мгновенный
             return;
         }
 
@@ -127,7 +124,7 @@ public static class SpellCaster
                 if (session.CastGeneration == gen && session.CastingSpellId == spellId && session.InWorldGuid != 0)
                 {
                     session.CastingSpellId = 0;
-                    await CompleteCastAsync(session, spellId, info, targetGuid, CancellationToken.None);
+                    await CompleteCastAsync(session, spellId, info, targetGuid, castCount, CancellationToken.None);
                 }
             }
             catch (Exception ex)
@@ -137,19 +134,33 @@ public static class SpellCaster
         });
     }
 
+    // Типы ресурса (UNIT power types): мана/ярость/энергия.
+    private const byte PowerMana = 0;
+    private const byte PowerRage = 1;
+    private const byte PowerEnergy = 3;
+
     /// <summary>
-    /// Стоимость маны спелла (M10.2): флэтом из spell_template, иначе процентом базовой маны кастера.
-    /// База — текущий MaxMana (приближение CreateMana; бонус от интеллекта при экипировке слегка завышает
-    /// стоимость на высоких уровнях — уточним в M10.3/M10.4). Не-мана-классам стоимость не считаем.
+    /// Стоимость ресурса спелла (M10.2 → M10.4a): для маны — флэт из spell_template или % MaxMana (приближение
+    /// базовой маны); для ярости/энергии — флэт в единицах ресурса (ярость в DBC уже ×10, как у нас).
     /// </summary>
-    private static uint EffectiveManaCost(WorldSession session, SpellCatalog.SpellInfo info)
+    private static uint EffectivePowerCost(WorldSession session, SpellCatalog.SpellInfo info)
     {
+        if (info.PowerType != PowerMana)
+            return info.ManaCost; // ярость/энергия — флэт
         if (info.ManaCost > 0)
             return info.ManaCost;
         if (info.ManaCostPct > 0 && session.MaxMana > 0)
             return Math.Max(1u, info.ManaCostPct * session.MaxMana / 100);
         return 0;
     }
+
+    /// <summary>Текущий запас ресурса кастера по типу (мана/ярость/энергия). M10.4a.</summary>
+    private static uint CurrentPower(WorldSession session, byte powerType) => powerType switch
+    {
+        PowerRage => session.Rage,
+        PowerEnergy => session.Energy,
+        _ => session.Mana,
+    };
 
     /// <summary>Клиент отменил каст (Esc) — снимаем pending, эффект не применяем.</summary>
     internal static void CancelCast(WorldSession session) => session.CastingSpellId = 0;
@@ -176,18 +187,27 @@ public static class SpellCaster
 
     /// <summary>Завершение каста: SPELL_GO + расход маны + кулдаун + применение эффекта (урон/хил) + лог.</summary>
     private static async Task CompleteCastAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
-        ulong targetGuid, CancellationToken ct)
+        ulong targetGuid, byte castCount, CancellationToken ct)
     {
-        await SendSpellGoAsync(session, spellId, targetGuid, ct);
+        await SendSpellGoAsync(session, spellId, targetGuid, castCount, ct);
 
-        // Расход маны (правило 5 секунд: реген паузится от LastSpellCastMs) + апдейт полоски себе.
+        // Расход ресурса: мана (правило 5 секунд: реген паузится от LastSpellCastMs) — или ярость/энергия
+        // для мили-абилок (списание + апдейт полоски). M10.4a.
         var now = Environment.TickCount64;
         session.LastSpellCastMs = now;
-        var manaCost = EffectiveManaCost(session, info);
-        if (session.MaxMana > 0 && manaCost > 0)
+        var cost = EffectivePowerCost(session, info);
+        if (cost > 0)
         {
-            session.Mana = session.Mana > manaCost ? session.Mana - manaCost : 0;
-            await ManaRegen.SendManaUpdateAsync(session, ct);
+            if (info.PowerType == PowerMana)
+            {
+                if (session.MaxMana > 0)
+                {
+                    session.Mana = session.Mana > cost ? session.Mana - cost : 0;
+                    await ManaRegen.SendManaUpdateAsync(session, ct);
+                }
+            }
+            else
+                await CombatResources.SpendPowerAsync(session, info.PowerType, cost, ct);
         }
 
         // Кулдаун: запускаем у клиента (полоска на кнопке) и запоминаем для отказа при раннем рекасте.
@@ -208,9 +228,12 @@ public static class SpellCaster
     /// SMSG_SPELL_GO кастеру (снаряд) и наблюдателям (broadcast). Общая точка для обычного каста и
     /// переключателей (<see cref="SpellToggles"/>).
     /// </summary>
-    internal static async Task SendSpellGoAsync(WorldSession session, uint spellId, ulong targetGuid, CancellationToken ct)
+    internal static async Task SendSpellGoAsync(WorldSession session, uint spellId, ulong targetGuid, byte castCount, CancellationToken ct)
     {
-        var body = SpellPackets.BuildSpellGo((ulong)session.InWorldGuid, spellId, targetGuid, session.CastCount);
+        // cast_count берём ПАРАМЕТРОМ, а не из session.CastCount: повторное нажатие во время каста
+        // перезатирает session.CastCount, и GO завершения исходного каста ушёл бы с чужим счётчиком →
+        // клиент не сопоставит GO со своим pending-кастом → залипание завершения каста (M10.4a фикс #26).
+        var body = SpellPackets.BuildSpellGo((ulong)session.InWorldGuid, spellId, targetGuid, castCount);
         await session.SendAsync(WorldOpcode.SmsgSpellGo, body, ct);   // кастеру (снаряд)
         if (session.Player is { } player)                            // и наблюдателям
             await session.World.BroadcastToNeighborsAsync(player, WorldOpcode.SmsgSpellGo, body, ct);

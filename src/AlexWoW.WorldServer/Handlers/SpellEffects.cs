@@ -21,7 +21,7 @@ public static class SpellEffects
             return; // цель пропала/мертва — спелл «впустую»
 
         session.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
-        var damage = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
+        var damage = ComputeDamage(session, info);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
@@ -38,6 +38,28 @@ public static class SpellEffects
 
         // M7 #13: урон спеллом (в т.ч. с дистанции) вводит существо в ответный бой (как landed-удар мили).
         await CombatHandlers.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
+    }
+
+    /// <summary>
+    /// Величина урона спелла (M10.4a): мили-абилка (WeaponDamage) — бросок урона оружия + бонус
+    /// (BasePoints); процентная (WeaponPercent) — доля от урона оружия; иначе — школьный урон диапазоном.
+    /// </summary>
+    private static uint ComputeDamage(WorldSession session, SpellCatalog.SpellInfo info)
+    {
+        if (info.WeaponPercent > 0)
+            return (uint)Math.Max(1, WeaponRoll(session) * (int)info.WeaponPercent / 100);
+        var bonus = info.MaxAmount > 0 ? Random.Shared.Next(info.MinAmount, info.MaxAmount + 1) : 0;
+        if (info.WeaponDamage)
+            return (uint)Math.Max(1, WeaponRoll(session) + bonus);
+        return (uint)Math.Max(0, bonus);
+    }
+
+    /// <summary>Случайный бросок урона оружия главной руки (min..max из RefreshMeleeAsync). M10.4a.</summary>
+    private static int WeaponRoll(WorldSession session)
+    {
+        var min = (int)MathF.Max(1f, session.WeaponMinDamage);
+        var max = (int)MathF.Max(min, session.WeaponMaxDamage);
+        return Random.Shared.Next(min, max + 1);
     }
 
     /// <summary>

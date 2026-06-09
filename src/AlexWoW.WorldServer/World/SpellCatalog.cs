@@ -21,17 +21,24 @@ public static class SpellCatalog
     public const byte SchoolFrost = 0x10;
     public const byte SchoolHoly = 0x02;
 
-    // SpellEffects (Spell.dbc Effect*): прямой урон школы и прямой хил — единственные, что даёт эффект M10.2.
-    private const int EffectSchoolDamage = 2;
-    private const int EffectHeal = 10;
+    // SpellEffects (Spell.dbc Effect*, сверено с CMaNGOS SpellEffectDefines.h):
+    private const int EffectSchoolDamage = 2;            // прямой урон школы
+    private const int EffectHeal = 10;                   // прямой хил
+    private const int EffectWeaponDamageNoSchool = 17;   // урон оружия (мили-абилки)
+    private const int EffectWeaponPercentDamage = 31;    // % урона оружия (BasePoints = процент)
+    private const int EffectWeaponDamage = 58;           // урон оружия + бонус
+    private const int EffectNormalizedWeaponDmg = 121;   // нормализованный урон оружия + бонус
 
     /// <summary>
-    /// Эффект спелла: школа, диапазон величины (урон ИЛИ хил), время каста (мс), стоимость маны — флэтом
-    /// (<paramref name="ManaCost"/>) или процентом базовой маны (<paramref name="ManaCostPct"/>, считается у
-    /// кастера), кулдаун (мс), хил-ли. Иммутабельно → кэшируется по spellId.
+    /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
+    /// стоимость ресурса (<paramref name="ManaCost"/> флэтом — мана/ярость/энергия по <paramref name="PowerType"/>,
+    /// либо <paramref name="ManaCostPct"/> % базовой маны), кулдаун, GCD, хил-ли. <paramref name="WeaponDamage"/> —
+    /// мили-абилка: к урону прибавляется бросок оружия; <paramref name="WeaponPercent"/> != 0 — урон = % оружия.
+    /// Иммутабельно (зависит только от спелла) → кэшируется по spellId. Урон оружия/ресурс кастера — на касте.
     /// </summary>
     public sealed record SpellInfo(byte School, int MinAmount, int MaxAmount, int CastMs, uint ManaCost,
-        int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0);
+        int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0,
+        byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0);
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -70,14 +77,21 @@ public static class SpellCatalog
             (Eff: t.Effect3, Bp: t.EffectBasePoints3, Ds: t.EffectDieSides3),
         };
 
-        // Прямой эффект: приоритет хилу, затем урону; иначе спелл без прямого эффекта (каст без числа).
+        // Прямой эффект: приоритет хил > школьный урон > урон оружия (мили-абилка); иначе без числа.
+        static bool IsWeapon(int eff) => eff is EffectWeaponDamage or EffectNormalizedWeaponDmg
+            or EffectWeaponDamageNoSchool or EffectWeaponPercentDamage;
         var heal = Array.Find(effects, e => e.Eff == EffectHeal);
         var dmg = Array.Find(effects, e => e.Eff == EffectSchoolDamage);
+        var weapon = Array.Find(effects, e => IsWeapon(e.Eff));
         var isHeal = heal.Eff == EffectHeal;
-        var chosen = isHeal ? heal : dmg;
+        var chosen = isHeal ? heal : dmg.Eff != 0 ? dmg : weapon;
+        var isWeapon = IsWeapon(chosen.Eff);
 
         int min = 0, max = 0;
-        if (chosen.Eff != 0)
+        uint weaponPercent = 0;
+        if (chosen.Eff == EffectWeaponPercentDamage)
+            weaponPercent = (uint)Math.Max(0, chosen.Bp); // BasePoints = % урона оружия
+        else if (chosen.Eff != 0)
         {
             // CMaNGOS: value = (BasePoints+1) .. (BasePoints+DieSides). DieSides<=1 → фиксированная величина.
             min = chosen.Bp + 1;
@@ -87,13 +101,12 @@ public static class SpellCatalog
         }
 
         var cooldown = (int)Math.Max(t.RecoveryTime, t.CategoryRecoveryTime);
-        // Стоимость маны учитываем только для мана-спеллов (PowerType=0). У воина/разбойника поле ManaCost —
-        // это ярость/энергия (расход не-мана ресурсов абилками — M10.4), мана-гейт на них не вешаем.
-        const int powerMana = 0;
-        var manaFlat = t.PowerType == powerMana ? t.ManaCost : 0;
-        var manaPct = t.PowerType == powerMana ? t.ManaCostPercentage : 0;
+        // PowerType: 0=мана (стоимость флэт или % базовой), 1=ярость, 3=энергия (стоимость флэт в единицах
+        // ресурса; ярость в DBC уже ×10, как у нас). Health-кост (-2) → без стоимости (Math.Max 0). M10.4a.
+        var powerType = (byte)Math.Max(0, t.PowerType);
+        var manaPct = powerType == 0 ? t.ManaCostPercentage : 0;
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
-            manaFlat, cooldown, isHeal, manaPct, t.StartRecoveryTime);
+            t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent);
     }
 
     /// <summary>
