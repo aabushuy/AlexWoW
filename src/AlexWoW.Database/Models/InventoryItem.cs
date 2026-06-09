@@ -81,6 +81,9 @@ public sealed class QuestTemplateData
     public string EndText { get; init; } = string.Empty;
     /// <summary>Деньги: &gt;0 — награда, &lt;0 — требуется (для нашего инкремента берём как награду, если &gt;0).</summary>
     public int RewOrReqMoney { get; init; }
+    /// <summary>Индекс XP-награды (quest_template.RewXPId). В 3.3.x — отдельное поле в SMSG_QUEST_QUERY_RESPONSE
+    /// между next_quest_in_chain и money_reward; без него съезжает массив наград. M6.5.</summary>
+    public uint RewXpId { get; init; }
     public uint RewSpell { get; init; }
     public uint RewSpellCast { get; init; }
     public uint[] RewItemId { get; init; } = new uint[4];

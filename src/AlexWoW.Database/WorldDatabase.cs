@@ -416,6 +416,7 @@ public sealed class WorldDatabase(string connectionString)
             RequestItemsText = S(r, "RequestItemsText"),
             EndText = S(r, "EndText"),
             RewOrReqMoney = I(r, "RewOrReqMoney"),
+            RewXpId = U(r, "RewXPId"),
             RewSpell = U(r, "RewSpell"),
             RewSpellCast = U(r, "RewSpellCast"),
             RewItemId = [U(r, "RewItemId1"), U(r, "RewItemId2"), U(r, "RewItemId3"), U(r, "RewItemId4")],

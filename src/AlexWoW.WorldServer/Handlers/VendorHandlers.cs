@@ -66,27 +66,16 @@ public static class VendorHandlers
         var cost = vi.BuyPrice * amount;
         if (session.Money < cost) { await FailAsync(BuyResult.NotEnoughMoney); return; }
 
-        var slot = InventoryGrant.FreeBackpackSlot(session);
-        if (slot < 0) { await FailAsync(BuyResult.InventoryFull); return; }
-
         var ownerGuid = session.InWorldGuid;
-        var itemLow = await session.Characters.AddItemAsync(ownerGuid, itemEntry,
-            InventorySlots.MainBag, (byte)slot, qty, ct);
-        var item = new InventoryItem
-        {
-            ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
-            Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = qty,
-        };
-        session.Inventory.Add(item);
+        // M7 #20: выдать со стаканием в существующие стопки (как лут/награда). null → нет места.
+        // Деньги списываем только после успешной выдачи.
+        var placed = await InventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
+        if (placed is null) { await FailAsync(BuyResult.InventoryFull); return; }
 
         session.Money -= cost;
         await session.Characters.SetMoneyAsync(ownerGuid, session.Money, ct);
 
-        // Создать предмет у клиента, привязать к слоту рюкзака, обновить деньги, подтвердить покупку.
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            ItemObject.BuildItemsCreate(new[] { item }, ownerGuid), ct);
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
+        // Обновить деньги, подтвердить покупку (предмет/стопку уже создал TryGiveAsync).
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Money), ct);
 
