@@ -36,6 +36,13 @@ public static class UpdateField
     public const int UnitBaseAttackTime = 0x003E;
     public const int UnitMinDamage = 0x0046;      // float
     public const int UnitMaxDamage = 0x0047;      // float
+    // Attack power (M7 #16): без этих полей слот-тултип оружия делит на percent=0 → 1.#INF.
+    public const int UnitAttackPower = 0x007B;             // int
+    public const int UnitAttackPowerMods = 0x007C;         // two int16 (pos|neg)
+    public const int UnitAttackPowerMultiplier = 0x007D;   // float (TOTAL_PCT-1; обычно 0.0)
+    public const int UnitRangedAttackPower = 0x007E;       // int
+    public const int UnitRangedAttackPowerMods = 0x007F;   // two int16
+    public const int UnitRangedAttackPowerMultiplier = 0x0080; // float
     public const int UnitDynamicFlags = 0x004F;   // UNIT_DYNAMIC_FLAGS — LOOTABLE(0x1) и пр. (труп-лут M6.6)
     public const int UnitNpcFlags = 0x0052;       // OBJECT_END(0x06)+0x4C — иконки госсипа/вендора/квестов
     public const int UnitBoundingRadius = 0x0041; // float
@@ -85,6 +92,10 @@ public static class UpdateField
     /// <summary>PLAYER_FIELD_BYTES (UNIT_END 0x94 + 0x419). Байт 2 — маска видимых доп. панелей
     /// (CMSG_SET_ACTIONBAR_TOGGLES). M7 #17.</summary>
     public const int PlayerFieldBytes = 0x04AD;
+    /// <summary>PLAYER_FIELD_MOD_DAMAGE_DONE_PCT (UNIT_END 0x94 + 0x40D), 7 float по школам. Это «percent»
+    /// в клиентском UnitDamage; по умолч. ДОЛЖЕН быть 1.0 (CMaNGOS), иначе слот-тултип оружия делит на 0 →
+    /// 1.#INF. M7 #16.</summary>
+    public const int PlayerFieldModDamageDonePct = 0x04A1;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
     public const int PlayerBytes3 = 0x009B;       // gender|drunk

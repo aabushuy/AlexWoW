@@ -181,6 +181,10 @@ public static class InventoryHandlers
             await session.Characters.MoveItemAsync(dst.ItemGuid, InventorySlots.MainBag, (byte)srcSlot, ct);
         }
         await ReassertAsync(session, ct, srcSlot, dstSlot);
+
+        // M7 #16: смена оружия гл. руки → пересчёт урона/скорости/attack-power (иначе нужен релог).
+        if (srcSlot == InventorySlots.MainHandSlot || dstSlot == InventorySlots.MainHandSlot)
+            await Progression.RefreshMeleeAsync(session, ct);
     }
 
     /// <summary>Отправляет клиенту текущее состояние указанных слотов (guid + видимый предмет для экипировки).</summary>

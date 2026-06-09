@@ -40,16 +40,42 @@ public static class SpellHandlers
     /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4.</summary>
     public static readonly int[] GrantedCombatSpells = { 133, 116, 2136, 2050 };
 
+    // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
+    private const byte GroupShapeshift = 1;   // стойки воина / формы друида
+    private const byte GroupPaladinAura = 2;  // ауры паладина
+    private const byte GroupHunterAspect = 3; // аспекты охотника
+
+    /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.</summary>
+    private readonly record struct Toggle(byte Form, byte Group);
+
     /// <summary>
-    /// Спеллы-стойки воина → форма шейпшифта (M6.12, через систему аур M6.11). Каст стойки мгновенный,
-    /// без маны/цели: накладывает аура-форму (UNIT_FIELD_BYTES_2) → клиент меняет набор кнопок и
-    /// подсвечивает активную стойку. Формы: Battle=17, Defensive=18, Berserker=19. Друид-формы — позже.
+    /// Спеллы-переключатели (M6.12/M7 #21): мгновенный каст без маны/цели → перманентная аура (персист
+    /// через релог). Форма (стойки воина → панель стоек). Эксклюзивны в своей группе. ⚠️ Только РАНГ 1 —
+    /// высшие ранги имеют другие spell-id (нужен Spell.dbc; полноценно — в расширении системы аур).
     /// </summary>
-    private static readonly Dictionary<uint, byte> ShapeshiftSpells = new()
+    private static readonly Dictionary<uint, Toggle> ToggleSpells = new()
     {
-        [2457] = 17, // Battle Stance
-        [71] = 18,   // Defensive Stance
-        [2458] = 19, // Berserker Stance
+        // Стойки воина (форма → панель стоек): Battle=17, Defensive=18, Berserker=19.
+        [2457] = new(17, GroupShapeshift),
+        [71] = new(18, GroupShapeshift),
+        [2458] = new(19, GroupShapeshift),
+        // Ауры паладина (эксклюзивны).
+        [465] = new(0, GroupPaladinAura),    // Devotion Aura
+        [7294] = new(0, GroupPaladinAura),   // Retribution Aura
+        [19746] = new(0, GroupPaladinAura),  // Concentration Aura
+        [32223] = new(0, GroupPaladinAura),  // Crusader Aura
+        [19876] = new(0, GroupPaladinAura),  // Shadow Resistance Aura
+        [19888] = new(0, GroupPaladinAura),  // Frost Resistance Aura
+        [19891] = new(0, GroupPaladinAura),  // Fire Resistance Aura
+        // Аспекты охотника (эксклюзивны).
+        [13165] = new(0, GroupHunterAspect), // Aspect of the Hawk
+        [5118] = new(0, GroupHunterAspect),  // Aspect of the Cheetah
+        [13163] = new(0, GroupHunterAspect), // Aspect of the Monkey
+        [13159] = new(0, GroupHunterAspect), // Aspect of the Pack
+        [20043] = new(0, GroupHunterAspect), // Aspect of the Wild
+        [13161] = new(0, GroupHunterAspect), // Aspect of the Beast
+        [34074] = new(0, GroupHunterAspect), // Aspect of the Viper
+        [61846] = new(0, GroupHunterAspect), // Aspect of the Dragonhawk
     };
 
     // --- SpellCastResult (3.3.5a, сверено с reference world/common.wowm) ---
@@ -84,12 +110,15 @@ public static class SpellHandlers
         session.CastCount = castCount;
         session.CastTargetGuid = targetGuid;
 
-        // M6.12: стойки воина — мгновенная аура-форма (через систему аур M6.11), без маны/цели/кулдауна.
-        if (ShapeshiftSpells.TryGetValue(spellId, out var form))
+        // M6.12/M7 #21: переключатели (стойки/ауры/аспекты) — мгновенная перманентная аура (персист),
+        // эксклюзивная в группе; без маны/цели/кулдауна.
+        if (ToggleSpells.TryGetValue(spellId, out var toggle))
         {
             await SendSpellGoAsync(session, spellId, 0, ct); // завершить каст у клиента
-            await Auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, form, ct);
-            session.Logger.LogDebug("STANCE '{User}': spell={Spell} → форма {Form}", session.Account, spellId, form);
+            await Auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
+                group: toggle.Group, persist: true);
+            session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
+                session.Account, spellId, toggle.Form, toggle.Group);
             return;
         }
 

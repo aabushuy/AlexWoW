@@ -106,6 +106,18 @@ public sealed class CharactersDatabase(string connectionString)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
+        // M7 #21: активные перманентные ауры-переключатели (стойки воина, ауры паладина, аспекты охотника,
+        // формы друида) — чтобы выбранное сохранялось через релог. form — байт шейпшифта (0 у не-форм).
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_aura (
+                owner_guid INT UNSIGNED NOT NULL,
+                spell      INT UNSIGNED NOT NULL,
+                form       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+                PRIMARY KEY (owner_guid, spell),
+                KEY ix_aura_owner (owner_guid)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
         // M7 #17: ярлыки панелей действий (action buttons). packed_data: action(24)|type(8) — как у клиента.
         await db.ExecuteAsync("""
             CREATE TABLE IF NOT EXISTS character_action (
@@ -338,6 +350,41 @@ public sealed class CharactersDatabase(string connectionString)
             new { ownerGuid, spell });
     }
 
+    /// <summary>Сохранённые перманентные ауры-переключатели персонажа: (spell, form). M7 #21.</summary>
+    public async Task<IReadOnlyList<(uint Spell, byte Form)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT spell AS Spell, form AS Form FROM character_aura WHERE owner_guid = @ownerGuid;",
+            new { ownerGuid }, cancellationToken: ct));
+        var list = new List<(uint, byte)>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            list.Add((Convert.ToUInt32(d["Spell"], System.Globalization.CultureInfo.InvariantCulture),
+                      Convert.ToByte(d["Form"], System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        return list;
+    }
+
+    /// <summary>Сохраняет активную ауру-переключатель (идемпотентно). M7 #21.</summary>
+    public async Task AddAuraAsync(uint ownerGuid, uint spell, byte form, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("""
+            INSERT INTO character_aura (owner_guid, spell, form) VALUES (@ownerGuid, @spell, @form)
+            ON DUPLICATE KEY UPDATE form = @form;
+            """, new { ownerGuid, spell, form });
+    }
+
+    /// <summary>Убирает сохранённую ауру-переключатель. M7 #21.</summary>
+    public async Task RemoveAuraAsync(uint ownerGuid, uint spell, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("DELETE FROM character_aura WHERE owner_guid = @ownerGuid AND spell = @spell;",
+            new { ownerGuid, spell });
+    }
+
     /// <summary>Ярлыки панелей персонажа: button → packed_data. M7 #17.</summary>
     public async Task<IReadOnlyDictionary<byte, uint>> GetActionButtonsAsync(uint ownerGuid, CancellationToken ct = default)
     {
@@ -485,6 +532,7 @@ public sealed class CharactersDatabase(string connectionString)
             await db.ExecuteAsync("DELETE FROM character_queststatus WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_spell WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM account_data WHERE owner_id = @guid AND is_char = 1;", new { guid });
+            await db.ExecuteAsync("DELETE FROM character_aura WHERE owner_guid = @guid;", new { guid });
         }
         return affected > 0;
     }

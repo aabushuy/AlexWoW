@@ -83,7 +83,7 @@ public static class Progression
     /// </summary>
     internal static async Task RefreshMeleeAsync(WorldSession session, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0)
+        if (session.InWorldGuid == 0 || session.Character is not { } c)
             return;
         float min = 1f, max = 2f;
         uint attackTime = 2000;
@@ -105,6 +105,15 @@ public static class Progression
             catch { /* БД мира недоступна — безоружный фолбэк */ }
         }
         session.MainHandSpeedMs = attackTime; // M6.12: для формулы ярости
+
+        // M7 #16: attack power (по статам класса). Без этих полей клиентский UnitDamage даёт percent=0 →
+        // слот-тултип оружия показывает 1.#INF. Формула — CMaNGOS Player::UpdateAttackPowerAndDamage.
+        await session.World.Stats.EnsureLoadedAsync(ct);
+        var stats = session.World.Stats.Compute(c.Race, c.Class, c.Level);
+        uint str = stats?.Str ?? 0, agi = stats?.Agi ?? 0;
+        var meleeAp = MeleeAttackPower(c.Class, c.Level, str, agi);
+        var rangedAp = RangedAttackPower(c.Class, c.Level, agi);
+
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
@@ -112,8 +121,31 @@ public static class Progression
                 m.SetFloat(UpdateField.UnitMaxDamage, max);
                 m.SetUInt32(UpdateField.UnitBaseAttackTime, attackTime);
                 m.SetUInt32(UpdateField.UnitBaseAttackTime + 1, attackTime);
+                m.SetUInt32(UpdateField.UnitAttackPower, meleeAp);
+                m.SetUInt32(UpdateField.UnitAttackPowerMods, 0);              // pos|neg = 0
+                m.SetFloat(UpdateField.UnitAttackPowerMultiplier, 0f);        // TOTAL_PCT-1 = 0 → percent 1.0
+                m.SetUInt32(UpdateField.UnitRangedAttackPower, rangedAp);
+                m.SetUInt32(UpdateField.UnitRangedAttackPowerMods, 0);
+                m.SetFloat(UpdateField.UnitRangedAttackPowerMultiplier, 0f);
             }), ct);
     }
+
+    /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS. M7 #16.</summary>
+    private static uint MeleeAttackPower(byte cls, byte level, uint str, uint agi)
+    {
+        float ap = cls switch
+        {
+            1 or 2 or 6 => level * 3f + str * 2f - 20f,                 // воин/паладин/DK
+            4 or 3 or 7 => level * 2f + str + agi - 20f,                // разбойник/охотник/шаман
+            11 => level * 3f + str * 2f - 20f,                          // друид (форма-бонусы — позже)
+            _ => str - 10f,                                            // маг/жрец/чернокнижник
+        };
+        return (uint)Math.Max(0f, ap);
+    }
+
+    /// <summary>Сила атаки (дальний бой): значима для охотника; прочим — 0. M7 #16.</summary>
+    private static uint RangedAttackPower(byte cls, byte level, uint agi)
+        => cls == 3 ? (uint)Math.Max(0f, level * 2f + agi - 10f) : 0u;
 
     /// <summary>Повышение на один уровень: +1 к уровню, пересчёт статов/HP/маны, ding.</summary>
     private static async Task ApplyLevelUpAsync(WorldSession session, CancellationToken ct)
