@@ -27,12 +27,13 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<(uint Spell, byte Form)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
+    public async Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.CharacterAuras.AsNoTracking()
-            .Where(x => x.OwnerGuid == ownerGuid).Select(x => new { x.Spell, x.Form }).ToListAsync(ct);
-        return rows.Select(x => (x.Spell, x.Form)).ToList();
+            .Where(x => x.OwnerGuid == ownerGuid)
+            .Select(x => new { x.Spell, x.Form, x.RemainingMs }).ToListAsync(ct);
+        return rows.Select(x => (x.Spell, x.Form, x.RemainingMs)).ToList();
     }
 
     public async Task AddAuraAsync(uint ownerGuid, uint spell, byte form, CancellationToken ct = default)
@@ -50,6 +51,16 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await db.CharacterAuras.Where(x => x.OwnerGuid == ownerGuid && x.Spell == spell).ExecuteDeleteAsync(ct);
+    }
+
+    public async Task SaveTimedAurasAsync(uint ownerGuid, IReadOnlyList<(uint Spell, uint RemainingMs)> auras, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        // Удаляем прежние временны́е (remaining>0); переключатели (remaining=0) не трогаем.
+        await db.CharacterAuras.Where(x => x.OwnerGuid == ownerGuid && x.RemainingMs > 0).ExecuteDeleteAsync(ct);
+        foreach (var (spell, rem) in auras)
+            db.CharacterAuras.Add(new CharacterAura { OwnerGuid = ownerGuid, Spell = spell, Form = 0, RemainingMs = rem });
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyDictionary<byte, uint>> GetActionButtonsAsync(uint ownerGuid, CancellationToken ct = default)

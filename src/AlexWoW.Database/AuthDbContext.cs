@@ -142,6 +142,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.OwnerGuid).HasColumnName("owner_guid");
             e.Property(x => x.Spell).HasColumnName("spell");
             e.Property(x => x.Form).HasColumnName("form").HasDefaultValue((byte)0);
+            e.Property(x => x.RemainingMs).HasColumnName("remaining_ms").HasDefaultValue(0u); // M10.5: временны́е баффы
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_aura_owner");
         });
 
