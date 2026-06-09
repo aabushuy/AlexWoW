@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 715 / 860 опкодов НЕ реализовано — 83.1%** (реализовано: 145 — 16.9%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 710 / 860 опкодов НЕ реализовано — 82.6%** (реализовано: 150 — 17.4%, см. [Implemented.md](Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -144,8 +144,6 @@
 | `0x0124` | SMSG_SET_FACTION_STANDING | Faction |
 | `0x0125` | CMSG_SET_FACTION_ATWAR | Faction |
 | `0x0127` | SMSG_SET_PROFICIENCY | Item |
-| `0x0128` | CMSG_SET_ACTION_BUTTON | Login |
-| `0x0129` | SMSG_ACTION_BUTTONS | Login |
 | `0x012C` | SMSG_SUPERCEDED_SPELL | Spell |
 | `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
 | `0x0136` | CMSG_CANCEL_AURA | Spell |
@@ -262,8 +260,6 @@
 | `0x0206` | SMSG_GMTICKET_CREATE | GM |
 | `0x0207` | CMSG_GMTICKET_UPDATETEXT | GM |
 | `0x0208` | SMSG_GMTICKET_UPDATETEXT | GM |
-| `0x020A` | CMSG_REQUEST_ACCOUNT_DATA | Login |
-| `0x020C` | SMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x0211` | CMSG_GMTICKET_GETTICKET | GM |
 | `0x0212` | SMSG_GMTICKET_GETTICKET | GM |
 | `0x0213` | CMSG_UNLEARN_TALENTS | Spell |
@@ -384,7 +380,6 @@
 | `0x02BB` | SMSG_LFG_ROLE_CHOSEN | LFG |
 | `0x02BC` | SMSG_PLAYER_SKINNED | Spell |
 | `0x02BD` | SMSG_DURABILITY_DAMAGE_DEATH | Combat |
-| `0x02BF` | CMSG_SET_ACTIONBAR_TOGGLES | Login |
 | `0x02C1` | MSG_PETITION_RENAME | Guild |
 | `0x02C2` | SMSG_INIT_WORLD_STATES | Smsg_init_world_states |
 | `0x02C3` | SMSG_UPDATE_WORLD_STATE | Weather |

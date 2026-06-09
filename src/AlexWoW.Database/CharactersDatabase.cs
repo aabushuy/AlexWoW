@@ -106,6 +106,31 @@ public sealed class CharactersDatabase(string connectionString)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """);
 
+        // M7 #17: ярлыки панелей действий (action buttons). packed_data: action(24)|type(8) — как у клиента.
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS character_action (
+                owner_guid  INT UNSIGNED NOT NULL,
+                button      TINYINT UNSIGNED NOT NULL,
+                packed_data INT UNSIGNED NOT NULL,
+                PRIMARY KEY (owner_guid, button)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
+        // M7 #17: account-data блобы (раскладка панелей, биндинги, макросы, чат, конфиг UI).
+        // Сервер — кросс-девайс хранилище: держит СЖАТЫЙ блоб как есть (decompressed_size+zlib) и отдаёт
+        // обратно (не распаковывает). owner_id = account_id (глобальные типы) либо guid персонажа
+        // (per-character типы), is_char различает. data_type 0..7 (ACCOUNT_DATA_TYPES).
+        await db.ExecuteAsync("""
+            CREATE TABLE IF NOT EXISTS account_data (
+                owner_id    INT UNSIGNED NOT NULL,
+                is_char     TINYINT UNSIGNED NOT NULL,
+                data_type   TINYINT UNSIGNED NOT NULL,
+                update_time INT UNSIGNED NOT NULL DEFAULT 0,
+                data        LONGBLOB,
+                PRIMARY KEY (owner_id, is_char, data_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """);
+
         // M6.2: деньги персонажа (медь). Стартовый баланс — тестовый (100g), чтобы было что тратить.
         // MySQL не поддерживает ADD COLUMN IF NOT EXISTS — глушим ошибку «дубликат столбца» (1060).
         try
@@ -119,6 +144,13 @@ public sealed class CharactersDatabase(string connectionString)
         try
         {
             await db.ExecuteAsync("ALTER TABLE characters ADD COLUMN xp INT UNSIGNED NOT NULL DEFAULT 0;");
+        }
+        catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
+
+        // M7 #17: маска видимых доп. панелей (PLAYER_FIELD_BYTES[2]) — персист отображения панелей.
+        try
+        {
+            await db.ExecuteAsync("ALTER TABLE characters ADD COLUMN action_bars TINYINT UNSIGNED NOT NULL DEFAULT 0;");
         }
         catch (MySqlException ex) when (ex.Number == 1060) { /* столбец уже есть */ }
     }
@@ -165,7 +197,7 @@ public sealed class CharactersDatabase(string connectionString)
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
                    hair_color AS HairColor, facial_hair AS FacialHair, level AS Level, xp AS Xp,
                    zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
-                   money AS Money
+                   money AS Money, action_bars AS ActionBars
             FROM characters WHERE account_id = @accountId ORDER BY guid;
             """, new { accountId });
         return rows.AsList();
@@ -179,7 +211,7 @@ public sealed class CharactersDatabase(string connectionString)
                    gender AS Gender, skin AS Skin, face AS Face, hair_style AS HairStyle,
                    hair_color AS HairColor, facial_hair AS FacialHair, level AS Level, xp AS Xp,
                    zone AS Zone, map AS Map, position_x AS X, position_y AS Y, position_z AS Z,
-                   money AS Money
+                   money AS Money, action_bars AS ActionBars
             FROM characters WHERE guid = @guid;
             """, new { guid });
     }
@@ -306,6 +338,90 @@ public sealed class CharactersDatabase(string connectionString)
             new { ownerGuid, spell });
     }
 
+    /// <summary>Ярлыки панелей персонажа: button → packed_data. M7 #17.</summary>
+    public async Task<IReadOnlyDictionary<byte, uint>> GetActionButtonsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT button AS Button, packed_data AS Packed FROM character_action WHERE owner_guid = @ownerGuid;",
+            new { ownerGuid }, cancellationToken: ct));
+        var map = new Dictionary<byte, uint>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            map[Convert.ToByte(d["Button"], System.Globalization.CultureInfo.InvariantCulture)] =
+                Convert.ToUInt32(d["Packed"], System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return map;
+    }
+
+    /// <summary>Ставит ярлык на кнопку панели (packed=0 → снять). M7 #17.</summary>
+    public async Task SetActionButtonAsync(uint ownerGuid, byte button, uint packed, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        if (packed == 0)
+        {
+            await db.ExecuteAsync("DELETE FROM character_action WHERE owner_guid=@ownerGuid AND button=@button;",
+                new { ownerGuid, button });
+            return;
+        }
+        await db.ExecuteAsync("""
+            INSERT INTO character_action (owner_guid, button, packed_data) VALUES (@ownerGuid, @button, @packed)
+            ON DUPLICATE KEY UPDATE packed_data=@packed;
+            """, new { ownerGuid, button, packed });
+    }
+
+    /// <summary>Сохраняет маску видимых доп. панелей (PLAYER_FIELD_BYTES[2]). M7 #17.</summary>
+    public async Task SetActionBarsAsync(uint guid, byte actionBars, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync("UPDATE characters SET action_bars = @actionBars WHERE guid = @guid;",
+            new { guid, actionBars });
+    }
+
+    /// <summary>Сохранённый блоб account-data (сжатый, как прислал клиент) + время, или null. M7 #17.</summary>
+    public async Task<(uint Time, byte[] Data)?> GetAccountDataAsync(uint ownerId, bool isChar, byte dataType, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var row = await db.QuerySingleOrDefaultAsync(new CommandDefinition(
+            "SELECT update_time AS Time, data AS Data FROM account_data WHERE owner_id=@ownerId AND is_char=@isChar AND data_type=@dataType;",
+            new { ownerId, isChar = isChar ? 1 : 0, dataType }, cancellationToken: ct));
+        if (row is null)
+            return null;
+        var d = (IDictionary<string, object>)row;
+        var time = Convert.ToUInt32(d["Time"], System.Globalization.CultureInfo.InvariantCulture);
+        var data = d["Data"] as byte[] ?? Array.Empty<byte>();
+        return (time, data);
+    }
+
+    /// <summary>Времена сохранённых блобов owner'а (для SMSG_ACCOUNT_DATA_TIMES): data_type → time. M7 #17.</summary>
+    public async Task<IReadOnlyDictionary<byte, uint>> GetAccountDataTimesAsync(uint ownerId, bool isChar, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT data_type AS Type, update_time AS Time FROM account_data WHERE owner_id=@ownerId AND is_char=@isChar;",
+            new { ownerId, isChar = isChar ? 1 : 0 }, cancellationToken: ct));
+        var map = new Dictionary<byte, uint>();
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            map[Convert.ToByte(d["Type"], System.Globalization.CultureInfo.InvariantCulture)] =
+                Convert.ToUInt32(d["Time"], System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return map;
+    }
+
+    /// <summary>Сохраняет/обновляет блоб account-data (M7 #17).</summary>
+    public async Task UpsertAccountDataAsync(uint ownerId, bool isChar, byte dataType, uint time, byte[] data, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        await db.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO account_data (owner_id, is_char, data_type, update_time, data)
+            VALUES (@ownerId, @isChar, @dataType, @time, @data)
+            ON DUPLICATE KEY UPDATE update_time=@time, data=@data;
+            """, new { ownerId, isChar = isChar ? 1 : 0, dataType, time, data }, cancellationToken: ct));
+    }
+
     /// <summary>Удаляет предмет персонажа по его low-counter GUID (продажа/перемещение). M6.2.</summary>
     public async Task RemoveItemAsync(uint itemGuid, CancellationToken ct = default)
     {
@@ -368,6 +484,7 @@ public sealed class CharactersDatabase(string connectionString)
             await db.ExecuteAsync("DELETE FROM character_declined_names WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_queststatus WHERE owner_guid = @guid;", new { guid });
             await db.ExecuteAsync("DELETE FROM character_spell WHERE owner_guid = @guid;", new { guid });
+            await db.ExecuteAsync("DELETE FROM account_data WHERE owner_id = @guid AND is_char = 1;", new { guid });
         }
         return affected > 0;
     }

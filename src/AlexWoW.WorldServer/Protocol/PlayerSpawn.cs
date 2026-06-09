@@ -180,7 +180,11 @@ public static class PlayerSpawn
 
         // M6.2: деньги (private-поле) — только себе.
         if (isSelf)
+        {
             m.SetUInt32(UpdateField.PlayerFieldCoinage, c.Money);
+            // M7 #17: маска видимых доп. панелей (PLAYER_FIELD_BYTES байт 2) — восстановить при входе.
+            m.SetBytes(UpdateField.PlayerFieldBytes, 0, 0, c.ActionBars, 0);
+        }
 
         // M6.1: экипировка. Видимые предметы (entry) одевают модель — у всех наблюдателей;
         // guid'ы слотов-контейнеров — private-поля, шлём только себе.

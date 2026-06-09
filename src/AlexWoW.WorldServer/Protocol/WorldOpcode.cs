@@ -162,6 +162,9 @@ public enum WorldOpcode : uint
     // Вход в мир (M4)
     SmsgLoginSetTimeSpeed = 0x042,
     SmsgInitialSpells = 0x12A,
+    CmsgSetActionButton = 0x128,                // игрок повесил/снял ярлык на панель (M7 #17)
+    SmsgActionButtons = 0x129,                  // выдача ярлыков панелей при входе (M7 #17)
+    CmsgSetActionbarToggles = 0x2BF,            // показ доп. панелей (PLAYER_FIELD_BYTES[2]) (M7 #17)
     SmsgInitializeFactions = 0x122, // список репутаций при входе (M7 #11) — инициализирует rep-менеджер клиента
     SmsgTutorialFlags = 0x0FD,
     SmsgUpdateObject = 0x0A9,
@@ -190,7 +193,9 @@ public enum WorldOpcode : uint
     // Прочее, что шлёт клиент на экране персонажей / при входе
     SmsgFeatureSystemStatus = 0x3C9,
     SmsgAccountDataTimes = 0x209,
+    CmsgRequestAccountData = 0x20A,              // клиент запрашивает блоб account-data (M7 #17)
     CmsgUpdateAccountData = 0x20B,
+    SmsgUpdateAccountData = 0x20C,               // ответ с сохранённым блобом (M7 #17)
     SmsgUpdateAccountDataComplete = 0x463,
     SmsgRealmSplit = 0x38B,
     CmsgRealmSplit = 0x38C,
