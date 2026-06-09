@@ -6,7 +6,7 @@ namespace AlexWoW.Database.Models;
 /// (для сданных не важен). <c>Counter0..3</c> — прогресс целей-существ (kill/talk).
 /// Complete/HasItemObjectives не хранятся — рекомпьютятся из quest_template при входе.
 /// </summary>
-public sealed class QuestStatusRow
+public sealed record QuestStatusRow
 {
     public uint QuestId { get; init; }
     public byte Slot { get; init; }

@@ -1,22 +1,10 @@
 namespace AlexWoW.Database.Models;
 
-/// <summary>Характеристика предмета (stat_type/value) — пара для ItemStat в item-query.</summary>
-public readonly record struct ItemStat(uint Type, int Value);
-
-/// <summary>Урон оружия (ItemDamageType): min/max + школа.</summary>
-public readonly record struct ItemDamage(float Min, float Max, uint School);
-
-/// <summary>Спелл на предмете (ItemSpells): id + триггер + заряды + кулдаун + категория.</summary>
-public readonly record struct ItemSpell(uint Id, uint Trigger, int Charges, int Cooldown, uint Category, int CategoryCooldown);
-
-/// <summary>Сокет (ItemSocket): цвет + контент.</summary>
-public readonly record struct ItemSocket(uint Color, uint Content);
-
 /// <summary>
 /// Шаблон предмета из БД мира (item_template, 3.3.5a) — полный набор для
 /// SMSG_ITEM_QUERY_SINGLE_RESPONSE и для раскладки/экипировки. Заполняется в WorldDatabase.
 /// </summary>
-public sealed class ItemTemplateData
+public sealed record ItemTemplateData
 {
     public uint Entry { get; init; }
     public uint Class { get; init; }

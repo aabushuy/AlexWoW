@@ -1,7 +1,7 @@
 namespace AlexWoW.Database.Models;
 
 /// <summary>Описание реалма (игрового мира) для списка выбора в клиенте.</summary>
-public sealed class Realm
+public sealed record Realm
 {
     public uint Id { get; init; }
     public required string Name { get; init; }
