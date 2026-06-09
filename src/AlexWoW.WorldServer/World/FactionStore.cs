@@ -9,7 +9,7 @@ namespace AlexWoW.WorldServer.World;
 /// считает враждебность по правилам CMaNGOS. Загрузка ленивая (один раз, потокобезопасно). Если таблицы
 /// нет/пуста — <see cref="IsHostile"/> всегда false (авто-агро просто не работает, остальное — как есть).
 /// </summary>
-public sealed class FactionStore(IWorldRepository worldDb, ILogger<FactionStore> logger)
+public sealed class FactionStore(IFactionRepository worldDb, ILogger<FactionStore> logger)
 {
     private volatile bool _loaded;
     private readonly SemaphoreSlim _lock = new(1, 1);

@@ -1,6 +1,7 @@
 using AlexWoW.Database;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Repositories;
+using AlexWoW.Database.Repositories.World;
 using AlexWoW.DataStores.Collision;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
@@ -39,12 +40,21 @@ builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
 builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
 builder.Services.AddSingleton<IQuestRepository, EfQuestRepository>();
 builder.Services.AddSingleton<ICharacterStateRepository, EfCharacterStateRepository>();
-builder.Services.AddSingleton(sp =>
-{
-    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
-    return new WorldDatabase(options.WorldConnectionString);
-});
-builder.Services.AddSingleton<IWorldRepository>(sp => sp.GetRequiredService<WorldDatabase>());
+// Рефактор #25 (SOLID): WorldDatabase (god-класс) разбит на focused SRP-репозитории (Dapper,
+// read-only дамп mangos). *Store зависят от УЗКИХ интерфейсов; WorldSession — от композитного
+// фасада IWorldRepository (делегирует этим репозиториям).
+static string WorldConn(IServiceProvider sp)
+    => sp.GetRequiredService<IOptions<WorldServerOptions>>().Value.WorldConnectionString;
+builder.Services.AddSingleton<ICreatureRepository>(sp => new CreatureRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IGameObjectRepository>(sp => new GameObjectRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IItemTemplateRepository>(sp => new ItemTemplateRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IVendorRepository>(sp => new VendorRepository(WorldConn(sp)));
+builder.Services.AddSingleton<ITrainerRepository>(sp => new TrainerRepository(WorldConn(sp)));
+builder.Services.AddSingleton<ILootRepository>(sp => new LootRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IQuestTemplateRepository>(sp => new QuestTemplateRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IFactionRepository>(sp => new FactionRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IPlayerDataRepository>(sp => new PlayerDataRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IWorldRepository, WorldRepository>();
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
