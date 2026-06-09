@@ -8,29 +8,50 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.World;
 
 /// <summary>
-/// Общее состояние мира: реестр онлайн-игроков и операции видимости
-/// (вход/выход в мир, рассылка движения соседям). Один экземпляр на сервер (singleton).
-/// Доступ из множества сессий-потоков — отсюда потокобезопасный словарь и сериализация
-/// отправки на уровне каждой сессии (см. WorldSession.SendAsync).
+/// Хаб состояния мира (singleton): реестр онлайн-игроков и авторитетных существ, пространственные
+/// запросы (видимость/радиус) и рассылка наблюдателям. Высокоуровневую логику держат SRP-коллабораторы
+/// (рефактор #30): <see cref="PlayerVisibility"/> (вход/выход/видимость игроков), <see cref="CreatureDirector"/>
+/// (движение/респавн/манекен существ), <see cref="WorldTick"/> (серверный тик). WorldState их композирует
+/// и делегирует — API для потребителей (хендлеры/сессии) не меняется. Доступ из множества потоков —
+/// потокобезопасные словари; сериализация отправки — на уровне сессии (WorldSession.SendAsync).
 /// </summary>
-public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
-    QuestStore quests, LevelStore levels, StatStore stats)
+public sealed class WorldState
 {
-    /// <summary>Характеристики по расе/классу/уровню (HP/мана/статы). M9.2.</summary>
-    public StatStore Stats => stats;
+    private readonly FactionStore _factions;
+    private readonly QuestStore _quests;
+    private readonly LevelStore _levels;
+    private readonly StatStore _stats;
 
-    /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
-    private int _splineId;
+    private readonly PlayerVisibility _visibility;
+    private readonly CreatureDirector _director;
+    private readonly WorldTick _tick;
+
+    public WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
+        QuestStore quests, LevelStore levels, StatStore stats)
+    {
+        _factions = factions;
+        _quests = quests;
+        _levels = levels;
+        _stats = stats;
+        _director = new CreatureDirector(this, navmesh, logger);
+        _visibility = new PlayerVisibility(this, logger);
+        _tick = new WorldTick(this, _director, factions, logger);
+    }
+
+    // --- Фасады сторов / фракции ---
+
+    /// <summary>Характеристики по расе/классу/уровню (HP/мана/статы). M9.2.</summary>
+    public StatStore Stats => _stats;
 
     /// <summary>Реестр квест-связей (иконки !/?). M6.5.</summary>
-    public QuestStore Quests => quests;
+    public QuestStore Quests => _quests;
 
     /// <summary>Прогрессия (кривая XP + XP за килл). M9.1.</summary>
-    public LevelStore Levels => levels;
+    public LevelStore Levels => _levels;
 
     /// <summary>Враждебна ли фракция существа к фракции игрока (авто-агро M6.7).</summary>
     public bool IsHostile(uint creatureFactionTemplate, uint playerFactionTemplate)
-        => factions.IsHostile(creatureFactionTemplate, playerFactionTemplate);
+        => _factions.IsHostile(creatureFactionTemplate, playerFactionTemplate);
 
     /// <summary>Радиус видимости (ярды). Грубо — как дефолтная зона интереса в WoW.</summary>
     public const float VisibilityRange = 100f;
@@ -38,8 +59,10 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
     /// <summary>Через сколько мс после смерти существо респавнится (тест). M6.3.</summary>
     private const long RespawnDelayMs = 30_000;
 
-    /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
-    private const long TimeSyncIntervalMs = 10_000;
+    /// <summary>Длительность респавна существа (мс). M6.3.</summary>
+    public static long RespawnDelay => RespawnDelayMs;
+
+    // --- Реестр игроков и существ ---
 
     private readonly ConcurrentDictionary<ulong, WorldPlayer> _players = new();
 
@@ -49,6 +72,15 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
     /// Пока без эвикции (статические спавны мира; чистку добавим в M6.8).
     /// </summary>
     private readonly ConcurrentDictionary<ulong, WorldCreature> _creatures = new();
+
+    /// <summary>Все онлайн-игроки.</summary>
+    public IEnumerable<WorldPlayer> Players => _players.Values;
+
+    /// <summary>Все материализованные существа.</summary>
+    public IEnumerable<WorldCreature> Creatures => _creatures.Values;
+
+    /// <summary>Число онлайн-игроков.</summary>
+    public int PlayerCount => _players.Count;
 
     /// <summary>Существо по GUID (или null, если ещё не материализовано). M6.3.</summary>
     public WorldCreature? FindCreature(ulong guid)
@@ -62,299 +94,34 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
     public WorldCreature GetOrAddCreature(ulong guid, Func<WorldCreature> factory)
         => _creatures.GetOrAdd(guid, _ => factory());
 
-    /// <summary>
-    /// Игрок вошёл в мир: регистрируем и спавним с соседями. Соседи (уже загружены) надёжно видят
-    /// новичка сразу; новичку соседи шлются немедленно, но НЕ помечаются видимыми — на первом его
-    /// движении (клиент уже догрузил мир) <see cref="RefreshVisiblePlayersAsync"/> пере-создаст их
-    /// надёжно (иначе клиент в момент загрузки теряет экипировку чужих — «голые соседи»).
-    /// </summary>
-    public async Task EnterWorldAsync(WorldPlayer player, CancellationToken ct)
+    /// <summary>Регистрирует онлайн-игрока (вход в мир). #30.</summary>
+    public void RegisterPlayer(WorldPlayer player) => _players[player.Guid] = player;
+
+    /// <summary>Снимает игрока с регистрации (выход). Возвращает true, если был зарегистрирован. #30.</summary>
+    public bool UnregisterPlayer(ulong guid) => _players.TryRemove(guid, out _);
+
+    // --- Пространственные запросы ---
+
+    /// <summary>Игроки на той же карте в радиусе видимости (исключая самого center).</summary>
+    public IEnumerable<WorldPlayer> PlayersInRangeOf(WorldPlayer center)
     {
-        _players[player.Guid] = player;
-
-        foreach (var other in PlayersInRangeOf(player))
-        {
-            if (other.Session.VisiblePlayers.TryAdd(player.Guid, 1))
-            {
-                logger.LogDebug("[vis] CREATE '{P}'(eq={N}) → '{O}' (enter)",
-                    player.Character.Name, EquipCount(player), other.Character.Name);
-                await other.Session.SendAsync(WorldOpcode.SmsgUpdateObject, BuildPlayerCreate(player), ct);
-            }
-            logger.LogInformation("[vis] CREATE '{O}'(eq={N}) → '{P}' (enter-self)",
-                other.Character.Name, EquipCount(other), player.Character.Name);
-            await player.Session.SendAsync(WorldOpcode.SmsgUpdateObject, BuildPlayerCreate(other), ct);
-        }
-
-        logger.LogInformation("В мир вошёл '{Name}' (guid={Guid}); онлайн: {Count}",
-            player.Character.Name, player.Guid, _players.Count);
-    }
-
-    /// <summary>
-    /// Пересчёт видимых игроков для текущей позиции (диф): новые в радиусе → CREATE (обоюдно),
-    /// ушедшие → DESTROY. Вызывается на движении (клиент загружен) — чинит «голых соседей» и даёт
-    /// динамическое появление/исчезновение игроков при перемещении.
-    /// </summary>
-    public async Task RefreshVisiblePlayersAsync(WorldPlayer me, CancellationToken ct)
-    {
-        var nearby = PlayersInRangeOf(me).ToList();
-        var nearbyGuids = new HashSet<ulong>(nearby.Count);
-
-        foreach (var other in nearby)
-        {
-            nearbyGuids.Add(other.Guid);
-            if (me.Session.VisiblePlayers.TryAdd(other.Guid, 1))
-            {
-                logger.LogDebug("[vis] CREATE '{Other}'(eq={N}) → '{Me}' (refresh)",
-                    other.Character.Name, EquipCount(other), me.Character.Name);
-                await me.Session.SendAsync(WorldOpcode.SmsgUpdateObject, BuildPlayerCreate(other), ct);
-            }
-            // обоюдно: чтобы стоящий на месте сосед тоже увидел подошедшего.
-            if (other.Session.VisiblePlayers.TryAdd(me.Guid, 1))
-            {
-                logger.LogDebug("[vis] CREATE '{Me}'(eq={N}) → '{Other}' (refresh-sym)",
-                    me.Character.Name, EquipCount(me), other.Character.Name);
-                await other.Session.SendAsync(WorldOpcode.SmsgUpdateObject, BuildPlayerCreate(me), ct);
-            }
-        }
-
-        foreach (var guid in me.Session.VisiblePlayers.Keys.Where(g => !nearbyGuids.Contains(g)).ToList())
-        {
-            me.Session.VisiblePlayers.TryRemove(guid, out _);
-            await me.Session.SendAsync(WorldOpcode.SmsgDestroyObject,
-                new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-        }
-    }
-
-    /// <summary>
-    /// Досылка экипировки соседних игроков этому игроку как VALUES-апдейт (на уже созданные объекты).
-    /// Нужна после входа: первый create приходит во время загрузочного экрана, и клиент теряет
-    /// видимые предметы соседей; повторный CREATE он игнорирует — применяется именно VALUES-апдейт.
-    /// </summary>
-    public async Task ResendNearbyEquipmentToAsync(WorldPlayer me, CancellationToken ct)
-    {
-        foreach (var other in PlayersInRangeOf(me))
-        {
-            var pkt = PlayerSpawn.BuildEquipmentValuesUpdate(other.Character, other.Session.Inventory);
-            if (pkt is not null)
-                await me.Session.SendAsync(WorldOpcode.SmsgUpdateObject, pkt, ct);
-        }
-    }
-
-    /// <summary>Игрок покинул мир: удаляем из реестра и шлём соседям DESTROY (+ чистим их видимость).</summary>
-    public async Task LeaveWorldAsync(WorldPlayer player, CancellationToken ct)
-    {
-        if (!_players.TryRemove(player.Guid, out _))
-            return;
-
-        var destroy = new ByteWriter(9).UInt64(player.Guid).UInt8(0).ToArray(); // target_died = 0
         foreach (var other in _players.Values)
         {
-            if (other.Guid == player.Guid)
+            if (other.Guid == center.Guid || other.Map != center.Map)
                 continue;
-            if (other.Session.VisiblePlayers.TryRemove(player.Guid, out _))
-                await other.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
-        }
-
-        logger.LogInformation("Из мира вышел '{Name}' (guid={Guid}); онлайн: {Count}",
-            player.Character.Name, player.Guid, _players.Count);
-    }
-
-    /// <summary>
-    /// Ретрансляция пакета движения соседним игрокам (тело уже содержит packed guid мувера).
-    /// M6.3 ч.2: переписывает поле <c>time</c> в часы наблюдателя
-    /// (<c>T_obs = T_mover + delta_mover − delta_obs</c>), чтобы убрать сдвиг экстраполяции
-    /// между клиентами с разными точками отсчёта тиков. Пока дельта любой из сторон неизвестна —
-    /// ретранслируем тело как есть (не хуже прежнего поведения).
-    /// </summary>
-    public async Task RelayMovementAsync(WorldPlayer mover, WorldOpcode opcode, byte[] body,
-        uint moverTime, int timeFieldOffset, CancellationToken ct)
-    {
-        // Один рерайт в СЕРВЕРНОЕ время (как TrinityCore AdjustClientMovementTime): time += delta_мувера.
-        // Все наблюдатели получают одинаковое тело; пока дельта мувера неизвестна — как есть.
-        var outBody = body;
-        if (timeFieldOffset >= 0 && timeFieldOffset + 4 <= body.Length
-            && mover.Session.ClockDeltaMs is { } delta)
-        {
-            var serverTime = (uint)((long)moverTime + delta);
-            outBody = (byte[])body.Clone();
-            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(
-                outBody.AsSpan(timeFieldOffset, 4), serverTime);
-        }
-
-        foreach (var other in PlayersInRangeOf(mover))
-            await other.Session.SendAsync(opcode, outBody, ct);
-    }
-
-    /// <summary>
-    /// Тик мира (M6.3): продвигает мили-свинги атакующих игроков и респавнит мёртвых существ.
-    /// Вызывается из <see cref="WorldUpdateLoop"/> ~раз в 250 мс. Исключения по отдельной сессии
-    /// не должны валить весь тик — ловим их поштучно.
-    /// </summary>
-    public async Task UpdateAsync(CancellationToken ct)
-    {
-        var now = Environment.TickCount64;
-        await factions.EnsureLoadedAsync(ct); // M6.7: ленивая загрузка реакций фракций (один раз)
-
-        foreach (var player in _players.Values)
-        {
-            try
-            {
-                await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
-                // M6.4: завершение каста — точно по времени (Task.Delay в SpellHandlers), не в тике;
-                // здесь — реген маны (вне «правила 5 секунд»).
-                await Handlers.SpellHandlers.TickManaRegenAsync(player.Session, now, ct);
-                await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
-                await Handlers.Auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
-                await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
-                await Handlers.CombatHandlers.TickAggroScanAsync(this, player, now, ct);      // M6.7: авто-агро по фракции
-
-                // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
-                if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
-                    await Handlers.WorldEntryHandlers.SendTimeSyncReqAsync(player.Session, ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug("Тик '{User}': {Msg}", player.Character.Name, ex.Message);
-            }
-        }
-
-        foreach (var creature in _creatures.Values)
-        {
-            try
-            {
-                // M6.7: живое существо — ИИ (возврат/преследование+бой/реген); мёртвое — ждёт респавна.
-                if (creature.IsAlive)
-                {
-                    if (creature.Evading)
-                        await Handlers.CombatHandlers.TickEvadeAsync(this, creature, now, ct);
-                    else if (creature.CombatTargetGuid != 0)
-                        await Handlers.CombatHandlers.TickCreatureCombatAsync(this, creature, now, ct);
-                    else
-                        await Handlers.CombatHandlers.TickRegenAsync(this, creature, now, ct);
-                    continue;
-                }
-                if (creature.RespawnAtMs is { } at && now >= at)
-                    await RespawnCreatureAsync(creature, ct);
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug("Тик существа {Guid}: {Msg}", creature.Guid, ex.Message);
-            }
+            var dx = other.X - center.X;
+            var dy = other.Y - center.Y;
+            var dz = other.Z - center.Z;
+            if (dx * dx + dy * dy + dz * dz <= VisibilityRange * VisibilityRange)
+                yield return other;
         }
     }
-
-    /// <summary>Воскрешает существо (полное HP) и шлёт наблюдателям апдейт здоровья. M6.3.</summary>
-    private async Task RespawnCreatureAsync(WorldCreature creature, CancellationToken ct)
-    {
-        creature.Health = creature.MaxHealth;
-        creature.RespawnAtMs = null;
-        creature.CombatTargetGuid = 0;
-        creature.Evading = false;       // M6.7: вернуть на спавн при респавне
-        creature.X = creature.HomeX;
-        creature.Y = creature.HomeY;
-        creature.Z = creature.HomeZ;
-        creature.O = creature.HomeO;
-        creature.Lootable = false; // M6.6: труп больше не lootable
-        creature.Loot = null;
-
-        // M7 #15: пере-создать у наблюдателей на ТОЧКЕ СПАВНА (DESTROY+CREATE). Иначе оживший виден на
-        // месте смерти (после погони — далеко от дома): мы сбрасываем позицию на Home, но клиенту об
-        // этом не сообщали. CREATE несёт полное состояние (позиция/HP/флаги), снимая и труп, и lootable.
-        var time = (uint)Environment.TickCount;
-        var destroy = new ByteWriter(9).UInt64(creature.Guid).UInt8(0).ToArray();
-        foreach (var observer in ObserversOf(creature).ToList())
-        {
-            await observer.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
-            await observer.Session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                CreatureUpdate.BuildCreateObject(creature, time), ct);
-        }
-        logger.LogDebug("Существо '{Name}' (guid={Guid}) респавнилось на спавне", creature.Template.Name, creature.Guid);
-    }
-
-    /// <summary>
-    /// Дев-команда <c>.dummy</c> (#29): телепортирует тренировочный манекен (тот же GUID, что у статичного
-    /// БД-спавна в Нортшире) на ~3 ярда перед игроком, лицом к нему. DESTROY+CREATE наблюдателям; HP и
-    /// боевое состояние сбрасываются. В пределах видимости БД-точки (вся Долина Североземья) остаётся;
-    /// дальше может пропасть при обновлении видимости — тогда позвать заново.
-    /// </summary>
-    public async Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
-    {
-        var map = session.Character?.Map ?? 0;
-        float x = session.PosX + 3f * MathF.Cos(session.PosO);
-        float y = session.PosY + 3f * MathF.Sin(session.PosO);
-        float z = session.PosZ;
-        float o = session.PosO + MathF.PI;            // лицом к игроку
-
-        var dummy = GetOrAddCreature(Npcs.TrainingDummyGuid, () =>
-        {
-            var hp = Npcs.TrainingDummyHealth;
-            return new WorldCreature
-            {
-                Guid = Npcs.TrainingDummyGuid, Map = map, Template = Npcs.TrainingDummy,
-                X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
-                MaxHealth = hp, Health = hp,
-            };
-        });
-
-        // Убрать со старого места у всех, кто его видит (включая вызвавшего — ниже пере-создадим).
-        var destroy = new ByteWriter(9).UInt64(dummy.Guid).UInt8(0).ToArray();
-        foreach (var observer in ObserversOf(dummy).ToList())
-        {
-            await observer.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
-            observer.Session.VisibleNpcs.TryRemove(dummy.Guid, out _);
-        }
-
-        // Переставить (X/Y/Z мутабельны; Home — init, и не нужен: манекен пассивен, не евейдит/респавнит)
-        // + полный сброс боевого состояния (как свежий манекен).
-        dummy.X = x; dummy.Y = y; dummy.Z = z; dummy.O = o;
-        dummy.Health = dummy.MaxHealth;
-        dummy.CombatTargetGuid = 0;
-        dummy.Evading = false;
-        dummy.RespawnAtMs = null;
-        dummy.Lootable = false;
-        dummy.Loot = null;
-
-        // Показать вызвавшему на новом месте.
-        session.VisibleNpcs[dummy.Guid] = dummy;
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            CreatureUpdate.BuildCreateObject(dummy, (uint)Environment.TickCount), ct);
-    }
-
-    /// <summary>
-    /// Двигает существо в точку (M6.7): шлёт наблюдателям SMSG_MONSTER_MOVE (сплайн из текущей позиции),
-    /// затем обновляет авторитетную позицию и фейсинг. <paramref name="durationMs"/> — время анимации хода.
-    /// </summary>
-    public async Task MoveCreatureAsync(WorldCreature creature, float nx, float ny, float nz, uint durationMs, CancellationToken ct)
-    {
-        float sx = creature.X, sy = creature.Y, sz = creature.Z;
-        var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
-        await BroadcastToObserversAsync(creature, WorldOpcode.SmsgMonsterMove,
-            MonsterMove.Build(creature.Guid, sx, sy, sz, nx, ny, nz, durationMs, splineId), ct);
-
-        creature.X = nx;
-        creature.Y = ny;
-        creature.Z = nz;
-        float dx = nx - sx, dy = ny - sy;
-        if (dx * dx + dy * dy > 1e-6f)
-            creature.O = MathF.Atan2(dy, dx);
-    }
-
-    /// <summary>Доворот существа лицом к цели (без перемещения) — для страфа игрока в мили. M6.7.</summary>
-    public async Task FaceCreatureAsync(WorldCreature creature, ulong targetGuid, CancellationToken ct)
-    {
-        var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
-        await BroadcastToObserversAsync(creature, WorldOpcode.SmsgMonsterMove,
-            MonsterMove.BuildFaceTarget(creature.Guid, creature.X, creature.Y, creature.Z, targetGuid, splineId), ct);
-    }
-
-    /// <summary>Путь по навмешу (mmaps) в игровых координатах или null (нет навмеша/пути). M6.7.</summary>
-    public IReadOnlyList<(float X, float Y, float Z)>? FindGroundPath(uint map,
-        float sx, float sy, float sz, float ex, float ey, float ez)
-        => navmesh.FindPath(map, sx, sy, sz, ex, ey, ez);
 
     /// <summary>Наблюдатели существа: игроки на его карте, у кого оно в видимом наборе. M6.3.</summary>
     public IEnumerable<WorldPlayer> ObserversOf(WorldCreature creature)
         => _players.Values.Where(p => p.Map == creature.Map && p.Session.VisibleNpcs.ContainsKey(creature.Guid));
+
+    // --- Рассылка наблюдателям ---
 
     /// <summary>
     /// Рассылка пакета соседним игрокам (в радиусе, БЕЗ самого игрока). M6.4: SMSG_SPELL_GO шлётся
@@ -379,6 +146,22 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
         => BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildHealthUpdate(creature.Guid, creature.Health), ct);
 
+    /// <summary>Наблюдатели игрока для боя/HP: сам игрок + соседи в радиусе. M6.7.</summary>
+    public async Task BroadcastToPlayerObserversAsync(WorldPlayer player, WorldOpcode opcode, byte[] body, CancellationToken ct)
+    {
+        await player.Session.SendAsync(opcode, body, ct);
+        foreach (var other in PlayersInRangeOf(player))
+            await other.Session.SendAsync(opcode, body, ct);
+    }
+
+    /// <summary>Рассылка текущего HP игрока (VALUES UNIT_FIELD_HEALTH) себе и соседям. M6.7.</summary>
+    public Task BroadcastPlayerHealthAsync(WorldPlayer player, CancellationToken ct)
+        => BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate(player.Guid,
+                m => m.SetUInt32(UpdateField.UnitHealth, player.Session.Health)), ct);
+
+    // --- Урон (мутация авторитетного состояния) ---
+
     /// <summary>
     /// Применяет урон существу (общий путь для мили M6.3 и спеллов M6.4): уменьшает HP, на смерти
     /// ставит таймер респавна. НЕ рассылает (порядок с combat-log контролирует вызывающий —
@@ -394,23 +177,6 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
         return (dealt, damage - dealt, creature.Health == 0);
     }
 
-    /// <summary>Длительность респавна существа (мс). M6.3.</summary>
-    public static long RespawnDelay => RespawnDelayMs;
-
-    /// <summary>Наблюдатели игрока для боя/HP: сам игрок + соседи в радиусе. M6.7.</summary>
-    public async Task BroadcastToPlayerObserversAsync(WorldPlayer player, WorldOpcode opcode, byte[] body, CancellationToken ct)
-    {
-        await player.Session.SendAsync(opcode, body, ct);
-        foreach (var other in PlayersInRangeOf(player))
-            await other.Session.SendAsync(opcode, body, ct);
-    }
-
-    /// <summary>Рассылка текущего HP игрока (VALUES UNIT_FIELD_HEALTH) себе и соседям. M6.7.</summary>
-    public Task BroadcastPlayerHealthAsync(WorldPlayer player, CancellationToken ct)
-        => BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildPlayerValuesUpdate(player.Guid,
-                m => m.SetUInt32(UpdateField.UnitHealth, player.Session.Health)), ct);
-
     /// <summary>
     /// Урон игроку (от существа, M6.7): уменьшает авторитетный HP. Возвращает фактический урон и
     /// факт смерти. Рассылку combat-log/HP и обработку смерти делает вызывающий (CombatHandlers).
@@ -423,27 +189,46 @@ public sealed class WorldState(ILogger<WorldState> logger, Navmesh navmesh, Fact
         return (dealt, s.Health == 0);
     }
 
-    /// <summary>Игроки на той же карте в радиусе видимости (исключая самого center).</summary>
-    private IEnumerable<WorldPlayer> PlayersInRangeOf(WorldPlayer center)
-    {
-        foreach (var other in _players.Values)
-        {
-            if (other.Guid == center.Guid || other.Map != center.Map)
-                continue;
-            var dx = other.X - center.X;
-            var dy = other.Y - center.Y;
-            var dz = other.Z - center.Z;
-            if (dx * dx + dy * dy + dz * dz <= VisibilityRange * VisibilityRange)
-                yield return other;
-        }
-    }
+    // --- Делегации к SRP-коллабораторам (API не меняется для потребителей) ---
 
-    /// <summary>ДИАГНОСТИКА: число надетых видимых предметов (слоты экипировки 0..18).</summary>
-    private static int EquipCount(WorldPlayer p)
-        => p.Session.Inventory.Count(i => i.Bag == Protocol.InventorySlots.MainBag
-            && i.Slot < Protocol.InventorySlots.EquipmentEnd);
+    /// <inheritdoc cref="PlayerVisibility.EnterWorldAsync"/>
+    public Task EnterWorldAsync(WorldPlayer player, CancellationToken ct)
+        => _visibility.EnterWorldAsync(player, ct);
 
-    private static byte[] BuildPlayerCreate(WorldPlayer p)
-        => PlayerSpawn.BuildCreateObject(p.Character, p.X, p.Y, p.Z, p.O, (uint)Environment.TickCount,
-            isSelf: false, p.Session.Inventory);
+    /// <inheritdoc cref="PlayerVisibility.RefreshVisiblePlayersAsync"/>
+    public Task RefreshVisiblePlayersAsync(WorldPlayer me, CancellationToken ct)
+        => _visibility.RefreshVisiblePlayersAsync(me, ct);
+
+    /// <inheritdoc cref="PlayerVisibility.ResendNearbyEquipmentToAsync"/>
+    public Task ResendNearbyEquipmentToAsync(WorldPlayer me, CancellationToken ct)
+        => _visibility.ResendNearbyEquipmentToAsync(me, ct);
+
+    /// <inheritdoc cref="PlayerVisibility.LeaveWorldAsync"/>
+    public Task LeaveWorldAsync(WorldPlayer player, CancellationToken ct)
+        => _visibility.LeaveWorldAsync(player, ct);
+
+    /// <inheritdoc cref="PlayerVisibility.RelayMovementAsync"/>
+    public Task RelayMovementAsync(WorldPlayer mover, WorldOpcode opcode, byte[] body,
+        uint moverTime, int timeFieldOffset, CancellationToken ct)
+        => _visibility.RelayMovementAsync(mover, opcode, body, moverTime, timeFieldOffset, ct);
+
+    /// <inheritdoc cref="CreatureDirector.MoveCreatureAsync"/>
+    public Task MoveCreatureAsync(WorldCreature creature, float nx, float ny, float nz, uint durationMs, CancellationToken ct)
+        => _director.MoveCreatureAsync(creature, nx, ny, nz, durationMs, ct);
+
+    /// <inheritdoc cref="CreatureDirector.FaceCreatureAsync"/>
+    public Task FaceCreatureAsync(WorldCreature creature, ulong targetGuid, CancellationToken ct)
+        => _director.FaceCreatureAsync(creature, targetGuid, ct);
+
+    /// <inheritdoc cref="CreatureDirector.FindGroundPath"/>
+    public IReadOnlyList<(float X, float Y, float Z)>? FindGroundPath(uint map,
+        float sx, float sy, float sz, float ex, float ey, float ez)
+        => _director.FindGroundPath(map, sx, sy, sz, ex, ey, ez);
+
+    /// <inheritdoc cref="CreatureDirector.SummonTrainingDummyAsync"/>
+    public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
+        => _director.SummonTrainingDummyAsync(session, ct);
+
+    /// <inheritdoc cref="WorldTick.UpdateAsync"/>
+    public Task UpdateAsync(CancellationToken ct) => _tick.UpdateAsync(ct);
 }
