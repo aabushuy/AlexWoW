@@ -54,6 +54,7 @@ builder.Services.AddSingleton<ILootRepository>(sp => new LootRepository(WorldCon
 builder.Services.AddSingleton<IQuestTemplateRepository>(sp => new QuestTemplateRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IFactionRepository>(sp => new FactionRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IPlayerDataRepository>(sp => new PlayerDataRepository(WorldConn(sp)));
+builder.Services.AddSingleton<ISpellTemplateRepository>(sp => new SpellTemplateRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IWorldRepository, WorldRepository>();
 builder.Services.AddSingleton(sp =>
 {
