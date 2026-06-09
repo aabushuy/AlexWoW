@@ -14,13 +14,17 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 public static class DevCommands
 {
-    public static readonly bool Enabled = Environment.GetEnvironmentVariable("WORLD_DEV_COMMANDS") != "0";
-
-    /// <summary>Выполнить, если это дев-команда. true → обработано (в чат не слать).</summary>
+    /// <summary>Выполнить, если это дев-команда. true → обработано (в чат не слать).
+    /// Доступ — только аккаунтам с флагом администратора (account.is_admin = 1). M7.</summary>
     public static async Task<bool> TryHandleAsync(WorldSession session, string text, CancellationToken ct)
     {
-        if (!Enabled || string.IsNullOrEmpty(text) || text[0] != '.')
+        if (string.IsNullOrEmpty(text) || text[0] != '.')
             return false;
+        if (!session.IsAdmin)
+        {
+            await ReplyAsync(session, "Команда доступна только администраторам.", ct);
+            return true; // в чат не уходит (это была попытка команды)
+        }
 
         var parts = text[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 0)

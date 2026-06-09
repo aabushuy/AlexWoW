@@ -9,4 +9,5 @@ public sealed class Account
     public required byte[] Verifier { get; init; }  // 32 байта little-endian
     public byte[]? SessionKey { get; set; }         // 40 байт, обновляется при логине
     public string? LastIp { get; set; }
+    public bool IsAdmin { get; init; }              // M7: доступ к дев/GM-командам (DevCommands)
 }

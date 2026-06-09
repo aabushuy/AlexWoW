@@ -72,6 +72,7 @@ public static class AuthHandlers
         }
 
         session.AccountId = dbAccount.Id;
+        session.IsAdmin = dbAccount.IsAdmin;     // M7: доступ к DevCommands
         session.InitCrypt(dbAccount.SessionKey); // дальше заголовки шифруются
 
         var response = new ByteWriter(11)
