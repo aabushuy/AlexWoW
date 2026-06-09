@@ -181,7 +181,7 @@ public static class SpellCaster
     /// </summary>
     internal static async Task SendSpellGoAsync(WorldSession session, uint spellId, ulong targetGuid, CancellationToken ct)
     {
-        var body = SpellPackets.BuildSpellGo((ulong)session.InWorldGuid, spellId, targetGuid);
+        var body = SpellPackets.BuildSpellGo((ulong)session.InWorldGuid, spellId, targetGuid, session.CastCount);
         await session.SendAsync(WorldOpcode.SmsgSpellGo, body, ct);   // кастеру (снаряд)
         if (session.Player is { } player)                            // и наблюдателям
             await session.World.BroadcastToNeighborsAsync(player, WorldOpcode.SmsgSpellGo, body, ct);
