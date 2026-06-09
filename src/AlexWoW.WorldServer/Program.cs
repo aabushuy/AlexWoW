@@ -33,17 +33,14 @@ builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
     o.UseMySql(options.ConnectionString, ServerVersion.Create(new Version(8, 4, 0), ServerType.MySql));
 });
 builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
-builder.Services.AddSingleton(sp =>
-{
-    var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
-    return new CharactersDatabase(options.ConnectionString);
-});
-// Фасад + сегрегированные интерфейсы — алиасы на один singleton CharactersDatabase.
-builder.Services.AddSingleton<ICharacterStore>(sp => sp.GetRequiredService<CharactersDatabase>());
-builder.Services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
-builder.Services.AddSingleton<IInventoryRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
-builder.Services.AddSingleton<IQuestRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
-builder.Services.AddSingleton<ICharacterStateRepository>(sp => sp.GetRequiredService<CharactersDatabase>());
+// Срез 4 рефактора DAL (#23): персонажи на EF. EfCharacterStore поверх пул-фабрики AuthDbContext
+// (зарегистрирована выше). Фасад + сегрегированные интерфейсы — алиасы на один singleton.
+builder.Services.AddSingleton<EfCharacterStore>();
+builder.Services.AddSingleton<ICharacterStore>(sp => sp.GetRequiredService<EfCharacterStore>());
+builder.Services.AddSingleton<ICharacterRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
+builder.Services.AddSingleton<IInventoryRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
+builder.Services.AddSingleton<IQuestRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
+builder.Services.AddSingleton<ICharacterStateRepository>(sp => sp.GetRequiredService<EfCharacterStore>());
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
