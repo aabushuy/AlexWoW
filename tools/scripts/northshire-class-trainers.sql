@@ -1,10 +1,14 @@
--- Нортшир: тренеры с ПОЛНЫМ набором умений для каждого класса (вкл. Рыцаря Смерти). #26.
+-- Кастомные ШАБЛОНЫ класс-тренеров с ПОЛНЫМ набором умений (вкл. Рыцаря Смерти). #26.
 --
--- Зачем: отладочные тренеры M9.3 (guid 9000001..99) — это нортширские стартовые тренеры с урезанными
--- шаблонами (5-6 спеллов). Здесь они убираются, а вместо них ставятся КАСТОМНЫЕ тренеры, обучающие
--- полной прогрессии класса (все ранги): берём канонический trainer-template класса (городские тренеры) и
--- кладём его спеллы напрямую в наш entry. Фракция 35 (hostileMask=0 → дружелюбны/нейтральны ко ВСЕМ расам),
--- TrainerRace=0 (без расового гейта) → доступны любому персонажу нужного класса, включая ДК.
+-- ⚠️ ОБНОВЛЕНО (веха Devcommands, D1): тренеры БОЛЬШЕ НЕ СТАВЯТСЯ на карту в Нортшире — их статичные
+-- спавны удалены (см. ОТКАТ ниже, выполнен в проде). Эти entry (990001..990011) теперь используются как
+-- ШАБЛОНЫ дев-тренеров для команды `.trainer <class>` (in-memory спавн у игрока по требованию;
+-- ITrainerRepository.GetClassTrainerEntryAsync выбирает их: TrainerType=0 + прямой npc_trainer +
+-- Faction=35). Поэтому ОСТАВЛЯЕМ creature_template + npc_trainer, но НЕ создаём строки creature.
+--
+-- Зачем такие шаблоны: берём канонический trainer-template класса (городские тренеры) и кладём его спеллы
+-- напрямую в наш entry. Фракция 35 (hostileMask=0 → дружелюбны/нейтральны ко ВСЕМ расам), TrainerRace=0
+-- (без расового гейта) → доступны любому персонажу нужного класса, включая ДК.
 --
 -- Канонические trainer-template'ы (creature_template.TrainerTemplateId), проверено по дампу:
 --   Воин=11(133)  Паладин=21(175)  Охотник=31(171)  Разбойник=41(124)  Жрец=51(240)
@@ -22,7 +26,8 @@ SET NAMES utf8mb4;
 -- Кастомные тренеры — рядом, в ряд по Y (лицом к точке старта, orientation ~ pi/2).
 
 -- Подчистка: старые отладочные спавны M9.3 + прошлый прогон этого скрипта.
-DELETE FROM creature WHERE guid BETWEEN 9000001 AND 9000099;
+-- ⚠️ Диапазон 9000001..9000019 — НЕ трогает манекен 9000020 (northshire-training-dummy.sql)!
+DELETE FROM creature WHERE guid BETWEEN 9000001 AND 9000019;
 DELETE FROM npc_trainer WHERE entry BETWEEN 990001 AND 990011;
 DELETE FROM creature_template WHERE entry BETWEEN 990001 AND 990011;
 
@@ -131,19 +136,9 @@ FROM npc_trainer_template WHERE entry=111;
 
 DROP TEMPORARY TABLE IF EXISTS _t;
 
--- Спавн 10 тренеров в ряд у точки старта (лицом к северу/игроку, orientation ~ pi/2).
-INSERT INTO creature (guid, id, map, spawnMask, phaseMask, position_x, position_y, position_z, orientation,
-                      spawntimesecsmin, spawntimesecsmax, spawndist, MovementType) VALUES
-  (9000001, 990001, 0, 1, 1, -8949.95, -150.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000002, 990002, 0, 1, 1, -8949.95, -155.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000003, 990003, 0, 1, 1, -8949.95, -160.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000004, 990004, 0, 1, 1, -8949.95, -165.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000005, 990005, 0, 1, 1, -8949.95, -170.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000006, 990006, 0, 1, 1, -8949.95, -175.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000007, 990007, 0, 1, 1, -8949.95, -180.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000008, 990008, 0, 1, 1, -8949.95, -185.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000009, 990009, 0, 1, 1, -8949.95, -190.00, 83.53, 1.57, 120, 120, 0, 0),
-  (9000011, 990011, 0, 1, 1, -8949.95, -195.00, 83.53, 1.57, 120, 120, 0, 0);
+-- НЕ спавним тренеров на карте: команда `.trainer <class>` (веха Devcommands) ставит их у игрока
+-- по требованию. Прежние статичные спавны (creature guid 9000001..9000011) удалены — см. ОТКАТ.
+-- Манекен (guid 9000020, northshire-training-dummy.sql) — отдельная сущность, не трогаем.
 
 -- Проверка:
 -- SELECT c.guid, ct.entry, ct.Name, ct.TrainerClass,
@@ -151,7 +146,11 @@ INSERT INTO creature (guid, id, map, spawnMask, phaseMask, position_x, position_
 -- FROM creature c JOIN creature_template ct ON ct.entry=c.id
 -- WHERE c.guid BETWEEN 9000001 AND 9000099 ORDER BY ct.TrainerClass;
 
--- ===== ОТКАТ =====
--- DELETE FROM creature WHERE guid BETWEEN 9000001 AND 9000099;
+-- ===== СНЯТИЕ СПАВНОВ С КАРТЫ (выполнено в проде, веха Devcommands D1) =====
+-- ⚠️ Диапазон 9000001..9000019 — НЕ трогает манекен 9000020!
+-- DELETE FROM creature WHERE guid BETWEEN 9000001 AND 9000019;
+--
+-- ===== ПОЛНЫЙ ОТКАТ (если нужно убрать и шаблоны — сломает .trainer) =====
+-- DELETE FROM creature WHERE guid BETWEEN 9000001 AND 9000019;
 -- DELETE FROM npc_trainer WHERE entry BETWEEN 990001 AND 990011;
 -- DELETE FROM creature_template WHERE entry BETWEEN 990001 AND 990011;
