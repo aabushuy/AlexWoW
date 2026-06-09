@@ -24,16 +24,24 @@ public sealed class TrainerRepository(string connectionString)
         byte trainerRace = Convert.ToByte(h["TrainerRace"], CultureInfo.InvariantCulture);
         uint templateId = Convert.ToUInt32(h["TrainerTemplateId"], CultureInfo.InvariantCulture);
 
+        // SpellLevel из spell_template (дамп Spell.dbc) — реальный уровень изучения ранга: в дампе
+        // npc_trainer.reqlevel почти всегда 0, поэтому гейт ранга по уровню без этого не работает (#27).
         var spells = (await db.QueryAsync<TrainerSpell>(new CommandDefinition("""
-            SELECT spell AS Spell, spellcost AS SpellCost, reqskill AS ReqSkill,
-                   reqskillvalue AS ReqSkillValue, reqlevel AS ReqLevel,
-                   COALESCE(ReqAbility1, 0) AS ReqAbility1, COALESCE(ReqAbility2, 0) AS ReqAbility2,
-                   COALESCE(ReqAbility3, 0) AS ReqAbility3
-            FROM npc_trainer WHERE entry = @entry
-            UNION
-            SELECT spell, spellcost, reqskill, reqskillvalue, reqlevel,
-                   COALESCE(ReqAbility1, 0), COALESCE(ReqAbility2, 0), COALESCE(ReqAbility3, 0)
-            FROM npc_trainer_template WHERE @templateId <> 0 AND entry = @templateId;
+            SELECT u.spell AS Spell, u.spellcost AS SpellCost, u.reqskill AS ReqSkill,
+                   u.reqskillvalue AS ReqSkillValue, u.reqlevel AS ReqLevel,
+                   u.ReqAbility1 AS ReqAbility1, u.ReqAbility2 AS ReqAbility2, u.ReqAbility3 AS ReqAbility3,
+                   COALESCE(st.SpellLevel, 0) AS SpellLevel
+            FROM (
+                SELECT spell, spellcost, reqskill, reqskillvalue, reqlevel,
+                       COALESCE(ReqAbility1, 0) ReqAbility1, COALESCE(ReqAbility2, 0) ReqAbility2,
+                       COALESCE(ReqAbility3, 0) ReqAbility3
+                FROM npc_trainer WHERE entry = @entry
+                UNION
+                SELECT spell, spellcost, reqskill, reqskillvalue, reqlevel,
+                       COALESCE(ReqAbility1, 0), COALESCE(ReqAbility2, 0), COALESCE(ReqAbility3, 0)
+                FROM npc_trainer_template WHERE @templateId <> 0 AND entry = @templateId
+            ) u
+            LEFT JOIN spell_template st ON st.Id = u.spell;
             """, new { entry, templateId }, cancellationToken: ct))).AsList();
 
         if (trainerType == 0 && spells.Count == 0)

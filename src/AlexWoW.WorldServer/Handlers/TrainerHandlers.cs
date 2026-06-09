@@ -173,7 +173,7 @@ public static class TrainerHandlers
             w.UInt32(s.SpellCost);
             w.UInt32(0);                       // talent_point_cost — спеллы не стоят очков талантов
             w.UInt32(0);                       // first_rank (профессии) — у нас всегда 0
-            w.UInt8(s.ReqLevel);
+            w.UInt8((byte)EffectiveReqLevel(s));
             w.UInt32(s.ReqSkill);
             w.UInt32(s.ReqSkillValue);
             w.UInt32(s.ReqAbility1);
@@ -264,11 +264,18 @@ public static class TrainerHandlers
     /// или незнакома требуемая предыдущая абилка (ReqAbility) → RED; иначе GREEN. Skill-требования
     /// (профессии) пока не проверяем — классовые абилки их не используют.
     /// </summary>
+    /// <summary>
+    /// Уровень изучения абилки: max(npc_trainer.reqlevel, Spell.dbc spellLevel). В дампе reqlevel почти
+    /// всегда 0, реальный уровень ранга — в spell_template.SpellLevel (#27). Без этого все ранги были бы
+    /// доступны на 1 уровне.
+    /// </summary>
+    private static uint EffectiveReqLevel(TrainerSpell s) => Math.Max((uint)s.ReqLevel, s.SpellLevel);
+
     private static byte StateFor(WorldSession session, byte level, TrainerSpell s)
     {
         if (session.KnownSpells.Contains(s.Spell))
             return StateGray;
-        if (level < s.ReqLevel)
+        if (level < EffectiveReqLevel(s))
             return StateRed;
         if ((s.ReqAbility1 != 0 && !session.KnownSpells.Contains(s.ReqAbility1))
             || (s.ReqAbility2 != 0 && !session.KnownSpells.Contains(s.ReqAbility2))
