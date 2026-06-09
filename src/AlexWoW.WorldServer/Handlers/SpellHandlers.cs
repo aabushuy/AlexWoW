@@ -303,7 +303,11 @@ public static class SpellHandlers
             await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("SPELL KILL '{User}' убил '{Name}' спеллом {Spell}",
                 session.Account, creature.Template.Name, spellId);
+            return;
         }
+
+        // M7 #13: урон спеллом (в т.ч. с дистанции) вводит существо в ответный бой (как landed-удар мили).
+        await CombatHandlers.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
     }
 
     /// <summary>
