@@ -97,8 +97,13 @@
 
 ### 4.2 Серверная БД мира
 - В CMaNGOS-WotLK мир поставляется **MySQL-дампом** (спавны, лут, квесты, тексты, скрипты) — грузим почти как есть, **конвертация не нужна** (ключевая причина выбора MySQL).
-- Три логические БД: `auth`/`realmd` (аккаунты, реалмы), `characters` (персонажи, инвентарь), `world`/`mangos` (статические данные мира).
-- Свои таблицы (наши служебные) кладём через миграции поверх импортированных дампов мира.
+- Две физические БД: **`alexwow_auth`** — НАШИ изменяемые данные (аккаунты, реалмы, персонажи `characters`/`character_*`, `account_data`); **`mangos`** — read-only дамп мира (статика: спавны, шаблоны, квесты, спеллы `spell_template`, …).
+
+### 4.3 Слой доступа к данным (DAL) — `AlexWoW.Database`
+Гибрид (рефактор #23–25, см. [devlog/M7-tech-debt.md](devlog/M7-tech-debt.md)):
+- **EF Core 9 + Pomelo (MySQL)** для `alexwow_auth`: сущности (`Entities/`) + `AuthDbContext` + **миграции** (вместо ручных `CREATE/ALTER`). На прод-БД миграции адаптированы baseline-строкой в `__EFMigrationsHistory` (таблицы не пересоздаются). ⚠️ Под EF Core 10 релиза Pomelo ещё нет — EF9 работает на рантайме net10 через roll-forward.
+- **Dapper** для read-only дампа `mangos` (таблицы по 100+ столбцов, тяжёлые джойны — миграции не нужны).
+- Потребители (хендлеры, сессии, `*Store`) зависят от **интерфейсов-репозиториев** (`Abstractions/`), не от конкретных классов и не от голого SQL: `IAccountRepository`/`IRealmRepository`/`ISchemaInitializer`, `ICharacterRepository`/`IInventoryRepository`/`IQuestRepository`/`ICharacterStateRepository`, и focused-репозитории mangos (`ICreatureRepository`/`IItemTemplateRepository`/`IVendorRepository`/`ITrainerRepository`/`ILootRepository`/`IQuestTemplateRepository`/`IFactionRepository`/`IPlayerDataRepository`/`IGameObjectRepository`) за композитным фасадом `IWorldRepository`.
 
 ---
 
@@ -110,7 +115,7 @@
 | Сеть | **Sockets** (+ `System.IO.Pipelines` для world) | Эффективный парсинг бинарного потока без лишних аллокаций |
 | Криптография | `System.Security.Cryptography` | SHA1, HMAC-SHA1, RC4 (RC4 реализуем вручную — нет в BCL) |
 | Большие числа (SRP6) | `System.Numerics.BigInteger` | Модульная арифметика SRP |
-| Доступ к БД | **Dapper** (горячие пути) + EF Core (миграции, по необходимости) | Скорость + удобство |
+| Доступ к БД | **EF Core 9 + Pomelo** для `alexwow_auth` (сущности+миграции) · **Dapper** для read-only `mangos` | EF — домен (пишем/мигрируем); Dapper — внешний дамп (читаем). См. §4.3 |
 | Драйвер MySQL | **MySqlConnector** | Быстрый async-драйвер; совместим с дампами эталонов |
 | DI / хостинг | `Microsoft.Extensions.Hosting` | BackgroundService под auth/world |
 | Логи | **Serilog** | Структурные логи |
@@ -124,7 +129,8 @@ AlexWoW.slnx
 ├─ src/
 │  ├─ AlexWoW.Common        ✅ утилиты, бинарные примитивы пакетов (ByteReader/Writer)
 │  ├─ AlexWoW.Cryptography  ✅ SRP6, RC4 header crypt, auth digest, хэши
-│  ├─ AlexWoW.Database      ✅ MySqlConnector/Dapper, репозитории, схема (auth/characters/world)
+│  ├─ AlexWoW.Database      ✅ DAL: EF Core 9/Pomelo (alexwow_auth, миграции) + Dapper (mangos);
+│  │                           интерфейсы Abstractions/, focused-репозитории Repositories/ (§4.3)
 │  ├─ AlexWoW.DataStores    ✅ загрузка maps (рельеф), vmaps (LoS), mmaps (навмеш); DBC
 │  ├─ AlexWoW.AuthServer    ✅ exe: realmd (логин + список реалмов)
 │  ├─ AlexWoW.WorldServer   ✅ exe: mangosd. WorldSession=транспорт+состояние; мир/бой/
