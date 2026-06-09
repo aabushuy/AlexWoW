@@ -227,6 +227,9 @@ public static class SpellCaster
         // M10.4b: периодическая аура (DoT/HoT) — поверх прямого эффекта (напр. Immolate: удар + DoT).
         if (info.Periodic)
             await Periodics.ApplyAsync(session, spellId, info, targetGuid, ct);
+        // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
+        if (info.AuraBuff)
+            await Periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
     }
 
     /// <summary>
