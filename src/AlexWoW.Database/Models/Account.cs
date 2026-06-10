@@ -11,4 +11,5 @@ public sealed class Account
     public byte[]? SessionKey { get; set; }         // 40 байт, обновляется при логине
     public string? LastIp { get; set; }
     public bool IsAdmin { get; init; }              // M7: доступ к дев/GM-командам (DevCommands)
+    public DateTime CreatedAt { get; init; }        // M8.8: дата регистрации (account.created_at)
 }

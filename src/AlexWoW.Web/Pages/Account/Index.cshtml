@@ -1,0 +1,18 @@
+@page
+@model AlexWoW.Web.Pages.Account.IndexModel
+@{
+    ViewData["Title"] = "Аккаунт";
+}
+<div class="panel panel-narrow">
+    <h1>Аккаунт</h1>
+
+    <div class="detail-grid">
+        <div><div class="k">Игровой логин</div><div class="v">@Model.GameAccount</div></div>
+        <div><div class="k">Email</div><div class="v">@Model.Email</div></div>
+        <div><div class="k">Дата регистрации</div><div class="v">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</div></div>
+    </div>
+
+    <div class="form-actions">
+        <a class="btn btn-ghost" asp-page="/Account/ChangePassword">Сменить пароль</a>
+    </div>
+</div>

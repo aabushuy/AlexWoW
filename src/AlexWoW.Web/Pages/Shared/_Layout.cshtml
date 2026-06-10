@@ -1,7 +1,7 @@
 @using System.Security.Claims
 @{
     var isAuth = User.Identity?.IsAuthenticated == true;
-    var email = User.Identity?.Name;
+    var gameAccount = AuthSession.GameAccount(User);
 }
 <!DOCTYPE html>
 <html lang="ru">
@@ -22,15 +22,20 @@
                 @if (isAuth)
                 {
                     <a asp-page="/Characters/Index">Персонажи</a>
-                    <a asp-page="/Account/ChangePassword">Сменить пароль</a>
-                    <span class="nav-user">@email</span>
-                    <form method="post" asp-page="/Logout" class="nav-logout">
-                        <button type="submit" class="btn btn-ghost btn-sm">Выход</button>
-                    </form>
+                    <details class="nav-dropdown">
+                        <summary>@gameAccount</summary>
+                        <div class="nav-dropdown-menu">
+                            <a asp-page="/Account/Index">Аккаунт</a>
+                            <a asp-page="/Account/ChangePassword">Сменить пароль</a>
+                            <form method="post" asp-page="/Logout">
+                                <button type="submit">Выйти</button>
+                            </form>
+                        </div>
+                    </details>
                 }
                 else
                 {
-                    <a asp-page="/Login">Вход</a>
+                    <a asp-page="/Login">Логин</a>
                     <a asp-page="/Register">Регистрация</a>
                 }
             </nav>
