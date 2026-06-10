@@ -6,13 +6,13 @@ using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Чат (M4): приём CMSG_MESSAGECHAT, эхо отправителю.</summary>
-public static class ChatHandlers
+/// <summary>Чат (M4): приём CMSG_MESSAGECHAT, эхо отправителю. (DI-модуль, M7 #36.)</summary>
+internal sealed class ChatHandlers(AddonProtocol addonProtocol) : IOpcodeHandlerModule
 {
     private const uint ChatTypeWhisper = 0x07; // CMSG: перед сообщением идёт CString адресата
 
     [WorldOpcodeHandler(WorldOpcode.CmsgMessageChat)]
-    public static async Task OnMessageChat(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnMessageChat(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var type = reader.UInt32();        // тип чата клиента (say/yell/emote/whisper…)
@@ -26,7 +26,7 @@ public static class ChatHandlers
             var addonMsg = reader.CString();          // тело: "PREFIX\tBODY"
             var tab = addonMsg.IndexOf('\t');
             if (tab >= 0)
-                await AddonProtocol.HandleAsync(session, addonMsg[..tab], addonMsg[(tab + 1)..], ct);
+                await addonProtocol.HandleAsync(session, addonMsg[..tab], addonMsg[(tab + 1)..], ct);
             return;
         }
 

@@ -7,19 +7,24 @@ using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Экран персонажей (M3): enum/create/delete, запросы имени/времени, realm split, account data.</summary>
-public static class CharScreenHandlers
+/// <summary>Экран персонажей (M3): enum/create/delete, запросы имени/времени, realm split, account data.
+/// (DI-модуль, M7 #36.)</summary>
+internal sealed class CharScreenHandlers(
+    ICharacterRepository characters,
+    IInventoryRepository items,
+    IWorldRepository worldDb,
+    ICharacterStateRepository charState) : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgCharEnum)]
-    public static async Task OnCharEnum(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnCharEnum(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        var list = await session.Characters.GetByAccountAsync(session.AccountId, ct);
+        var list = await characters.GetByAccountAsync(session.AccountId, ct);
         var equipment = await BuildPaperdollAsync(session, list, ct);
 
         // M7 #16: персонажи с заданными склонениями → флаг CHARACTER_FLAG_DECLINED в enum,
         // иначе ruRU-клиент показывает диалог склонений при каждом заходе на экран выбора.
         IReadOnlySet<uint> declined;
-        try { declined = await session.Characters.GetGuidsWithDeclinedNamesAsync(list.Select(c => c.Guid).ToList(), ct); }
+        try { declined = await characters.GetGuidsWithDeclinedNamesAsync(list.Select(c => c.Guid).ToList(), ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("CHAR_ENUM declined-флаги: {Msg}", ex.Message);
@@ -35,15 +40,15 @@ public static class CharScreenHandlers
     /// Экипировка для paperdoll на экране выбора: по каждому персонажу слот(0..18) → displayId+invType.
     /// При недоступности БД мира — пустой набор (персонажи всё равно отображаются).
     /// </summary>
-    private static async Task<IReadOnlyDictionary<uint, CharEnum.SlotDisplay[]>> BuildPaperdollAsync(
-        WorldSession session, IReadOnlyList<Character> characters, CancellationToken ct)
+    private async Task<IReadOnlyDictionary<uint, CharEnum.SlotDisplay[]>> BuildPaperdollAsync(
+        WorldSession session, IReadOnlyList<Character> charList, CancellationToken ct)
     {
         var equippedByChar = new Dictionary<uint, List<InventoryItem>>();
         var entries = new HashSet<uint>();
-        foreach (var c in characters)
+        foreach (var c in charList)
         {
-            var items = await session.Items.GetItemsAsync(c.Guid, ct);
-            var equipped = items.Where(i => i.Bag == InventorySlots.MainBag
+            var charItems = await items.GetItemsAsync(c.Guid, ct);
+            var equipped = charItems.Where(i => i.Bag == InventorySlots.MainBag
                 && i.Slot < InventorySlots.EquipmentEnd).ToList();
             if (equipped.Count == 0)
                 continue;
@@ -58,7 +63,7 @@ public static class CharScreenHandlers
         IReadOnlyDictionary<uint, (uint DisplayId, byte InventoryType)> displays;
         try
         {
-            displays = await session.WorldDb.GetItemDisplaysAsync(entries, ct);
+            displays = await worldDb.GetItemDisplaysAsync(entries, ct);
         }
         catch (Exception ex)
         {
@@ -79,7 +84,7 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCharCreate)]
-    public static async Task OnCharCreate(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnCharCreate(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var name = NormalizeName(reader.CString());
@@ -110,16 +115,16 @@ public static class CharScreenHandlers
         session.Logger.LogInformation("CHAR_CREATE '{Name}' для '{User}' → {Result}", name, session.Account, result);
     }
 
-    private static async Task<CharResponse> TryCreateAsync(WorldSession session, string name, byte race, byte charClass,
+    private async Task<CharResponse> TryCreateAsync(WorldSession session, string name, byte race, byte charClass,
         byte gender, byte skin, byte face, byte hairStyle, byte hairColor, byte facialHair, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name))
             return CharResponse.CreateFailed;
         if (name.Length is < 2 or > 12)   // лимит имени WoW — 12 символов (столбец name VARCHAR(12))
             return CharResponse.CreateFailed;
-        if (await session.Characters.CountByAccountAsync(session.AccountId, ct) >= ICharacterRepository.MaxCharactersPerAccount)
+        if (await characters.CountByAccountAsync(session.AccountId, ct) >= ICharacterRepository.MaxCharactersPerAccount)
             return CharResponse.CreateServerLimit;
-        if (await session.Characters.NameExistsAsync(name, ct))
+        if (await characters.NameExistsAsync(name, ct))
             return CharResponse.CreateNameInUse;
 
         var start = StartPositions.ForRace(race);
@@ -142,7 +147,7 @@ public static class CharScreenHandlers
             Y = start.Y,
             Z = start.Z,
         };
-        var newGuid = await session.Characters.CreateAsync(character, ct);
+        var newGuid = await characters.CreateAsync(character, ct);
 
         // M6.1: выдать стартовую экипировку (шмот/оружие), чтобы персонаж входил в мир не голым.
         await StartingGear.GiveAsync(session, newGuid, race, charClass, ct);
@@ -155,7 +160,7 @@ public static class CharScreenHandlers
     /// просто подтверждаем приём, иначе клиент зависает на «Обновление персонажа…».
     /// </summary>
     [WorldOpcodeHandler(WorldOpcode.CmsgSetPlayerDeclinedNames)]
-    public static async Task OnSetDeclinedNames(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnSetDeclinedNames(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var guid = reader.UInt64();
@@ -165,7 +170,7 @@ public static class CharScreenHandlers
             declined[i] = reader.CString();
 
         // Сохраняем — иначе ruRU-клиент спрашивает склонения при каждом входе.
-        try { await session.Characters.SetDeclinedNamesAsync((uint)guid, declined, ct); }
+        try { await characters.SetDeclinedNamesAsync((uint)guid, declined, ct); }
         catch (Exception ex) { session.Logger.LogWarning("SET_DECLINED_NAMES guid={Guid}: {Msg}", guid, ex.Message); }
 
         var w = new ByteWriter(12)
@@ -176,11 +181,11 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgCharDelete)]
-    public static async Task OnCharDelete(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnCharDelete(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var guid = (uint)reader.UInt64();
-        var deleted = await session.Characters.DeleteAsync(guid, session.AccountId, ct);
+        var deleted = await characters.DeleteAsync(guid, session.AccountId, ct);
 
         await session.SendAsync(WorldOpcode.SmsgCharDelete,
             new ByteWriter(1).UInt8((byte)(deleted ? CharResponse.DeleteSuccess : CharResponse.DeleteFailed)).ToArray(), ct);
@@ -188,17 +193,17 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgNameQuery)]
-    public static async Task OnNameQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnNameQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var guid = (uint)reader.UInt64();
 
-        var character = await session.Characters.GetByGuidAsync(guid, ct);
+        var character = await characters.GetByGuidAsync(guid, ct);
         if (character is null)
             return;
 
         string[]? declined = null;
-        try { declined = await session.Characters.GetDeclinedNamesAsync(guid, ct); }
+        try { declined = await characters.GetDeclinedNamesAsync(guid, ct); }
         catch { /* нет таблицы/данных — отдаём без склонений */ }
         var hasDeclined = declined is not null && declined.Any(s => !string.IsNullOrEmpty(s));
 
@@ -218,7 +223,7 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgQueryTime)]
-    public static async Task OnQueryTime(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnQueryTime(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var w = new ByteWriter(8)
             .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())
@@ -227,7 +232,7 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgRealmSplit)]
-    public static async Task OnRealmSplit(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnRealmSplit(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var clientState = reader.UInt32();
@@ -239,7 +244,7 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgReadyForAccountDataTimes)]
-    public static Task OnReadyForAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public Task OnReadyForAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => SendAccountDataTimesAsync(session, 0x15, ct); // GLOBAL_CACHE_MASK
 
     /// <summary>GLOBAL_CACHE_MASK (типы 0,2,4 — account-wide); остальные (1,3,5,6,7) — per-character. M7 #17.</summary>
@@ -253,7 +258,7 @@ public static class CharScreenHandlers
         => IsGlobalType(dataType) ? (session.AccountId, false) : (session.InWorldGuid, true);
 
     [WorldOpcodeHandler(WorldOpcode.CmsgUpdateAccountData)]
-    public static async Task OnUpdateAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnUpdateAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var dataType = reader.UInt32();
@@ -265,7 +270,7 @@ public static class CharScreenHandlers
         var (ownerId, isChar) = OwnerFor(session, dataType);
         if (ownerId != 0)
         {
-            try { await session.CharState.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
+            try { await charState.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
             catch (Exception ex) { session.Logger.LogDebug("UPDATE_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
         }
 
@@ -275,7 +280,7 @@ public static class CharScreenHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgRequestAccountData)]
-    public static async Task OnRequestAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnRequestAccountData(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var dataType = packet.Reader().UInt32();
         var (ownerId, isChar) = OwnerFor(session, dataType);
@@ -286,7 +291,7 @@ public static class CharScreenHandlers
         {
             try
             {
-                var stored = await session.CharState.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
+                var stored = await charState.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
                 if (stored is { } s) { time = s.Time; blob = s.Data; }
             }
             catch (Exception ex) { session.Logger.LogDebug("REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
@@ -311,7 +316,8 @@ public static class CharScreenHandlers
     /// вход в мир — per-character (0xEA). Шлём реальные времена сохранённых блобов, чтобы клиент знал,
     /// что на сервере есть данные, и запросил их (CMSG_REQUEST_ACCOUNT_DATA). M7 #17.
     /// </summary>
-    internal static async Task SendAccountDataTimesAsync(WorldSession session, uint mask, CancellationToken ct)
+    // статик-мост до S7 (#41): зовёт легаси-статик WorldEntryHandlers
+    public static async Task SendAccountDataTimesAsync(WorldSession session, uint mask, CancellationToken ct)
     {
         // Времена: для глобальных типов — по аккаунту, для per-character — по персонажу.
         IReadOnlyDictionary<byte, uint> accountTimes = new Dictionary<byte, uint>();

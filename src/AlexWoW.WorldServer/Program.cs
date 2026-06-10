@@ -82,6 +82,7 @@ builder.Services.AddSingleton<WorldState>();
 // Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();
+builder.Services.AddSingleton<AddonProtocol>(); // не модуль (своих опкодов нет) — сервис для ChatHandlers (M7 #36)
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();
 builder.Services.AddSingleton<WorldSessionFactory>();

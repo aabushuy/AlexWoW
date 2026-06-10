@@ -4,19 +4,20 @@ using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.</summary>
-public static class MovementHandlers
+/// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.
+/// (DI-модуль, M7 #36.)</summary>
+internal sealed class MovementHandlers : IOpcodeHandlerModule
 {
     /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
     /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgMoveTeleportAck)]
-    public static Task OnTeleportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public Task OnTeleportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => Task.CompletedTask;
 
     /// <summary>MSG_MOVE_WORLDPORT_ACK (Devcommands #79): клиент догрузил новую карту после SMSG_NEW_WORLD —
     /// завершаем кросс-карта телепорт (пере-вход в мир, окрестности, time sync).</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgMoveWorldportAck)]
-    public static Task OnWorldportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public Task OnWorldportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => TeleportService.CompleteWorldportAsync(session, ct);
 
     [WorldOpcodeHandler(
@@ -27,7 +28,7 @@ public static class MovementHandlers
         WorldOpcode.MsgMoveStopPitch, WorldOpcode.MsgMoveSetRunMode, WorldOpcode.MsgMoveSetWalkMode,
         WorldOpcode.MsgMoveFallLand, WorldOpcode.MsgMoveStartSwim, WorldOpcode.MsgMoveStopSwim,
         WorldOpcode.MsgMoveSetFacing, WorldOpcode.MsgMoveSetPitch, WorldOpcode.MsgMoveHeartbeat)]
-    public static async Task OnMovement(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnMovement(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         // Смещение/значение поля time в теле — для нормализации часов при ретрансляции (M6.3 ч.2).
         // -1 = не распарсили (нестандартный пакет) → ретранслируем как есть.
