@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 
@@ -25,9 +26,13 @@ public static class SpellLearn
 
         await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
 
-        // M11.2/M11.5: спелл изучает профессию (Effect SKILL/SKILL_STEP) → выдать навык-линию + обработать
-        // тиры. Если это апгрейд тира — шлём SUPERCEDED(старый→новый) вместо LEARNED (в книге один спелл).
-        if (await TryGrantProfessionAsync(session, spellId, ct))
+        SpellTemplateData? tpl = null;
+        try { tpl = await session.WorldDb.GetSpellAsync(spellId, ct); }
+        catch { /* БД мира недоступна — просто LEARNED */ }
+
+        // M11.2/M11.5/#2: профессия — учитель (LEARN_SPELL) учит спелл-открывашку; либо спелл сам выдаёт
+        // навык/тир. Если обработали — клиенту уже сообщили (LEARNED открывашки / SUPERCEDED тира).
+        if (tpl is not null && await TryGrantProfessionAsync(session, tpl, ct))
             return true;
 
         uint prev = 0;
@@ -44,50 +49,69 @@ public static class SpellLearn
     }
 
     /// <summary>
-    /// Если спелл изучает профессию: выдаёт навык-линию (потолок-тир из BasePoints, не понижая текущий),
-    /// supercede'ит прежний тир-спелл этой профессии в книге и выдаёт доп. спеллы (Mining → Smelting).
-    /// Возвращает true, если уже сообщил клиенту через SUPERCEDED (LEARNED слать не нужно).
+    /// Профессиональная обработка изучаемого спелла:
+    /// <list type="bullet">
+    /// <item>спелл-учитель (LEARN_SPELL) — учит реальный спелл-открывашку окна (он попадёт в книгу),
+    /// сам учитель в книге не показывается;</item>
+    /// <item>спелл-открывашка/тир — выдаёт навык-линию (потолок-тир из BasePoints), supercede'ит прежний
+    /// тир в книге, выдаёт доп. спеллы (Mining → Smelting).</item>
+    /// </list>
+    /// Возвращает true, если уже сообщил клиенту (LEARNED открывашки / SUPERCEDED) — обычный LEARNED не нужен.
     /// </summary>
-    private static async Task<bool> TryGrantProfessionAsync(WorldSession session, uint spellId, CancellationToken ct)
+    private static async Task<bool> TryGrantProfessionAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
     {
-        try
+        // Учитель (LEARN_SPELL): выдаём навык/тир из его SKILL_STEP, учим реальный спелл (открывашку),
+        // доп. спеллы; сам учитель в книгу не идёт (return true, LEARNED не шлём).
+        var taught = World.Professions.TaughtSpell(tpl);
+        if (taught != 0)
         {
-            var tpl = await session.WorldDb.GetSpellAsync(spellId, ct);
-            if (tpl is null || World.Professions.SkillGrantedBy(tpl) is not { } grant)
-                return false;
-
-            var existing = session.SkillBook.Get(grant.SkillId);
-            int curValue = existing?.Value ?? 0;
-            int curMax = existing?.Max ?? 0;
-            var value = (ushort)Math.Max(curValue, 1);
-            var max = (ushort)Math.Max(curMax, (int)grant.Max);
-            await Skills.GrantAsync(session, grant.SkillId, value, max, ct);
-
-            var superceded = false;
-            // #3: апгрейд тира — прежний тир-спелл заменяется в книге (SUPERCEDED + убрать из персиста).
-            if (session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var prevTier)
-                && prevTier.Spell != spellId && grant.Max >= prevTier.Max)
-            {
-                await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
-                    new ByteWriter(8).UInt32(prevTier.Spell).UInt32(spellId).ToArray(), ct);
-                session.KnownSpells.Remove(prevTier.Spell);
-                await session.CharState.RemoveLearnedSpellAsync(session.InWorldGuid, prevTier.Spell, ct);
-                superceded = true;
-            }
-            // Запоминаем текущий тир профессии (для следующего апгрейда/дедупа).
-            if (!session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var curTier) || grant.Max >= curTier.Max)
-                session.ProfessionRankSpell[grant.SkillId] = (spellId, grant.Max);
-
-            // Доп. спеллы профессии (Mining → Smelting: окно плавки). 2656 навык не выдаёт → без рекурсии.
-            if (World.Professions.AutoGrantSpells.TryGetValue(grant.SkillId, out var extras))
-                foreach (var extra in extras)
-                    await GrantAsync(session, extra, ct);
-
-            return superceded;
+            await GrantSkillFromAsync(session, tpl, ct);
+            await GrantAsync(session, taught, ct);       // изучаемый спелл-открывашка → попадает в книгу
+            await GrantAutoSpellsAsync(session, tpl, ct);
+            return true;
         }
-        catch
+
+        if (World.Professions.SkillGrantedBy(tpl) is not { } grant)
+            return false;
+
+        await GrantSkillFromAsync(session, tpl, ct);
+
+        var superceded = false;
+        // #3: апгрейд тира — прежний тир-спелл заменяется в книге (SUPERCEDED + убрать из персиста).
+        if (session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var prevTier)
+            && prevTier.Spell != tpl.Id && grant.Max >= prevTier.Max)
         {
-            return false; // БД мира недоступна — навык не выдаём, спелл всё равно изучен (LEARNED)
+            await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
+                new ByteWriter(8).UInt32(prevTier.Spell).UInt32(tpl.Id).ToArray(), ct);
+            session.KnownSpells.Remove(prevTier.Spell);
+            await session.CharState.RemoveLearnedSpellAsync(session.InWorldGuid, prevTier.Spell, ct);
+            superceded = true;
         }
+        if (!session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var curTier) || grant.Max >= curTier.Max)
+            session.ProfessionRankSpell[grant.SkillId] = (tpl.Id, grant.Max);
+
+        await GrantAutoSpellsAsync(session, tpl, ct);
+        return superceded;
+    }
+
+    /// <summary>Выдаёт навык-линию по SKILL/SKILL_STEP спелла (не понижая текущее значение/потолок).</summary>
+    private static async Task GrantSkillFromAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
+    {
+        if (World.Professions.SkillGrantedBy(tpl) is not { } grant)
+            return;
+        var existing = session.SkillBook.Get(grant.SkillId);
+        int curValue = existing?.Value ?? 0;
+        int curMax = existing?.Max ?? 0;
+        await Skills.GrantAsync(session, grant.SkillId,
+            (ushort)Math.Max(curValue, 1), (ushort)Math.Max(curMax, (int)grant.Max), ct);
+    }
+
+    /// <summary>Доп. спеллы профессии (Mining → Smelting). Выдаваемые навык не несут → без рекурсии.</summary>
+    private static async Task GrantAutoSpellsAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
+    {
+        if (World.Professions.SkillGrantedBy(tpl) is { } g
+            && World.Professions.AutoGrantSpells.TryGetValue(g.SkillId, out var extras))
+            foreach (var extra in extras)
+                await GrantAsync(session, extra, ct);
     }
 }
