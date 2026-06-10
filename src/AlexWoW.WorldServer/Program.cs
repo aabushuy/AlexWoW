@@ -97,6 +97,11 @@ builder.Services.AddSingleton<AuraPersistenceService>();
 builder.Services.AddSingleton<ManaRegenService>();
 builder.Services.AddSingleton<CombatResourcesService>();
 builder.Services.AddSingleton<CraftingService>();
+// M7 S4: бой — god-класс CombatHandlers разнесён по SRP-сервисам (мили игрока, ИИ существ, реген HP);
+// опкод-входы — модуль CombatOpcodeHandlers (регистрируется assembly-сканом выше).
+builder.Services.AddSingleton<PlayerMeleeService>();
+builder.Services.AddSingleton<CreatureCombatAI>();
+builder.Services.AddSingleton<RegenService>();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();

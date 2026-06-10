@@ -11,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (<see cref="SpellCastCompletion"/>) по SRP. Урон идёт общим путём с мили
 /// (<see cref="World.WorldState.ApplyCreatureDamage"/>); хил опирается на авторитетное HP (M6.7).
 /// </summary>
-internal sealed class SpellEffectsService
+internal sealed class SpellEffectsService(CreatureCombatAI creatureAi)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
     internal async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
@@ -39,7 +39,7 @@ internal sealed class SpellEffectsService
         }
 
         // M7 #13: урон спеллом (в т.ч. с дистанции) вводит существо в ответный бой (как landed-удар мили).
-        await CombatHandlers.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
+        await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
     }
 
     /// <summary>Монотонный id сплайна для движущих эффектов игрока (SMSG_MONSTER_MOVE). M7 #33.

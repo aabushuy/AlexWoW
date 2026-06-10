@@ -192,7 +192,7 @@ public sealed class WorldState
 
     /// <summary>
     /// Урон игроку (от существа, M6.7): уменьшает авторитетный HP. Возвращает фактический урон и
-    /// факт смерти. Рассылку combat-log/HP и обработку смерти делает вызывающий (CombatHandlers).
+    /// факт смерти. Рассылку combat-log/HP и обработку смерти делает вызывающий (CreatureCombatAI, M7 S4).
     /// </summary>
     public (uint Dealt, bool Died) ApplyPlayerDamage(WorldPlayer player, uint damage)
     {

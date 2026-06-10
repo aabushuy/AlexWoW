@@ -45,12 +45,12 @@ public sealed class WorldSession
     internal TerrainMaps Terrain => _services.Terrain;
     internal WorldState World => _services.World;
     internal WorldServerOptions Options => _services.Options;
-    // мост до S4/S7 (M7 S3): легаси-статики (CombatHandlers, WorldEntryHandlers, dev-команды) получают
-    // session — конвертированные сервисы спелл-кластера достают через неё.
+    // мост до S7 (M7 S3): легаси-статики (WorldEntryHandlers, dev-команды) получают session —
+    // конвертированные сервисы спелл-кластера достают через неё. CombatResources снят в S4
+    // (боевые сервисы получают его конструктором).
     internal SpellCatalog SpellCatalog => _services.SpellCatalog;
     internal AuraService AuraService => _services.AuraService;
     internal AuraPersistenceService AuraPersistence => _services.AuraPersistence;
-    internal CombatResourcesService CombatResources => _services.CombatResources;
     internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 
