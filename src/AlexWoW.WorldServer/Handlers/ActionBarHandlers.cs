@@ -50,13 +50,12 @@ internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICh
 
     /// <summary>
     /// SMSG_ACTION_BUTTONS при входе (M7 #17): behavior=INITIAL(1) + 144×u32 packed (0 — пусто).
-    /// Восстанавливает ярлыки панелей из character_action. Зовётся из OnPlayerLogin.
+    /// Восстанавливает ярлыки панелей из character_action. Зовётся из <see cref="LoginSequenceService"/>.
     /// </summary>
-    // статик-мост до S7 (#41): зовёт легаси-статик WorldEntryHandlers
-    public static async Task SendInitialActionButtonsAsync(WorldSession session, CancellationToken ct)
+    internal async Task SendInitialActionButtonsAsync(WorldSession session, CancellationToken ct)
     {
         IReadOnlyDictionary<byte, uint> buttons;
-        try { buttons = await session.CharState.GetActionButtonsAsync(session.InWorldGuid, ct); }
+        try { buttons = await charState.GetActionButtonsAsync(session.InWorldGuid, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("ACTION_BUTTONS load '{User}': {Msg}", session.Account, ex.Message);

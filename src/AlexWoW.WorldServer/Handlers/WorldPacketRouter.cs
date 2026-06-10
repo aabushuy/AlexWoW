@@ -12,8 +12,8 @@ internal delegate Task WorldOpcodeHandler(WorldSession session, IncomingPacket p
 /// Реестр обработчиков опкодов (M7 #35: DI-синглтон). Таблица <c>opcode → handler</c> строится один раз
 /// из методов DI-модулей <see cref="IOpcodeHandlerModule"/>, помеченных <see cref="WorldOpcodeHandlerAttribute"/>.
 /// Добавить опкод = добавить метод с атрибутом; центральный switch не нужен.
-/// <para>Мост миграции: пока конверсия модулей не завершена, вторым проходом сканируются легаси-статические
-/// методы; метод модуля приоритетнее. Фолбэк удаляется в финальном срезе (S7).</para>
+/// Миграция M7 завершена (S7): статического фолбэка больше нет — все хендлеры живут в DI-модулях,
+/// остаточные статики с атрибутом валят старт (см. страховку в конструкторе).
 /// </summary>
 internal sealed class WorldPacketRouter
 {
@@ -23,7 +23,6 @@ internal sealed class WorldPacketRouter
     {
         var table = new Dictionary<WorldOpcode, WorldOpcodeHandler>();
 
-        // 1) Целевая схема: instance-методы DI-модулей.
         foreach (var module in modules)
         {
             foreach (var method in module.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
@@ -42,22 +41,17 @@ internal sealed class WorldPacketRouter
             }
         }
 
-        // 2) Временный фолбэк (мост M7): легаси-статические методы. Модуль приоритетнее.
-        var staticMethods = typeof(WorldPacketRouter).Assembly.GetTypes()
-            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static));
-        foreach (var method in staticMethods)
-        {
-            foreach (var attribute in method.GetCustomAttributes<WorldOpcodeHandlerAttribute>())
-            {
-                var handler = (WorldOpcodeHandler)Delegate.CreateDelegate(typeof(WorldOpcodeHandler), method);
-                foreach (var opcode in attribute.Opcodes)
-                {
-                    if (!table.TryAdd(opcode, handler))
-                        logger.LogDebug("Опкод {Opcode}: статик {Type}.{Method} перекрыт модулем",
-                            opcode, method.DeclaringType?.Name, method.Name);
-                }
-            }
-        }
+        // Страховка от потерянных опкодов (M7 S7): статический [WorldOpcodeHandler]-метод вне DI-модуля
+        // в таблицу не попал бы молча — лучше уронить старт с именами виновников, чем терять опкоды.
+        var orphans = typeof(WorldPacketRouter).Assembly.GetTypes()
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+            .Where(m => m.GetCustomAttributes<WorldOpcodeHandlerAttribute>().Any())
+            .Select(m => $"{m.DeclaringType?.Name}.{m.Name}")
+            .ToArray();
+        if (orphans.Length > 0)
+            throw new InvalidOperationException(
+                $"Статические методы с [WorldOpcodeHandler] вне DI-модулей: {string.Join(", ", orphans)} — " +
+                "сконвертируйте их в IOpcodeHandlerModule (миграция M7 завершена, фолбэка нет)");
 
         _handlers = table.ToFrozenDictionary();
     }

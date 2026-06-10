@@ -30,6 +30,6 @@ internal sealed class TpCommand : IDevCommand
         }
 
         await ctx.ReplyAsync($"Телепортация: {loc.Name}…", ct);
-        await TeleportService.TeleportAsync(ctx.Session, loc.Map, loc.X, loc.Y, loc.Z, loc.O, ct);
+        await ctx.Session.Teleport.TeleportAsync(ctx.Session, loc.Map, loc.X, loc.Y, loc.Z, loc.O, ct); // мост сессии (до S8)
     }
 }

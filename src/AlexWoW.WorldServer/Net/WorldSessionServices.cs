@@ -9,9 +9,9 @@ namespace AlexWoW.WorldServer.Net;
 
 /// <summary>
 /// Parameter object зависимостей <see cref="WorldSession"/> (M7 #35): собирается DI один раз и передаётся
-/// фабрикой в каждую сессию — без service locator. Репозитории здесь временно (мост до S9 #43): легаси-статики
-/// читают их через свойства сессии; после конверсии модулей останется только нужное самой сессии
-/// (роутер, handshake, сохранение позиции, мир, опции, логгер).
+/// фабрикой в каждую сессию — без service locator. Репозитории здесь временно (мост до S9 #43), игровые
+/// сервисы — мосты dev-командам (до S8): после их конверсии останется только нужное самой сессии
+/// (роутер, handshake, сохранение позиции, персист аур, мир, опции, логгер).
 /// </summary>
 internal sealed class WorldSessionServices(
     IOptions<WorldServerOptions> options,
@@ -26,17 +26,15 @@ internal sealed class WorldSessionServices(
     WorldState world,
     WorldPacketRouter router,
     AuthChallengeSender authChallenge,
-    SpellCatalog spellCatalog,
     AuraService auras,
     AuraPersistenceService auraPersistence,
     InventoryGrantService inventoryGrant,
-    QuestProgressService questProgress,
     SkillsService skills,
     SpellLearnService spellLearn,
     ProgressionService progression,
     TalentHandlers talents,
     TrainerCatalogService trainerCatalog,
-    StartingGearService startingGear,
+    TeleportService teleport,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -51,19 +49,17 @@ internal sealed class WorldSessionServices(
     public WorldState World { get; } = world;
     public WorldPacketRouter Router { get; } = router;
     public AuthChallengeSender AuthChallenge { get; } = authChallenge;
-    // Спелл-кластер (M7 S3): сервисы для самой сессии (персист аур при выходе) и мосты легаси-статикам.
-    public SpellCatalog SpellCatalog { get; } = spellCatalog;
-    public AuraService AuraService { get; } = auras;
+    // Нужно самой сессии: персист временных аур при выходе из мира (M10.5).
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
-    // Квест/лут-кластер (M7 S5): мосты легаси-статикам до их конверсии.
-    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;   // мост до S7/S8 (GO-сбор, dev)
-    public QuestProgressService QuestProgress { get; } = questProgress;      // мост до S7 (WorldEntryHandlers)
-    // Инвентарь/тренеры/прогрессия (M7 S6): мосты легаси-статикам до их конверсии.
-    public SkillsService Skills { get; } = skills;                           // мост до S7/S8 (вход в мир, GO-сбор, dev)
-    public SpellLearnService SpellLearn { get; } = spellLearn;               // мост до S8 (.learn)
-    public ProgressionService Progression { get; } = progression;            // мост до S7/S8 (вход в мир, dev)
-    public TalentHandlers Talents { get; } = talents;                        // мост до S7/S8 (вход в мир, dev)
-    public TrainerCatalogService TrainerCatalog { get; } = trainerCatalog;   // мост до S8 (.learnall)
-    public StartingGearService StartingGear { get; } = startingGear;         // мост до S7 (вход в мир)
+    // Мосты до S8 (M7 S7): опкод-хендлеры сконвертированы — через сессию сервисы достают
+    // только dev-команды (статики до S8).
+    public AuraService AuraService { get; } = auras;                          // .buff/.unbuff
+    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;    // .additem
+    public SkillsService Skills { get; } = skills;                            // .skill
+    public SpellLearnService SpellLearn { get; } = spellLearn;                // .learn
+    public ProgressionService Progression { get; } = progression;             // .xp/.level
+    public TalentHandlers Talents { get; } = talents;                         // .resettalents
+    public TrainerCatalogService TrainerCatalog { get; } = trainerCatalog;    // .learnall
+    public TeleportService Teleport { get; } = teleport;                      // .tp
     public ILogger<WorldSession> Logger { get; } = logger;
 }

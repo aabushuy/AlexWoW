@@ -1,21 +1,41 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
+using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Вход в мир (M4): player login + полная последовательность входа, логаут, time sync.</summary>
-public static class WorldEntryHandlers
+/// <summary>
+/// Оркестрация полной последовательности входа в мир (M4; DI-сервис M7 S7 — вынос из легаси-статика
+/// WorldEntryHandlers): verify world, account data, книга спеллов, панели действий, инвентарь, статы,
+/// состояние квестов, навыки, self-спавн, time sync, таланты, ауры, окрестные NPC/GO/игроки.
+/// Порядок шагов — как в эталонных ядрах (CMaNGOS/TrinityCore), иначе клиент не отдаёт управление.
+/// Опкод-вход — <see cref="WorldEntryOpcodeHandlers"/>.
+/// </summary>
+internal sealed class LoginSequenceService(
+    ICharacterRepository characters,
+    IInventoryRepository items,
+    IWorldRepository worldDb,
+    ICharacterStateRepository charState,
+    TerrainMaps terrain,
+    CharScreenHandlers charScreen,
+    ActionBarHandlers actionBars,
+    TimeSyncService timeSync,
+    World.VisibilityService visibility,
+    QuestProgressService questProgress,
+    AuraPersistenceService auraPersistence,
+    StartingGearService startingGear,
+    SkillsService skills,
+    TalentHandlers talents,
+    ProgressionService progression)
 {
-    [WorldOpcodeHandler(WorldOpcode.CmsgPlayerLogin)]
-    public static async Task OnPlayerLogin(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    /// <summary>Вход персонажа в мир по CMSG_PLAYER_LOGIN (валидация владения + вся последовательность).</summary>
+    internal async Task LoginAsync(WorldSession session, uint guid, CancellationToken ct)
     {
-        var reader = packet.Reader();
-        var guid = (uint)reader.UInt64();
-
-        var character = await session.Characters.GetByGuidAsync(guid, ct);
+        var character = await characters.GetByGuidAsync(guid, ct);
         if (character is null || character.AccountId != session.AccountId)
         {
             session.Logger.LogWarning("PLAYER_LOGIN: персонаж guid={Guid} не найден/чужой для '{User}'", guid, session.Account);
@@ -35,13 +55,13 @@ public static class WorldEntryHandlers
             .Single(0f);
         await session.SendAsync(WorldOpcode.SmsgLoginVerifyWorld, verify.ToArray(), ct);
 
-        await CharScreenHandlers.SendAccountDataTimesAsync(session, 0xEA, ct);
+        await charScreen.SendAccountDataTimesAsync(session, 0xEA, ct);
 
         await session.SendAsync(WorldOpcode.SmsgFeatureSystemStatus,
             new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
 
         await SendInitialSpellsAsync(session, character, ct);
-        await ActionBarHandlers.SendInitialActionButtonsAsync(session, ct); // M7 #17: ярлыки панелей
+        await actionBars.SendInitialActionButtonsAsync(session, ct); // M7 #17: ярлыки панелей
 
         var tutorials = new ByteWriter(32);
         for (var i = 0; i < 8; i++)
@@ -53,10 +73,10 @@ public static class WorldEntryHandlers
 
         // M6.1: инвентарь — выдать стартовый набор голым персонажам, загрузить и создать item-объекты
         // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
-        if (!await session.Items.HasItemsAsync(character.Guid, ct))
-            await session.StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct); // мост до S7
+        if (!await items.HasItemsAsync(character.Guid, ct))
+            await startingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
         session.Inventory.Clear();
-        session.Inventory.AddRange(await session.Items.GetItemsAsync(character.Guid, ct));
+        session.Inventory.AddRange(await items.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
 
         // M6.13: class/ContainerSlots/MaxDurability по entry'ям инвентаря (батч, кэш на сессии) — чтобы
@@ -65,7 +85,7 @@ public static class WorldEntryHandlers
         try
         {
             var entries = session.Inventory.Select(i => i.ItemEntry).Distinct().ToArray();
-            foreach (var (entry, info) in await session.WorldDb.GetItemBagInfoAsync(entries, ct))
+            foreach (var (entry, info) in await worldDb.GetItemBagInfoAsync(entries, ct))
                 session.ItemBagInfo[entry] = info;
         }
         catch (Exception ex)
@@ -99,10 +119,10 @@ public static class WorldEntryHandlers
 
         // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
-        await session.QuestProgress.LoadQuestStateAsync(session, ct); // мост сессии (до конверсии в S7)
+        await questProgress.LoadQuestStateAsync(session, ct);
 
         // M11.1: навыки персонажа (профессии и пр.) — загрузить ДО спавна, чтобы лечь в слоты PLAYER_SKILL_INFO.
-        await session.Skills.LoadAsync(session, character.Guid, character.Race, ct); // мост до S7
+        await skills.LoadAsync(session, character.Guid, character.Race, ct);
 
         var spawn = PlayerSpawn.BuildCreateObject(character,
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
@@ -110,14 +130,14 @@ public static class WorldEntryHandlers
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
-        await SendTimeSyncReqAsync(session, ct);
+        await timeSync.SendTimeSyncReqAsync(session, ct);
 
         // M9.7: загрузить изученные таланты (для панели + расчёта потраченных очков). Ранг-спеллы уже
         // в KnownSpells (character_spell). M9.6: свободные очки = MaxPoints − потрачено.
         session.LearnedTalents.Clear();
-        foreach (var (tid, rank) in await session.CharState.GetTalentsAsync(character.Guid, ct))
+        foreach (var (tid, rank) in await charState.GetTalentsAsync(character.Guid, ct))
             session.LearnedTalents[tid] = rank;
-        session.Talents.RecomputePoints(session, character.Class, character.Level); // мост до S7
+        talents.RecomputePoints(session, character.Class, character.Level);
 
         // M9.1: XP-бар — текущий опыт + порог следующего уровня. M9.6: очки талантов в то же поле-апдейт.
         await session.World.Levels.EnsureLoadedAsync(ct);
@@ -130,23 +150,23 @@ public static class WorldEntryHandlers
             }), ct);
 
         // M9.6: состояние талантов (открывает панель; деревья клиент рисует сам из своей DBC).
-        await session.Talents.SendTalentsInfoAsync(session, ct); // мост до S7
+        await talents.SendTalentsInfoAsync(session, ct);
 
         // M9.2: боевые поля (урон/скорость) из экипированного оружия — чтобы чарпейн не показывал INF.
-        await session.Progression.RefreshMeleeAsync(session, ct); // мост до S7
+        await progression.RefreshMeleeAsync(session, ct);
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
 
         // M5.5: проверка рельефа — высота земли в точке входа против сохранённой Z.
-        var ground = session.Terrain.GetHeight(character.Map, character.X, character.Y);
+        var ground = terrain.GetHeight(character.Map, character.X, character.Y);
         if (ground is { } g)
             session.Logger.LogInformation("Рельеф: земля в ({X};{Y}) = {Ground:F2} (Z персонажа {Z:F2}, дельта {Delta:F2})",
                 character.X, character.Y, g, character.Z, character.Z - g);
 
         // M5.1/M5.6: показать существ и гейм-объекты из БД мира вокруг (диф-видимость).
-        await SpawnHandlers.RefreshVisibleNpcsAsync(session, character.Map, character.X, character.Y, ct);
-        await SpawnHandlers.RefreshVisibleGameObjectsAsync(session, character.Map, character.X, character.Y, ct);
+        await visibility.RefreshVisibleNpcsAsync(session, character.Map, character.X, character.Y, ct);
+        await visibility.RefreshVisibleGameObjectsAsync(session, character.Map, character.X, character.Y, ct);
 
         // M5.3: зарегистрировать в мире и обоюдно спавнить с соседними игроками.
         session.Character = character;
@@ -155,7 +175,7 @@ public static class WorldEntryHandlers
         await session.World.EnterWorldAsync(player, ct);
 
         // M7 #21: восстановить сохранённые переключатели (стойка воина/аура паладина/аспект охотника).
-        await session.AuraPersistence.ReapplyPersistedAsync(session, ct); // мост (M7 S3): класс ещё статик
+        await auraPersistence.ReapplyPersistedAsync(session, ct);
 
         // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
         // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).
@@ -175,51 +195,6 @@ public static class WorldEntryHandlers
         }, ct);
     }
 
-    [WorldOpcodeHandler(WorldOpcode.CmsgLogoutRequest)]
-    public static async Task OnLogoutRequest(WorldSession session, IncomingPacket packet, CancellationToken ct)
-    {
-        await session.SavePositionIfInWorldAsync(ct);
-        await session.LeaveWorldAsync(ct); // снять с реестра + DESTROY соседям
-
-        await session.SendAsync(WorldOpcode.SmsgLogoutResponse,
-            new ByteWriter(5).UInt32(0).UInt8(1).ToArray(), ct); // reason=0, instant=1
-        await session.SendAsync(WorldOpcode.SmsgLogoutComplete, [], ct);
-        session.Logger.LogInformation("LOGOUT '{User}' → возврат к выбору персонажа", session.Account);
-    }
-
-    [WorldOpcodeHandler(WorldOpcode.CmsgLogoutCancel)]
-    public static Task OnLogoutCancel(WorldSession session, IncomingPacket packet, CancellationToken ct)
-        => session.SendAsync(WorldOpcode.SmsgLogoutCancelAck, [], ct);
-
-    [WorldOpcodeHandler(WorldOpcode.CmsgTimeSyncResp)]
-    public static Task OnTimeSyncResp(WorldSession session, IncomingPacket packet, CancellationToken ct)
-    {
-        var reader = packet.Reader();
-        var counter = reader.UInt32();
-        var clientTicks = reader.UInt32();
-        // Матчим ответ с последним REQ → дельта часов (serverMs − clientTicks). RTT на LAN пренебрежим.
-        if (counter == session.TimeSyncOutstanding)
-        {
-            session.ClockDeltaMs = session.TimeSyncSentMs - clientTicks;
-            session.Logger.LogDebug("[timesync] '{User}': counter={C} clientTicks={T} → delta={D}мс",
-                session.Account, counter, clientTicks, session.ClockDeltaMs);
-        }
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Шлёт SMSG_TIME_SYNC_REQ (новый счётчик) и запоминает время отправки — фундамент расчёта
-    /// дельты часов клиента для нормализации времени движения. Зовётся при входе и периодически из тика.
-    /// </summary>
-    internal static async Task SendTimeSyncReqAsync(WorldSession session, CancellationToken ct)
-    {
-        var counter = session.TimeSyncCounter++;
-        session.TimeSyncOutstanding = counter;
-        session.TimeSyncSentMs = (uint)Environment.TickCount64;
-        session.LastTimeSyncDispatchMs = Environment.TickCount64;
-        await session.SendAsync(WorldOpcode.SmsgTimeSyncReq, new ByteWriter(4).UInt32(counter).ToArray(), ct);
-    }
-
     /// <summary>
     /// SMSG_INITIAL_SPELLS (M9.3): книга заклинаний при входе. Набор = языковые спеллы расы ∪ стартовые
     /// абилки класса (playercreateinfo_spell) ∪ изученное у тренера (character_spell). Хардкод маг-спеллов
@@ -229,7 +204,7 @@ public static class WorldEntryHandlers
     /// </summary>
     private const byte ClassMage = 8;
 
-    private static async Task SendInitialSpellsAsync(WorldSession session, Character character, CancellationToken ct)
+    private async Task SendInitialSpellsAsync(WorldSession session, Character character, CancellationToken ct)
     {
         var known = session.KnownSpells;
         known.Clear();
@@ -238,7 +213,7 @@ public static class WorldEntryHandlers
 
         try
         {
-            foreach (var s in await session.WorldDb.GetStartSpellsAsync(character.Race, character.Class, ct))
+            foreach (var s in await worldDb.GetStartSpellsAsync(character.Race, character.Class, ct))
                 known.Add(s);
         }
         catch (Exception ex)
@@ -253,7 +228,7 @@ public static class WorldEntryHandlers
                 known.Add((uint)s);
 
         // Изученное у тренера (персист).
-        foreach (var s in await session.CharState.GetLearnedSpellsAsync(character.Guid, ct))
+        foreach (var s in await charState.GetLearnedSpellsAsync(character.Guid, ct))
             known.Add(s);
 
         // M11 (#2/#3): причесать книгу профессий одним батч-запросом:
@@ -265,7 +240,7 @@ public static class WorldEntryHandlers
         var hiddenSpells = new HashSet<uint>();
         try
         {
-            var templates = (await session.WorldDb.GetSpellsAsync(known.ToList(), ct)).ToList();
+            var templates = (await worldDb.GetSpellsAsync(known.ToList(), ct)).ToList();
             foreach (var tpl in templates)
             {
                 var taught = World.Professions.TaughtSpell(tpl);
@@ -273,7 +248,7 @@ public static class WorldEntryHandlers
                     continue;
                 hiddenSpells.Add(tpl.Id);                 // учитель — не книжный спелл
                 if (known.Add(taught))                    // изучаемый спелл отсутствовал → выучить
-                    await session.CharState.AddLearnedSpellAsync(character.Guid, taught, ct);
+                    await charState.AddLearnedSpellAsync(character.Guid, taught, ct);
             }
             foreach (var tpl in templates)
             {

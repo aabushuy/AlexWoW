@@ -5,8 +5,10 @@ using AlexWoW.WorldServer.World;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.
-/// (DI-модуль, M7 #36; прерывание каста движением — <see cref="SpellCastService"/>, S3.)</summary>
-internal sealed class MovementHandlers(SpellCastService spellCast) : IOpcodeHandlerModule
+/// (DI-модуль, M7 #36; прерывание каста движением — <see cref="SpellCastService"/>, S3;
+/// телепорт/видимость — DI-сервисы, S7.)</summary>
+internal sealed class MovementHandlers(SpellCastService spellCast, TeleportService teleport, VisibilityService visibility)
+    : IOpcodeHandlerModule
 {
     /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
     /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
@@ -18,7 +20,7 @@ internal sealed class MovementHandlers(SpellCastService spellCast) : IOpcodeHand
     /// завершаем кросс-карта телепорт (пере-вход в мир, окрестности, time sync).</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgMoveWorldportAck)]
     public Task OnWorldportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
-        => TeleportService.CompleteWorldportAsync(session, ct);
+        => teleport.CompleteWorldportAsync(session, ct);
 
     [WorldOpcodeHandler(
         WorldOpcode.MsgMoveStartForward, WorldOpcode.MsgMoveStartBackward, WorldOpcode.MsgMoveStop,
@@ -72,10 +74,10 @@ internal sealed class MovementHandlers(SpellCastService spellCast) : IOpcodeHand
         {
             var dx = session.PosX - session.LastVisX;
             var dy = session.PosY - session.LastVisY;
-            if (dx * dx + dy * dy >= SpawnHandlers.VisRefreshStep * SpawnHandlers.VisRefreshStep)
+            if (dx * dx + dy * dy >= VisibilityService.VisRefreshStep * VisibilityService.VisRefreshStep)
             {
-                await SpawnHandlers.RefreshVisibleNpcsAsync(session, character.Map, session.PosX, session.PosY, ct);
-                await SpawnHandlers.RefreshVisibleGameObjectsAsync(session, character.Map, session.PosX, session.PosY, ct);
+                await visibility.RefreshVisibleNpcsAsync(session, character.Map, session.PosX, session.PosY, ct);
+                await visibility.RefreshVisibleGameObjectsAsync(session, character.Map, session.PosX, session.PosY, ct);
             }
         }
     }
