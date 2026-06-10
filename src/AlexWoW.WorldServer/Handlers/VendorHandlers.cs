@@ -68,8 +68,8 @@ public static class VendorHandlers
 
         var ownerGuid = session.InWorldGuid;
         // M7 #20: выдать со стаканием в существующие стопки (как лут/награда). null → нет места.
-        // Деньги списываем только после успешной выдачи.
-        var placed = await InventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
+        // Деньги списываем только после успешной выдачи. Сервис — через мост сессии (до конверсии в S6).
+        var placed = await session.InventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
         if (placed is null) { await FailAsync(BuyResult.InventoryFull); return; }
 
         session.Money -= cost;

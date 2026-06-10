@@ -102,6 +102,15 @@ builder.Services.AddSingleton<CraftingService>();
 builder.Services.AddSingleton<PlayerMeleeService>();
 builder.Services.AddSingleton<CreatureCombatAI>();
 builder.Services.AddSingleton<RegenService>();
+// M7 S5: квест/лут-кластер — god-класс QuestHandlers разнесён по SRP-сервисам (прогресс/персист, иконки
+// квестгиверов, диалоги/награды, госсип-оркестрация), выдача предметов и награда за убийство — DI-сервисы;
+// опкод-входы — модули QuestOpcodeHandlers/LootHandlers (регистрируются assembly-сканом выше).
+builder.Services.AddSingleton<QuestProgressService>();
+builder.Services.AddSingleton<QuestGiverStatusService>();
+builder.Services.AddSingleton<QuestDialogService>();
+builder.Services.AddSingleton<GossipService>();
+builder.Services.AddSingleton<InventoryGrantService>();
+builder.Services.AddSingleton<KillRewardService>();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();

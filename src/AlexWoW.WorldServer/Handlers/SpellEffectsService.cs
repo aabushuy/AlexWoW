@@ -11,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (<see cref="SpellCastCompletion"/>) по SRP. Урон идёт общим путём с мили
 /// (<see cref="World.WorldState.ApplyCreatureDamage"/>); хил опирается на авторитетное HP (M6.7).
 /// </summary>
-internal sealed class SpellEffectsService(CreatureCombatAI creatureAi)
+internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewardService killReward)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
     internal async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
@@ -31,8 +31,7 @@ internal sealed class SpellEffectsService(CreatureCombatAI creatureAi)
 
         if (died)
         {
-            // Лут — пока легаси-статик (конверсия в S5).
-            await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
+            await killReward.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("SPELL KILL '{User}' убил '{Name}' спеллом {Spell}",
                 session.Account, creature.Template.Name, spellId);
             return;

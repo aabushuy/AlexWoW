@@ -10,7 +10,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <c>spell_template</c> (см. <see cref="SpellCatalog"/>), привязка рецепт→навык для skill-up —
 /// <see cref="Professions.Recipes"/>.
 /// </summary>
-internal sealed class CraftingService
+internal sealed class CraftingService(InventoryGrantService inventoryGrant)
 {
     /// <summary>Есть ли у игрока все реагенты рецепта (для отказа на старте каста).</summary>
     internal bool HasReagents(WorldSession session, SpellCatalog.SpellInfo info)
@@ -18,7 +18,7 @@ internal sealed class CraftingService
         if (info.Reagents is null)
             return true;
         foreach (var (item, count) in info.Reagents)
-            if (InventoryGrant.CountItem(session, item) < count)
+            if (InventoryGrantService.CountItem(session, item) < count)
                 return false;
         return true;
     }
@@ -32,9 +32,9 @@ internal sealed class CraftingService
 
         if (info.Reagents is not null)
             foreach (var (item, count) in info.Reagents)
-                await InventoryGrant.ConsumeAsync(session, item, count, ct);
+                await inventoryGrant.ConsumeAsync(session, item, count, ct);
 
-        var placed = await InventoryGrant.TryGiveAsync(session, info.CreateItemId, info.CreateItemCount, ct);
+        var placed = await inventoryGrant.TryGiveAsync(session, info.CreateItemId, info.CreateItemCount, ct);
         session.Logger.LogInformation("CRAFT '{User}': spell={Spell} → {Count}×{Item}{Full}",
             session.Account, spellId, info.CreateItemCount, info.CreateItemId,
             placed is null ? " (нет места — результат потерян)" : "");

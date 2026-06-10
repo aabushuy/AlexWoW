@@ -11,7 +11,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Сторона существа (ответка/агро/evade) — <see cref="CreatureCombatAI"/>, реген HP —
 /// <see cref="RegenService"/>, байты пакетов — <see cref="Protocol.CombatPackets"/>.
 /// </summary>
-internal sealed class PlayerMeleeService(CreatureCombatAI creatureAi, CombatResourcesService combatResources)
+internal sealed class PlayerMeleeService(
+    CreatureCombatAI creatureAi,
+    CombatResourcesService combatResources,
+    KillRewardService killReward)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
     internal const long SwingIntervalMs = 2000;
@@ -101,7 +104,7 @@ internal sealed class PlayerMeleeService(CreatureCombatAI creatureAi, CombatReso
         if (died)
         {
             await StopAttackAsync(session, creature.Guid, ct);
-            await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг (легаси-статик, конверсия в S5)
+            await killReward.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("KILL '{User}' убил '{Name}' (guid={Guid}), респавн через {Sec}с",
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);
             return;
