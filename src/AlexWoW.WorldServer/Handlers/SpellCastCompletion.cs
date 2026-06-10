@@ -106,10 +106,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     /// <summary>Применяет движущий эффект: рывок (сплайн) или телепорт вперёд/за спину цели. M7 #33.</summary>
     private Task ApplyMovementAsync(WorldSession session, SpellCatalog.SpellMovement movement,
         ulong targetGuid, CancellationToken ct) => movement switch
-    {
-        SpellCatalog.SpellMovement.Charge => spellEffects.ApplyChargeAsync(session, targetGuid, ct),
-        SpellCatalog.SpellMovement.TeleportForward => spellEffects.ApplyTeleportAsync(session, targetGuid, behind: false, ct),
-        SpellCatalog.SpellMovement.TeleportBehind => spellEffects.ApplyTeleportAsync(session, targetGuid, behind: true, ct),
-        _ => Task.CompletedTask,
-    };
+        {
+            SpellCatalog.SpellMovement.Charge => spellEffects.ApplyChargeAsync(session, targetGuid, ct),
+            SpellCatalog.SpellMovement.TeleportForward => spellEffects.ApplyTeleportAsync(session, targetGuid, behind: false, ct),
+            SpellCatalog.SpellMovement.TeleportBehind => spellEffects.ApplyTeleportAsync(session, targetGuid, behind: true, ct),
+            _ => Task.CompletedTask,
+        };
 }

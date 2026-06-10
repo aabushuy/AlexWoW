@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages.Account;
 
+/// <summary>Смена пароля: тот же SRP-верификатор, что и в игре (пароль общий для сайта и клиента).</summary>
 public sealed class ChangePasswordModel(IAccountService accounts) : PageModel
 {
     [BindProperty]
@@ -39,7 +40,7 @@ public sealed class ChangePasswordModel(IAccountService accounts) : PageModel
         if (!ModelState.IsValid)
             return Page();
 
-        var email = AuthSession.Email(User);
+        var email = User.Email();
         var ok = await accounts.ChangePasswordAsync(email, Input.CurrentPassword, Input.NewPassword, ct);
         if (!ok)
         {

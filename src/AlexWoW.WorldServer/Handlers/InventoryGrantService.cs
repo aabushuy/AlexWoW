@@ -118,8 +118,12 @@ internal sealed class InventoryGrantService(
             var itemLow = await items.AddItemAsync(ownerGuid, itemEntry, (byte)pos.Bag, (byte)pos.Slot, portion, ct);
             var item = new InventoryItem
             {
-                ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
-                Bag = (byte)pos.Bag, Slot = (byte)pos.Slot, StackCount = portion,
+                ItemGuid = itemLow,
+                OwnerGuid = ownerGuid,
+                ItemEntry = itemEntry,
+                Bag = (byte)pos.Bag,
+                Slot = (byte)pos.Slot,
+                StackCount = portion,
             };
             session.Inv.Inventory.Add(item);
             var itemGuid = ItemObject.ItemGuid(itemLow);

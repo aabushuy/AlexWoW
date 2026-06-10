@@ -160,8 +160,12 @@ internal sealed class InventoryMoveService(
         var newLow = await items.AddItemAsync(owner, item.ItemEntry, (byte)dstBag, (byte)dst, amount, ct);
         var newItem = new InventoryItem
         {
-            ItemGuid = newLow, OwnerGuid = owner, ItemEntry = item.ItemEntry,
-            Bag = (byte)dstBag, Slot = (byte)dst, StackCount = amount,
+            ItemGuid = newLow,
+            OwnerGuid = owner,
+            ItemEntry = item.ItemEntry,
+            Bag = (byte)dstBag,
+            Slot = (byte)dst,
+            StackCount = amount,
         };
         session.Inv.Inventory.Add(newItem);
 

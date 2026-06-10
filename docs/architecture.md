@@ -26,6 +26,25 @@
 
 При появлении «жирного» класса с несколькими ответственностями — разбиваем на SRP-классы.
 
+Дополнительно — **KISS** (не плодим абстракции «на вырост») и **DRY** (общая логика — в одном месте).
+Полный код-стайл (нейминг, политика статиков, async, логирование) — **[code-style.md](code-style.md)**,
+машинная часть — `.editorconfig` + `Directory.Build.props` в корне.
+
+**DI-конвенции (M7 #34–#45):**
+- Контейнер — `Microsoft.Extensions.DependencyInjection`; всё сервисоподобное — **stateless
+  DI-синглтоны** (состояние живёт в `WorldSession`/`WorldState`). Статические классы — только
+  чистые хелперы: билдеры пакетов `Protocol/*`, константы, математика, extensions.
+- **Опкод-хендлеры — модули**: `internal sealed class XxxHandlers(...deps...) : IOpcodeHandlerModule`,
+  методы с `[WorldOpcodeHandler(opcode)]`; регистрация assembly-сканом (`AddWorldOpcodeHandlers()`),
+  диспетчеризация — `WorldPacketRouter` (DI-синглтон, таблица строится один раз). Добавить опкод =
+  добавить метод с атрибутом. Остаточный статик с атрибутом валит старт (страховка).
+- **Dev-команды — Command-паттерн на DI**: классы `IDevCommand` сканируются (`AddDevCommands()`),
+  `DevCommandRegistry` — синглтон над `IEnumerable<IDevCommand>`, диспетчер инжектится в чат.
+- Объекты с ручным временем жизни (`WorldSession` per-connection) создаются **фабрикой**
+  (`WorldSessionFactory`) с **parameter object** (`WorldSessionServices`); service locator запрещён.
+- Состояние сессии сгруппировано в компоненты `Net/SessionState/*` (`session.Combat`, `session.Cast`,
+  `session.Visibility`, `session.Quest`, `session.Progression`, `session.Inv`) с `Reset()`.
+
 ---
 
 ## 1. Что такое эмулятор сервера WoW

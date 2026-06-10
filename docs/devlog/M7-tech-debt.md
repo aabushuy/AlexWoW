@@ -134,3 +134,59 @@ God-класс `WorldState` (449 строк, ~7 ответственностей
 Коллабораторы создаются в ctor `WorldState` (берут `this`), не в DI. `Protocol` — фокусные билдеры
 пакетов / константы, god-классов нет, разбивать нечего. **Паттерн для будущих god-классов: хаб-фасад +
 SRP-коллабораторы.**
+
+---
+
+## #34–#45 — Большой рефакторинг: статики → DI, code-style, разбор god-классов (S0–S11)
+
+Сквозной рефакторинг всех 7 проектов по принципам SOLID/KISS/DRY: статические классы оставлены
+только хелперам (билдеры пакетов `Protocol/*`, константы, чистая математика, extensions), вся
+игровая логика и сервисы — stateless DI-синглтоны. 12 срезов (S0–S11), каждый собирается,
+бутается и коммитится отдельно; инвариант — **84 опкода в логе старта** на каждом срезе.
+
+**S0 — code-style базис (#34):** `docs/code-style.md` (конвенции Microsoft C# + практика репо),
+`.editorconfig` (нейминг, file-scoped namespaces, var), `Directory.Build.props` (net10.0, Nullable,
+`TreatWarningsAsErrors`); csproj очищены от дублей.
+
+**S1 — DI-роутер (#35):** `WorldPacketRouter` — DI-синглтон; модули `IOpcodeHandlerModule`
+регистрируются assembly-сканом (`AddWorldOpcodeHandlers()`: конкретный тип + форвард на маркер),
+роутер собирает instance-методы с `[WorldOpcodeHandler]` в `FrozenDictionary`. Сессии создаёт
+`WorldSessionFactory` с parameter object `WorldSessionServices` — service locator запрещён.
+
+**S2–S8 — конверсия кластеров (#36–#42):** простые модули → спеллы (разбор `SpellCaster` на
+`SpellCastService`/`SpellCastCompletion`/`SpellGoSender`) → бой (разбор `CombatHandlers` на
+`CombatOpcodeHandlers`/`PlayerMeleeService`/`CreatureCombatAI`/`RegenService`) → квесты/лут
+(разбор `QuestHandlers` на модуль + `QuestProgressService`/`QuestDialogService`/
+`QuestGiverStatusService`/`GossipService`; `KillRewardService`) → инвентарь/тренеры/прогрессия
+(разбор `InventoryHandlers`; `TrainerCatalogService`, `SpellLearnService`, `SkillsService`,
+`ProgressionService`) → вход/спавн/телепорт (`LoginSequenceService`, `VisibilityService`,
+`TimeSyncService`) → dev-команды (реестр над `IEnumerable<IDevCommand>`, `ChatNotifier`).
+
+**S9 (#43):** с `WorldSession` сняты все repo-мосты (потребители на ctor-инъекции), состояние
+сгруппировано в компоненты `Net/SessionState/*` с `Reset()` (семантика `LeaveWorldAsync` 1:1).
+
+**S10 (#44):** AuthServer CLI → `ICliCommand` из единого Host-контейнера (минус `CliRepository`
+и дубли конфига); `RealmListBuilder` вынесен из `AuthSession`.
+
+**S11 (#45):** Web `AuthSession` → extension-методы; стиль-проход остальных проектов;
+`dotnet format` по решению.
+
+**Ключевые решения / грабли:**
+- **Порядок конверсии — сверху вниз по графу вызовов**: instance-код может звать статики, статики
+  instance-сервисы — НЕТ. Мост на переходный период: роутер сканировал и модули, и легаси-статики
+  (модуль приоритетнее), а статикам сервисы публиковались **свойствами сессии** («мост до Sx») —
+  статики и так получают session, глобального состояния не появилось. Фолбэк и мосты сняты в S7–S9.
+- **Страховка от потери опкодов**: после снятия фолбэка роутер валит старт, если в сборке остался
+  статический метод с `[WorldOpcodeHandler]` (имена виновников в исключении).
+- **Циклы статических вызовов** разорваны выделением сервисов: `SpellGoSender`
+  (SpellCaster↔SpellToggles), `AuraPersistenceService` (Auras↔Periodics), `QuestProgressService`
+  (InventoryGrant↔QuestHandlers), `GossipService` (Quest↔Trainer↔Vendor), `VisibilityService`
+  (Teleport→SpawnHandlers), `TimeSyncService` (WorldTick→WorldEntryHandlers).
+- **Инъекция модуля в модуль**: модуль регистрируется как конкретный singleton + форвард на маркер —
+  один экземпляр и для роутера, и для зависимостей.
+- **DI-цикл реестра dev-команд**: `.help` нельзя дать реестр через ctor (реестр ← команды ← реестр) —
+  список команд передаётся через `DevCommandContext.AllCommands` от диспетчера.
+- **`dotnet format` и EF-миграции**: сгенерированные `Migrations/*` пометить `generated_code = true`
+  в `.editorconfig`, иначе format переписывает их под file-scoped namespaces (лишний чёрн).
+- Сервисы обязаны быть **stateless** (всё состояние — в `WorldSession`/`WorldState`); допустимые
+  исключения — иммутабельные кэши (`SpellCatalog`) и атомарные счётчики (`_splineId`).

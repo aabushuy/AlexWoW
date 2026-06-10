@@ -9,8 +9,14 @@ internal sealed class NodeCommand : IDevCommand
 {
     private static readonly Dictionary<string, uint> NodeGo = new()
     {
-        ["copper"] = 1731, ["tin"] = 1732, ["silver"] = 1733, ["iron"] = 1735,
-        ["silverleaf"] = 1617, ["peacebloom"] = 1618, ["earthroot"] = 1619, ["mageroyal"] = 1620,
+        ["copper"] = 1731,
+        ["tin"] = 1732,
+        ["silver"] = 1733,
+        ["iron"] = 1735,
+        ["silverleaf"] = 1617,
+        ["peacebloom"] = 1618,
+        ["earthroot"] = 1619,
+        ["mageroyal"] = 1620,
     };
 
     public IReadOnlyList<string> Names { get; } = ["node"];

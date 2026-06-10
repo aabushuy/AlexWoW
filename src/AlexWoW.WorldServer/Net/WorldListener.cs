@@ -78,7 +78,7 @@ internal sealed class WorldListener(
 
     private async Task EnsureSchemaWithRetryAsync(CancellationToken ct)
     {
-        const int maxAttempts = 30;
+        const int MaxAttempts = 30;
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -86,11 +86,11 @@ internal sealed class WorldListener(
                 await characters.EnsureSchemaAsync(ct);
                 return;
             }
-            catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+            catch (Exception ex) when (attempt < MaxAttempts && !ct.IsCancellationRequested)
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(5, attempt));
                 logger.LogWarning("БД персонажей недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
-                    attempt, maxAttempts, ex.Message, delay.TotalSeconds);
+                    attempt, MaxAttempts, ex.Message, delay.TotalSeconds);
                 await Task.Delay(delay, ct);
             }
         }

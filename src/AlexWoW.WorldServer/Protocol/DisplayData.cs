@@ -21,8 +21,16 @@ public static class DisplayData
     // Faction template по расе (UNIT_FIELD_FACTIONTEMPLATE), ChrRaces.dbc.
     private static readonly Dictionary<byte, uint> Factions = new()
     {
-        [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 5, [6] = 6,
-        [7] = 115, [8] = 116, [10] = 1610, [11] = 1629,
+        [1] = 1,
+        [2] = 2,
+        [3] = 3,
+        [4] = 4,
+        [5] = 5,
+        [6] = 6,
+        [7] = 115,
+        [8] = 116,
+        [10] = 1610,
+        [11] = 1629,
     };
 
     /// <summary>Display id модели по расе и полу (0 = male, 1 = female).</summary>

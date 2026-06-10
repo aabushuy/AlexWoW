@@ -44,8 +44,8 @@ public sealed class PlayerDataRepository(string connectionString)
         foreach (var row in rows)
         {
             var d = (IDictionary<string, object>)row;
-            byte cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
-            byte lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
+            var cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
+            var lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
             map[(cls, lvl)] = (Convert.ToUInt32(d["basehp"], CultureInfo.InvariantCulture),
                                Convert.ToUInt32(d["basemana"], CultureInfo.InvariantCulture));
         }
@@ -62,9 +62,9 @@ public sealed class PlayerDataRepository(string connectionString)
         foreach (var row in rows)
         {
             var d = (IDictionary<string, object>)row;
-            byte race = Convert.ToByte(d["race"], CultureInfo.InvariantCulture);
-            byte cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
-            byte lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
+            var race = Convert.ToByte(d["race"], CultureInfo.InvariantCulture);
+            var cls = Convert.ToByte(d["class"], CultureInfo.InvariantCulture);
+            var lvl = Convert.ToByte(d["level"], CultureInfo.InvariantCulture);
             map[(race, cls, lvl)] = (
                 Convert.ToUInt32(d["str"], CultureInfo.InvariantCulture),
                 Convert.ToUInt32(d["agi"], CultureInfo.InvariantCulture),
