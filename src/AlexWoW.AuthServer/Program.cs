@@ -1,4 +1,5 @@
 using AlexWoW.AuthServer;
+using AlexWoW.AuthServer.Cli;
 using AlexWoW.AuthServer.Net;
 using AlexWoW.Database;
 using AlexWoW.Database.Abstractions;
@@ -11,26 +12,26 @@ using Microsoft.Extensions.Options;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Serilog;
 
-// Вспомогательный CLI: создание аккаунта без запуска сервера.
-//   dotnet run -- create-account <username> <password>
-if (args.Length >= 1 && args[0].Equals("create-account", StringComparison.OrdinalIgnoreCase))
-{
-    return await AccountCreator.RunAsync(args);
-}
+// Вспомогательный CLI (S10): команды выполняются на том же DI-хосте, что и сервер
+// (общие репозитории, без дублирования сборки DAL): dotnet run -- <команда> …
+// Имя определяем до сборки хоста, чтобы не отдавать позиционные аргументы CLI
+// в command-line-провайдер конфигурации (как и прежний CLI, он их не использовал).
+var cliCommandName = args.Length >= 1 ? args[0] : null;
+var isCli = CreateAccountCommand.CommandName.Equals(cliCommandName, StringComparison.OrdinalIgnoreCase)
+    || ResetAllPasswordsCommand.CommandName.Equals(cliCommandName, StringComparison.OrdinalIgnoreCase)
+    || SetAdminCommand.CommandName.Equals(cliCommandName, StringComparison.OrdinalIgnoreCase);
 
-// CLI: массовая смена пароля — reset-all-passwords <password>
-if (args.Length >= 1 && args[0].Equals("reset-all-passwords", StringComparison.OrdinalIgnoreCase))
-{
-    return await PasswordReset.RunAsync(args);
-}
+var builder = Host.CreateApplicationBuilder(isCli ? [] : args);
 
-// CLI: флаг администратора — set-admin <username> [0|1]
-if (args.Length >= 1 && args[0].Equals("set-admin", StringComparison.OrdinalIgnoreCase))
+if (isCli)
 {
-    return await AccountAdmin.RunAsync(args);
+    // Прежний CLI читал appsettings.json из каталога бинарника (а не из cwd, как хост) —
+    // сохраняем источник, иначе `dotnet run` из корня репозитория не найдёт конфиг.
+    // Env-переменные добавляются повторно, чтобы остаться приоритетнее json (как раньше).
+    builder.Configuration
+        .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true)
+        .AddEnvironmentVariables();
 }
-
-var builder = Host.CreateApplicationBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -54,7 +55,20 @@ builder.Services.AddSingleton<IRealmRepository, EfRealmRepository>();
 builder.Services.AddSingleton<ISchemaInitializer, AuthSchemaInitializer>();
 builder.Services.AddHostedService<AuthListener>();
 
+// CLI-команды (S10): создание аккаунта, массовый сброс паролей, флаг администратора.
+builder.Services.AddSingleton<ICliCommand, CreateAccountCommand>();
+builder.Services.AddSingleton<ICliCommand, ResetAllPasswordsCommand>();
+builder.Services.AddSingleton<ICliCommand, SetAdminCommand>();
+
 var host = builder.Build();
+
+if (isCli)
+{
+    // Hosted-сервисы не стартуют: host.RunAsync не вызывается, выполняем команду и выходим.
+    var command = host.Services.GetServices<ICliCommand>()
+        .First(c => c.Name.Equals(cliCommandName, StringComparison.OrdinalIgnoreCase));
+    return await command.RunAsync(args, CancellationToken.None);
+}
 
 try
 {

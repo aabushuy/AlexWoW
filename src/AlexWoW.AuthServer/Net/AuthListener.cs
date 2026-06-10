@@ -51,7 +51,7 @@ public sealed class AuthListener(
     private async Task EnsureSchemaWithRetryAsync(CancellationToken ct)
     {
         const int maxAttempts = 30;
-        var realm = ToRealm(_options.DefaultRealm);
+        var realm = _options.DefaultRealm.ToRealm();
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -68,15 +68,4 @@ public sealed class AuthListener(
             }
         }
     }
-
-    private static Database.Models.Realm ToRealm(DefaultRealmOptions o) => new()
-    {
-        Name = o.Name,
-        Address = o.Address,
-        Port = o.Port,
-        Type = o.Type,
-        Flags = o.Flags,
-        Timezone = o.Timezone,
-        Population = o.Population,
-    };
 }

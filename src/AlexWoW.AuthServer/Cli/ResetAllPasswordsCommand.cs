@@ -1,16 +1,23 @@
 using System.Security.Cryptography;
 using AlexWoW.Cryptography;
-using Microsoft.Extensions.Configuration;
+using AlexWoW.Database.Abstractions;
+using Microsoft.Extensions.Options;
 
-namespace AlexWoW.AuthServer;
+namespace AlexWoW.AuthServer.Cli;
 
 /// <summary>
 /// CLI-команда массовой смены пароля: <c>reset-all-passwords &lt;password&gt;</c> — ставит один пароль
 /// всем аккаунтам (новые SRP6 соль+верификатор, session_key сбрасывается). Тестовый стенд.
 /// </summary>
-public static class PasswordReset
+internal sealed class ResetAllPasswordsCommand(
+    IAccountRepository accounts,
+    IOptions<AuthServerOptions> options) : ICliCommand
 {
-    public static async Task<int> RunAsync(string[] args)
+    public const string CommandName = "reset-all-passwords";
+
+    public string Name => CommandName;
+
+    public async Task<int> RunAsync(string[] args, CancellationToken ct)
     {
         if (args.Length < 2)
         {
@@ -19,29 +26,20 @@ public static class PasswordReset
         }
         var password = args[1];
 
-        var config = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true)
-            .AddEnvironmentVariables()
-            .Build();
-
-        var options = new AuthServerOptions();
-        config.GetSection(AuthServerOptions.SectionName).Bind(options);
-        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+        if (string.IsNullOrWhiteSpace(options.Value.ConnectionString))
         {
             Console.Error.WriteLine("Не задана строка подключения (AuthServer:ConnectionString).");
             return 1;
         }
 
-        var database = CliRepository.CreateAccountRepository(options.ConnectionString);
-        var users = await database.GetAllUsernamesAsync();
+        var users = await accounts.GetAllUsernamesAsync(ct);
         foreach (var username in users)
         {
             var salt = new byte[Srp6.SaltLength];
             RandomNumberGenerator.Fill(salt);
             var verifier = Srp6.ToFixedLittleEndian(
                 Srp6.CalculateVerifier(username, password, salt), Srp6.KeyLength);
-            await database.UpdatePasswordAsync(username, salt, verifier);
+            await accounts.UpdatePasswordAsync(username, salt, verifier, ct);
         }
 
         Console.WriteLine($"Пароль изменён на '{password}' у {users.Count} аккаунтов.");
