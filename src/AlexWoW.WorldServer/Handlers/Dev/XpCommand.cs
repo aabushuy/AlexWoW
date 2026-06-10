@@ -1,7 +1,7 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.xp [add] N</c> — добавить опыт. M9.4.</summary>
-internal sealed class XpCommand : IDevCommand
+internal sealed class XpCommand(ProgressionService progression) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["xp"];
     public string Help => ".xp [add] N";
@@ -17,7 +17,7 @@ internal sealed class XpCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .xp [add] N", ct);
             return;
         }
-        await ctx.Session.Progression.GiveXpAsync(ctx.Session, amount, ct); // мост сессии (до S8)
+        await progression.GiveXpAsync(ctx.Session, amount, ct);
         await ctx.ReplyAsync($"Опыт +{amount}", ct);
     }
 }

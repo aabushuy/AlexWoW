@@ -1,36 +1,26 @@
-using System.Reflection;
-
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>
-/// Реестр dev-команд: таблица <c>имя/алиас → команда</c>, построенная один раз рефлексией из всех
-/// реализаций <see cref="IDevCommand"/> с публичным конструктором без параметров. Аналог
-/// <c>WorldPacketRouter</c> для опкодов — добавить команду = добавить класс, реестр не трогаем.
+/// Реестр dev-команд: таблица <c>имя/алиас → команда</c>, построенная один раз в конструкторе из всех
+/// DI-зарегистрированных <see cref="IDevCommand"/> (скан сборки — <see cref="DevCommandRegistration"/>).
+/// Аналог <c>WorldPacketRouter</c> для опкодов — добавить команду = добавить класс, реестр не трогаем.
+/// DI-синглтон (M7 S8, бывший статик с Activator.CreateInstance).
 /// </summary>
-internal static class DevCommandRegistry
+internal sealed class DevCommandRegistry
 {
-    private static readonly Dictionary<string, IDevCommand> ByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IDevCommand> _byName = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Команды в порядке <see cref="IDevCommand.Order"/> (для <c>.help</c>).</summary>
-    public static IReadOnlyList<IDevCommand> Ordered { get; }
+    public IReadOnlyList<IDevCommand> Ordered { get; }
 
-    static DevCommandRegistry()
+    public DevCommandRegistry(IEnumerable<IDevCommand> commands)
     {
-        var commands = typeof(DevCommandRegistry).Assembly.GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false }
-                        && typeof(IDevCommand).IsAssignableFrom(t)
-                        && t.GetConstructor(Type.EmptyTypes) is not null)
-            .Select(t => (IDevCommand)Activator.CreateInstance(t)!)
-            .OrderBy(c => c.Order)
-            .ToList();
-
-        foreach (var c in commands)
+        Ordered = commands.OrderBy(c => c.Order).ToList();
+        foreach (var c in Ordered)
             foreach (var name in c.Names)
-                ByName[name] = c;
-
-        Ordered = commands;
+                _byName[name] = c;
     }
 
     /// <summary>Команда по имени/алиасу (без точки), либо null.</summary>
-    public static IDevCommand? Find(string name) => ByName.TryGetValue(name, out var c) ? c : null;
+    public IDevCommand? Find(string name) => _byName.TryGetValue(name, out var c) ? c : null;
 }

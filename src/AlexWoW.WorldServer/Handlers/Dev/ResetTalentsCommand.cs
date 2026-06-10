@@ -2,7 +2,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.resettalents</c> — бесплатно сбросить таланты (для теста перекидки). Переиспользует
 /// wipe-логику тренера с нулевой стоимостью. Devcommands D5 (#70).</summary>
-internal sealed class ResetTalentsCommand : IDevCommand
+internal sealed class ResetTalentsCommand(TalentHandlers talents) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["resettalents", "untalent"];
     public string Help => ".resettalents";
@@ -11,7 +11,7 @@ internal sealed class ResetTalentsCommand : IDevCommand
 
     public async Task ExecuteAsync(DevCommandContext ctx, CancellationToken ct)
     {
-        await ctx.Session.Talents.ResetTalentsAsync(ctx.Session, 0, ct); // мост сессии (до S8)
+        await talents.ResetTalentsAsync(ctx.Session, 0, ct);
         await ctx.ReplyAsync("Таланты сброшены (бесплатно)", ct);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text;
 using AlexWoW.Common.Network;
+using AlexWoW.WorldServer.Handlers.Dev;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>Чат (M4): приём CMSG_MESSAGECHAT, эхо отправителю. (DI-модуль, M7 #36.)</summary>
-internal sealed class ChatHandlers(AddonProtocol addonProtocol) : IOpcodeHandlerModule
+internal sealed class ChatHandlers(AddonProtocol addonProtocol, DevCommandDispatcher devCommands) : IOpcodeHandlerModule
 {
     private const uint ChatTypeWhisper = 0x07; // CMSG: перед сообщением идёт CString адресата
 
@@ -42,7 +43,7 @@ internal sealed class ChatHandlers(AddonProtocol addonProtocol) : IOpcodeHandler
         session.Logger.LogInformation("CHAT '{User}' type={Type}: {Msg}", session.Account, type, text);
 
         // M9.4: дев-команды (.level/.xp/.additem) — не уходят в чат.
-        if (await DevCommands.TryHandleAsync(session, text, ct))
+        if (await devCommands.TryHandleAsync(session, text, ct))
             return;
 
         // Эхо отправителю (для одного игрока этого достаточно).

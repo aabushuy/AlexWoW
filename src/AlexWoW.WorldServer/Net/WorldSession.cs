@@ -45,16 +45,8 @@ public sealed class WorldSession
     internal TerrainMaps Terrain => _services.Terrain;
     internal WorldState World => _services.World;
     internal WorldServerOptions Options => _services.Options;
-    // мост до S8 (M7 S7): опкод-хендлеры сконвертированы — сервисы через сессию достают только
-    // dev-команды (статики до S8). Какая команда что тянет — в комментарии у свойства.
-    internal AuraService AuraService => _services.AuraService;                 // .buff/.unbuff
-    internal InventoryGrantService InventoryGrant => _services.InventoryGrant; // .additem
-    internal SkillsService Skills => _services.Skills;                         // .skill
-    internal SpellLearnService SpellLearn => _services.SpellLearn;             // .learn
-    internal ProgressionService Progression => _services.Progression;          // .xp/.level
-    internal TalentHandlers Talents => _services.Talents;                      // .resettalents
-    internal TrainerCatalogService TrainerCatalog => _services.TrainerCatalog; // .learnall
-    internal TeleportService Teleport => _services.Teleport;                   // .tp
+    // M7 S8: мосты игровых сервисов сняты — dev-команды получают сервисы ctor-инъекцией
+    // (DI-скан DevCommandRegistration); через сессию остаются только репозитории (мост до S9 #43).
     internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 

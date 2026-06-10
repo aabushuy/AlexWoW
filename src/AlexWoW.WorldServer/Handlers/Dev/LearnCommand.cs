@@ -1,7 +1,7 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.learn SPELL</c> — выучить спелл без тренера (персист + грант, LEARNED/SUPERCEDED). M9.3/M10.3.</summary>
-internal sealed class LearnCommand : IDevCommand
+internal sealed class LearnCommand(SpellLearnService spellLearn) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["learn"];
     public string Help => ".learn SPELL";
@@ -15,7 +15,7 @@ internal sealed class LearnCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .learn SPELL", ct);
             return;
         }
-        await ctx.Session.SpellLearn.GrantAsync(ctx.Session, spellId, ct); // мост сессии (до S8)
+        await spellLearn.GrantAsync(ctx.Session, spellId, ct);
         await ctx.ReplyAsync($"Изучен спелл {spellId}", ct);
     }
 }

@@ -1,7 +1,7 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.additem ID [count]</c> / <c>.item ID [count]</c> — выдать предмет в инвентарь. M9.4.</summary>
-internal sealed class AddItemCommand : IDevCommand
+internal sealed class AddItemCommand(InventoryGrantService inventoryGrant) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["additem", "item"];
     public string Help => ".additem ID [count]";
@@ -16,7 +16,7 @@ internal sealed class AddItemCommand : IDevCommand
             return;
         }
         var qty = ctx.Args.Count >= 2 && uint.TryParse(ctx.Args[1], out var q) ? q : 1u;
-        var item = await ctx.Session.InventoryGrant.TryGiveAsync(ctx.Session, itemId, qty, ct); // мост сессии (до S8)
+        var item = await inventoryGrant.TryGiveAsync(ctx.Session, itemId, qty, ct);
         await ctx.ReplyAsync(item is null ? "Нет места в сумке" : $"Выдан предмет {itemId} x{qty}", ct);
     }
 }

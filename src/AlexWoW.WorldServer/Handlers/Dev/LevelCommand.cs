@@ -1,7 +1,7 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.level N</c> / <c>.lvl N</c> — установить уровень персонажа. M9.4.</summary>
-internal sealed class LevelCommand : IDevCommand
+internal sealed class LevelCommand(ProgressionService progression) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["level", "lvl"];
     public string Help => ".level N";
@@ -15,7 +15,7 @@ internal sealed class LevelCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .level N", ct);
             return;
         }
-        await ctx.Session.Progression.SetLevelAsync(ctx.Session, lvl, ct); // мост сессии (до S8)
+        await progression.SetLevelAsync(ctx.Session, lvl, ct);
         await ctx.ReplyAsync($"Уровень: {Math.Clamp(lvl, (byte)1, World.LevelStore.MaxLevel)}", ct);
     }
 }

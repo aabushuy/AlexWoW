@@ -8,14 +8,15 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// Раньше дерево хардкодилось в Lua аддона; теперь его отдаёт сервер (единый источник правды), а аддон лишь
 /// рисует пришедшее. Статические группы (тренеры/станки/персонаж/баффы) + динамическая ветка «Телепорт» из
 /// таблицы <c>dev_teleport</c> (alexwow_auth). Формат строк — см. <see cref="Builder"/> и AddonProtocol.
+/// DI-синглтон (M7 S8), потребитель — AddonProtocol.
 /// </summary>
-internal static class DevMenuCatalog
+internal sealed class DevMenuCatalog
 {
     /// <summary>Префикс addon-сообщений (общий для запроса и ответа).</summary>
     public const string Prefix = "AlexDev";
 
     /// <summary>Строки-узлы каталога (без кадров BEGIN/END — их добавляет AddonProtocol).</summary>
-    public static async Task<IReadOnlyList<string>> BuildAsync(WorldSession session, CancellationToken ct)
+    public async Task<IReadOnlyList<string>> BuildAsync(WorldSession session, CancellationToken ct)
     {
         var b = new Builder();
 
