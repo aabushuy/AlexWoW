@@ -105,6 +105,17 @@ public static class Professions
         return 0;                   // серый — не растёт
     }
 
+    /// <summary>
+    /// Доп. спеллы, выдаваемые вместе с навыком профессии (M11.2 фикс). Горное дело (186) само по себе —
+    /// только сбор (спелл 2575, эффект 33), а окно ПЛАВКИ открывает отдельный спелл «Выплавка» (2656,
+    /// эффект TRADE_SKILL): на оффе он выдаётся вместе с Mining. Прочие профессии (кузнечное/алхимия/…)
+    /// сами открывают окно (их учебный спелл имеет эффект 47), доп. спелл не нужен.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<ushort, uint[]> AutoGrantSpells = new Dictionary<ushort, uint[]>
+    {
+        [186] = [2656], // Mining → Smelting (окно плавки)
+    };
+
     /// <summary>Что выдаёт спелл-профессия: навык и его потолок (тир). M11.2/M11.5.</summary>
     public readonly record struct SkillGrant(ushort SkillId, ushort Max);
 
