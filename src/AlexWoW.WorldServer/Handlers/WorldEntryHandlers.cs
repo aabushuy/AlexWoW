@@ -101,9 +101,12 @@ public static class WorldEntryHandlers
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
         await QuestHandlers.LoadQuestStateAsync(session, ct);
 
+        // M11.1: навыки персонажа (профессии и пр.) — загрузить ДО спавна, чтобы лечь в слоты PLAYER_SKILL_INFO.
+        await Skills.LoadAsync(session, character.Guid, character.Race, ct);
+
         var spawn = PlayerSpawn.BuildCreateObject(character,
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
-            session.Inventory, session.QuestSlots, stats);
+            session.Inventory, session.QuestSlots, stats, session.SkillBook.Skills);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).

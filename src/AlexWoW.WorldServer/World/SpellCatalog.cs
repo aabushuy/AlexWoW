@@ -33,6 +33,7 @@ public static class SpellCatalog
     private const int EffectLeap = 29;                   // прыжок вперёд (Blink) — телепорт по направлению
     private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
+    private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
@@ -51,7 +52,9 @@ public static class SpellCatalog
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
         int AuraDurationMs = 0,
         bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0,
-        SpellMovement Movement = SpellMovement.None, uint TriggerSpellId = 0);
+        SpellMovement Movement = SpellMovement.None, uint TriggerSpellId = 0,
+        uint CreateItemId = 0, uint CreateItemCount = 0,
+        IReadOnlyList<(uint Item, uint Count)>? Reagents = null);
 
     /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн), телепорт вперёд (Blink) или за спину
     /// цели (Shadowstep). None — не двигает.</summary>
@@ -156,10 +159,32 @@ public static class SpellCatalog
             t.Effect2 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell2 :
             t.Effect3 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell3 : 0u;
 
+        // M11.3: создание предмета (крафт). count = BasePoints+1 (Smelt Bronze: BasePoints=1 → 2 слитка).
+        uint createItemId = 0, createItemCount = 0;
+        if (t.Effect1 == EffectCreateItem) { createItemId = t.EffectItemType1; createItemCount = (uint)Math.Max(1, t.EffectBasePoints1 + 1); }
+        else if (t.Effect2 == EffectCreateItem) { createItemId = t.EffectItemType2; createItemCount = (uint)Math.Max(1, t.EffectBasePoints2 + 1); }
+        else if (t.Effect3 == EffectCreateItem) { createItemId = t.EffectItemType3; createItemCount = (uint)Math.Max(1, t.EffectBasePoints3 + 1); }
+
+        List<(uint Item, uint Count)>? reagents = null;
+        AddReagent(ref reagents, t.Reagent1, t.ReagentCount1);
+        AddReagent(ref reagents, t.Reagent2, t.ReagentCount2);
+        AddReagent(ref reagents, t.Reagent3, t.ReagentCount3);
+        AddReagent(ref reagents, t.Reagent4, t.ReagentCount4);
+        AddReagent(ref reagents, t.Reagent5, t.ReagentCount5);
+        AddReagent(ref reagents, t.Reagent6, t.ReagentCount6);
+        AddReagent(ref reagents, t.Reagent7, t.ReagentCount7);
+        AddReagent(ref reagents, t.Reagent8, t.ReagentCount8);
+
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
             isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
-            movement, triggerSpell);
+            movement, triggerSpell, createItemId, createItemCount, reagents);
+    }
+
+    private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
+    {
+        if (item > 0 && count > 0)
+            (reagents ??= new List<(uint, uint)>()).Add(((uint)item, count));
     }
 
     /// <summary>

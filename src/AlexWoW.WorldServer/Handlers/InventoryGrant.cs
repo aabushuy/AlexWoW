@@ -1,3 +1,4 @@
+using AlexWoW.Common.Network;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -10,6 +11,51 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 public static class InventoryGrant
 {
+    /// <summary>Сколько предметов entry в сумках игрока (item-цели квестов, реагенты крафта).</summary>
+    public static uint CountItem(WorldSession session, uint itemEntry)
+    {
+        uint total = 0;
+        foreach (var it in session.Inventory)
+            if (it.ItemEntry == itemEntry)
+                total += it.StackCount;
+        return total;
+    }
+
+    /// <summary>
+    /// Списывает <paramref name="count"/> предметов entry из сумок (квест-предметы при сдаче M6.10,
+    /// реагенты крафта M11.3): целые предметы удаляет (DestroyObject + очистка слота), частичную стопку
+    /// уменьшает (ITEM_FIELD_STACK_COUNT), с персистом.
+    /// </summary>
+    public static async Task ConsumeAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
+    {
+        var ownerGuid = session.InWorldGuid;
+        var remaining = count;
+        foreach (var item in session.Inventory.Where(i => i.ItemEntry == itemEntry).ToList())
+        {
+            if (remaining == 0)
+                break;
+            if (item.StackCount <= remaining)
+            {
+                remaining -= item.StackCount;
+                session.Inventory.Remove(item);
+                await session.Items.RemoveItemAsync(item.ItemGuid, ct);
+                await session.SendAsync(WorldOpcode.SmsgDestroyObject,
+                    new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
+                if (item.Bag == InventorySlots.MainBag)
+                    await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                        PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
+            }
+            else
+            {
+                item.StackCount -= remaining;
+                remaining = 0;
+                await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
+            }
+        }
+    }
+
     /// <summary>Первый свободный слот рюкзака (23..38) основного контейнера; -1 если места нет.</summary>
     public static int FreeBackpackSlot(WorldSession session)
     {

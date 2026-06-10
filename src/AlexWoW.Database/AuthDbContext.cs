@@ -20,6 +20,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<CharacterQuestStatus> QuestStatuses => Set<CharacterQuestStatus>();
     public DbSet<CharacterSpell> CharacterSpells => Set<CharacterSpell>();
     public DbSet<CharacterTalent> CharacterTalents => Set<CharacterTalent>();
+    public DbSet<CharacterSkill> CharacterSkills => Set<CharacterSkill>();
     public DbSet<CharacterAura> CharacterAuras => Set<CharacterAura>();
     public DbSet<CharacterActionButton> ActionButtons => Set<CharacterActionButton>();
     public DbSet<AccountDataBlob> AccountDataBlobs => Set<AccountDataBlob>();
@@ -151,6 +152,18 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.TalentId).HasColumnName("talent_id");
             e.Property(x => x.Rank).HasColumnName("rank").HasDefaultValue((byte)0);
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_talent_owner");
+        });
+
+        b.Entity<CharacterSkill>(e =>
+        {
+            e.ToTable("character_skill");
+            e.HasKey(x => new { x.OwnerGuid, x.SkillId });
+            e.Property(x => x.OwnerGuid).HasColumnName("owner_guid");
+            e.Property(x => x.SkillId).HasColumnName("skill_id");
+            e.Property(x => x.Value).HasColumnName("value").HasDefaultValue((ushort)0);
+            e.Property(x => x.Max).HasColumnName("max_value").HasDefaultValue((ushort)0);
+            e.Property(x => x.Step).HasColumnName("step").HasDefaultValue((byte)0);
+            e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_skill_owner");
         });
 
         b.Entity<CharacterAura>(e =>

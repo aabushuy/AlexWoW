@@ -14,4 +14,7 @@ public static class DevSlot
 
     /// <summary>Вендор реагентов (<c>.reagentvendor</c>). D4.</summary>
     public const string ReagentVendor = "reagentvendor";
+
+    /// <summary>Нода сбора (<c>.node</c>) — рудная жила/трава. M11.4.</summary>
+    public const string Node = "node";
 }

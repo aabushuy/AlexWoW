@@ -19,7 +19,12 @@ public sealed class SpellTemplateRepository(string connectionString)
                    EffectDieSides1, EffectDieSides2, EffectDieSides3,
                    EffectApplyAuraName1, EffectApplyAuraName2, EffectApplyAuraName3,
                    EffectAmplitude1, EffectAmplitude2, EffectAmplitude3,
-                   EffectTriggerSpell1, EffectTriggerSpell2, EffectTriggerSpell3
+                   EffectTriggerSpell1, EffectTriggerSpell2, EffectTriggerSpell3,
+                   EffectMiscValue1, EffectMiscValue2, EffectMiscValue3,
+                   EffectItemType1, EffectItemType2, EffectItemType3,
+                   Reagent1, Reagent2, Reagent3, Reagent4, Reagent5, Reagent6, Reagent7, Reagent8,
+                   ReagentCount1, ReagentCount2, ReagentCount3, ReagentCount4,
+                   ReagentCount5, ReagentCount6, ReagentCount7, ReagentCount8
             FROM spell_template WHERE Id = @id;
             """, new { id }, cancellationToken: ct));
     }

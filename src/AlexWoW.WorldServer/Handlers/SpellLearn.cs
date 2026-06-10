@@ -25,6 +25,24 @@ public static class SpellLearn
 
         await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
 
+        // M11.2/M11.5: спелл изучает профессию (Effect SKILL/SKILL_STEP) → выдать навык-линию. Потолок
+        // (тир: апрентис 75 … грандмастер 450) берём из BasePoints эффекта; не понижаем уже имеющийся
+        // навык/потолок (изучение след. тира поднимает кап).
+        try
+        {
+            var tpl = await session.WorldDb.GetSpellAsync(spellId, ct);
+            if (tpl is not null && World.Professions.SkillGrantedBy(tpl) is { } grant)
+            {
+                var existing = session.SkillBook.Get(grant.SkillId);
+                int curValue = existing?.Value ?? 0;
+                int curMax = existing?.Max ?? 0;
+                var value = (ushort)Math.Max(curValue, 1);
+                var max = (ushort)Math.Max(curMax, (int)grant.Max);
+                await Skills.GrantAsync(session, grant.SkillId, value, max, ct);
+            }
+        }
+        catch { /* БД мира недоступна — навык не выдаём, спелл всё равно изучен */ }
+
         uint prev = 0;
         try { prev = await session.WorldDb.GetPrevRankAsync(spellId, ct); }
         catch { /* БД мира недоступна — просто LEARNED */ }

@@ -18,6 +18,7 @@ public static class SpellCaster
     private const byte CastResultNotReady = 0x43;        // 67  — спелл на кулдауне/GCD
     private const byte CastResultNoPower = 0x55;         // 85  — не хватает маны
     private const byte CastResultSpellInProgress = 0x69; // 105 — уже идёт другой каст
+    private const byte CastResultReagents = 0x64;        // 100 — не хватает реагентов (крафт) M11.3
     private const byte SpellFailedInterrupted = 0x28;
 
     /// <summary>Толеранс GCD-гейта (мс): не режем каст у границы GCD из-за скью клиент/сервер. M10.3.</summary>
@@ -90,6 +91,14 @@ public static class SpellCaster
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
+            return;
+        }
+
+        // M11.3: крафт — нет реагентов → отказ ДО старта каст-бара (как на оффе).
+        if (info.CreateItemId != 0 && !Crafting.HasReagents(session, info))
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultReagents), ct);
             return;
         }
 
@@ -230,6 +239,10 @@ public static class SpellCaster
         // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
         if (info.AuraBuff)
             await Periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
+
+        // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
+        if (info.CreateItemId != 0)
+            await Crafting.DoCraftAsync(session, spellId, info, ct);
 
         // M7 #33: движущий эффект — рывок к цели (Charge) или телепорт (Blink/Shadowstep).
         await ApplyMovementAsync(session, info.Movement, targetGuid, ct);

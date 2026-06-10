@@ -252,6 +252,10 @@ public sealed class WorldState
     public Task<bool> SummonDevGoAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
         => _director.SummonDevGoAsync(session, entry, slot, ct);
 
+    /// <inheritdoc cref="CreatureDirector.DespawnDevGoAsync"/>
+    public Task<bool> DespawnDevGoAsync(WorldSession session, string slot, CancellationToken ct)
+        => _director.DespawnDevGoAsync(session, slot, ct);
+
     /// <inheritdoc cref="CreatureDirector.DevCleanGosAsync"/>
     public Task DevCleanGosAsync(WorldSession session, CancellationToken ct)
         => _director.DevCleanGosAsync(session, ct);

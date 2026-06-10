@@ -165,6 +165,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
         await db.CharacterSpells.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
         await db.AccountDataBlobs.Where(x => x.OwnerId == guid && x.IsChar == 1).ExecuteDeleteAsync(ct);
         await db.CharacterAuras.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
+        await db.CharacterSkills.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
         return true;
     }
 
