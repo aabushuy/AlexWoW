@@ -256,21 +256,32 @@ public static class WorldEntryHandlers
         foreach (var s in await session.CharState.GetLearnedSpellsAsync(character.Guid, ct))
             known.Add(s);
 
-        // M11 (#3): среди известных оставить в КНИГЕ только высший тир каждой профессии (низшие
-        // superceded — иначе показывались бы «Горное дело (ученик)» и «(подмастерье)» вместе). Низшие
-        // остаются в KnownSpells (для каста/валидации не важно), но в книгу не шлём. Один батч-запрос.
+        // M11 (#2/#3): причесать книгу профессий одним батч-запросом:
+        //  • учителя (LEARN_SPELL, напр. «Подмастерье кузнеца») прячем; их изучаемый спелл-открывашку
+        //    окна (2018) добавляем в книгу/персист, если не выучен (самолечение персонажей до фикса #2);
+        //  • тир-дедуп: показываем только высший тир каждой профессии (низшие superceded).
+        // Спрятанные остаются в KnownSpells (для каста/валидации), но в книгу не шлём.
         session.ProfessionRankSpell.Clear();
-        var hiddenLowerTiers = new HashSet<uint>();
+        var hiddenSpells = new HashSet<uint>();
         try
         {
-            foreach (var tpl in await session.WorldDb.GetSpellsAsync(known.ToList(), ct))
+            var templates = (await session.WorldDb.GetSpellsAsync(known.ToList(), ct)).ToList();
+            foreach (var tpl in templates)
             {
-                if (World.Professions.SkillGrantedBy(tpl) is not { } g)
+                var taught = World.Professions.TaughtSpell(tpl);
+                if (taught == 0)
+                    continue;
+                hiddenSpells.Add(tpl.Id);                 // учитель — не книжный спелл
+                if (known.Add(taught))                    // изучаемый спелл отсутствовал → выучить
+                    await session.CharState.AddLearnedSpellAsync(character.Guid, taught, ct);
+            }
+            foreach (var tpl in templates)
+            {
+                if (hiddenSpells.Contains(tpl.Id) || World.Professions.SkillGrantedBy(tpl) is not { } g)
                     continue;
                 if (session.ProfessionRankSpell.TryGetValue(g.SkillId, out var cur))
                 {
-                    var lower = g.Max > cur.Max ? cur.Spell : tpl.Id;
-                    hiddenLowerTiers.Add(lower);
+                    hiddenSpells.Add(g.Max > cur.Max ? cur.Spell : tpl.Id);
                     if (g.Max > cur.Max)
                         session.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
                 }
@@ -280,10 +291,10 @@ public static class WorldEntryHandlers
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("INITIAL_SPELLS '{User}': дедуп профессий пропущен ({Msg})", session.Account, ex.Message);
+            session.Logger.LogDebug("INITIAL_SPELLS '{User}': причёсывание профессий пропущено ({Msg})", session.Account, ex.Message);
         }
 
-        var book = known.Where(s => !hiddenLowerTiers.Contains(s)).ToList();
+        var book = known.Where(s => !hiddenSpells.Contains(s)).ToList();
         var w = new ByteWriter(8 + book.Count * 6)
             .UInt8(0)
             .UInt16((ushort)book.Count);

@@ -12,6 +12,21 @@ public static class Professions
     // SpellEffect, выдающие/повышающие навык (3.3.5a): SKILL=118, SKILL_STEP=44.
     private const int EffectSkill = 118;
     private const int EffectSkillStep = 44;
+    // LEARN_SPELL=36: спелл-«учитель» (напр. «Подмастерье кузнеца» 2020) учит реальный спелл —
+    // открывашку окна профессии (2018 «Кузнечное дело», эффект TRADE_SKILL). EffectTriggerSpell = id.
+    private const int EffectLearnSpell = 36;
+
+    /// <summary>
+    /// Если спелл — «учитель» профессии (Effect LEARN_SPELL=36), возвращает id изучаемого им спелла
+    /// (открывашка окна/навык), иначе 0. Сам учитель в книге не показывается. M11 (#2).
+    /// </summary>
+    public static uint TaughtSpell(SpellTemplateData t)
+    {
+        if (t.Effect1 == EffectLearnSpell && t.EffectTriggerSpell1 > 0) return (uint)t.EffectTriggerSpell1;
+        if (t.Effect2 == EffectLearnSpell && t.EffectTriggerSpell2 > 0) return (uint)t.EffectTriggerSpell2;
+        if (t.Effect3 == EffectLearnSpell && t.EffectTriggerSpell3 > 0) return (uint)t.EffectTriggerSpell3;
+        return 0;
+    }
 
     /// <summary>Потолок навыка апрентис-тира (стартовый при изучении профессии). M11.2.</summary>
     public const ushort ApprenticeMax = 75;
