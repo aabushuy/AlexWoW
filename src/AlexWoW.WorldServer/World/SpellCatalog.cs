@@ -29,6 +29,7 @@ public static class SpellCatalog
     private const int EffectWeaponDamage = 58;           // урон оружия + бонус
     private const int EffectNormalizedWeaponDmg = 121;   // нормализованный урон оружия + бонус
     private const int EffectApplyAura = 6;               // наложение ауры (периодика и пр.)
+    private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
@@ -46,7 +47,11 @@ public static class SpellCatalog
         byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0,
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
         int AuraDurationMs = 0,
-        bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0);
+        bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0,
+        SpellMovement Movement = SpellMovement.None);
+
+    /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн) / телепорт. None — не двигает.</summary>
+    public enum SpellMovement : byte { None = 0, Charge = 1, Teleport = 2 }
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -134,9 +139,14 @@ public static class SpellCatalog
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
+        // M7 #33: движущий эффект. Charge (96) — рывок к цели (сплайн). Телепорты (Blink/Shadowstep) — срез 2.
+        var movement = Array.Exists(effects, e => e.Eff == EffectCharge)
+            ? SpellMovement.Charge : SpellMovement.None;
+
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
-            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus);
+            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
+            movement);
     }
 
     /// <summary>
