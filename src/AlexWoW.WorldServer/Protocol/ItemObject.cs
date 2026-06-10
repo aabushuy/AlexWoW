@@ -16,17 +16,24 @@ public static class ItemObject
     /// <summary>Полный GUID предмета по low-counter из БД (character_items.item_guid).</summary>
     public static ulong ItemGuid(uint counter) => (HighGuidItem << 48) | counter;
 
-    /// <summary>Один SMSG_UPDATE_OBJECT, создающий все предметы инвентаря (по блоку на предмет).</summary>
+    /// <summary>
+    /// Один SMSG_UPDATE_OBJECT, создающий все предметы инвентаря (по блоку на предмет). Предметы-сумки
+    /// (class=1, по <paramref name="bagInfo"/>) создаются как TYPEID_CONTAINER (<see cref="ContainerObject"/>) —
+    /// иначе клиент крашится, читая поля контейнера у обычного item-объекта (M6.13 / баг #31).
+    /// </summary>
     public static byte[] BuildItemsCreate(IReadOnlyList<InventoryItem> items, ulong ownerGuid,
-        IReadOnlyDictionary<uint, ItemTemplateData>? templates = null)
+        IReadOnlyDictionary<uint, ItemBagInfo>? bagInfo = null)
     {
         var w = new ByteWriter(64 + items.Count * 96);
         w.UInt32((uint)items.Count); // количество блоков
         foreach (var item in items)
         {
-            var maxDur = templates is not null && templates.TryGetValue(item.ItemEntry, out var t)
-                ? t.MaxDurability : 0u;
-            WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid, item.StackCount, maxDur);
+            var info = bagInfo is not null && bagInfo.TryGetValue(item.ItemEntry, out var bi) ? bi : default;
+            if (info.IsContainer)
+                ContainerObject.WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid,
+                    item.StackCount, info.MaxDurability, info.ContainerSlots);
+            else
+                WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid, item.StackCount, info.MaxDurability);
         }
         return w.ToArray();
     }

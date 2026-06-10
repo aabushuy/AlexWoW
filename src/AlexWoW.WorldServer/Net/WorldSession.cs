@@ -78,6 +78,10 @@ public sealed class WorldSession
     /// <summary>Инвентарь персонажа в мире (предметы во всех слотах). Загружается при входе. M6.1.</summary>
     internal List<InventoryItem> Inventory { get; } = new();
 
+    /// <summary>Кэш class/ContainerSlots/MaxDurability по entry предметов инвентаря (батч при входе) —
+    /// чтобы знать, какие предметы суммки (контейнеры), без запроса БД на каждый предмет. M6.13.</summary>
+    internal Dictionary<uint, ItemBagInfo> ItemBagInfo { get; } = new();
+
     /// <summary>Деньги персонажа (медь) в мире. Загружается при входе, меняется торговлей. M6.2.</summary>
     internal uint Money { get; set; }
 
@@ -270,6 +274,7 @@ public sealed class WorldSession
         VisibleGos.Clear();
         VisiblePlayers.Clear();
         Inventory.Clear();
+        ItemBagInfo.Clear(); // M6.13: кэш сумок перезагружается при следующем входе
         try
         {
             await World.LeaveWorldAsync(player, ct);

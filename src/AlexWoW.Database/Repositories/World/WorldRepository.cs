@@ -42,6 +42,9 @@ public sealed class WorldRepository(
     public Task<IReadOnlyDictionary<uint, (uint DisplayId, byte InventoryType)>> GetItemDisplaysAsync(
         IReadOnlyCollection<uint> entries, CancellationToken ct = default)
         => items.GetItemDisplaysAsync(entries, ct);
+    public Task<IReadOnlyDictionary<uint, ItemBagInfo>> GetItemBagInfoAsync(
+        IReadOnlyCollection<uint> entries, CancellationToken ct = default)
+        => items.GetItemBagInfoAsync(entries, ct);
 
     // ---- IVendorRepository ----
     public Task<IReadOnlyList<VendorItem>> GetVendorItemsAsync(uint entry, CancellationToken ct = default)

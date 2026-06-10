@@ -59,6 +59,20 @@ public static class WorldEntryHandlers
         session.Inventory.AddRange(await session.Items.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
 
+        // M6.13: class/ContainerSlots/MaxDurability по entry'ям инвентаря (батч, кэш на сессии) — чтобы
+        // предметы-сумки (class=1) создавались как TYPEID_CONTAINER (иначе клиент крашится, баг #31).
+        session.ItemBagInfo.Clear();
+        try
+        {
+            var entries = session.Inventory.Select(i => i.ItemEntry).Distinct().ToArray();
+            foreach (var (entry, info) in await session.WorldDb.GetItemBagInfoAsync(entries, ct))
+                session.ItemBagInfo[entry] = info;
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("M6.13: bag-info недоступен ({Msg}) — сумки как обычные предметы", ex.Message);
+        }
+
         // M9.2: статы/HP/мана по классу+уровню (player_levelstats); фолбэк — флэт. Полное HP при входе.
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(character.Race, character.Class, character.Level);
@@ -81,7 +95,7 @@ public static class WorldEntryHandlers
         session.LastResourceTickMs = Environment.TickCount64;
         if (session.Inventory.Count > 0)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                ItemObject.BuildItemsCreate(session.Inventory, character.Guid), ct);
+                ItemObject.BuildItemsCreate(session.Inventory, character.Guid, session.ItemBagInfo), ct);
 
         // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
