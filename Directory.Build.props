@@ -1,0 +1,11 @@
+<Project>
+  <!-- Общие настройки сборки всех проектов решения (S0, M7 #34). Подробности — docs/code-style.md.
+       В csproj остаются только специфичные свойства (OutputType, AssemblyName и т.п.). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>
