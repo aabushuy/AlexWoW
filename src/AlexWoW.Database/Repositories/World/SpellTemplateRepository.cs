@@ -18,7 +18,8 @@ public sealed class SpellTemplateRepository(string connectionString)
                    EffectBasePoints1, EffectBasePoints2, EffectBasePoints3,
                    EffectDieSides1, EffectDieSides2, EffectDieSides3,
                    EffectApplyAuraName1, EffectApplyAuraName2, EffectApplyAuraName3,
-                   EffectAmplitude1, EffectAmplitude2, EffectAmplitude3
+                   EffectAmplitude1, EffectAmplitude2, EffectAmplitude3,
+                   EffectTriggerSpell1, EffectTriggerSpell2, EffectTriggerSpell3
             FROM spell_template WHERE Id = @id;
             """, new { id }, cancellationToken: ct));
     }

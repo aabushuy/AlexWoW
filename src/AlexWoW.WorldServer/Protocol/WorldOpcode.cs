@@ -120,6 +120,9 @@ public enum WorldOpcode : uint
     SmsgLearnedSpell = 0x12B,                    // spell + u16 — добавить абилку в книгу
     SmsgSupercededSpell = 0x12C,                 // u32 old + u32 new — высший ранг заменяет низший (M10.3)
     SmsgRemovedSpell = 0x203,                    // u32 spell — убрать абилку из книги (сброс талантов M9.8)
+    // Телепорт игрока (Blink/Shadowstep, M7 #33). Сверено с CMaNGOS Opcodes.h.
+    MsgMoveTeleport = 0x0C5,                      // наблюдателям: packed guid + MovementInfo
+    MsgMoveTeleportAck = 0x0C7,                   // s→c: guid+counter+MovementInfo; c→s ответ (consume)
 
     // Таланты (M9.6–M9.8). Опкоды/форматы сверены с CMaNGOS Opcodes.h / wow_messages (3.3.5a).
     SmsgTalentsInfo = 0x4C0,                      // состояние талантов при входе (очки + изученные)

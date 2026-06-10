@@ -231,10 +231,26 @@ public static class SpellCaster
         if (info.AuraBuff)
             await Periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
 
-        // M7 #33: движущий эффект — рывок к цели (Charge/Intercept/Intervene/Feral Charge).
-        if (info.Movement == SpellCatalog.SpellMovement.Charge)
-            await SpellEffects.ApplyChargeAsync(session, targetGuid, ct);
+        // M7 #33: движущий эффект — рывок к цели (Charge) или телепорт (Blink/Shadowstep).
+        await ApplyMovementAsync(session, info.Movement, targetGuid, ct);
+        // Цепочка триггера (Shadowstep 36554 → 36563 с эффектом телепорта): резолвим тип у триггера.
+        if (info.TriggerSpellId != 0)
+        {
+            var trig = await SpellCatalog.GetAsync(session.WorldDb, info.TriggerSpellId, session.Logger, ct);
+            if (trig is not null)
+                await ApplyMovementAsync(session, trig.Movement, targetGuid, ct);
+        }
     }
+
+    /// <summary>Применяет движущий эффект: рывок (сплайн) или телепорт вперёд/за спину цели. M7 #33.</summary>
+    private static Task ApplyMovementAsync(WorldSession session, SpellCatalog.SpellMovement movement,
+        ulong targetGuid, CancellationToken ct) => movement switch
+    {
+        SpellCatalog.SpellMovement.Charge => SpellEffects.ApplyChargeAsync(session, targetGuid, ct),
+        SpellCatalog.SpellMovement.TeleportForward => SpellEffects.ApplyTeleportAsync(session, targetGuid, behind: false, ct),
+        SpellCatalog.SpellMovement.TeleportBehind => SpellEffects.ApplyTeleportAsync(session, targetGuid, behind: true, ct),
+        _ => Task.CompletedTask,
+    };
 
     /// <summary>
     /// SMSG_SPELL_GO кастеру (снаряд) и наблюдателям (broadcast). Общая точка для обычного каста и

@@ -29,6 +29,9 @@ public static class SpellCatalog
     private const int EffectWeaponDamage = 58;           // урон оружия + бонус
     private const int EffectNormalizedWeaponDmg = 121;   // нормализованный урон оружия + бонус
     private const int EffectApplyAura = 6;               // наложение ауры (периодика и пр.)
+    private const int EffectTeleportUnits = 5;           // телепорт юнита (Shadowstep-триггер 36563) — за спину цели
+    private const int EffectLeap = 29;                   // прыжок вперёд (Blink) — телепорт по направлению
+    private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
@@ -48,10 +51,11 @@ public static class SpellCatalog
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
         int AuraDurationMs = 0,
         bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0,
-        SpellMovement Movement = SpellMovement.None);
+        SpellMovement Movement = SpellMovement.None, uint TriggerSpellId = 0);
 
-    /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн) / телепорт. None — не двигает.</summary>
-    public enum SpellMovement : byte { None = 0, Charge = 1, Teleport = 2 }
+    /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн), телепорт вперёд (Blink) или за спину
+    /// цели (Shadowstep). None — не двигает.</summary>
+    public enum SpellMovement : byte { None = 0, Charge = 1, TeleportForward = 2, TeleportBehind = 3 }
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
@@ -139,14 +143,23 @@ public static class SpellCatalog
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
-        // M7 #33: движущий эффект. Charge (96) — рывок к цели (сплайн). Телепорты (Blink/Shadowstep) — срез 2.
-        var movement = Array.Exists(effects, e => e.Eff == EffectCharge)
-            ? SpellMovement.Charge : SpellMovement.None;
+        // M7 #33: движущий эффект. Charge(96)=рывок (сплайн); Leap(29)=прыжок вперёд (Blink);
+        // TeleportUnits(5)=телепорт за спину цели (триггер Shadowstep 36563). TRIGGER_SPELL(64) — цепочка
+        // (Shadowstep 36554 → 36563): несём id триггера, тип движения резолвится у триггера в SpellCaster.
+        var movement =
+            Array.Exists(effects, e => e.Eff == EffectCharge) ? SpellMovement.Charge :
+            Array.Exists(effects, e => e.Eff == EffectLeap) ? SpellMovement.TeleportForward :
+            Array.Exists(effects, e => e.Eff == EffectTeleportUnits) ? SpellMovement.TeleportBehind :
+            SpellMovement.None;
+        uint triggerSpell =
+            t.Effect1 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell1 :
+            t.Effect2 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell2 :
+            t.Effect3 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell3 : 0u;
 
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
             isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
-            movement);
+            movement, triggerSpell);
     }
 
     /// <summary>
