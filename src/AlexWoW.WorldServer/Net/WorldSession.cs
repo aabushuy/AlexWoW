@@ -25,39 +25,27 @@ public sealed class WorldSession
     private readonly NetworkStream _stream;
     private readonly WorldHeaderCrypt _crypt = new();
     private readonly SemaphoreSlim _sendLock = new(1, 1); // сериализация отправки (RC4 — stateful)
+    private readonly WorldSessionServices _services;
 
-    public WorldSession(Socket socket, IAccountRepository database, ICharacterRepository characters,
-        IInventoryRepository items, IQuestRepository quests, ICharacterStateRepository charState,
-        ITeleportRepository teleports, IWorldRepository worldDatabase, TerrainMaps terrain, WorldState world,
-        WorldServerOptions options, ILogger logger)
+    internal WorldSession(Socket socket, WorldSessionServices services)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
-        Database = database;
-        Characters = characters;
-        Items = items;
-        Quests = quests;
-        CharState = charState;
-        Teleports = teleports;
-        WorldDb = worldDatabase;
-        Terrain = terrain;
-        World = world;
-        Options = options;
-        Logger = logger;
+        _services = services;
     }
 
-    // --- Контекст для обработчиков ---
-    internal IAccountRepository Database { get; }
-    internal ICharacterRepository Characters { get; }
-    internal IInventoryRepository Items { get; }
-    internal IQuestRepository Quests { get; }
-    internal ICharacterStateRepository CharState { get; }
-    internal ITeleportRepository Teleports { get; }
-    internal IWorldRepository WorldDb { get; }
-    internal TerrainMaps Terrain { get; }
-    internal WorldState World { get; }
-    internal WorldServerOptions Options { get; }
-    internal ILogger Logger { get; }
+    // --- Контекст для обработчиков (мост до S9 #43: легаси-статики читают зависимости через сессию) ---
+    internal IAccountRepository Database => _services.Accounts;
+    internal ICharacterRepository Characters => _services.Characters;
+    internal IInventoryRepository Items => _services.Items;
+    internal IQuestRepository Quests => _services.Quests;
+    internal ICharacterStateRepository CharState => _services.CharState;
+    internal ITeleportRepository Teleports => _services.Teleports;
+    internal IWorldRepository WorldDb => _services.WorldDb;
+    internal TerrainMaps Terrain => _services.Terrain;
+    internal WorldState World => _services.World;
+    internal WorldServerOptions Options => _services.Options;
+    internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 
     // --- Состояние сессии ---
@@ -243,14 +231,14 @@ public sealed class WorldSession
     {
         try
         {
-            await AuthHandlers.SendAuthChallengeAsync(this, ct);
+            await _services.AuthChallenge.SendAsync(this, ct);
 
             while (!ct.IsCancellationRequested)
             {
                 var packet = await ReadPacketAsync(ct);
                 if (packet is null)
                     break;
-                await WorldPacketRouter.DispatchAsync(this, packet.Value, ct);
+                await _services.Router.DispatchAsync(this, packet.Value, ct);
             }
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException
