@@ -7,24 +7,22 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Управление инвентарём (M6.9): перемещение/своп слотов, сплит стака, экипировка кликом, выброс.
-/// Работаем в основном контейнере (bag = INVENTORY_SLOT_BAG_0 = 255): экипировка 0..18, рюкзак 23..38.
-/// Сервер авторитетен: клиент ждёт обновления полей слотов; при отказе пере-утверждаем текущее
-/// состояние (предмет «возвращается» на место).
+/// Управление инвентарём (M6.9 + сумки M6.13): перемещение/своп слотов, сплит стака, экипировка кликом,
+/// выброс. Позиция предмета — пара (bag, slot): bag=255 — основной контейнер (экипировка 0..18, bag-слоты
+/// 19..22, рюкзак 23..38); bag=19..22 — ВНУТРИ надетой сумки (slot = индекс 0..ContainerSlots-1). Сервер
+/// авторитетен: при отказе пере-утверждаем текущее состояние (предмет «возвращается» на место).
 /// </summary>
 public static class InventoryHandlers
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgSwapInvItem)]
     public static async Task OnSwapInvItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        // ВНИМАНИЕ: порядок байт — destination_slot, ПОТОМ source_slot (как CMaNGOS
-        // `recv_data >> dstslot >> srcslot`). При свопе двух занятых слотов это незаметно
-        // (симметрично), но при перемещении/снятии в ПУСТОЙ слот порядок критичен — иначе
-        // источник=пустой слот → операция игнорируется (M7 #18: не снималась экипировка).
+        // Порядок байт — destination_slot, ПОТОМ source_slot (CMaNGOS `recv_data >> dstslot >> srcslot`).
+        // Оба слота — в основном контейнере (bag=255). M7 #18.
         var r = packet.Reader();
         int dst = r.UInt8(), src = r.UInt8();
         session.Logger.LogDebug("[inv] SWAP_INV src={Src} dst={Dst}", src, dst);
-        await MoveOrSwapAsync(session, src, dst, ct);
+        await MoveOrSwapAsync(session, InventorySlots.MainBag, src, InventorySlots.MainBag, dst, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSwapItem)]
@@ -33,8 +31,8 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int dstBag = r.UInt8(), dst = r.UInt8(), srcBag = r.UInt8(), src = r.UInt8();
         session.Logger.LogDebug("[inv] SWAP_ITEM srcBag={SB} src={S} dstBag={DB} dst={D}", srcBag, src, dstBag, dst);
-        if (!IsMain(srcBag) || !IsMain(dstBag)) return; // доп. сумки-контейнеры пока не поддержаны
-        await MoveOrSwapAsync(session, src, dst, ct);
+        if (!ValidContainer(session, srcBag) || !ValidContainer(session, dstBag)) return;
+        await MoveOrSwapAsync(session, srcBag, src, dstBag, dst, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAutostoreBagItem)]
@@ -43,9 +41,9 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8(), dstBag = r.UInt8();
         session.Logger.LogDebug("[inv] AUTOSTORE srcBag={SB} src={S} dstBag={DB}", srcBag, src, dstBag);
-        if (!IsMain(srcBag) || !IsMain(dstBag)) return;
-        var free = FreeBackpackSlot(session);
-        if (free >= 0) await MoveOrSwapAsync(session, src, free, ct);
+        if (!ValidContainer(session, srcBag) || !ValidContainer(session, dstBag)) return;
+        var free = FreeSlotIn(session, dstBag);
+        if (free >= 0) await MoveOrSwapAsync(session, srcBag, src, dstBag, free, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAutoEquipItem)]
@@ -54,35 +52,34 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8();
         session.Logger.LogDebug("[inv] AUTOEQUIP srcBag={SB} src={S}", srcBag, src);
-        if (!IsMain(srcBag)) return;
+        if (!ValidContainer(session, srcBag)) return;
 
-        var item = ItemAt(session, src);
+        var item = ItemAt(session, srcBag, src);
         if (item is null) return;
 
-        // Предмет уже надет (src — слот экипировки) → это СНЯТИЕ: в первый свободный слот рюкзака.
-        if (InventorySlots.IsEquipmentSlot(src))
+        // Предмет уже надет (src — слот экипировки осн. контейнера) → СНЯТИЕ в первое свободное место.
+        if (srcBag == InventorySlots.MainBag && InventorySlots.IsEquipmentSlot(src))
         {
-            var freeSlot = FreeBackpackSlot(session);
-            if (freeSlot >= 0) await MoveOrSwapAsync(session, src, freeSlot, ct);
+            var free = BagInventory.FirstFreeStoreSlot(session);
+            if (free is { } f) await MoveOrSwapAsync(session, srcBag, src, f.Bag, f.Slot, ct);
             else await ReassertAsync(session, ct, src);
             return;
         }
 
         var inv = await InvTypeAsync(session, item.ItemEntry, ct);
 
-        // M6.13: сумка (INVTYPE_BAG) — надеть в первый свободный bag-слот 19..22; если все заняты,
-        // свопнуть с первой ПУСТОЙ надетой сумкой; иначе отказ.
+        // Сумка (INVTYPE_BAG) — надеть в первый свободный bag-слот 19..22 (или своп с пустой надетой). M6.13.
         if (inv == InventorySlots.InvTypeBag)
         {
             var bagSlot = FreeBagSlot(session);
             if (bagSlot < 0) bagSlot = FirstEmptyEquippedBagSlot(session);
-            if (bagSlot < 0) { await ReassertAsync(session, ct, src); return; }
-            await MoveOrSwapAsync(session, src, bagSlot, ct);
+            if (bagSlot < 0) { await ReassertPosAsync(session, ct, (srcBag, src)); return; }
+            await MoveOrSwapAsync(session, srcBag, src, InventorySlots.MainBag, bagSlot, ct);
             return;
         }
 
         var slot = InventorySlots.EquipSlotFor(inv);
-        if (slot < 0) { await ReassertAsync(session, ct, src); return; } // не экипируется
+        if (slot < 0) { await ReassertPosAsync(session, ct, (srcBag, src)); return; } // не экипируется
 
         // кольцо/тринкет: если основной слот занят, а альтернативный свободен — берём альтернативный.
         if (ItemAt(session, slot) is not null)
@@ -90,7 +87,7 @@ public static class InventoryHandlers
             if (inv == 11 && ItemAt(session, 11) is null) slot = 11;
             else if (inv == 12 && ItemAt(session, 13) is null) slot = 13;
         }
-        await MoveOrSwapAsync(session, src, slot, ct);
+        await MoveOrSwapAsync(session, srcBag, src, InventorySlots.MainBag, slot, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAutoEquipItemSlot)]
@@ -102,7 +99,7 @@ public static class InventoryHandlers
         var low = (uint)(itemGuid & 0xFFFFFFFF);
         var item = session.Inventory.FirstOrDefault(i => i.ItemGuid == low);
         if (item is null) return;
-        await MoveOrSwapAsync(session, item.Slot, dst, ct);
+        await MoveOrSwapAsync(session, item.Bag, item.Slot, InventorySlots.MainBag, dst, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSplitItem)]
@@ -111,7 +108,7 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8(), dstBag = r.UInt8(), dst = r.UInt8();
         var amount = r.UInt32();
-        if (!IsMain(srcBag) || !IsMain(dstBag)) return;
+        if (!IsMain(srcBag) || !IsMain(dstBag)) return; // дробление в/из сумок — B4
 
         var item = ItemAt(session, src);
         if (item is null) { await ReassertAsync(session, ct, src, dst); return; }
@@ -146,7 +143,7 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int bag = r.UInt8(), slot = r.UInt8();
         var amount = r.UInt8();
-        if (!IsMain(bag)) return;
+        if (!IsMain(bag)) return; // уничтожение из сумок — B4
 
         var item = ItemAt(session, slot);
         if (item is null) return;
@@ -169,67 +166,121 @@ public static class InventoryHandlers
         session.Logger.LogDebug("DESTROY '{User}': слот {Slot} x{Amt}", session.Account, slot, amount);
     }
 
-    /// <summary>Перемещение/обмен двух слотов основного контейнера (с валидацией экипировки).</summary>
-    private static async Task MoveOrSwapAsync(WorldSession session, int srcSlot, int dstSlot, CancellationToken ct)
+    /// <summary>
+    /// Перемещение/обмен предметов между позициями (bag,slot) с валидацией экипировки/сумок (M6.9 + M6.13).
+    /// Позиции — основной контейнер (bag=255) или внутренность надетой сумки (bag=19..22).
+    /// </summary>
+    private static async Task MoveOrSwapAsync(WorldSession session, int srcBag, int srcSlot,
+        int dstBag, int dstSlot, CancellationToken ct)
     {
-        if (srcSlot == dstSlot) return;
-        var src = ItemAt(session, srcSlot);
-        if (src is null) { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
-        var dst = ItemAt(session, dstSlot);
+        if (srcBag == dstBag && srcSlot == dstSlot) return;
+        var src = ItemAt(session, srcBag, srcSlot);
+        if (src is null) { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        var dst = ItemAt(session, dstBag, dstSlot);
 
-        // Нельзя положить неэкипируемое/неподходящее в слот экипировки.
-        if (InventorySlots.IsEquipmentSlot(dstSlot)
-            && !InventorySlots.CanEquipInSlot(await InvTypeAsync(session, src.ItemEntry, ct), dstSlot))
-        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
-        if (dst is not null && InventorySlots.IsEquipmentSlot(srcSlot)
-            && !InventorySlots.CanEquipInSlot(await InvTypeAsync(session, dst.ItemEntry, ct), srcSlot))
-        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
+        var srcInv = await InvTypeAsync(session, src.ItemEntry, ct);
+        var dstInv = dst is not null ? await InvTypeAsync(session, dst.ItemEntry, ct) : 0u;
+        bool srcMain = srcBag == InventorySlots.MainBag, dstMain = dstBag == InventorySlots.MainBag;
 
-        // M6.13: bag-слот (19..22) принимает только сумку (INVTYPE_BAG); непустую сумку нельзя
-        // снять/переместить (CMaNGOS EQUIP_ERR_CAN_ONLY_DO_WITH_EMPTY_BAGS).
-        if (InventorySlots.IsBagSlot(dstSlot)
-            && await InvTypeAsync(session, src.ItemEntry, ct) != InventorySlots.InvTypeBag)
-        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
-        if (dst is not null && InventorySlots.IsBagSlot(srcSlot)
-            && await InvTypeAsync(session, dst.ItemEntry, ct) != InventorySlots.InvTypeBag)
-        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
-        if ((InventorySlots.IsBagSlot(srcSlot) && BagHasItems(session, srcSlot))
-            || (dst is not null && InventorySlots.IsBagSlot(dstSlot) && BagHasItems(session, dstSlot)))
-        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
+        // Экипировка (осн. контейнер): можно класть только подходящий тип.
+        if (dstMain && InventorySlots.IsEquipmentSlot(dstSlot)
+            && !InventorySlots.CanEquipInSlot(srcInv, dstSlot))
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        if (dst is not null && srcMain && InventorySlots.IsEquipmentSlot(srcSlot)
+            && !InventorySlots.CanEquipInSlot(dstInv, srcSlot))
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
 
-        src.Slot = (byte)dstSlot;
-        await session.Items.MoveItemAsync(src.ItemGuid, InventorySlots.MainBag, (byte)dstSlot, ct);
+        // bag-слот осн. контейнера (19..22): только сумка; непустую сумку нельзя снять/вытеснить.
+        if (dstMain && InventorySlots.IsBagSlot(dstSlot) && srcInv != InventorySlots.InvTypeBag)
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        if (dst is not null && srcMain && InventorySlots.IsBagSlot(srcSlot) && dstInv != InventorySlots.InvTypeBag)
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        if ((srcMain && InventorySlots.IsBagSlot(srcSlot) && BagInventory.HasItems(session, srcSlot))
+            || (dst is not null && dstMain && InventorySlots.IsBagSlot(dstSlot) && BagInventory.HasItems(session, dstSlot)))
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+
+        // Внутрь сумки (dstBag 19..22): по ёмкости; без вложенности (сумку в сумку нельзя).
+        if (!dstMain)
+        {
+            var cap = BagInventory.Capacity(session, dstBag);
+            if (cap == 0 || dstSlot >= cap || srcInv == InventorySlots.InvTypeBag)
+            { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        }
+        if (dst is not null && !srcMain && dstInv == InventorySlots.InvTypeBag)
+        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+
+        // --- применяем ---
+        src.Bag = (byte)dstBag; src.Slot = (byte)dstSlot;
+        await session.Items.MoveItemAsync(src.ItemGuid, (byte)dstBag, (byte)dstSlot, ct);
         if (dst is not null)
         {
-            dst.Slot = (byte)srcSlot;
-            await session.Items.MoveItemAsync(dst.ItemGuid, InventorySlots.MainBag, (byte)srcSlot, ct);
+            dst.Bag = (byte)srcBag; dst.Slot = (byte)srcSlot;
+            await session.Items.MoveItemAsync(dst.ItemGuid, (byte)srcBag, (byte)srcSlot, ct);
         }
-        await ReassertAsync(session, ct, srcSlot, dstSlot);
 
-        // M7 #16: смена оружия гл. руки → пересчёт урона/скорости/attack-power (иначе нужен релог).
-        if (srcSlot == InventorySlots.MainHandSlot || dstSlot == InventorySlots.MainHandSlot)
+        await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot));
+        await SendContainedAsync(session, src, ct);
+        if (dst is not null) await SendContainedAsync(session, dst, ct);
+
+        // M7 #16: смена оружия гл. руки → пересчёт урона/скорости/attack-power.
+        if ((srcMain && srcSlot == InventorySlots.MainHandSlot) || (dstMain && dstSlot == InventorySlots.MainHandSlot))
             await Progression.RefreshMeleeAsync(session, ct);
     }
 
-    /// <summary>Отправляет клиенту текущее состояние указанных слотов (guid + видимый предмет для экипировки).</summary>
-    private static async Task ReassertAsync(WorldSession session, CancellationToken ct, params int[] slots)
+    /// <summary>Отправляет клиенту текущее состояние позиций: осн. слоты — через поле игрока (guid + видимый
+    /// предмет для экипировки); внутренности сумок — через CONTAINER_FIELD_SLOT_x соответствующей сумки. M6.13.</summary>
+    private static async Task ReassertPosAsync(WorldSession session, CancellationToken ct, params (int Bag, int Slot)[] positions)
     {
-        var guid = (ulong)session.InWorldGuid;
-        var pkt = PlayerSpawn.BuildPlayerValuesUpdate(guid, m =>
+        var mainSlots = positions.Where(p => p.Bag == InventorySlots.MainBag).Select(p => p.Slot).Distinct().ToArray();
+        if (mainSlots.Length > 0)
         {
-            foreach (var slot in slots)
+            var guid = (ulong)session.InWorldGuid;
+            var pkt = PlayerSpawn.BuildPlayerValuesUpdate(guid, m =>
             {
-                var it = ItemAt(session, slot);
-                m.SetUInt64(UpdateField.InvSlotGuid(slot), it is null ? 0UL : ItemObject.ItemGuid(it.ItemGuid));
-                if (InventorySlots.IsEquipmentSlot(slot))
-                    m.SetUInt32(UpdateField.VisibleItemEntry(slot), it?.ItemEntry ?? 0u);
-            }
-        });
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject, pkt, ct);
+                foreach (var slot in mainSlots)
+                {
+                    var it = ItemAt(session, slot);
+                    m.SetUInt64(UpdateField.InvSlotGuid(slot), it is null ? 0UL : ItemObject.ItemGuid(it.ItemGuid));
+                    if (InventorySlots.IsEquipmentSlot(slot))
+                        m.SetUInt32(UpdateField.VisibleItemEntry(slot), it?.ItemEntry ?? 0u);
+                }
+            });
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, pkt, ct);
+        }
+
+        foreach (var (bag, slot) in positions.Where(p => InventorySlots.IsBagSlot(p.Bag)))
+        {
+            var bagGuid = BagInventory.BagGuid(session, bag);
+            if (bagGuid == 0) continue;
+            var it = ItemAt(session, bag, slot);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                ContainerObject.BuildSlotUpdate(bagGuid, slot, it is null ? 0UL : ItemObject.ItemGuid(it.ItemGuid)), ct);
+        }
     }
 
+    /// <summary>Главный контейнер: пере-утвердить осн. слоты (обёртка над <see cref="ReassertPosAsync"/>).</summary>
+    private static Task ReassertAsync(WorldSession session, CancellationToken ct, params int[] slots)
+        => ReassertPosAsync(session, ct, slots.Select(s => ((int)InventorySlots.MainBag, s)).ToArray());
+
+    /// <summary>Обновляет ITEM_FIELD_CONTAINED предмета: внутри сумки — guid сумки, иначе — guid игрока. M6.13.</summary>
+    private static Task SendContainedAsync(WorldSession session, InventoryItem item, CancellationToken ct)
+    {
+        var container = (ulong)session.InWorldGuid;
+        if (InventorySlots.IsBagSlot(item.Bag))
+        {
+            var bagGuid = BagInventory.BagGuid(session, item.Bag);
+            if (bagGuid != 0) container = bagGuid;
+        }
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            ItemObject.BuildContainedUpdate(ItemObject.ItemGuid(item.ItemGuid), container), ct);
+    }
+
+    private static InventoryItem? ItemAt(WorldSession session, int bag, int slot)
+        => session.Inventory.FirstOrDefault(i => i.Bag == (byte)bag && i.Slot == (byte)slot);
+
+    /// <summary>Предмет осн. контейнера по слоту (Bag==255).</summary>
     private static InventoryItem? ItemAt(WorldSession session, int slot)
-        => session.Inventory.FirstOrDefault(i => i.Bag == InventorySlots.MainBag && i.Slot == slot);
+        => ItemAt(session, InventorySlots.MainBag, slot);
 
     private static async Task<uint> InvTypeAsync(WorldSession session, uint entry, CancellationToken ct)
     {
@@ -240,6 +291,10 @@ public static class InventoryHandlers
         }
         catch { return 0u; }
     }
+
+    /// <summary>Первое свободное место в контейнере <paramref name="bag"/> (255 — рюкзак, 19..22 — сумка). -1 — нет.</summary>
+    private static int FreeSlotIn(WorldSession session, int bag)
+        => bag == InventorySlots.MainBag ? FreeBackpackSlot(session) : BagInventory.FreeInnerSlot(session, bag);
 
     private static int FreeBackpackSlot(WorldSession session)
     {
@@ -261,13 +316,14 @@ public static class InventoryHandlers
     private static int FirstEmptyEquippedBagSlot(WorldSession session)
     {
         for (var s = InventorySlots.BagSlotStart; s < InventorySlots.BagSlotEnd; s++)
-            if (ItemAt(session, s) is not null && !BagHasItems(session, s)) return s;
+            if (ItemAt(session, s) is not null && !BagInventory.HasItems(session, s)) return s;
         return -1;
     }
 
-    /// <summary>Есть ли предметы внутри надетой сумки в bag-слоте <paramref name="bagSlot"/> (Bag==bagSlot). M6.13.</summary>
-    private static bool BagHasItems(WorldSession session, int bagSlot)
-        => session.Inventory.Any(i => i.Bag == (byte)bagSlot);
+    /// <summary>Допустимый контейнер для адресации: осн. (255) или существующая надетая сумка (19..22). M6.13.</summary>
+    private static bool ValidContainer(WorldSession session, int bag)
+        => bag == InventorySlots.MainBag
+           || (InventorySlots.IsBagSlot(bag) && BagInventory.MainItemAt(session, bag) is not null);
 
     private static bool IsMain(int bag) => bag == InventorySlots.MainBag;
 }

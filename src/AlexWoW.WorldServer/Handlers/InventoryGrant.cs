@@ -69,23 +69,33 @@ public static class InventoryGrant
             }
         }
 
-        // 2) Остаток — в новые слоты (по maxStack на слот).
+        // 2) Остаток — в новые слоты (по maxStack на слот): сперва рюкзак, затем надетые сумки (M6.13).
         while (remaining > 0)
         {
-            var slot = FreeBackpackSlot(session);
-            if (slot < 0)
+            if (BagInventory.FirstFreeStoreSlot(session) is not { } pos)
                 break; // нет места — остаток не выдан (bag-full → почта, M7 #14)
             var portion = Math.Min(remaining, maxStack);
-            var itemLow = await session.Items.AddItemAsync(ownerGuid, itemEntry, InventorySlots.MainBag, (byte)slot, portion, ct);
+            var itemLow = await session.Items.AddItemAsync(ownerGuid, itemEntry, (byte)pos.Bag, (byte)pos.Slot, portion, ct);
             var item = new InventoryItem
             {
                 ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
-                Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = portion,
+                Bag = (byte)pos.Bag, Slot = (byte)pos.Slot, StackCount = portion,
             };
             session.Inventory.Add(item);
+            var itemGuid = ItemObject.ItemGuid(itemLow);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid, session.ItemBagInfo), ct);
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
+            // Уведомить о позиции: осн. контейнер — поле игрока; внутри сумки — слот сумки + CONTAINED.
+            if (pos.Bag == InventorySlots.MainBag)
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    PlayerSpawn.BuildInvSlotUpdate(ownerGuid, pos.Slot, itemGuid), ct);
+            else
+            {
+                var bagGuid = BagInventory.BagGuid(session, pos.Bag);
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ContainerObject.BuildSlotUpdate(bagGuid, pos.Slot, itemGuid), ct);
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ItemObject.BuildContainedUpdate(itemGuid, bagGuid), ct);
+            }
             remaining -= portion;
             last = item;
         }
