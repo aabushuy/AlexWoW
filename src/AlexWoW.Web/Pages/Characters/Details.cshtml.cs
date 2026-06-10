@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages.Characters;
 
+/// <summary>Карточка персонажа: атрибуты + экипировка (только свои персонажи).</summary>
 public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepository inventory) : PageModel
 {
     /// <summary>Экипированный предмет (слот 0..18 основного контейнера).</summary>
@@ -18,7 +19,7 @@ public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepo
     {
         var character = await characters.GetByGuidAsync(guid, ct);
         // Доступ только к своим персонажам — иначе чужой аккаунт мог бы листать по guid.
-        if (character is null || character.AccountId != AuthSession.AccountId(User))
+        if (character is null || character.AccountId != User.AccountId())
             return NotFound();
 
         Character = character;

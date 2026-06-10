@@ -13,10 +13,19 @@ internal sealed class ProfTrainerCommand(IWorldRepository worldDb) : IDevCommand
     /// <summary>Имена профессий → ключевое слово в SubName тренера.</summary>
     private static readonly Dictionary<string, string> ProfKeyword = new()
     {
-        ["tailoring"] = "Tailor", ["blacksmithing"] = "Blacksmith", ["leatherworking"] = "Leatherwork",
-        ["alchemy"] = "Alchem", ["enchanting"] = "Enchant", ["engineering"] = "Engineer",
-        ["jewelcrafting"] = "Jewelcraft", ["mining"] = "Mining", ["herbalism"] = "Herbalism",
-        ["skinning"] = "Skinning", ["cooking"] = "Cooking", ["firstaid"] = "First Aid", ["fishing"] = "Fishing",
+        ["tailoring"] = "Tailor",
+        ["blacksmithing"] = "Blacksmith",
+        ["leatherworking"] = "Leatherwork",
+        ["alchemy"] = "Alchem",
+        ["enchanting"] = "Enchant",
+        ["engineering"] = "Engineer",
+        ["jewelcrafting"] = "Jewelcraft",
+        ["mining"] = "Mining",
+        ["herbalism"] = "Herbalism",
+        ["skinning"] = "Skinning",
+        ["cooking"] = "Cooking",
+        ["firstaid"] = "First Aid",
+        ["fishing"] = "Fishing",
     };
 
     public IReadOnlyList<string> Names { get; } = ["proftrainer"];

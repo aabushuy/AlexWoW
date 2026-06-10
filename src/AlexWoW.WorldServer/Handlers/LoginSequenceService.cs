@@ -291,10 +291,10 @@ internal sealed class LoginSequenceService(
     /// </summary>
     private static async Task SendInitializeFactionsAsync(WorldSession session, CancellationToken ct)
     {
-        const int factionCount = 128; // mangostwo (wrath) = 0x80
-        var w = new ByteWriter(4 + factionCount * 5);
-        w.UInt32(factionCount);
-        for (var i = 0; i < factionCount; i++)
+        const int FactionCount = 128; // mangostwo (wrath) = 0x80
+        var w = new ByteWriter(4 + FactionCount * 5);
+        w.UInt32(FactionCount);
+        for (var i = 0; i < FactionCount; i++)
             w.UInt8(0).UInt32(0); // flag=0 (невидима/не-at-war), standing=0 (база)
         await session.SendAsync(WorldOpcode.SmsgInitializeFactions, w.ToArray(), ct);
     }

@@ -53,14 +53,14 @@ public class Srp6Tests
     [Fact]
     public void FullHandshake_WithCorrectPassword_Succeeds_AndKeysMatch()
     {
-        const string user = "ALEX";
-        const string password = "hunter2";
+        const string User = "ALEX";
+        const string Password = "hunter2";
         var salt = NewSalt();
         var verifier = Srp6.ToFixedLittleEndian(
-            Srp6.CalculateVerifier(user, password, salt), Srp6.KeyLength);
+            Srp6.CalculateVerifier(User, Password, salt), Srp6.KeyLength);
 
-        var server = new Srp6Server(user, salt, verifier);
-        var client = new Srp6Client(user, password);
+        var server = new Srp6Server(User, salt, verifier);
+        var client = new Srp6Client(User, Password);
 
         // Клиент вычисляет доказательство по challenge сервера.
         var (clientM1, clientKey) = client.ComputeProof(server.B, salt);
@@ -78,13 +78,13 @@ public class Srp6Tests
     [Fact]
     public void FullHandshake_WithWrongPassword_Fails()
     {
-        const string user = "ALEX";
+        const string User = "ALEX";
         var salt = NewSalt();
         var verifier = Srp6.ToFixedLittleEndian(
-            Srp6.CalculateVerifier(user, "correct-password", salt), Srp6.KeyLength);
+            Srp6.CalculateVerifier(User, "correct-Password", salt), Srp6.KeyLength);
 
-        var server = new Srp6Server(user, salt, verifier);
-        var attacker = new Srp6Client(user, "wrong-password");
+        var server = new Srp6Server(User, salt, verifier);
+        var attacker = new Srp6Client(User, "wrong-Password");
 
         var (m1, _) = attacker.ComputeProof(server.B, salt);
 

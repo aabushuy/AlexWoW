@@ -169,7 +169,11 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         {
             db.AccountDataBlobs.Add(new AccountDataBlob
             {
-                OwnerId = ownerId, IsChar = isCharByte, DataType = dataType, UpdateTime = time, Data = data,
+                OwnerId = ownerId,
+                IsChar = isCharByte,
+                DataType = dataType,
+                UpdateTime = time,
+                Data = data,
             });
         }
         else

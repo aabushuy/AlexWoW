@@ -2,7 +2,7 @@
 @model AlexWoW.Web.Pages.Characters.IndexModel
 @{
     ViewData["Title"] = "Персонажи";
-    var gameLogin = AuthSession.GameAccount(User);
+    var gameLogin = User.GameAccount();
 }
 <h1>Мои персонажи</h1>
 

@@ -26,7 +26,15 @@ public sealed class EfTeleportRepository(IDbContextFactory<AuthDbContext> factor
 
     private static ModelTeleport Map(Entities.TeleportLocation x) => new()
     {
-        Id = x.Id, SortOrder = x.SortOrder, Name = x.Name, Faction = x.Faction,
-        Map = x.Map, Zone = x.Zone, X = x.X, Y = x.Y, Z = x.Z, O = x.O,
+        Id = x.Id,
+        SortOrder = x.SortOrder,
+        Name = x.Name,
+        Faction = x.Faction,
+        Map = x.Map,
+        Zone = x.Zone,
+        X = x.X,
+        Y = x.Y,
+        Z = x.Z,
+        O = x.O,
     };
 }

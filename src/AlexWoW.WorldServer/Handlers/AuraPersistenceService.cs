@@ -42,8 +42,13 @@ internal sealed class AuraPersistenceService(
             byte flags = (byte)(AuraFlags.Effect1 | AuraFlags.SelfCast | AuraFlags.Positive);
             var aura = new ActiveAura
             {
-                SpellId = spell, Slot = AuraService.FirstFreeSlot(session), Flags = flags,
-                ShapeshiftForm = form, Persist = true, DurationMs = 0, ExpiresAtMs = 0,
+                SpellId = spell,
+                Slot = AuraService.FirstFreeSlot(session),
+                Flags = flags,
+                ShapeshiftForm = form,
+                Persist = true,
+                DurationMs = 0,
+                ExpiresAtMs = 0,
             };
             session.Progression.Auras.Add(aura);
             await session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgAuraUpdate,

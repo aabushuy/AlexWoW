@@ -55,8 +55,18 @@ public sealed class LevelStore(IPlayerDataRepository worldDb, ILogger<LevelStore
 
     private static uint GetZeroDifference(uint level) => level switch
     {
-        < 8 => 5, < 10 => 6, < 12 => 7, < 16 => 8, < 20 => 9, < 30 => 11,
-        < 40 => 12, < 45 => 13, < 50 => 14, < 55 => 15, < 60 => 16, _ => 17,
+        < 8 => 5,
+        < 10 => 6,
+        < 12 => 7,
+        < 16 => 8,
+        < 20 => 9,
+        < 30 => 11,
+        < 40 => 12,
+        < 45 => 13,
+        < 50 => 14,
+        < 55 => 15,
+        < 60 => 16,
+        _ => 17,
     };
 
     private static bool IsTrivialLevelDifference(uint unitLvl, uint targetLvl)

@@ -65,11 +65,11 @@ public class M2CryptoTests
     public void AuthSessionDigest_Matches_ForSameInputs()
     {
         var sessionKey = RandomNumberGenerator.GetBytes(Srp6.SessionKeyLength);
-        const uint clientSeed = 0xDEADBEEF;
-        const uint authSeed = 0x12345678;
+        const uint ClientSeed = 0xDEADBEEF;
+        const uint AuthSeed = 0x12345678;
 
-        var server = WorldAuth.ComputeAuthSessionDigest("ALEX", clientSeed, authSeed, sessionKey);
-        var client = WorldAuth.ComputeAuthSessionDigest("alex", clientSeed, authSeed, sessionKey);
+        var server = WorldAuth.ComputeAuthSessionDigest("ALEX", ClientSeed, AuthSeed, sessionKey);
+        var client = WorldAuth.ComputeAuthSessionDigest("alex", ClientSeed, AuthSeed, sessionKey);
 
         Assert.Equal(server, client); // регистр логина не важен
     }

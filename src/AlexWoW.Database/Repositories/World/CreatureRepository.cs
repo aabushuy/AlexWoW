@@ -54,8 +54,16 @@ public sealed class CreatureRepository(string connectionString)
               AND c.position_y BETWEEN @minY AND @maxY
             LIMIT @limit;
             """,
-            new { map, minX = x - range, maxX = x + range, minY = y - range, maxY = y + range, limit,
-                  excluded = ExcludedCreatureEntries },
+            new
+            {
+                map,
+                minX = x - range,
+                maxX = x + range,
+                minY = y - range,
+                maxY = y + range,
+                limit,
+                excluded = ExcludedCreatureEntries
+            },
             cancellationToken: ct));
         return rows.AsList();
     }

@@ -97,9 +97,19 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
             var hp = Npcs.TrainingDummyHealth;
             return new WorldCreature
             {
-                Guid = Npcs.TrainingDummyGuid, Map = map, Template = Npcs.TrainingDummy,
-                X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
-                MaxHealth = hp, Health = hp,
+                Guid = Npcs.TrainingDummyGuid,
+                Map = map,
+                Template = Npcs.TrainingDummy,
+                X = x,
+                Y = y,
+                Z = z,
+                O = o,
+                HomeX = x,
+                HomeY = y,
+                HomeZ = z,
+                HomeO = o,
+                MaxHealth = hp,
+                Health = hp,
             };
         });
 
@@ -168,9 +178,19 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         var hp = WorldCreature.MaxHealthFor(template.Level);
         var creature = world.GetOrAddCreature(guid, () => new WorldCreature
         {
-            Guid = guid, Map = map, Template = template,
-            X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
-            MaxHealth = hp, Health = hp,
+            Guid = guid,
+            Map = map,
+            Template = template,
+            X = x,
+            Y = y,
+            Z = z,
+            O = o,
+            HomeX = x,
+            HomeY = y,
+            HomeZ = z,
+            HomeO = o,
+            MaxHealth = hp,
+            Health = hp,
         });
 
         session.Visibility.VisibleNpcs[guid] = creature;

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages;
 
+/// <summary>Вход на сайт по email/паролю (SRP-проверка по игровому логину).</summary>
 public sealed class LoginModel(IAccountService accounts) : PageModel
 {
     [BindProperty]
@@ -43,7 +44,7 @@ public sealed class LoginModel(IAccountService accounts) : PageModel
             return Page();
         }
 
-        await AuthSession.SignInAsync(HttpContext, account, Input.RememberMe);
+        await HttpContext.SignInAccountAsync(account, Input.RememberMe);
 
         if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             return LocalRedirect(returnUrl);

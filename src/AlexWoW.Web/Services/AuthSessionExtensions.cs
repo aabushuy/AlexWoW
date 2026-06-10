@@ -5,14 +5,17 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace AlexWoW.Web.Services;
 
-/// <summary>Помощник cookie-сессии: выдаёт/снимает аутентификацию по игровому аккаунту.</summary>
-public static class AuthSession
+/// <summary>
+/// Расширения cookie-сессии панели: выдача/снятие аутентификации по игровому аккаунту
+/// и чтение claims текущего пользователя.
+/// </summary>
+internal static class AuthSessionExtensions
 {
     /// <summary>Имя игрового логина в claims (для подсказки «что вводить в клиенте»).</summary>
     public const string GameAccountClaim = "alexwow:game_account";
 
     /// <summary>account_id → NameIdentifier, email → Name, игровой логин → GameAccountClaim.</summary>
-    public static async Task SignInAsync(HttpContext http, Account account, bool persistent = true)
+    public static async Task SignInAccountAsync(this HttpContext http, Account account, bool persistent = true)
     {
         var claims = new List<Claim>
         {
@@ -27,15 +30,17 @@ public static class AuthSession
             new AuthenticationProperties { IsPersistent = persistent });
     }
 
-    public static Task SignOutAsync(HttpContext http) =>
+    /// <summary>Снимает cookie-аутентификацию панели (выход с сайта).</summary>
+    public static Task SignOutAccountAsync(this HttpContext http) =>
         http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
     /// <summary>account_id текущего пользователя из claims (0, если не аутентифицирован).</summary>
-    public static uint AccountId(ClaimsPrincipal user) =>
+    public static uint AccountId(this ClaimsPrincipal user) =>
         uint.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
-    public static string Email(ClaimsPrincipal user) => user.FindFirstValue(ClaimTypes.Name) ?? "";
+    /// <summary>Email текущего пользователя (логин на сайте).</summary>
+    public static string Email(this ClaimsPrincipal user) => user.FindFirstValue(ClaimTypes.Name) ?? "";
 
     /// <summary>Игровой логин (то, что игрок вводит в клиенте WoW).</summary>
-    public static string GameAccount(ClaimsPrincipal user) => user.FindFirstValue(GameAccountClaim) ?? "";
+    public static string GameAccount(this ClaimsPrincipal user) => user.FindFirstValue(GameAccountClaim) ?? "";
 }

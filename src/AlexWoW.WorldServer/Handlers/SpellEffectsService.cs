@@ -83,8 +83,8 @@ internal sealed class SpellEffectsService(
         if (dist < 0.5f)
             return; // уже вплотную
 
-        const float stop = 1.5f; // не приземляться ВНУТРЬ цели (combat reach)
-        var k = MathF.Max(0f, (dist - stop) / dist);
+        const float Stop = 1.5f; // не приземляться ВНУТРЬ цели (combat reach)
+        var k = MathF.Max(0f, (dist - Stop) / dist);
         float lx = sx + dx * k, ly = sy + dy * k, lz = tz;
         var durationMs = (uint)MathF.Max(100f, dist / ChargeSpeed * 1000f);
         var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
@@ -125,18 +125,18 @@ internal sealed class SpellEffectsService(
             {
                 return;
             }
-            const float reach = 1.5f;
-            nx = tx - MathF.Cos(to) * reach;
-            ny = ty - MathF.Sin(to) * reach;
+            const float Reach = 1.5f;
+            nx = tx - MathF.Cos(to) * Reach;
+            ny = ty - MathF.Sin(to) * Reach;
             nz = tz;
             no = to; // лицом туда же, куда цель (стоим за спиной)
         }
         else
         {
             // Вперёд по направлению взгляда (Blink ~20 ярдов); Z — по рельефу.
-            const float dist = 20f;
-            nx = session.PosX + MathF.Cos(session.PosO) * dist;
-            ny = session.PosY + MathF.Sin(session.PosO) * dist;
+            const float Dist = 20f;
+            nx = session.PosX + MathF.Cos(session.PosO) * Dist;
+            ny = session.PosY + MathF.Sin(session.PosO) * Dist;
             no = session.PosO;
             var map = session.Character?.Map ?? 0;
             nz = terrain.GetHeight(map, nx, ny) ?? session.PosZ;

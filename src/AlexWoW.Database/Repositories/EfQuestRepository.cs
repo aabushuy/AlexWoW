@@ -17,8 +17,13 @@ public sealed class EfQuestRepository(IDbContextFactory<AuthDbContext> factory) 
         var rows = await db.QuestStatuses.AsNoTracking().Where(x => x.OwnerGuid == ownerGuid).ToListAsync(ct);
         return rows.Select(x => new ModelQuestStatusRow
         {
-            QuestId = x.QuestId, Slot = x.Slot, Status = x.Status,
-            Counter0 = x.Counter0, Counter1 = x.Counter1, Counter2 = x.Counter2, Counter3 = x.Counter3,
+            QuestId = x.QuestId,
+            Slot = x.Slot,
+            Status = x.Status,
+            Counter0 = x.Counter0,
+            Counter1 = x.Counter1,
+            Counter2 = x.Counter2,
+            Counter3 = x.Counter3,
         }).ToList();
     }
 

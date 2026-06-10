@@ -21,7 +21,12 @@ public sealed record TalentData
     /// <summary>Спелл-id для ранга 0..4 (0 — нет такого ранга).</summary>
     public uint RankSpell(int rank) => rank switch
     {
-        0 => Rank1, 1 => Rank2, 2 => Rank3, 3 => Rank4, 4 => Rank5, _ => 0u,
+        0 => Rank1,
+        1 => Rank2,
+        2 => Rank3,
+        3 => Rank4,
+        4 => Rank5,
+        _ => 0u,
     };
 
     /// <summary>Максимальный ранг таланта (число непустых RankID).</summary>

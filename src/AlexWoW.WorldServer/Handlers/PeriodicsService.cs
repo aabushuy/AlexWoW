@@ -56,8 +56,14 @@ internal sealed class PeriodicsService(
             await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct);
             session.Progression.Periodics.Add(new PeriodicEffect
             {
-                SpellId = spellId, TargetGuid = 0, SchoolMask = info.School, Amount = info.TickAmount,
-                IntervalMs = interval, NextTickMs = now + interval, ExpiresAtMs = expires, IsHeal = true,
+                SpellId = spellId,
+                TargetGuid = 0,
+                SchoolMask = info.School,
+                Amount = info.TickAmount,
+                IntervalMs = interval,
+                NextTickMs = now + interval,
+                ExpiresAtMs = expires,
+                IsHeal = true,
             });
             return;
         }
@@ -73,14 +79,21 @@ internal sealed class PeriodicsService(
         if (dup is not null) { slot = dup.Slot; session.Progression.Periodics.Remove(dup); }
         else slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
 
-        const byte flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, dur), ct);
+            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, Flags, level, 1, dur), ct);
         session.Progression.Periodics.Add(new PeriodicEffect
         {
-            SpellId = spellId, TargetGuid = targetCreatureGuid, SchoolMask = info.School, Amount = info.TickAmount,
-            IntervalMs = interval, NextTickMs = now + interval, ExpiresAtMs = expires, IsHeal = false,
-            OwnsVisual = true, Slot = slot,
+            SpellId = spellId,
+            TargetGuid = targetCreatureGuid,
+            SchoolMask = info.School,
+            Amount = info.TickAmount,
+            IntervalMs = interval,
+            NextTickMs = now + interval,
+            ExpiresAtMs = expires,
+            IsHeal = false,
+            OwnsVisual = true,
+            Slot = slot,
         });
     }
 
@@ -113,7 +126,10 @@ internal sealed class PeriodicsService(
                     await session.World.BroadcastPlayerHealthAsync(pl, ct);
                 session.Progression.Periodics.Add(new PeriodicEffect
                 {
-                    SpellId = spellId, TargetGuid = 0, ExpiresAtMs = expires, DoesTick = false,
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
                     HealthBonus = info.HealthBonus,
                 });
             }
@@ -129,13 +145,17 @@ internal sealed class PeriodicsService(
         if (dup is not null) { slot = dup.Slot; session.Progression.Periodics.Remove(dup); }
         else slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
 
-        const byte flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, flags, level, 1, dur), ct);
+            AuraPackets.BuildApplyByCaster(creature.Guid, caster, slot, spellId, Flags, level, 1, dur), ct);
         session.Progression.Periodics.Add(new PeriodicEffect
         {
-            SpellId = spellId, TargetGuid = targetCreatureGuid, ExpiresAtMs = expires, DoesTick = false,
-            OwnsVisual = true, Slot = slot,
+            SpellId = spellId,
+            TargetGuid = targetCreatureGuid,
+            ExpiresAtMs = expires,
+            DoesTick = false,
+            OwnsVisual = true,
+            Slot = slot,
         });
     }
 

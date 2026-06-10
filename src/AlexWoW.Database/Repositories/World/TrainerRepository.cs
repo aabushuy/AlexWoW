@@ -19,10 +19,10 @@ public sealed class TrainerRepository(string connectionString)
         if (head is null)
             return null;
         var h = (IDictionary<string, object>)head;
-        byte trainerType = Convert.ToByte(h["TrainerType"], CultureInfo.InvariantCulture);
-        byte trainerClass = Convert.ToByte(h["TrainerClass"], CultureInfo.InvariantCulture);
-        byte trainerRace = Convert.ToByte(h["TrainerRace"], CultureInfo.InvariantCulture);
-        uint templateId = Convert.ToUInt32(h["TrainerTemplateId"], CultureInfo.InvariantCulture);
+        var trainerType = Convert.ToByte(h["TrainerType"], CultureInfo.InvariantCulture);
+        var trainerClass = Convert.ToByte(h["TrainerClass"], CultureInfo.InvariantCulture);
+        var trainerRace = Convert.ToByte(h["TrainerRace"], CultureInfo.InvariantCulture);
+        var templateId = Convert.ToUInt32(h["TrainerTemplateId"], CultureInfo.InvariantCulture);
 
         // SpellLevel из spell_template (дамп Spell.dbc) — реальный уровень изучения ранга: в дампе
         // npc_trainer.reqlevel почти всегда 0, поэтому гейт ранга по уровню без этого не работает (#27).
@@ -52,8 +52,11 @@ public sealed class TrainerRepository(string connectionString)
 
         return new TrainerData
         {
-            TrainerType = trainerType, TrainerClass = trainerClass, TrainerRace = trainerRace,
-            Greeting = greeting ?? string.Empty, Spells = spells,
+            TrainerType = trainerType,
+            TrainerClass = trainerClass,
+            TrainerRace = trainerRace,
+            Greeting = greeting ?? string.Empty,
+            Spells = spells,
         };
     }
 

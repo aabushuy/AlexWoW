@@ -13,8 +13,17 @@ internal sealed class TrainerCommand(IWorldRepository worldDb) : IDevCommand
     /// <summary>Имена классов → id (WotLK).</summary>
     private static readonly Dictionary<string, byte> ClassByName = new()
     {
-        ["warrior"] = 1, ["paladin"] = 2, ["hunter"] = 3, ["rogue"] = 4, ["priest"] = 5,
-        ["dk"] = 6, ["deathknight"] = 6, ["shaman"] = 7, ["mage"] = 8, ["warlock"] = 9, ["druid"] = 11,
+        ["warrior"] = 1,
+        ["paladin"] = 2,
+        ["hunter"] = 3,
+        ["rogue"] = 4,
+        ["priest"] = 5,
+        ["dk"] = 6,
+        ["deathknight"] = 6,
+        ["shaman"] = 7,
+        ["mage"] = 8,
+        ["warlock"] = 9,
+        ["druid"] = 11,
     };
 
     public IReadOnlyList<string> Names { get; } = ["trainer"];

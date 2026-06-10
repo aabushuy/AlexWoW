@@ -68,10 +68,19 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
                     : WorldCreature.MaxHealthFor(row.MinLevel);
                 return new WorldCreature
                 {
-                    Guid = guid, Map = map, Template = template,
-                    X = row.X, Y = row.Y, Z = row.Z, O = row.O,
-                    HomeX = row.X, HomeY = row.Y, HomeZ = row.Z, HomeO = row.O,
-                    MaxHealth = maxHealth, Health = maxHealth,
+                    Guid = guid,
+                    Map = map,
+                    Template = template,
+                    X = row.X,
+                    Y = row.Y,
+                    Z = row.Z,
+                    O = row.O,
+                    HomeX = row.X,
+                    HomeY = row.Y,
+                    HomeZ = row.Z,
+                    HomeO = row.O,
+                    MaxHealth = maxHealth,
+                    Health = maxHealth,
                 };
             });
             newSet[guid] = creature;
@@ -156,10 +165,19 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
             var maxHealth = WorldCreature.MaxHealthFor(Npcs.TestDummy.Level);
             return new WorldCreature
             {
-                Guid = guid, Map = session.Character?.Map ?? 0, Template = Npcs.TestDummy,
-                X = x + 4f, Y = y, Z = z, O = MathF.PI,
-                HomeX = x + 4f, HomeY = y, HomeZ = z, HomeO = MathF.PI,
-                MaxHealth = maxHealth, Health = maxHealth,
+                Guid = guid,
+                Map = session.Character?.Map ?? 0,
+                Template = Npcs.TestDummy,
+                X = x + 4f,
+                Y = y,
+                Z = z,
+                O = MathF.PI,
+                HomeX = x + 4f,
+                HomeY = y,
+                HomeZ = z,
+                HomeO = MathF.PI,
+                MaxHealth = maxHealth,
+                Health = maxHealth,
             };
         });
         session.Visibility.VisibleNpcs[guid] = creature;

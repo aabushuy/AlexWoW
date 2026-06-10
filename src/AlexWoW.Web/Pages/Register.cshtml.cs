@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages;
 
+/// <summary>Регистрация аккаунта: email — для сайта, имя аккаунта — игровой логин (SRP).</summary>
 public sealed class RegisterModel(IAccountService accounts) : PageModel
 {
     [BindProperty]
@@ -59,7 +60,7 @@ public sealed class RegisterModel(IAccountService accounts) : PageModel
         // После регистрации сразу входим под новым аккаунтом.
         var account = await accounts.VerifyCredentialsAsync(Input.Email, Input.Password, ct);
         if (account is not null)
-            await AuthSession.SignInAsync(HttpContext, account);
+            await HttpContext.SignInAccountAsync(account);
 
         return RedirectToPage("/Characters/Index");
     }

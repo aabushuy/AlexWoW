@@ -50,7 +50,7 @@ public sealed class AuthListener(
     /// </summary>
     private async Task EnsureSchemaWithRetryAsync(CancellationToken ct)
     {
-        const int maxAttempts = 30;
+        const int MaxAttempts = 30;
         var realm = _options.DefaultRealm.ToRealm();
         for (var attempt = 1; ; attempt++)
         {
@@ -59,11 +59,11 @@ public sealed class AuthListener(
                 await schema.EnsureSchemaAsync(realm, ct);
                 return;
             }
-            catch (Exception ex) when (attempt < maxAttempts && !ct.IsCancellationRequested)
+            catch (Exception ex) when (attempt < MaxAttempts && !ct.IsCancellationRequested)
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(5, attempt));
                 logger.LogWarning("БД недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
-                    attempt, maxAttempts, ex.Message, delay.TotalSeconds);
+                    attempt, MaxAttempts, ex.Message, delay.TotalSeconds);
                 await Task.Delay(delay, ct);
             }
         }
