@@ -24,4 +24,5 @@ public sealed class Character
     public uint Money { get; set; }           // DEFAULT 1000000
     public uint Xp { get; set; }              // DEFAULT 0
     public byte ActionBars { get; set; }      // DEFAULT 0
+    public uint TalentResetCost { get; set; } // последняя стоимость сброса талантов (медь); DEFAULT 0. M9.8
 }

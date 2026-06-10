@@ -30,8 +30,12 @@ public static class TrainerHandlers
 
     /// <summary>GOSSIP_ICON_TRAINER (3) — иконка-«книга» у пункта меню тренера.</summary>
     private const byte GossipIconTrainer = 3;
-    /// <summary>Id пункта «обучиться» в меню госсипа тренера (у нас единственный пункт).</summary>
+    /// <summary>Id пункта «обучиться» в меню госсипа тренера.</summary>
     private const uint TrainGossipOptionId = 0;
+    /// <summary>Id пункта «сбросить таланты» (только у классового тренера). M9.8.</summary>
+    private const uint ResetTalentsOptionId = 1;
+    /// <summary>GOSSIP_ICON_CHAT (0) — обычная иконка-«реплика».</summary>
+    private const byte GossipIconChat = 0;
     /// <summary>CMaNGOS DEFAULT_GOSSIP_MESSAGE — дефолтный npc_text для greeting'а меню (своего у нас нет).</summary>
     private const uint DefaultGossipTextId = 0xFFFFFF;
 
@@ -55,6 +59,8 @@ public static class TrainerHandlers
         var optionId = r.UInt32();       // gossip_list_id
         if (optionId == TrainGossipOptionId)
             await SendTrainerListAsync(session, npcGuid, ct);
+        else if (optionId == ResetTalentsOptionId)
+            await TalentHandlers.SendWipeConfirmAsync(session, npcGuid, ct); // M9.8
     }
 
     /// <summary>
@@ -122,18 +128,21 @@ public static class TrainerHandlers
         if (trainer is null || !FitsPlayer(session, trainer))
             return false;
 
-        var option = System.Text.Encoding.UTF8.GetBytes("Я хочу обучиться.");
-        var w = new ByteWriter(64 + option.Length)
+        var learn = Encoding.UTF8.GetBytes("Я хочу обучиться.");
+        var reset = Encoding.UTF8.GetBytes("Я хочу сбросить таланты.");
+        var showReset = trainer.TrainerType == 0; // сброс талантов — только у классового тренера (M9.8)
+        var w = new ByteWriter(96 + learn.Length + reset.Length)
             .UInt64(npcGuid)
-            .UInt32(0)                       // menu_id
-            .UInt32(DefaultGossipTextId)     // title_text_id (greeting)
-            .UInt32(1);                      // amount_of_gossip_items
-        w.UInt32(TrainGossipOptionId)        // id пункта
-            .UInt8(GossipIconTrainer)        // иконка-книга
-            .UInt8(0)                        // coded = false
-            .UInt32(0)                       // money_required
-            .Bytes(option).UInt8(0)          // message (CString)
-            .UInt8(0);                       // accept_text (пустая CString)
+            .UInt32(0)                                  // menu_id
+            .UInt32(DefaultGossipTextId)                // title_text_id (greeting)
+            .UInt32((uint)(showReset ? 2 : 1));         // amount_of_gossip_items
+        w.UInt32(TrainGossipOptionId)        // пункт «обучиться»
+            .UInt8(GossipIconTrainer).UInt8(0).UInt32(0)
+            .Bytes(learn).UInt8(0).UInt8(0);
+        if (showReset)
+            w.UInt32(ResetTalentsOptionId)   // пункт «сбросить таланты»
+                .UInt8(GossipIconChat).UInt8(0).UInt32(0)
+                .Bytes(reset).UInt8(0).UInt8(0);
         w.UInt32(0);                         // amount_of_quests
         await session.SendAsync(WorldOpcode.SmsgGossipMessage, w.ToArray(), ct);
         session.Logger.LogDebug("TRAINER gossip entry={Entry}: меню «обучиться» (класс {Class})",

@@ -128,6 +128,13 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, money), ct);
     }
 
+    public async Task SetTalentResetCostAsync(uint guid, uint cost, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.Characters.Where(c => c.Guid == guid)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.TalentResetCost, cost), ct);
+    }
+
     public async Task SetLevelXpAsync(uint guid, byte level, uint xp, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -182,5 +189,6 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
         Z = e.PositionZ,
         Money = e.Money,
         ActionBars = e.ActionBars,
+        TalentResetCost = e.TalentResetCost,
     };
 }

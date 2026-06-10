@@ -38,6 +38,9 @@ public interface ICharacterRepository
     /// <summary>Деньги персонажа (медь).</summary>
     Task SetMoneyAsync(uint guid, uint money, CancellationToken ct = default);
 
+    /// <summary>Последняя стоимость сброса талантов (медь) — для растущей цены. M9.8.</summary>
+    Task SetTalentResetCostAsync(uint guid, uint cost, CancellationToken ct = default);
+
     /// <summary>Сохраняет уровень и текущий опыт персонажа.</summary>
     Task SetLevelXpAsync(uint guid, byte level, uint xp, CancellationToken ct = default);
 

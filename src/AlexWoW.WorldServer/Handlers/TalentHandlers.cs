@@ -1,3 +1,4 @@
+using AlexWoW.Common.Network;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -97,5 +98,84 @@ public static class TalentHandlers
         await SendTalentsInfoAsync(session, ct);
         session.Logger.LogInformation("LEARN_TALENT '{User}': talent={Tid} rank={Rank} spell={Spell}, очков {Points}",
             session.Account, talentId, nextRank, rankSpell, session.TalentPoints);
+    }
+
+    private const uint Gold = 10000;
+
+    /// <summary>Стоимость следующего сброса по последней (CMaNGOS resetTalentsCost): 1/5/10g, далее +5g, кап 50g.</summary>
+    private static uint NextResetCost(uint stored) =>
+        stored < Gold ? Gold :
+        stored < 5 * Gold ? 5 * Gold :
+        stored < 10 * Gold ? 10 * Gold :
+        Math.Min(stored + 5 * Gold, 50 * Gold);
+
+    /// <summary>Госсип «Сбросить таланты» → MSG_TALENT_WIPE_CONFIRM (npc + стоимость): открывает окно
+    /// подтверждения у клиента. M9.8.</summary>
+    internal static Task SendWipeConfirmAsync(WorldSession session, ulong npcGuid, CancellationToken ct)
+    {
+        var cost = NextResetCost(session.Character?.TalentResetCost ?? 0);
+        return session.SendAsync(WorldOpcode.MsgTalentWipeConfirm,
+            new ByteWriter(12).UInt64(npcGuid).UInt32(cost).ToArray(), ct);
+    }
+
+    /// <summary>MSG_TALENT_WIPE_CONFIRM (клиент подтвердил, u64 npc): сброс талантов за золото. M9.8.</summary>
+    [WorldOpcodeHandler(WorldOpcode.MsgTalentWipeConfirm)]
+    public static async Task OnTalentWipeConfirm(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        packet.Reader().UInt64(); // npc guid — не используем
+        if (session.InWorldGuid == 0 || session.Character is not { } c)
+            return;
+        var cost = NextResetCost(c.TalentResetCost);
+        if (session.LearnedTalents.Count == 0 || session.Money < cost)
+            return; // нечего сбрасывать / нет денег
+        await ResetTalentsAsync(session, cost, ct);
+    }
+
+    /// <summary>
+    /// Сброс всех талантов: снять ранг-спеллы изученных талантов (все ранги 0..current) из книги/персиста
+    /// (<c>SMSG_REMOVED_SPELL</c>), очистить character_talent, вернуть очки, списать <paramref name="cost"/>
+    /// (0 — бесплатно, для дев-команды D5). M9.8.
+    /// </summary>
+    internal static async Task ResetTalentsAsync(WorldSession session, uint cost, CancellationToken ct)
+    {
+        var c = session.Character!;
+        IReadOnlyDictionary<uint, TalentData> all;
+        try { all = await session.WorldDb.GetAllTalentsAsync(ct); }
+        catch { all = new Dictionary<uint, TalentData>(); }
+
+        foreach (var (talentId, rank) in session.LearnedTalents)
+        {
+            if (!all.TryGetValue(talentId, out var t))
+                continue;
+            for (var rr = 0; rr <= rank; rr++)
+            {
+                var sp = t.RankSpell(rr);
+                if (sp == 0 || !session.KnownSpells.Remove(sp))
+                    continue;
+                await session.CharState.RemoveLearnedSpellAsync(session.InWorldGuid, sp, ct);
+                await session.SendAsync(WorldOpcode.SmsgRemovedSpell, new ByteWriter(4).UInt32(sp).ToArray(), ct);
+            }
+        }
+
+        session.LearnedTalents.Clear();
+        await session.CharState.ClearTalentsAsync(session.InWorldGuid, ct);
+
+        if (cost > 0)
+        {
+            session.Money -= cost;
+            await session.Characters.SetMoneyAsync(session.InWorldGuid, session.Money, ct);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Money), ct);
+            c.TalentResetCost = cost;
+            await session.Characters.SetTalentResetCostAsync(session.InWorldGuid, cost, ct);
+        }
+
+        RecomputePoints(session, c.Class, c.Level);
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
+                m => m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.TalentPoints)), ct);
+        await SendTalentsInfoAsync(session, ct);
+        session.Logger.LogInformation("TALENT WIPE '{User}': сброшено, очков {Points}, списано {Cost}",
+            session.Account, session.TalentPoints, cost);
     }
 }
