@@ -1,0 +1,118 @@
+# M8 — Веб-интерфейс игрока
+
+Сайт для игроков: регистрация аккаунта, вход, смена пароля, просмотр персонажей.
+Стек — **ASP.NET Core (Razor Pages, .NET 10)**, проект `src/AlexWoW.Web`. За **Caddy** на
+homeserver, домен **`alexwow.home.srv`**. Переиспользует `AlexWoW.Cryptography` (SRP6) и
+`AlexWoW.Database` (та же БД `alexwow_auth`, что и у игровых серверов).
+
+Задачи и статусы — **Vikunja** (project M8, `https://tasks.home.srv`).
+
+| Срез | Статус |
+|---|---|
+| **M8.1** Каркас (ASP.NET Core + деплой за Caddy) | ✅ |
+| **M8.2** Регистрация (email + имя аккаунта, SRP6) | ✅ |
+| **M8.3** Вход + cookie-сессии | ✅ |
+| **M8.4** Смена пароля | ✅ |
+| **M8.5** Просмотр персонажей (список + детали) | ✅ |
+| **M8.8** Верхнее меню (выпадающее) + страница «Аккаунт» | ✅ |
+| **M8.6** Смена расы/пола | ⬜ позже |
+| **M8.7** Покупка игрового золота | ⬜ позже |
+
+---
+
+## Архитектура
+
+```
+Браузер ──HTTPS──► Caddy (homeserver) ──HTTP──► alexwow-web:8080 (хост :8090)
+                                                      │
+                                                      ▼  EF Core (Pomelo)
+                                               MySQL alexwow_auth
+                                               (account, characters, character_*)
+```
+
+- **`Pages/`** — Razor Pages: `Index` (лендинг), `Login`, `Register`, `Logout`,
+  `Account/Index` (инфо), `Account/ChangePassword`, `Characters/Index` (список),
+  `Characters/Details` (детали), `Error`.
+- **`Services/`** (SOLID):
+  - `IAccountService`/`AccountService` — регистрация, проверка пароля, смена пароля (вся SRP6-логика).
+  - `AuthSession` — выдача/снятие cookie, чтение claims (account_id, email, игровой логин).
+  - `GameData` — справочники для UI (раса/класс/пол/зона/слоты/деньги, цвета классов).
+- **DI** (`Program.cs`): пул-фабрика `AuthDbContext` + focused-репозитории
+  (`EfAccountRepository`/`EfCharacterRepository`/`EfInventoryRepository`), cookie-аутентификация,
+  `ForwardedHeaders` (доверяем `X-Forwarded-Proto/For` от Caddy), `AuthorizeFolder("/")` +
+  явный `AllowAnonymous` для `Index`/`Login`/`Register`/`Error`.
+- **Стиль** — тёмный камень + золото под интерфейс WoW (`wwwroot/css/wow.css`), без внешних
+  зависимостей. Выпадающее меню аккаунта — нативный `<details>`/`<summary>` (без JS).
+
+---
+
+## Ключевые решения
+
+### Пароль не хранится — SRP6, как в игре
+Панель считает SRP6 соль+верификатор **теми же вызовами** `Srp6.CalculateVerifier`, что и CLI
+`create-account`/`reset-all-passwords`. Поэтому аккаунт, созданный на сайте, **работает в игре**, а
+смена пароля на сайте сразу действует в клиенте. Проверка пароля = пересчёт верификатора по
+сохранённой соли и сравнение (constant-time `FixedTimeEquals`). Смена пароля сбрасывает `session_key`.
+
+### ⚠️ Грабли: email НЕЛЬЗЯ как игровой логин (клиент режет по «@»)
+Изначально (по плану M8) логин был = email. Но **клиент WoW 3.3.5a резервирует «@» в поле
+«Учётная запись»** как разделитель `account@логин-сервер`: `test@mail.ru` понимается как аккаунт
+`test` на сервере `mail.ru` → дисконнект (на наш auth challenge вообще не приходит). На сайте при
+этом всё работало (там «@» — обычный символ).
+
+Решение (M8.2, фикс): при регистрации **два поля** —
+- **email** — вход на сайт (столбец `account.email`, nullable + unique; миграция `AddAccountEmail`);
+- **имя аккаунта** — игровой логин (латиница/цифры, без «@»), его игрок вводит в клиенте.
+
+**SRP6-верификатор считается по игровому имени** (`account.Username`), не по email. Вход на сайт и
+смена пароля ищут аккаунт по email (`GetAccountByEmailAsync`), затем SRP по `Username`. У CLI/игровых
+аккаунтов `email = NULL` (они на сайт не заходят). На странице персонажей и в меню показывается
+игровой логин — что вводить в клиенте.
+
+### Логин = email для сайта, имя аккаунта для игры
+- Сайт: вход по **email + пароль**.
+- Игра: вход по **имени аккаунта + пароль** (то же поле SRP).
+- Cookie-claims: `NameIdentifier` = account_id, `Name` = email, `alexwow:game_account` = игровой логин.
+
+### Миграции применяет AuthServer
+Панель **не мигрирует** БД (единый мигратор — AuthServer, как и для world). Web только читает/пишет.
+Миграции M8: `WidenAccountUsername` (username 32→255 — задел под длинные имена), `AddAccountEmail`.
+
+---
+
+## Деплой
+
+Та же схема, что у auth/world: **сборка локальная**, на сервер едут бинарники
+(`deploy/deploy.ps1` публикует и `auth`/`world`/`web`).
+
+- **`Dockerfile.web`** — runtime-only, образ `mcr.microsoft.com/dotnet/aspnet:10.0`
+  (нужен ASP.NET Core рантайм, не базовый `dotnet/runtime`), `COPY publish/web`.
+- **`docker-compose.yml`** — сервис `alexwow-web`: порт **8090→8080**, БД `alexwow_auth`,
+  ключи Data Protection (cookie/antiforgery) в named-volume `alexwow-web-keys` (переживают
+  пересборку контейнера, иначе каждый деплой разлогинивал бы всех).
+- **Caddy** (`/data/docker/caddy/Caddyfile`, **отдельный стек на homeserver, не в этом репо**)
+  проксирует `https://alexwow.home.srv` → `192.168.2.210:8090` (как plex/sonarr — по host-IP, т.к.
+  стек alexwow в своей docker-сети). Сертификат wildcard `*.home.srv`. Правка Caddyfile + reload —
+  вручную на сервере: `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+
+> ⚠️ Протокол игры (auth 3724 / world 8085) — сырой TCP, **за Caddy не идёт**; только веб-панель — HTTP.
+
+---
+
+## Что показывает панель
+
+- **Список персонажей** — карточки: имя (цвет класса), раса/класс/пол, уровень, фракция, зона.
+- **Детали персонажа** — раса/класс/пол/фракция, уровень/опыт, зона/карта, деньги (золото/серебро/медь),
+  экипировка по слотам (имя слота + entry предмета). Доступ только к своим персонажам (проверка
+  `AccountId`). Имена предметов (из `mangos.item_template`) — возможное развитие; пока entry-номера.
+- **Аккаунт** — игровой логин, email, дата регистрации (`account.created_at`).
+
+---
+
+## Замечания / возможное развитие
+
+- Экипировка показывает entry предметов, а не названия — панель читает только `alexwow_auth`
+  (не подключает read-only `mangos`). Названия = подключить `IItemTemplateRepository` + 2-ю строку
+  подключения.
+- Rate-limit на регистрацию/вход — по плану позже.
+- M8.6 (смена расы/пола) и M8.7 (покупка золота) — отдельные срезы, позже.
