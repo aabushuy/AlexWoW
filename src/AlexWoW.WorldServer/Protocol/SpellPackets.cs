@@ -5,7 +5,7 @@ namespace AlexWoW.WorldServer.Protocol;
 /// <summary>
 /// Билдеры пакетов спеллов (M6.4): SMSG_SPELL_START/GO, CAST_FAILED, SPELL_FAILURE, SPELL_COOLDOWN,
 /// SPELLNONMELEEDAMAGELOG, SPELLHEALLOG. Фокусные сборщики байтов (как <see cref="AuraPackets"/>) —
-/// отделены от оркестрации каста (<see cref="Handlers.SpellCaster"/>). Layout сверен с reference
+/// отделены от оркестрации каста (<see cref="Handlers.SpellCastService"/>). Layout сверен с reference
 /// world/common.wowm + CMaNGOS/TrinityCore (эталон против клиента 3.3.5a).
 /// </summary>
 public static class SpellPackets

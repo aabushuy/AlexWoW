@@ -11,8 +11,9 @@ namespace AlexWoW.WorldServer.World;
 /// Хаб состояния мира (singleton): реестр онлайн-игроков и авторитетных существ, пространственные
 /// запросы (видимость/радиус) и рассылка наблюдателям. Высокоуровневую логику держат SRP-коллабораторы
 /// (рефактор #30): <see cref="PlayerVisibility"/> (вход/выход/видимость игроков), <see cref="CreatureDirector"/>
-/// (движение/респавн/манекен существ), <see cref="WorldTick"/> (серверный тик). WorldState их композирует
-/// и делегирует — API для потребителей (хендлеры/сессии) не меняется. Доступ из множества потоков —
+/// (движение/респавн/манекен существ). Серверный тик (<see cref="WorldTick"/>) — DI-синглтон (M7 S3),
+/// его драйвит <see cref="WorldUpdateLoop"/>. WorldState композирует коллабораторов и делегирует —
+/// API для потребителей (хендлеры/сессии) не меняется. Доступ из множества потоков —
 /// потокобезопасные словари; сериализация отправки — на уровне сессии (WorldSession.SendAsync).
 /// </summary>
 public sealed class WorldState
@@ -24,7 +25,6 @@ public sealed class WorldState
 
     private readonly PlayerVisibility _visibility;
     private readonly CreatureDirector _director;
-    private readonly WorldTick _tick;
 
     public WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
         QuestStore quests, LevelStore levels, StatStore stats)
@@ -35,8 +35,10 @@ public sealed class WorldState
         _stats = stats;
         _director = new CreatureDirector(this, navmesh, logger);
         _visibility = new PlayerVisibility(this, logger);
-        _tick = new WorldTick(this, _director, factions, logger);
     }
+
+    /// <summary>Режиссёр существ — для респавна из серверного тика (<see cref="WorldTick"/>, M7 S3).</summary>
+    internal CreatureDirector Director => _director;
 
     // --- Фасады сторов / фракции ---
 
@@ -263,7 +265,4 @@ public sealed class WorldState
     /// <inheritdoc cref="CreatureDirector.DevCleanAsync"/>
     public Task DevCleanAsync(WorldSession session, CancellationToken ct)
         => _director.DevCleanAsync(session, ct);
-
-    /// <inheritdoc cref="WorldTick.UpdateAsync"/>
-    public Task UpdateAsync(CancellationToken ct) => _tick.UpdateAsync(ct);
 }

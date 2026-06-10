@@ -5,14 +5,15 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Крафт профессии (M11.3): спелл-рецепт с эффектом CREATE_ITEM расходует реагенты и создаёт предмет,
-/// затем — ролл прокачки навыка. Реагенты/результат — из <c>spell_template</c> (см. <see cref="SpellCatalog"/>),
-/// привязка рецепт→навык для skill-up — <see cref="Professions.Recipes"/>.
+/// Крафт профессии (M11.3, DI-сервис M7 S3 — бывший статик Crafting): спелл-рецепт с эффектом CREATE_ITEM
+/// расходует реагенты и создаёт предмет, затем — ролл прокачки навыка. Реагенты/результат — из
+/// <c>spell_template</c> (см. <see cref="SpellCatalog"/>), привязка рецепт→навык для skill-up —
+/// <see cref="Professions.Recipes"/>.
 /// </summary>
-public static class Crafting
+internal sealed class CraftingService
 {
     /// <summary>Есть ли у игрока все реагенты рецепта (для отказа на старте каста).</summary>
-    public static bool HasReagents(WorldSession session, SpellCatalog.SpellInfo info)
+    internal bool HasReagents(WorldSession session, SpellCatalog.SpellInfo info)
     {
         if (info.Reagents is null)
             return true;
@@ -23,7 +24,7 @@ public static class Crafting
     }
 
     /// <summary>Завершение крафта: повторная проверка реагентов → расход → создание результата → skill-up.</summary>
-    public static async Task DoCraftAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
+    internal async Task DoCraftAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
         CancellationToken ct)
     {
         if (info.CreateItemId == 0 || !HasReagents(session, info))
@@ -41,7 +42,8 @@ public static class Crafting
         await SkillUpForRecipeAsync(session, spellId, ct);
     }
 
-    /// <summary>Кэш привязки рецепт→(навык, req) из npc_trainer (иммутабельно), чтобы не дёргать БД каждый крафт.</summary>
+    /// <summary>Кэш привязки рецепт→(навык, req) из npc_trainer (иммутабельно), чтобы не дёргать БД каждый крафт.
+    /// Static: разделяемый кэш данных, не состояние сервиса (как кэш <see cref="SpellCatalog"/>).</summary>
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, (ushort SkillId, ushort ReqSkill)?> RecipeSkillCache = new();
 
     /// <summary>
@@ -49,7 +51,7 @@ public static class Crafting
     /// (плавка и пр., которых нет у тренера), затем npc_trainer (reqskill/reqskillvalue) — покрывает все
     /// рецепты, изучаемые у тренера. Формула цвета — <see cref="Professions.SkillUpChance"/>. M11.5.
     /// </summary>
-    private static async Task SkillUpForRecipeAsync(WorldSession session, uint spellId, CancellationToken ct)
+    private async Task SkillUpForRecipeAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
         (ushort SkillId, ushort ReqSkill)? recipe = Professions.Recipes.TryGetValue(spellId, out var seed)
             ? (seed.SkillId, seed.ReqSkill)

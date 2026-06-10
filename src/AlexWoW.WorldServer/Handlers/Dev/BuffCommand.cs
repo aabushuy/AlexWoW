@@ -16,7 +16,8 @@ internal sealed class BuffCommand : IDevCommand
             return;
         }
         var secs = ctx.Args.Count >= 2 && uint.TryParse(ctx.Args[1], out var sv) ? sv : 120u;
-        await Auras.ApplyAsync(ctx.Session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
+        // мост (M7 S3): dev-команды — статиковый реестр, сервис аур достаём через сессию.
+        await ctx.Session.AuraService.ApplyAsync(ctx.Session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
         await ctx.ReplyAsync($"Бафф {buffSpell} на {secs}с", ct);
     }
 }

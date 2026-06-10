@@ -6,15 +6,16 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.World;
 
 /// <summary>
-/// Каталог спеллов (M6.4 → M10.2): данные эффекта/каста для оркестрации (<see cref="Handlers.SpellCaster"/>).
+/// Каталог спеллов (M6.4 → M10.2, DI-синглтон M7 S3): данные эффекта/каста для оркестрации
+/// (<see cref="Handlers.SpellCastService"/>).
 /// <para>M10.2: основной источник — дамп <c>spell_template</c> (mangos): школа, время каста
 /// (<see cref="SpellCastTimes"/>), эффект (урон/хил), мана (флэт или % базовой), кулдаун — читаются из БД
 /// и кэшируются (данные спелла иммутабельны). Хардкод снят. Легаси-словарь <see cref="LegacySpells"/>
 /// оставлен только фолбэком, если БД мира недоступна.</para>
 /// Переключатели (<see cref="Toggles"/>) и стартовый набор (<see cref="GrantedCombatSpells"/>) — наша
-/// игровая конфигурация, не из БД.
+/// игровая конфигурация, не из БД (чистые данные — статические члены).
 /// </summary>
-public static class SpellCatalog
+public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog> logger)
 {
     /// <summary>МАСКИ школ магии (SpellSchoolMask, u8): Fire=0x4, Frost=0x10, Holy=0x2 (см. SMSG_*DAMAGELOG).</summary>
     public const byte SchoolFire = 0x04;
@@ -61,28 +62,27 @@ public static class SpellCatalog
     public enum SpellMovement : byte { None = 0, Charge = 1, TeleportForward = 2, TeleportBehind = 3 }
 
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
-    private static readonly ConcurrentDictionary<uint, SpellInfo?> Cache = new();
+    private readonly ConcurrentDictionary<uint, SpellInfo?> _cache = new();
 
     /// <summary>
     /// Эффект спелла: из <c>spell_template</c> (с кэшем); при недоступности БД мира — легаси-фолбэк.
     /// Возвращает null, если спелл не известен ни в БД, ни в фолбэке (клиент сам валидирует — каст без эффекта).
     /// </summary>
-    public static async Task<SpellInfo?> GetAsync(IWorldRepository worldDb, uint spellId,
-        ILogger? logger = null, CancellationToken ct = default)
+    public async Task<SpellInfo?> GetAsync(uint spellId, CancellationToken ct)
     {
-        if (Cache.TryGetValue(spellId, out var cached))
+        if (_cache.TryGetValue(spellId, out var cached))
             return cached;
         try
         {
             var tpl = await worldDb.GetSpellAsync(spellId, ct);
             var info = tpl is not null ? FromTemplate(tpl) : LegacySpells.GetValueOrDefault(spellId);
-            Cache[spellId] = info; // кэшируем определённый результат (в т.ч. null = нет такого спелла)
+            _cache[spellId] = info; // кэшируем определённый результат (в т.ч. null = нет такого спелла)
             return info;
         }
         catch (Exception ex)
         {
             // БД мира недоступна / ошибка маппинга — фолбэк на легаси, без кэша. ЛОГИРУЕМ (раньше глоталось).
-            logger?.LogError(ex, "SpellCatalog: spell={Spell} — ошибка чтения spell_template, фолбэк на легаси", spellId);
+            logger.LogError(ex, "SpellCatalog: spell={Spell} — ошибка чтения spell_template, фолбэк на легаси", spellId);
             return LegacySpells.GetValueOrDefault(spellId);
         }
     }
@@ -148,7 +148,7 @@ public static class SpellCatalog
 
         // M7 #33: движущий эффект. Charge(96)=рывок (сплайн); Leap(29)=прыжок вперёд (Blink);
         // TeleportUnits(5)=телепорт за спину цели (триггер Shadowstep 36563). TRIGGER_SPELL(64) — цепочка
-        // (Shadowstep 36554 → 36563): несём id триггера, тип движения резолвится у триггера в SpellCaster.
+        // (Shadowstep 36554 → 36563): несём id триггера, тип движения резолвится у триггера в SpellCastCompletion.
         var movement =
             Array.Exists(effects, e => e.Eff == EffectCharge) ? SpellMovement.Charge :
             Array.Exists(effects, e => e.Eff == EffectLeap) ? SpellMovement.TeleportForward :

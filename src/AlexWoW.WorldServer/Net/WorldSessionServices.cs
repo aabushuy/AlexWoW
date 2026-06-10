@@ -26,6 +26,10 @@ internal sealed class WorldSessionServices(
     WorldState world,
     WorldPacketRouter router,
     AuthChallengeSender authChallenge,
+    SpellCatalog spellCatalog,
+    AuraService auras,
+    AuraPersistenceService auraPersistence,
+    CombatResourcesService combatResources,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -40,5 +44,10 @@ internal sealed class WorldSessionServices(
     public WorldState World { get; } = world;
     public WorldPacketRouter Router { get; } = router;
     public AuthChallengeSender AuthChallenge { get; } = authChallenge;
+    // Спелл-кластер (M7 S3): сервисы для самой сессии (персист аур при выходе) и мосты легаси-статикам.
+    public SpellCatalog SpellCatalog { get; } = spellCatalog;
+    public AuraService AuraService { get; } = auras;
+    public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
+    public CombatResourcesService CombatResources { get; } = combatResources;
     public ILogger<WorldSession> Logger { get; } = logger;
 }

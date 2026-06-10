@@ -15,7 +15,8 @@ internal sealed class UnbuffCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .unbuff SPELL", ct);
             return;
         }
-        await Auras.RemoveAsync(ctx.Session, offSpell, ct);
+        // мост (M7 S3): dev-команды — статиковый реестр, сервис аур достаём через сессию.
+        await ctx.Session.AuraService.RemoveAsync(ctx.Session, offSpell, ct);
         await ctx.ReplyAsync($"Снят бафф {offSpell}", ct);
     }
 }

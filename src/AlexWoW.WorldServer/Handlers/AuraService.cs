@@ -5,12 +5,13 @@ using AlexWoW.WorldServer.World;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Система аур (M6.11): применение/снятие/истечение аур игрока (баффы, дебаффы, формы/стойки) и их показ
-/// клиенту (SMSG_AURA_UPDATE) + себе и наблюдателям. Аура-форма (ShapeshiftForm != 0) выставляет форму в
-/// UNIT_FIELD_BYTES_2 → клиент меняет набор кнопок (стойки воина, M6.12; формы друида — позже). Фундамент
-/// под расход/эффекты абилок и баффы спеллов. Точка применения — каст спелла с аура-эффектом (SpellHandlers).
+/// Система аур (M6.11, DI-сервис M7 S3 — бывший статик Auras): применение/снятие/истечение аур игрока
+/// (баффы, дебаффы, формы/стойки) и их показ клиенту (SMSG_AURA_UPDATE) + себе и наблюдателям. Аура-форма
+/// (ShapeshiftForm != 0) выставляет форму в UNIT_FIELD_BYTES_2 → клиент меняет набор кнопок (стойки воина,
+/// M6.12; формы друида — позже). Фундамент под расход/эффекты абилок и баффы спеллов. Точка применения —
+/// каст спелла с аура-эффектом (SpellHandlers). Персист через релог — <see cref="AuraPersistenceService"/>.
 /// </summary>
-public static class Auras
+internal sealed class AuraService
 {
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
@@ -21,7 +22,7 @@ public static class Auras
     /// <paramref name="durationMs"/> = 0 — перманентная (переключатель) → персистится через релог
     /// (если <paramref name="persist"/>). Повтор того же спелла — рефреш.
     /// </summary>
-    internal static async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
+    internal async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
         bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false)
     {
         if (session.InWorldGuid == 0)
@@ -75,75 +76,16 @@ public static class Auras
             catch { /* персист не критичен для текущей сессии */ }
     }
 
-    /// <summary>
-    /// Восстанавливает сохранённые ауры при входе: перманентные переключатели (M7 #21, form-based, remaining=0)
-    /// и временны́е баффы/HoT с остатком длительности (M10.5, remaining&gt;0 → <see cref="Periodics"/>).
-    /// Зовётся после спавна в OnPlayerLogin (MaxHealth уже пересчитан — +HP-баффы накладываются поверх).
-    /// </summary>
-    internal static async Task ReapplyPersistedAsync(WorldSession session, CancellationToken ct)
-    {
-        if (session.InWorldGuid == 0)
-            return;
-        IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)> saved;
-        try { saved = await session.CharState.GetAurasAsync(session.InWorldGuid, ct); }
-        catch { return; }
-
-        var level = (byte)(session.Character?.Level ?? 1);
-        foreach (var (spell, form, remaining) in saved)
-        {
-            // Временны́е баффы/HoT (M10.5) — через систему периодики/аур с остатком длительности.
-            if (remaining > 0)
-            {
-                await Periodics.RestoreTimedAuraAsync(session, spell, (int)remaining, ct);
-                continue;
-            }
-
-            // Перманентный переключатель (M7 #21).
-            byte flags = (byte)(AuraFlags.Effect1 | AuraFlags.SelfCast | AuraFlags.Positive);
-            var aura = new ActiveAura
-            {
-                SpellId = spell, Slot = FirstFreeSlot(session), Flags = flags,
-                ShapeshiftForm = form, Persist = true, DurationMs = 0, ExpiresAtMs = 0,
-            };
-            session.Auras.Add(aura);
-            await session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgAuraUpdate,
-                AuraPackets.BuildApply((ulong)session.InWorldGuid, aura.Slot, spell, flags, level, 1, 0), ct);
-            if (form != 0)
-            {
-                session.ShapeshiftForm = form;
-                await BroadcastFormAsync(session, ct);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Сохраняет временны́е свои ауры (баффы/HoT) при выходе с остатком длительности (M10.5): собирает из
-    /// <see cref="WorldSession.Auras"/> те, что с таймером (DurationMs&gt;0, ещё не истёкшие), и перезаписывает
-    /// их в БД. Переключатели (перманентные) персистятся отдельно при наложении. Зовётся из LeaveWorldAsync.
-    /// </summary>
-    internal static async Task SaveTimedAurasAsync(WorldSession session, uint ownerGuid, CancellationToken ct)
-    {
-        if (ownerGuid == 0)
-            return;
-        var now = Environment.TickCount64;
-        var timed = session.Auras
-            .Where(a => a.DurationMs > 0 && a.ExpiresAtMs > now)
-            .Select(a => (a.SpellId, (uint)(a.ExpiresAtMs - now)))
-            .ToList();
-        try { await session.CharState.SaveTimedAurasAsync(ownerGuid, timed, ct); }
-        catch { /* персист не критичен для текущей сессии */ }
-    }
-
     /// <summary>Снимает ауру по spellId, если есть (M6.11).</summary>
-    internal static async Task RemoveAsync(WorldSession session, uint spellId, CancellationToken ct)
+    internal async Task RemoveAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
         var aura = session.Auras.FirstOrDefault(a => a.SpellId == spellId);
         if (aura is not null)
             await RemoveInternalAsync(session, aura, resetForm: true, ct);
     }
 
-    /// <summary>Тик истечения аур (M6.11): снимает ауры с вышедшим таймером. Из WorldState.UpdateAsync.</summary>
-    internal static async Task TickAsync(WorldSession session, long now, CancellationToken ct)
+    /// <summary>Тик истечения аур (M6.11): снимает ауры с вышедшим таймером. Из WorldTick.UpdateAsync.</summary>
+    internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
         if (session.Auras.Count == 0)
             return;
@@ -155,7 +97,7 @@ public static class Auras
     /// Снимает ауру (M6.11). <paramref name="resetForm"/>=false — НЕ сбрасывать форму в 0 (при смене стойки
     /// новая форма выставится сразу следом, без промежуточного «нет стойки» → без мигания подсветки, M7 #21).
     /// </summary>
-    private static async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, bool resetForm, CancellationToken ct)
+    private async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, bool resetForm, CancellationToken ct)
     {
         session.Auras.Remove(aura);
         if (resetForm && aura.ShapeshiftForm != 0 && session.ShapeshiftForm == aura.ShapeshiftForm)
@@ -171,8 +113,9 @@ public static class Auras
                 AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
     }
 
-    /// <summary>VALUES-апдейт UNIT_FIELD_BYTES_2 (байт 3 = форма) себе и наблюдателям. M6.11.</summary>
-    private static Task BroadcastFormAsync(WorldSession session, CancellationToken ct)
+    /// <summary>VALUES-апдейт UNIT_FIELD_BYTES_2 (байт 3 = форма) себе и наблюдателям. M6.11.
+    /// Internal: восстановление персиста (<see cref="AuraPersistenceService"/>) выставляет форму напрямую.</summary>
+    internal Task BroadcastFormAsync(WorldSession session, CancellationToken ct)
     {
         // sheath/pvp/pet байты пока не используем (0); форма — старший байт.
         var bytes2 = (uint)session.ShapeshiftForm << 24;
@@ -181,7 +124,8 @@ public static class Auras
                 m => m.SetUInt32(UpdateField.UnitBytes2, bytes2)), ct);
     }
 
-    private static byte FirstFreeSlot(WorldSession session)
+    /// <summary>Первый свободный визуальный слот ауры (чистый хелпер; нужен и персисту аур).</summary>
+    internal static byte FirstFreeSlot(WorldSession session)
     {
         for (var slot = 0; slot < MaxAuraSlots; slot++)
             if (session.Auras.All(a => a.Slot != slot))

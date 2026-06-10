@@ -155,7 +155,7 @@ public static class WorldEntryHandlers
         await session.World.EnterWorldAsync(player, ct);
 
         // M7 #21: восстановить сохранённые переключатели (стойка воина/аура паладина/аспект охотника).
-        await Auras.ReapplyPersistedAsync(session, ct);
+        await session.AuraPersistence.ReapplyPersistedAsync(session, ct); // мост (M7 S3): класс ещё статик
 
         // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
         // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).

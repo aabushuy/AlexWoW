@@ -8,7 +8,7 @@ namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
 /// Бой (M6.3): выбор цели, авто-атака мили по NPC, расчёт урона, смерть и стоп.
-/// Свинги продвигает серверный тик (<see cref="WorldState.UpdateAsync"/> → <see cref="TickMeleeAsync"/>);
+/// Свинги продвигает серверный тик (<see cref="WorldTick.UpdateAsync"/> → <see cref="TickMeleeAsync"/>);
 /// существо — авторитетная <see cref="WorldCreature"/> из реестра мира (общее HP для наблюдателей).
 /// Ответный удар NPC и преследование — M6.7.
 /// </summary>
@@ -114,7 +114,7 @@ public static class CombatHandlers
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
-        await CombatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за удар
+        await session.CombatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за удар (мост M7 S3)
 
         var attackerGuid = (ulong)session.InWorldGuid;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
@@ -264,7 +264,7 @@ public static class CombatHandlers
             var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.LastCombatMs = now; // M6.7: получил урон → пауза регена
-            await CombatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
+            await player.Session.CombatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон (мост M7 S3)
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
                 BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0), ct);

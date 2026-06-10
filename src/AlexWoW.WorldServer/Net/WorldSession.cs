@@ -45,6 +45,12 @@ public sealed class WorldSession
     internal TerrainMaps Terrain => _services.Terrain;
     internal WorldState World => _services.World;
     internal WorldServerOptions Options => _services.Options;
+    // мост до S4/S7 (M7 S3): легаси-статики (CombatHandlers, WorldEntryHandlers, dev-команды) получают
+    // session — конвертированные сервисы спелл-кластера достают через неё.
+    internal SpellCatalog SpellCatalog => _services.SpellCatalog;
+    internal AuraService AuraService => _services.AuraService;
+    internal AuraPersistenceService AuraPersistence => _services.AuraPersistence;
+    internal CombatResourcesService CombatResources => _services.CombatResources;
     internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 
@@ -261,7 +267,7 @@ public sealed class WorldSession
         if (player is null)
             return;
         // M10.5: сохранить временны́е баффы/HoT с остатком длительности ДО очистки (InWorldGuid ещё валиден).
-        await Handlers.Auras.SaveTimedAurasAsync(this, InWorldGuid, ct);
+        await _services.AuraPersistence.SaveTimedAurasAsync(this, InWorldGuid, ct);
         Player = null;
         InWorldGuid = 0;
         CombatTargetGuid = 0; // M6.3: вне мира боя нет

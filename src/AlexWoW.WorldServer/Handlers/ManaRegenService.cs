@@ -5,11 +5,12 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Реген маны (M6.4): вне «правила 5 секунд» прибавляет ману в серверном тике и двигает полоску ресурса.
-/// Аналог регена ярости/энергии (<see cref="CombatResources"/>), но для мана-классов; вынесен из
-/// SpellHandlers по SRP. Списание маны при касте — в <see cref="SpellCaster"/> (зовёт <see cref="SendManaUpdateAsync"/>).
+/// Реген маны (M6.4, DI-сервис M7 S3 — бывший статик ManaRegen): вне «правила 5 секунд» прибавляет ману
+/// в серверном тике и двигает полоску ресурса. Аналог регена ярости/энергии
+/// (<see cref="CombatResourcesService"/>), но для мана-классов; вынесен из SpellHandlers по SRP.
+/// Списание маны при касте — в <see cref="SpellCastCompletion"/> (зовёт <see cref="SendManaUpdateAsync"/>).
 /// </summary>
-public static class ManaRegen
+internal sealed class ManaRegenService
 {
     /// <summary>Реген маны вне «правила 5 секунд»: прибавка за тик регена. M6.4.</summary>
     private const uint ManaRegenPerSec = 20;
@@ -20,9 +21,9 @@ public static class ManaRegen
 
     /// <summary>
     /// Тик регена маны (M6.4): вне «правила 5 секунд» прибавляет ManaRegenPerSec раз в ManaRegenIntervalMs,
-    /// апдейтит полоску. Зовётся из <see cref="World.WorldState.UpdateAsync"/>.
+    /// апдейтит полоску. Зовётся из <see cref="World.WorldTick.UpdateAsync"/>.
     /// </summary>
-    internal static async Task TickAsync(WorldSession session, long now, CancellationToken ct)
+    internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
         if (session.MaxMana == 0 || session.Mana >= session.MaxMana || session.InWorldGuid == 0)
             return;
@@ -41,7 +42,7 @@ public static class ManaRegen
     /// + <c>SMSG_POWER_UPDATE</c> (0x480) — именно он надёжно двигает полоску ресурса у клиента 3.3.5a
     /// (как TrinityCore на каждом изменении power). Одного VALUES-апдейта собственному юниту не хватает. M6.4.
     /// </summary>
-    internal static async Task SendManaUpdateAsync(WorldSession session, CancellationToken ct)
+    internal async Task SendManaUpdateAsync(WorldSession session, CancellationToken ct)
     {
         var guid = (ulong)session.InWorldGuid;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, PlayerSpawn.BuildPowerUpdate(guid, session.Mana), ct);
