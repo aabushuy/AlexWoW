@@ -1,5 +1,6 @@
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
+using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Handlers;
 
@@ -11,6 +12,12 @@ public static class MovementHandlers
     [WorldOpcodeHandler(WorldOpcode.MsgMoveTeleportAck)]
     public static Task OnTeleportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => Task.CompletedTask;
+
+    /// <summary>MSG_MOVE_WORLDPORT_ACK (Devcommands #79): клиент догрузил новую карту после SMSG_NEW_WORLD —
+    /// завершаем кросс-карта телепорт (пере-вход в мир, окрестности, time sync).</summary>
+    [WorldOpcodeHandler(WorldOpcode.MsgMoveWorldportAck)]
+    public static Task OnWorldportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+        => TeleportService.CompleteWorldportAsync(session, ct);
 
     [WorldOpcodeHandler(
         WorldOpcode.MsgMoveStartForward, WorldOpcode.MsgMoveStartBackward, WorldOpcode.MsgMoveStop,

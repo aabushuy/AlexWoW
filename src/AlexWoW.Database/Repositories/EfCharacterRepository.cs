@@ -75,13 +75,14 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
         return e.Guid;
     }
 
-    public async Task SavePositionAsync(uint guid, float x, float y, float z, CancellationToken ct = default)
+    public async Task SavePositionAsync(uint guid, float x, float y, float z, uint map, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await db.Characters.Where(c => c.Guid == guid).ExecuteUpdateAsync(s => s
             .SetProperty(c => c.PositionX, x)
             .SetProperty(c => c.PositionY, y)
-            .SetProperty(c => c.PositionZ, z), ct);
+            .SetProperty(c => c.PositionZ, z)
+            .SetProperty(c => c.Map, map), ct);
     }
 
     public async Task SetDeclinedNamesAsync(uint ownerGuid, string[] names, CancellationToken ct = default)

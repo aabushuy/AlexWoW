@@ -1,0 +1,48 @@
+@using System.Security.Claims
+@{
+    var isAuth = User.Identity?.IsAuthenticated == true;
+    var email = User.Identity?.Name;
+}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — AlexWoW</title>
+    <link rel="stylesheet" href="~/css/wow.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="page-frame">
+        <header class="site-header">
+            <a class="brand" asp-page="/Index">
+                <span class="brand-mark">⚔</span>
+                <span class="brand-text">Alex<span class="brand-accent">WoW</span></span>
+            </a>
+            <nav class="site-nav">
+                @if (isAuth)
+                {
+                    <a asp-page="/Characters/Index">Персонажи</a>
+                    <a asp-page="/Account/ChangePassword">Сменить пароль</a>
+                    <span class="nav-user">@email</span>
+                    <form method="post" asp-page="/Logout" class="nav-logout">
+                        <button type="submit" class="btn btn-ghost btn-sm">Выход</button>
+                    </form>
+                }
+                else
+                {
+                    <a asp-page="/Login">Вход</a>
+                    <a asp-page="/Register">Регистрация</a>
+                }
+            </nav>
+        </header>
+
+        <main class="site-main">
+            @RenderBody()
+        </main>
+
+        <footer class="site-footer">
+            <span>AlexWoW — игровая панель · WotLK 3.3.5a</span>
+        </footer>
+    </div>
+</body>
+</html>

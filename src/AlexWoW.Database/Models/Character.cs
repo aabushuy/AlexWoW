@@ -17,7 +17,7 @@ public sealed class Character
     public byte Level { get; set; }    // M9.1: меняется при повышении уровня
     public uint Xp { get; set; }        // M9.1: текущий опыт на уровне
     public uint Zone { get; init; }
-    public uint Map { get; init; }
+    public uint Map { get; set; }       // #79: меняется при кросс-карта телепорте (до пере-входа в мир)
     public float X { get; init; }
     public float Y { get; init; }
     public float Z { get; init; }

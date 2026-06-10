@@ -39,4 +39,12 @@ public static class MovementPackets
         WriteMovementInfo(w, x, y, z, o);
         return w.ToArray();
     }
+
+    /// <summary>SMSG_TRANSFER_PENDING: анонс перехода на карту <paramref name="map"/> (без транспорта). #79.</summary>
+    public static byte[] BuildTransferPending(uint map)
+        => new ByteWriter(4).UInt32(map).ToArray();
+
+    /// <summary>SMSG_NEW_WORLD: загрузить карту <paramref name="map"/> и поставить персонажа в точку. #79.</summary>
+    public static byte[] BuildNewWorld(uint map, float x, float y, float z, float o)
+        => new ByteWriter(20).UInt32(map).Single(x).Single(y).Single(z).Single(o).ToArray();
 }

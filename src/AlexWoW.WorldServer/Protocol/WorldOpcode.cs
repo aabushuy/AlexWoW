@@ -123,6 +123,10 @@ public enum WorldOpcode : uint
     // Телепорт игрока (Blink/Shadowstep, M7 #33). Сверено с CMaNGOS Opcodes.h.
     MsgMoveTeleport = 0x0C5,                      // наблюдателям: packed guid + MovementInfo
     MsgMoveTeleportAck = 0x0C7,                   // s→c: guid+counter+MovementInfo; c→s ответ (consume)
+    // Кросс-карта телепорт (Devcommands #79). Сверено с wow_messages (3.3.5) / TrinityCore.
+    SmsgNewWorld = 0x03E,                         // s→c: u32 map + Vector3 + f32 orient (загрузить др. карту)
+    SmsgTransferPending = 0x03F,                  // s→c: u32 map (анонс перехода; до NEW_WORLD)
+    MsgMoveWorldportAck = 0x0DC,                  // c→s: клиент догрузил карту → пере-вход в мир
 
     // Таланты (M9.6–M9.8). Опкоды/форматы сверены с CMaNGOS Opcodes.h / wow_messages (3.3.5a).
     SmsgTalentsInfo = 0x4C0,                      // состояние талантов при входе (очки + изученные)

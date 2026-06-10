@@ -40,6 +40,7 @@ builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
 builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
 builder.Services.AddSingleton<IQuestRepository, EfQuestRepository>();
 builder.Services.AddSingleton<ICharacterStateRepository, EfCharacterStateRepository>();
+builder.Services.AddSingleton<ITeleportRepository, EfTeleportRepository>(); // Devcommands #79: точки телепорта
 // Рефактор #25 (SOLID): WorldDatabase (god-класс) разбит на focused SRP-репозитории (Dapper,
 // read-only дамп mangos). *Store зависят от УЗКИХ интерфейсов; WorldSession — от композитного
 // фасада IWorldRepository (делегирует этим репозиториям).

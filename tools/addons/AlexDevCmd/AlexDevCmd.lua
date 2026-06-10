@@ -1,76 +1,29 @@
 --[[ Alex Dev Commands — клиентский пульт dev-команд для AlexWoW (WoW 3.3.5a).
-     Команды отправляются как обычный SAY-чат (".trainer mage" и т.п.); сервер ловит сообщения на "."
-     (DevCommands.TryHandleAsync) и НЕ эхоит их в чат. Гейт is_admin — на сервере, аддон ничего не обходит.
-     Хардкод-каталог (дерево). Окно ввода — для свободных значений (.level / .additem / .learn / .buff). ]]
+     Каталог меню теперь ОТДАЁТ СЕРВЕР (#79): аддон шлёт addon-сообщение "AlexDev menu" и строит дерево
+     из присланных узлов (ничего не хардкодит). Команды-листья отправляются как обычный SAY-чат (".trainer
+     mage" и т.п.); сервер ловит "." (DevCommands.TryHandleAsync) и НЕ эхоит. Телепорт-листья открывают
+     поп-ап подтверждения и шлют ".tp <id>". Гейт is_admin — на сервере. Открыть/закрыть — кнопка у
+     миникарты или /dev. ]]
 
 local ADDON = "AlexDevCmd"
+local PREFIX = "AlexDev"
 local ROW_HEIGHT, NUM_ROWS = 20, 18
 
--- Каталог команд (категория → листья). Лист: cmd = готовая команда, либо prompt = {prefix,label} для ввода.
-local TREE = {
-  { text = "Тренеры классов", children = {
-      { text = "Воин",            cmd = ".trainer warrior" },
-      { text = "Паладин",         cmd = ".trainer paladin" },
-      { text = "Охотник",         cmd = ".trainer hunter" },
-      { text = "Разбойник",       cmd = ".trainer rogue" },
-      { text = "Жрец",            cmd = ".trainer priest" },
-      { text = "Рыцарь смерти",   cmd = ".trainer dk" },
-      { text = "Шаман",           cmd = ".trainer shaman" },
-      { text = "Маг",             cmd = ".trainer mage" },
-      { text = "Чернокнижник",    cmd = ".trainer warlock" },
-      { text = "Друид",           cmd = ".trainer druid" },
-      { text = "Снять",           cmd = ".trainer off" },
-  }},
-  { text = "Тренеры профессий", children = {
-      { text = "Портняжное",      cmd = ".proftrainer tailoring" },
-      { text = "Кузнечное",       cmd = ".proftrainer blacksmithing" },
-      { text = "Кожевничество",   cmd = ".proftrainer leatherworking" },
-      { text = "Алхимия",         cmd = ".proftrainer alchemy" },
-      { text = "Наложение чар",   cmd = ".proftrainer enchanting" },
-      { text = "Инженерное",      cmd = ".proftrainer engineering" },
-      { text = "Ювелирное",       cmd = ".proftrainer jewelcrafting" },
-      { text = "Горное дело",     cmd = ".proftrainer mining" },
-      { text = "Травничество",    cmd = ".proftrainer herbalism" },
-      { text = "Снятие шкур",     cmd = ".proftrainer skinning" },
-      { text = "Кулинария",       cmd = ".proftrainer cooking" },
-      { text = "Первая помощь",   cmd = ".proftrainer firstaid" },
-      { text = "Рыбная ловля",    cmd = ".proftrainer fishing" },
-      { text = "Снять",           cmd = ".proftrainer off" },
-  }},
-  { text = "Крафт-станки", children = {
-      { text = "Наковальня",      cmd = ".craft anvil" },
-      { text = "Горн",            cmd = ".craft forge" },
-      { text = "Костёр",          cmd = ".craft cookfire" },
-      { text = "Почтовый ящик",   cmd = ".craft mailbox" },
-      { text = "Убрать все",      cmd = ".craft off" },
-  }},
-  { text = "Вендор реагентов", children = {
-      { text = "Поставить",       cmd = ".reagentvendor" },
-      { text = "Снять",           cmd = ".reagentvendor off" },
-  }},
-  { text = "Персонаж", children = {
-      { text = "Уровень…",        prompt = { prefix = ".level ",   label = "Установить уровень (1–80):" } },
-      { text = "Опыт…",           prompt = { prefix = ".xp ",      label = "Добавить опыт:" } },
-      { text = "Выдать предмет…", prompt = { prefix = ".additem ", label = "ID предмета [кол-во]:" } },
-      { text = "Изучить спелл…",  prompt = { prefix = ".learn ",   label = "ID спелла:" } },
-      { text = "Выучить всё у тренера", cmd = ".learnall" },
-  }},
-  { text = "Баффы", children = {
-      { text = "Наложить бафф…",  prompt = { prefix = ".buff ",   label = "ID спелла [секунды]:" } },
-      { text = "Снять бафф…",     prompt = { prefix = ".unbuff ", label = "ID спелла:" } },
-  }},
-  { text = "Прочее", children = {
-      { text = "Тренировочный манекен", cmd = ".dummy" },
-      { text = "Снести dev-сущности",   cmd = ".devclean" },
-  }},
-}
+-- ---- Каталог, присланный сервером ----
+-- byId[id] = { id, parent, kind, label, payload = {..}, children = {ids..} }
+-- kind: "cat" (узел с детьми), "cmd", "prompt", "tp", "info".
+local catalog = { byId = {}, order = {}, roots = {} }
+local building = nil            -- временный каталог между BEGIN и END
+local expanded = {}            -- [id] = true (узел развёрнут)
+local visible = {}            -- плоский список видимых строк (DFS по развёрнутым)
+local rows = {}
+local mainFrame, scroll
 
--- Editbox диалога: в 3.3.5 поле dialog.editBox не всегда задано — фолбэк на именованный глобал.
+-- ---- Диалог ввода (свободный аргумент: .level / .additem / .learn / .buff) ----
 local function DialogEditBox(dialog)
   return dialog.editBox or _G[dialog:GetName() .. "EditBox"]
 end
 
--- Окно ввода (одно на все команды со свободным аргументом). data = {prefix,label} передаётся в StaticPopup_Show.
 StaticPopupDialogs["ALEXDEVCMD_INPUT"] = {
   text = "%s",
   button1 = ACCEPT, button2 = CANCEL,
@@ -96,41 +49,110 @@ function AlexDevCmd_SendPrompt(dialog)
   end
 end
 
--- Отправка готовой команды.
+-- ---- Поп-ап подтверждения телепорта (#79) ----
+StaticPopupDialogs["ALEXDEVCMD_TELEPORT"] = {
+  text = "Телепортироваться в %s?",
+  button1 = YES, button2 = NO,
+  OnAccept = function(self)
+    local data = self.data
+    if data and data.cityId then
+      SendChatMessage(".tp " .. data.cityId, "SAY")
+    end
+  end,
+  timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+-- ---- Отправка ----
 local function SendCmd(cmd)
   SendChatMessage(cmd, "SAY")
 end
 
--- ---- Состояние дерева / рендер ----
-local expanded = {}     -- [индекс категории] = true (развёрнута)
-local visible = {}      -- плоский список видимых строк
-local rows = {}         -- кнопки-строки
-local mainFrame, scroll
+local function RequestMenu()
+  SendAddonMessage(PREFIX, "menu", "WHISPER", UnitName("player"))
+end
 
-local function Rebuild()
-  wipe(visible)
-  for ci, cat in ipairs(TREE) do
-    visible[#visible + 1] = { isCategory = true, node = cat, ci = ci }
-    if expanded[ci] then
-      for _, child in ipairs(cat.children) do
-        visible[#visible + 1] = { isCategory = false, node = child }
-      end
+-- ---- Разбор каталога от сервера ----
+local function CommitCatalog()
+  local byId, order = building.byId, building.order
+  for _, id in ipairs(order) do byId[id].children = {} end
+  local roots = {}
+  for _, id in ipairs(order) do
+    local n = byId[id]
+    if n.parent == 0 then
+      table.insert(roots, id)
+    elseif byId[n.parent] then
+      table.insert(byId[n.parent].children, id)
     end
+  end
+  catalog = { byId = byId, order = order, roots = roots }
+  building = nil
+end
+
+-- Строка узла: "N|id|parent|kind|label|payload1|payload2..."
+local function ParseNode(line)
+  local parts = { strsplit("|", line) }
+  if parts[1] ~= "N" then return end
+  local id = tonumber(parts[2])
+  if not id then return end
+  local node = {
+    id = id,
+    parent = tonumber(parts[3]) or 0,
+    kind = parts[4] or "info",
+    label = parts[5] or "?",
+    payload = {},
+  }
+  for i = 6, #parts do node.payload[#node.payload + 1] = parts[i] end
+  building.byId[id] = node
+  table.insert(building.order, id)
+end
+
+local Rebuild, Refresh  -- forward
+
+local function HandleAddonLine(line)
+  if line == "BEGIN" then
+    building = { byId = {}, order = {} }
+  elseif line == "END" then
+    if building then
+      CommitCatalog()
+      wipe(expanded)
+      if mainFrame then Rebuild(); Refresh() end
+    end
+  elseif building then
+    ParseNode(line)
   end
 end
 
-local function Refresh()
+-- ---- Состояние дерева / рендер (обобщённая глубина) ----
+local function HasKids(node) return node.children and #node.children > 0 end
+
+Rebuild = function()
+  wipe(visible)
+  local byId = catalog.byId
+  local function walk(id, depth)
+    local n = byId[id]
+    if not n then return end
+    visible[#visible + 1] = { id = id, depth = depth, hasKids = HasKids(n) }
+    if expanded[id] and HasKids(n) then
+      for _, cid in ipairs(n.children) do walk(cid, depth + 1) end
+    end
+  end
+  for _, id in ipairs(catalog.roots) do walk(id, 0) end
+end
+
+Refresh = function()
   FauxScrollFrame_Update(scroll, #visible, NUM_ROWS, ROW_HEIGHT)
   local offset = FauxScrollFrame_GetOffset(scroll)
   for i = 1, NUM_ROWS do
     local b = rows[i]
     local entry = visible[i + offset]
     if entry then
+      local node = catalog.byId[entry.id]
       b.index = i + offset
-      if entry.isCategory then
-        b.label:SetText("|cffffd100" .. (expanded[entry.ci] and "- " or "+ ") .. entry.node.text .. "|r")
+      local indent = string.rep("  ", entry.depth)
+      if entry.hasKids then
+        b.label:SetText(indent .. "|cffffd100" .. (expanded[entry.id] and "- " or "+ ") .. node.label .. "|r")
       else
-        b.label:SetText("      |cffd0d0d0" .. entry.node.text .. "|r")
+        b.label:SetText(indent .. "  |cffd0d0d0" .. node.label .. "|r")
       end
       b:Show()
     else
@@ -142,17 +164,22 @@ end
 local function OnRowClick(index)
   local entry = visible[index]
   if not entry then return end
-  if entry.isCategory then
-    expanded[entry.ci] = not expanded[entry.ci]
+  local node = catalog.byId[entry.id]
+  if not node then return end
+  if entry.hasKids then
+    expanded[entry.id] = not expanded[entry.id]
     Rebuild(); Refresh()
-  elseif entry.node.cmd then
-    SendCmd(entry.node.cmd)
-  elseif entry.node.prompt then
-    StaticPopup_Show("ALEXDEVCMD_INPUT", entry.node.prompt.label, nil, entry.node.prompt)
+  elseif node.kind == "cmd" then
+    SendCmd(node.payload[1])
+  elseif node.kind == "prompt" then
+    local prefix, hint = node.payload[1], node.payload[2]
+    StaticPopup_Show("ALEXDEVCMD_INPUT", hint, nil, { prefix = prefix, label = hint })
+  elseif node.kind == "tp" then
+    StaticPopup_Show("ALEXDEVCMD_TELEPORT", node.label, nil, { cityId = node.payload[1], cityName = node.label })
   end
 end
 
--- ---- Построение окна ----
+-- ---- Главное окно ----
 local function BuildUI()
   local f = CreateFrame("Frame", "AlexDevCmdFrame", UIParent)
   f:SetWidth(300); f:SetHeight(460)
@@ -210,28 +237,96 @@ local function BuildUI()
   mainFrame = f
 end
 
+local function Toggle()
+  if mainFrame:IsShown() then
+    mainFrame:Hide()
+  else
+    if #catalog.roots == 0 then RequestMenu() end -- ещё не загружен — дёрнуть сервер
+    mainFrame:Show(); Rebuild(); Refresh()
+  end
+end
+
+-- ---- Кнопка у миникарты ----
+local minimapButton
+
+local function MinimapUpdatePosition(self)
+  local angle = math.rad(AlexDevCmdDB.minimapAngle or 200)
+  self:SetPoint("CENTER", Minimap, "CENTER", 80 * math.cos(angle), 80 * math.sin(angle))
+end
+
+local function MinimapDragUpdate(self)
+  local mx, my = Minimap:GetCenter()
+  local scale = Minimap:GetEffectiveScale()
+  local px, py = GetCursorPosition()
+  px, py = px / scale, py / scale
+  AlexDevCmdDB.minimapAngle = math.deg(math.atan2(py - my, px - mx))
+  MinimapUpdatePosition(self)
+end
+
+local function BuildMinimapButton()
+  local btn = CreateFrame("Button", "AlexDevCmdMinimapButton", Minimap)
+  btn:SetWidth(31); btn:SetHeight(31)
+  btn:SetFrameStrata("MEDIUM"); btn:SetFrameLevel(8)
+  btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  btn:RegisterForDrag("LeftButton")
+  btn:SetMovable(true)
+
+  local icon = btn:CreateTexture(nil, "BACKGROUND")
+  icon:SetTexture("Interface\\Icons\\Spell_Arcane_Blink")
+  icon:SetWidth(20); icon:SetHeight(20)
+  icon:SetPoint("CENTER", 0, 1)
+  icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+  local border = btn:CreateTexture(nil, "OVERLAY")
+  border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  border:SetWidth(53); border:SetHeight(53)
+  border:SetPoint("TOPLEFT")
+
+  btn:SetScript("OnClick", function() Toggle() end)
+  btn:SetScript("OnDragStart", function(self) self:SetScript("OnUpdate", MinimapDragUpdate) end)
+  btn:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+  btn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+    GameTooltip:AddLine("Alex Dev")
+    GameTooltip:AddLine("Клик — пульт dev-команд", 1, 1, 1)
+    GameTooltip:AddLine("Перетащить — вокруг миникарты", 0.7, 0.7, 0.7)
+    GameTooltip:Show()
+  end)
+  btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+  minimapButton = btn
+  MinimapUpdatePosition(btn)
+end
+
 -- ---- Загрузка ----
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
-loader:SetScript("OnEvent", function(self, event, name)
-  if name ~= ADDON then return end
-  AlexDevCmdDB = AlexDevCmdDB or {}
-  BuildUI()
-  if AlexDevCmdDB.pos then
-    local p, rp, x, y = unpack(AlexDevCmdDB.pos)
-    mainFrame:ClearAllPoints()
-    mainFrame:SetPoint(p, UIParent, rp, x, y)
+loader:RegisterEvent("PLAYER_ENTERING_WORLD")
+loader:RegisterEvent("CHAT_MSG_ADDON")
+loader:SetScript("OnEvent", function(self, event, ...)
+  if event == "ADDON_LOADED" then
+    local name = ...
+    if name ~= ADDON then return end
+    AlexDevCmdDB = AlexDevCmdDB or {}
+    BuildUI()
+    BuildMinimapButton()
+    if AlexDevCmdDB.pos then
+      local p, rp, x, y = unpack(AlexDevCmdDB.pos)
+      mainFrame:ClearAllPoints()
+      mainFrame:SetPoint(p, UIParent, rp, x, y)
+    end
+    Rebuild(); Refresh()
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    RequestMenu() -- каталог отдаёт сервер (#79); пере-запрос после загрузки/телепорта безвреден
+  elseif event == "CHAT_MSG_ADDON" then
+    local prefix, message = ...
+    if prefix == PREFIX and message then HandleAddonLine(message) end
   end
-  Rebuild(); Refresh()
-  self:UnregisterEvent("ADDON_LOADED")
 end)
 
-local function Toggle()
-  if mainFrame:IsShown() then mainFrame:Hide() else mainFrame:Show(); Refresh() end
-end
-
+local function ToggleSlash() Toggle() end
 SLASH_ALEXDEVCMD1 = "/dev"
 SLASH_ALEXDEVCMD2 = "/devcmd"
-SlashCmdList["ALEXDEVCMD"] = Toggle
+SlashCmdList["ALEXDEVCMD"] = ToggleSlash
 
-DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99AlexDevCmd|r загружен — /dev открывает пульт.")
+DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99AlexDevCmd|r загружен — кнопка у миникарты или /dev открывает пульт.")

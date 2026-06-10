@@ -1,0 +1,35 @@
+@page
+@model AlexWoW.Web.Pages.Characters.IndexModel
+@{
+    ViewData["Title"] = "Персонажи";
+}
+<h1>Мои персонажи</h1>
+
+@if (Model.Characters.Count == 0)
+{
+    <div class="panel">
+        <div class="empty-state">
+            <p>На этом аккаунте пока нет персонажей.</p>
+            <p>Войдите в игру и создайте героя — он появится здесь.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="char-grid">
+        @foreach (var c in Model.Characters)
+        {
+            <a class="char-card" asp-page="/Characters/Details" asp-route-guid="@c.Guid">
+                <div class="char-name" style="color:@GameData.ClassColor(c.Class)">@c.Name</div>
+                <div class="char-sub">
+                    @GameData.RaceName(c.Race), @GameData.ClassName(c.Class) · @GameData.GenderName(c.Gender)
+                </div>
+                <div class="char-meta">
+                    <span class="level-badge">@c.Level</span>
+                    <span class="faction-tag" style="color:@GameData.FactionColor(c.Race)">@GameData.Faction(c.Race)</span>
+                    <span>@GameData.ZoneName(c.Zone)</span>
+                </div>
+            </a>
+        }
+    </div>
+}

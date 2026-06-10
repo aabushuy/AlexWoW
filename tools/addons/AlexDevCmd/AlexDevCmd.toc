@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Alex Dev Commands
-## Notes: Древовидный пульт dev-команд (расстановка тренеров/станков/вендора, прокачка и пр.). Гейт is_admin — на сервере.
+## Notes: Древовидный пульт dev-команд + телепорт по городам. Каталог отдаёт сервер. Кнопка у миникарты. Гейт is_admin — на сервере.
 ## Author: AlexWoW
-## Version: 1.0
+## Version: 2.0
 ## SavedVariables: AlexDevCmdDB
 
 AlexDevCmd.lua

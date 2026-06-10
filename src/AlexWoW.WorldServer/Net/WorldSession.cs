@@ -28,7 +28,8 @@ public sealed class WorldSession
 
     public WorldSession(Socket socket, IAccountRepository database, ICharacterRepository characters,
         IInventoryRepository items, IQuestRepository quests, ICharacterStateRepository charState,
-        IWorldRepository worldDatabase, TerrainMaps terrain, WorldState world, WorldServerOptions options, ILogger logger)
+        ITeleportRepository teleports, IWorldRepository worldDatabase, TerrainMaps terrain, WorldState world,
+        WorldServerOptions options, ILogger logger)
     {
         _stream = new NetworkStream(socket, ownsSocket: true);
         RemoteIp = (socket.RemoteEndPoint as System.Net.IPEndPoint)?.Address.ToString() ?? "?";
@@ -37,6 +38,7 @@ public sealed class WorldSession
         Items = items;
         Quests = quests;
         CharState = charState;
+        Teleports = teleports;
         WorldDb = worldDatabase;
         Terrain = terrain;
         World = world;
@@ -50,6 +52,7 @@ public sealed class WorldSession
     internal IInventoryRepository Items { get; }
     internal IQuestRepository Quests { get; }
     internal ICharacterStateRepository CharState { get; }
+    internal ITeleportRepository Teleports { get; }
     internal IWorldRepository WorldDb { get; }
     internal TerrainMaps Terrain { get; }
     internal WorldState World { get; }
@@ -142,6 +145,9 @@ public sealed class WorldSession
     /// <summary>Счётчик телепортов (movement order counter в MSG_MOVE_TELEPORT_ACK). M7 #33.</summary>
     private uint _teleportCounter;
     internal uint NextTeleportCounter() => ++_teleportCounter;
+
+    /// <summary>Идёт кросс-карта телепорт: отправлен SMSG_NEW_WORLD, ждём MSG_MOVE_WORLDPORT_ACK. #79.</summary>
+    internal bool PendingWorldport { get; set; }
 
     /// <summary>Журнал квестов: слот (0..24) → прогресс (null — пусто). Персист — позже. M6.5.</summary>
     internal World.QuestProgress?[] QuestSlots { get; } = new World.QuestProgress?[Protocol.UpdateField.QuestLogSlots];
@@ -302,7 +308,7 @@ public sealed class WorldSession
             return;
         try
         {
-            await Characters.SavePositionAsync(InWorldGuid, PosX, PosY, PosZ, ct);
+            await Characters.SavePositionAsync(InWorldGuid, PosX, PosY, PosZ, Character?.Map ?? 0, ct);
             Logger.LogInformation("Позиция '{User}' сохранена: ({X};{Y};{Z})", Account, PosX, PosY, PosZ);
         }
         catch (Exception ex)

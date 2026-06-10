@@ -19,6 +19,7 @@ public sealed class WorldListener(
     IInventoryRepository items,
     IQuestRepository quests,
     ICharacterStateRepository charState,
+    ITeleportRepository teleports,
     IWorldRepository worldDatabase,
     TerrainMaps terrain,
     Vmaps vmaps,
@@ -63,7 +64,7 @@ public sealed class WorldListener(
 
             _ = Task.Run(
                 () => new WorldSession(client, database, characters, items, quests, charState,
-                        worldDatabase, terrain, world, _options, logger)
+                        teleports, worldDatabase, terrain, world, _options, logger)
                     .RunAsync(stoppingToken),
                 stoppingToken);
         }
