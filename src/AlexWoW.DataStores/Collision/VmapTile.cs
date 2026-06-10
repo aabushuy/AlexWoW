@@ -93,7 +93,7 @@ public sealed class VmapTile
         var inv = 1f / det;
         var tv = o - a;
         var u = Vector3.Dot(tv, p) * inv;
-        if (u < 0f || u > 1f)
+        if (u is < 0f or > 1f)
             return false;
         var q = Vector3.Cross(tv, e1);
         var v = Vector3.Dot(d, q) * inv;
