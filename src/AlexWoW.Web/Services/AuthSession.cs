@@ -8,13 +8,17 @@ namespace AlexWoW.Web.Services;
 /// <summary>Помощник cookie-сессии: выдаёт/снимает аутентификацию по игровому аккаунту.</summary>
 public static class AuthSession
 {
-    /// <summary>account_id хранится в claim NameIdentifier, email — в Name.</summary>
+    /// <summary>Имя игрового логина в claims (для подсказки «что вводить в клиенте»).</summary>
+    public const string GameAccountClaim = "alexwow:game_account";
+
+    /// <summary>account_id → NameIdentifier, email → Name, игровой логин → GameAccountClaim.</summary>
     public static async Task SignInAsync(HttpContext http, Account account, bool persistent = true)
     {
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, account.Id.ToString()),
-            new(ClaimTypes.Name, account.Username),
+            new(ClaimTypes.Name, account.Email ?? account.Username),
+            new(GameAccountClaim, account.Username),
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await http.SignInAsync(
@@ -31,4 +35,7 @@ public static class AuthSession
         uint.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
 
     public static string Email(ClaimsPrincipal user) => user.FindFirstValue(ClaimTypes.Name) ?? "";
+
+    /// <summary>Игровой логин (то, что игрок вводит в клиенте WoW).</summary>
+    public static string GameAccount(ClaimsPrincipal user) => user.FindFirstValue(GameAccountClaim) ?? "";
 }

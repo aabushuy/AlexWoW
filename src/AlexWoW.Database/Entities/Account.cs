@@ -4,7 +4,8 @@ namespace AlexWoW.Database.Entities;
 public sealed class Account
 {
     public uint Id { get; set; }
-    public string Username { get; set; } = null!;
+    public string Username { get; set; } = null!;          // игровой логин (вводится в клиенте WoW)
+    public string? Email { get; set; }                      // M8: вход на сайт; null у CLI/игровых аккаунтов
     public byte[] Salt { get; set; } = null!;       // binary(32)
     public byte[] Verifier { get; set; } = null!;   // binary(32)
     public byte[]? SessionKey { get; set; }          // binary(40), nullable

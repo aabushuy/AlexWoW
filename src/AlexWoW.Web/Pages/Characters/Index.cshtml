@@ -2,8 +2,16 @@
 @model AlexWoW.Web.Pages.Characters.IndexModel
 @{
     ViewData["Title"] = "Персонажи";
+    var gameLogin = AuthSession.GameAccount(User);
 }
 <h1>Мои персонажи</h1>
+
+@if (!string.IsNullOrEmpty(gameLogin))
+{
+    <div class="alert alert-ok" role="alert" style="margin-bottom:20px">
+        Игровой логин (поле «Учётная запись» в клиенте WoW): <strong>@gameLogin</strong>
+    </div>
+}
 
 @if (Model.Characters.Count == 0)
 {

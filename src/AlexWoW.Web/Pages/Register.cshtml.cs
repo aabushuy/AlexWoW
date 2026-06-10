@@ -15,8 +15,14 @@ public sealed class RegisterModel(IAccountService accounts) : PageModel
         [Required(ErrorMessage = "Укажите email.")]
         [EmailAddress(ErrorMessage = "Некорректный email.")]
         [StringLength(255, ErrorMessage = "Email слишком длинный.")]
-        [Display(Name = "Email")]
+        [Display(Name = "Email (для входа на сайт)")]
         public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Укажите имя аккаунта.")]
+        [StringLength(16, MinimumLength = 3, ErrorMessage = "Имя аккаунта — от 3 до 16 символов.")]
+        [RegularExpression("^[A-Za-z0-9]+$", ErrorMessage = "Только латинские буквы и цифры (без @, пробелов и символов).")]
+        [Display(Name = "Имя аккаунта (для входа в игру)")]
+        public string AccountName { get; set; } = "";
 
         [Required(ErrorMessage = "Укажите пароль.")]
         [StringLength(16, MinimumLength = 4, ErrorMessage = "Пароль должен быть от 4 до 16 символов.")]
@@ -38,8 +44,13 @@ public sealed class RegisterModel(IAccountService accounts) : PageModel
         if (!ModelState.IsValid)
             return Page();
 
-        var result = await accounts.RegisterAsync(Input.Email, Input.Password, ct);
-        if (result == RegisterResult.AlreadyExists)
+        var result = await accounts.RegisterAsync(Input.Email, Input.AccountName, Input.Password, ct);
+        if (result == RegisterResult.AccountNameTaken)
+        {
+            ModelState.AddModelError(string.Empty, "Это имя аккаунта уже занято — выберите другое.");
+            return Page();
+        }
+        if (result == RegisterResult.EmailTaken)
         {
             ModelState.AddModelError(string.Empty, "Аккаунт с таким email уже существует.");
             return Page();

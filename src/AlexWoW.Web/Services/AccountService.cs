@@ -12,36 +12,38 @@ namespace AlexWoW.Web.Services;
 /// </summary>
 public sealed class AccountService(IAccountRepository accounts) : IAccountService
 {
-    public async Task<RegisterResult> RegisterAsync(string email, string password, CancellationToken ct = default)
+    public async Task<RegisterResult> RegisterAsync(string email, string accountName, string password,
+        CancellationToken ct = default)
     {
-        var username = email.ToUpperInvariant();
+        var username = accountName.ToUpperInvariant();   // игровой логин = SRP-идентичность
         if (await accounts.AccountExistsAsync(username, ct))
-            return RegisterResult.AlreadyExists;
+            return RegisterResult.AccountNameTaken;
+        if (await accounts.EmailExistsAsync(email, ct))
+            return RegisterResult.EmailTaken;
 
         var (salt, verifier) = MakeCredentials(username, password);
-        await accounts.CreateAccountAsync(username, salt, verifier, ct);
+        await accounts.CreateAccountAsync(username, salt, verifier, email, ct);
         return RegisterResult.Success;
     }
 
     public async Task<Account?> VerifyCredentialsAsync(string email, string password, CancellationToken ct = default)
     {
-        var username = email.ToUpperInvariant();
-        var account = await accounts.GetAccountByUsernameAsync(username, ct);
+        var account = await accounts.GetAccountByEmailAsync(email, ct);
         if (account is null)
             return null;
-        return VerifierMatches(username, password, account) ? account : null;
+        // SRP считается по игровому имени аккаунта, не по email.
+        return VerifierMatches(account.Username, password, account) ? account : null;
     }
 
     public async Task<bool> ChangePasswordAsync(string email, string currentPassword, string newPassword,
         CancellationToken ct = default)
     {
-        var username = email.ToUpperInvariant();
-        var account = await accounts.GetAccountByUsernameAsync(username, ct);
-        if (account is null || !VerifierMatches(username, currentPassword, account))
+        var account = await accounts.GetAccountByEmailAsync(email, ct);
+        if (account is null || !VerifierMatches(account.Username, currentPassword, account))
             return false;
 
-        var (salt, verifier) = MakeCredentials(username, newPassword);
-        await accounts.UpdatePasswordAsync(username, salt, verifier, ct);
+        var (salt, verifier) = MakeCredentials(account.Username, newPassword);
+        await accounts.UpdatePasswordAsync(account.Username, salt, verifier, ct);
         return true;
     }
 

@@ -5,7 +5,11 @@
 }
 <div class="panel panel-narrow">
     <h1>Создать аккаунт</h1>
-    <p class="lead">Email и пароль — те же, что вы введёте в игровом клиенте.</p>
+    <p class="lead">
+        <strong>Email</strong> — для входа на этот сайт.
+        <strong>Имя аккаунта</strong> — то, что вы вводите в поле «Учётная запись» игрового клиента
+        (только латиница и цифры — клиент WoW не принимает «@@»).
+    </p>
 
     <form method="post">
         @{
@@ -25,6 +29,11 @@
             <label asp-for="Input.Email"></label>
             <input asp-for="Input.Email" autocomplete="email" autofocus />
             <span asp-validation-for="Input.Email" class="field-error"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Input.AccountName"></label>
+            <input asp-for="Input.AccountName" autocomplete="off" spellcheck="false" />
+            <span asp-validation-for="Input.AccountName" class="field-error"></span>
         </div>
         <div class="field">
             <label asp-for="Input.Password"></label>
