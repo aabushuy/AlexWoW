@@ -9,11 +9,12 @@ namespace AlexWoW.WorldServer.Handlers;
 /// числа ожидающих приглашений (<see cref="WorldOpcode.CmsgCalendarGetNumPending"/>) значением 0,
 /// чтобы индикатор на часах миникарты не висел в неопределённом состоянии и опкод не логировался
 /// как необработанный. (Сам taint Blizzard-аддонов лечится ответом SMSG_ADDON_INFO в AuthHandlers.)
+/// (DI-модуль, M7 #36.)
 /// </summary>
-public static class CalendarHandlers
+internal sealed class CalendarHandlers : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgCalendarGetNumPending)]
-    public static async Task OnGetNumPending(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnGetNumPending(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var w = new ByteWriter(4).UInt32(0); // pending_events = 0
         await session.SendAsync(WorldOpcode.SmsgCalendarSendNumPending, w.ToArray(), ct);

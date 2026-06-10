@@ -1,15 +1,16 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Предметы (M6.1): ответ на CMSG_ITEM_QUERY_SINGLE из item_template (тултипы).</summary>
-public static class ItemHandlers
+/// <summary>Предметы (M6.1): ответ на CMSG_ITEM_QUERY_SINGLE из item_template (тултипы). (DI-модуль, M7 #36.)</summary>
+internal sealed class ItemHandlers(IWorldRepository worldDb) : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgItemQuerySingle)]
-    public static async Task OnItemQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnItemQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var entry = reader.UInt32();
@@ -17,7 +18,7 @@ public static class ItemHandlers
         session.Logger.LogDebug("[item-query] '{User}' запросил item {Entry}", session.Account, entry);
 
         Database.Models.ItemTemplateData? t = null;
-        try { t = await session.WorldDb.GetItemTemplateAsync(entry, ct); }
+        try { t = await worldDb.GetItemTemplateAsync(entry, ct); }
         catch (Exception ex) { session.Logger.LogDebug("ITEM_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message); }
 
         if (t is null)

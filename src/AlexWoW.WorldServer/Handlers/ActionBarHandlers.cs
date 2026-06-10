@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -10,14 +11,16 @@ namespace AlexWoW.WorldServer.Handlers;
 /// SMSG_ACTION_BUTTONS при входе) и видимости доп. панелей (CMSG_SET_ACTIONBAR_TOGGLES →
 /// PLAYER_FIELD_BYTES[2] + персист). Это НЕ account-data: содержимое кнопок и набор панелей —
 /// отдельные опкоды (сверено с CMaNGOS Player::SendInitialActionButtons/HandleSetActionButtonOpcode).
+/// (DI-модуль, M7 #36.)
 /// </summary>
-public static class ActionBarHandlers
+internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICharacterRepository characters)
+    : IOpcodeHandlerModule
 {
     /// <summary>Кол-во кнопок панелей (3.3.5: MAX_ACTION_BUTTONS).</summary>
     private const int MaxActionButtons = 144;
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSetActionButton)]
-    public static async Task OnSetActionButton(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnSetActionButton(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         if (session.InWorldGuid == 0)
             return;
@@ -25,12 +28,12 @@ public static class ActionBarHandlers
         var button = r.UInt8();
         // Клиент шлёт button(u8) + packedData(u32) = action(24)|type(8). packed=0 → снять ярлык.
         var packed = r.UInt32();
-        try { await session.CharState.SetActionButtonAsync(session.InWorldGuid, button, packed, ct); }
+        try { await charState.SetActionButtonAsync(session.InWorldGuid, button, packed, ct); }
         catch (Exception ex) { session.Logger.LogDebug("SET_ACTION_BUTTON {Btn}: {Msg}", button, ex.Message); }
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSetActionbarToggles)]
-    public static async Task OnSetActionbarToggles(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnSetActionbarToggles(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         if (session.InWorldGuid == 0 || session.Character is null)
             return;
@@ -41,7 +44,7 @@ public static class ActionBarHandlers
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
                 m => m.SetBytes(UpdateField.PlayerFieldBytes, 0, 0, actionBars, 0)), ct);
-        try { await session.Characters.SetActionBarsAsync(session.InWorldGuid, actionBars, ct); }
+        try { await characters.SetActionBarsAsync(session.InWorldGuid, actionBars, ct); }
         catch (Exception ex) { session.Logger.LogDebug("SET_ACTIONBAR_TOGGLES: {Msg}", ex.Message); }
     }
 
@@ -49,7 +52,8 @@ public static class ActionBarHandlers
     /// SMSG_ACTION_BUTTONS при входе (M7 #17): behavior=INITIAL(1) + 144×u32 packed (0 — пусто).
     /// Восстанавливает ярлыки панелей из character_action. Зовётся из OnPlayerLogin.
     /// </summary>
-    internal static async Task SendInitialActionButtonsAsync(WorldSession session, CancellationToken ct)
+    // статик-мост до S7 (#41): зовёт легаси-статик WorldEntryHandlers
+    public static async Task SendInitialActionButtonsAsync(WorldSession session, CancellationToken ct)
     {
         IReadOnlyDictionary<byte, uint> buttons;
         try { buttons = await session.CharState.GetActionButtonsAsync(session.InWorldGuid, ct); }

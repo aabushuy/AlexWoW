@@ -13,14 +13,15 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <c>"PREFIX\tBODY"</c>); сервер отвечает <c>SMSG_MESSAGECHAT</c> с тем же языком — клиент поднимает
 /// событие <c>CHAT_MSG_ADDON</c> (в чат не печатается). Сверено с TrinityCore <c>Player::WhisperAddon</c>.
 /// Сейчас единственная команда — <c>menu</c>: сервер отдаёт каталог dev-меню (<see cref="DevMenuCatalog"/>).
+/// Не опкод-модуль (своих опкодов нет) — DI-сервис, инжектится в <see cref="ChatHandlers"/> (M7 #36).
 /// </summary>
-public static class AddonProtocol
+internal sealed class AddonProtocol
 {
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
 
     /// <summary>Разобрать addon-сообщение от клиента (<paramref name="prefix"/>/<paramref name="body"/>).</summary>
-    public static async Task HandleAsync(WorldSession session, string prefix, string body, CancellationToken ct)
+    public async Task HandleAsync(WorldSession session, string prefix, string body, CancellationToken ct)
     {
         if (prefix != DevMenuCatalog.Prefix)
             return;
@@ -35,7 +36,7 @@ public static class AddonProtocol
     }
 
     /// <summary>Отдать каталог dev-меню кадрами BEGIN … узлы … END. Не-админу — пустой каталог.</summary>
-    private static async Task SendMenuAsync(WorldSession session, CancellationToken ct)
+    private async Task SendMenuAsync(WorldSession session, CancellationToken ct)
     {
         await SendLineAsync(session, "BEGIN", ct);
         if (session.IsAdmin)
