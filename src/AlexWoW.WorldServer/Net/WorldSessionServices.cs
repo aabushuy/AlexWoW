@@ -29,7 +29,6 @@ internal sealed class WorldSessionServices(
     SpellCatalog spellCatalog,
     AuraService auras,
     AuraPersistenceService auraPersistence,
-    CombatResourcesService combatResources,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -48,6 +47,5 @@ internal sealed class WorldSessionServices(
     public SpellCatalog SpellCatalog { get; } = spellCatalog;
     public AuraService AuraService { get; } = auras;
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
-    public CombatResourcesService CombatResources { get; } = combatResources;
     public ILogger<WorldSession> Logger { get; } = logger;
 }

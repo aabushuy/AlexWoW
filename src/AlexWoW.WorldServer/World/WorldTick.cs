@@ -7,12 +7,14 @@ namespace AlexWoW.WorldServer.World;
 /// Оркестрация серверного тика мира (SRP-часть рефактора #30, DI-синглтон M7 S3): раз в ~250 мс
 /// (из <see cref="WorldUpdateLoop"/>) продвигает по-игроку (мили-свинги/реген/ауры/авто-агро/time-sync) и
 /// по-существу (ИИ возврат/бой/реген, респавн мёртвых). Исключения по сессии/существу ловятся поштучно,
-/// чтобы не валить весь тик. Тик-сервисы (реген/ауры/периодика) — DI; бой/time-sync — пока легаси-статики
-/// (CombatHandlers/WorldEntryHandlers, конверсия в S4/S7).
+/// чтобы не валить весь тик. Тик-сервисы (бой/реген/ауры/периодика) — DI (бой — S4); time-sync — пока
+/// легаси-статик (WorldEntryHandlers, конверсия в S7).
 /// </summary>
 internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
-    AuraService auras, PeriodicsService periodics, ILogger<WorldTick> logger)
+    AuraService auras, PeriodicsService periodics,
+    PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
+    ILogger<WorldTick> logger)
 {
     /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
     private const long TimeSyncIntervalMs = 10_000;
@@ -26,15 +28,15 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
         {
             try
             {
-                await CombatHandlers.TickMeleeAsync(player.Session, now, ct);
+                await playerMelee.TickMeleeAsync(player.Session, now, ct);
                 // M6.4: завершение каста — точно по времени (Task.Delay в SpellCastCompletion), не в тике;
                 // здесь — реген маны (вне «правила 5 секунд»).
                 await manaRegen.TickAsync(player.Session, now, ct);
                 await combatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
                 await auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
                 await periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
-                await CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
-                await CombatHandlers.TickAggroScanAsync(world, player, now, ct);     // M6.7: авто-агро по фракции
+                await regen.TickPlayerRegenAsync(player.Session, now, ct);            // M6.7: внебоевой реген HP
+                await creatureAi.TickAggroScanAsync(world, player, now, ct);          // M6.7: авто-агро по фракции
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
@@ -54,11 +56,11 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                 if (creature.IsAlive)
                 {
                     if (creature.Evading)
-                        await CombatHandlers.TickEvadeAsync(world, creature, now, ct);
+                        await creatureAi.TickEvadeAsync(world, creature, now, ct);
                     else if (creature.CombatTargetGuid != 0)
-                        await CombatHandlers.TickCreatureCombatAsync(world, creature, now, ct);
+                        await creatureAi.TickCreatureCombatAsync(world, creature, now, ct);
                     else
-                        await CombatHandlers.TickRegenAsync(world, creature, now, ct);
+                        await regen.TickRegenAsync(world, creature, now, ct);
                     continue;
                 }
                 if (creature.RespawnAtMs is { } at && now >= at)
