@@ -77,7 +77,10 @@ internal sealed class PeriodicsService(
         var dup = session.Progression.Periodics.FirstOrDefault(p => p.SpellId == spellId && p.TargetGuid == targetCreatureGuid);
         byte slot;
         if (dup is not null) { slot = dup.Slot; session.Progression.Periodics.Remove(dup); }
-        else slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
+        else
+        {
+            slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
+        }
 
         const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
@@ -143,7 +146,10 @@ internal sealed class PeriodicsService(
         var dup = session.Progression.Periodics.FirstOrDefault(p => p.SpellId == spellId && p.TargetGuid == targetCreatureGuid);
         byte slot;
         if (dup is not null) { slot = dup.Slot; session.Progression.Periodics.Remove(dup); }
-        else slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
+        else
+        {
+            slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == targetCreatureGuid);
+        }
 
         const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
@@ -222,7 +228,9 @@ internal sealed class PeriodicsService(
             await RemoveAsync(session, p, ct);
         }
         else
+        {
             await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: false, ct);
+        }
     }
 
     private async Task TickHealAsync(WorldSession session, PeriodicEffect p, ulong caster, CancellationToken ct)
@@ -261,7 +269,9 @@ internal sealed class PeriodicsService(
             return; // визуал на себе (бафф/HoT-иконка) истечёт сам в AuraService.TickAsync (та же длительность)
         var creature = session.World.FindCreature(p.TargetGuid);
         if (creature is not null)
+        {
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
                 AuraPackets.BuildRemove(creature.Guid, p.Slot), ct);
+        }
     }
 }

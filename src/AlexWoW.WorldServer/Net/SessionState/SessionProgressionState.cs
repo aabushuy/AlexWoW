@@ -11,24 +11,24 @@ internal sealed class SessionProgressionState
 
     /// <summary>Известные игроку спеллы (стартовые по классу + языковые + изученные у тренера). Для
     /// HasSpell-проверок тренера и анти-дубля. Загружается при входе в мир. M9.3.</summary>
-    internal HashSet<uint> KnownSpells { get; } = new();
+    internal HashSet<uint> KnownSpells { get; } = [];
 
     /// <summary>Свободные очки талантов (PLAYER_CHARACTER_POINTS1). Вычисляются: MaxPoints(level) − потрачено. M9.6.</summary>
     internal uint TalentPoints { get; set; }
     /// <summary>Изученные таланты: talentId → ранг (0-индексный). Загружается при входе. M9.6/M9.7.</summary>
-    internal Dictionary<uint, byte> LearnedTalents { get; } = new();
+    internal Dictionary<uint, byte> LearnedTalents { get; } = [];
 
     /// <summary>Книга навыков персонажа (профессии и пр.). Загружается при входе в мир. M11.1.</summary>
     internal World.PlayerSkillBook SkillBook { get; } = new();
 
     /// <summary>Текущий тир-спелл каждой профессии в книге: skillId → (spell, потолок). Высший тир
     /// supercede'ит низшие (в книге показывается один). Заполняется при входе/изучении. M11.</summary>
-    internal Dictionary<ushort, (uint Spell, ushort Max)> ProfessionRankSpell { get; } = new();
+    internal Dictionary<ushort, (uint Spell, ushort Max)> ProfessionRankSpell { get; } = [];
 
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
-    internal List<World.ActiveAura> Auras { get; } = new();
+    internal List<World.ActiveAura> Auras { get; } = [];
     /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
-    internal List<Handlers.PeriodicEffect> Periodics { get; } = new();
+    internal List<Handlers.PeriodicEffect> Periodics { get; } = [];
     /// <summary>Текущая форма шейпшифта (стойка воина/форма друида); 0 — нет формы. UNIT_FIELD_BYTES_2 байт 3. M6.11.</summary>
     internal byte ShapeshiftForm { get; set; }
 

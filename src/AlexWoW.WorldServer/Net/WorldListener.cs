@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.DataStores.Collision;
@@ -29,9 +29,10 @@ internal sealed class WorldListener(
     {
         await EnsureSchemaWithRetryAsync(stoppingToken);
         await ProbeWorldDatabaseAsync(stoppingToken);
-        logger.LogInformation(terrain.Available
-            ? "Рельеф (maps) подключён"
-            : "Рельеф (maps) не задан — высота земли недоступна");
+        if (terrain.Available)
+            logger.LogInformation("Рельеф (maps) подключён");
+        else
+            logger.LogInformation("Рельеф (maps) не задан — высота земли недоступна");
         logger.LogInformation("Коллизии (vmaps): {V}; навмеш (mmaps): {M}",
             vmaps.Available ? "подключены" : "нет", navmesh.Available ? "подключён" : "нет");
 
@@ -72,7 +73,7 @@ internal sealed class WorldListener(
         }
         catch (Exception ex)
         {
-            logger.LogWarning("БД мира недоступна ({Msg}) — NPC из дампа не будут спавниться", ex.Message);
+            logger.LogWarning(ex, "БД мира недоступна ({Msg}) — NPC из дампа не будут спавниться", ex.Message);
         }
     }
 
@@ -89,7 +90,7 @@ internal sealed class WorldListener(
             catch (Exception ex) when (attempt < MaxAttempts && !ct.IsCancellationRequested)
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(5, attempt));
-                logger.LogWarning("БД персонажей недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
+                logger.LogWarning(ex, "БД персонажей недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
                     attempt, MaxAttempts, ex.Message, delay.TotalSeconds);
                 await Task.Delay(delay, ct);
             }

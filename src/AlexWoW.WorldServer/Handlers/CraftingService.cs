@@ -22,8 +22,11 @@ internal sealed class CraftingService(
         if (info.Reagents is null)
             return true;
         foreach (var (item, count) in info.Reagents)
+        {
             if (InventoryGrantService.CountItem(session, item) < count)
                 return false;
+        }
+
         return true;
     }
 
@@ -35,8 +38,10 @@ internal sealed class CraftingService(
             return;
 
         if (info.Reagents is not null)
+        {
             foreach (var (item, count) in info.Reagents)
                 await inventoryGrant.ConsumeAsync(session, item, count, ct);
+        }
 
         var placed = await inventoryGrant.TryGiveAsync(session, info.CreateItemId, info.CreateItemCount, ct);
         session.Logger.LogInformation("CRAFT '{User}': spell={Spell} → {Count}×{Item}{Full}",

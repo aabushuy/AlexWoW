@@ -30,7 +30,7 @@ internal sealed class SessionCastState
     internal long LastManaRegenMs { get; set; }
 
     /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
-    internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = new();
+    internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = [];
 
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (мана/GCD/тайминги переживают выход by design — переинициализируются при входе).</summary>

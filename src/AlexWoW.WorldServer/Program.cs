@@ -22,7 +22,7 @@ var builder = Host.CreateApplicationBuilder(args);
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
+    .WriteTo.Console(formatProvider: System.Globalization.CultureInfo.InvariantCulture)
     .CreateLogger();
 builder.Services.AddSerilog();
 

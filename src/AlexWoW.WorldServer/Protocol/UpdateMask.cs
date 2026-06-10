@@ -8,7 +8,7 @@ namespace AlexWoW.WorldServer.Protocol;
 /// </summary>
 public sealed class UpdateMask
 {
-    private readonly SortedDictionary<int, uint> _fields = new();
+    private readonly SortedDictionary<int, uint> _fields = [];
 
     public void SetUInt32(int index, uint value) => _fields[index] = value;
 

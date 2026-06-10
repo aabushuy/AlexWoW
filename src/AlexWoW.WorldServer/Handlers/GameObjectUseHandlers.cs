@@ -49,7 +49,9 @@ internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant
         if (slot is not null)
             await session.World.DespawnDevGoAsync(session, slot, ct);
         else
+        {
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
+        }
     }
 }

@@ -52,8 +52,11 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
         creature.NextSwingMs = Environment.TickCount64 + PlayerMeleeService.SwingIntervalMs;
         creature.NextMoveMs = 0;
         if (roar)
+        {
             await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAiReaction,
                 CombatPackets.BuildAiReaction(creature.Guid, AiReactionHostile), ct);
+        }
+
         await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStart,
             CombatPackets.BuildAttackStart(creature.Guid, targetGuid), ct);
     }
@@ -223,8 +226,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
         creature.Evading = true;
         creature.NextMoveMs = 0; // шагнуть сразу
         if (target != 0)
+        {
             await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackStop,
                 CombatPackets.BuildAttackStop(creature.Guid, target), ct);
+        }
     }
 
     /// <summary>Смерть игрока: помечаем мёртвым, существо уходит в evade, игрок прекращает атаку. M6.7.</summary>

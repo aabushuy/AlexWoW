@@ -32,7 +32,7 @@ public sealed class FactionStore(IFactionRepository worldDb, ILogger<FactionStor
             }
             catch (Exception ex)
             {
-                logger.LogWarning("faction_template не загружен ({Msg}) — авто-агро отключено "
+                logger.LogWarning(ex, "faction_template не загружен ({Msg}) — авто-агро отключено "
                     + "(прогоните tools/MapExtractor factiontemplate и залейте SQL)", ex.Message);
                 _byId = new Dictionary<uint, FactionTemplateRow>();
             }

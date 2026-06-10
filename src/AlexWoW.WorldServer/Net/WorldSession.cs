@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Net.Sockets;
 using AlexWoW.Cryptography;
 using AlexWoW.Database.Models;
@@ -113,7 +113,7 @@ public sealed class WorldSession
         catch (Exception ex) when (ex is IOException or OperationCanceledException
                                    or InvalidOperationException or EndOfStreamException)
         {
-            Logger.LogDebug("World-соединение {Ip} закрыто: {Message}", RemoteIp, ex.Message);
+            Logger.LogDebug(ex, "World-соединение {Ip} закрыто: {Message}", RemoteIp, ex.Message);
         }
         finally
         {
@@ -148,7 +148,7 @@ public sealed class WorldSession
         }
         catch (Exception ex)
         {
-            Logger.LogDebug("LeaveWorld '{User}': {Msg}", Account, ex.Message);
+            Logger.LogDebug(ex, "LeaveWorld '{User}': {Msg}", Account, ex.Message);
         }
     }
 
@@ -164,7 +164,7 @@ public sealed class WorldSession
         }
         catch (Exception ex)
         {
-            Logger.LogWarning("Не удалось сохранить позицию '{User}': {Msg}", Account, ex.Message);
+            Logger.LogWarning(ex, "Не удалось сохранить позицию '{User}': {Msg}", Account, ex.Message);
         }
     }
 

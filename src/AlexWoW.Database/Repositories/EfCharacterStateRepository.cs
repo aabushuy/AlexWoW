@@ -72,7 +72,9 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await using var db = await factory.CreateDbContextAsync(ct);
         var e = await db.CharacterSkills.FindAsync([ownerGuid, skillId], ct);
         if (e is null)
+        {
             db.CharacterSkills.Add(new CharacterSkill { OwnerGuid = ownerGuid, SkillId = skillId, Value = value, Max = max });
+        }
         else
         {
             e.Value = value;

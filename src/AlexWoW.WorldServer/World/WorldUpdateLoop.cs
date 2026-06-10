@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -28,7 +28,7 @@ internal sealed class WorldUpdateLoop(WorldTick tick, ILogger<WorldUpdateLoop> l
             }
             catch (Exception ex)
             {
-                logger.LogWarning("Ошибка в тике мира: {Msg}", ex.Message);
+                logger.LogWarning(ex, "Ошибка в тике мира: {Msg}", ex.Message);
             }
         }
     }

@@ -147,6 +147,16 @@ dotnet_naming_rule.locals_camel_case.style = camel_case
 dotnet_naming_symbols.locals_and_parameters.applicable_kinds = parameter, local
 dotnet_naming_style.camel_case.capitalization = camel_case
 
+#### Подавления анализаторов (осознанные, с обоснованием) ####
+
+# SHA1/HMACSHA1 — требование протокола WoW 3.3.5a (SRP6, RC4-ключ, дайджесты), не наш выбор криптографии
+dotnet_diagnostic.CA5350.severity = none
+# Имена UInt8/UInt32/Single/guid — осознанный DSL протокола (ByteReader/Writer, GUID сущностей)
+dotnet_diagnostic.CA1720.severity = none
+# LoggerMessage-делегаты не используем (KISS): горячих путей логирования нет, обычные ILogger-вызовы читабельнее
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+
 #### Генерированный код ####
 
 # EF-сгенерированные миграции не трогаем (ни стиль, ни dotnet format)

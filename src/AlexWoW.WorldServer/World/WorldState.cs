@@ -20,37 +20,32 @@ namespace AlexWoW.WorldServer.World;
 public sealed class WorldState
 {
     private readonly FactionStore _factions;
-    private readonly QuestStore _quests;
-    private readonly LevelStore _levels;
-    private readonly StatStore _stats;
-
     private readonly PlayerVisibility _visibility;
-    private readonly CreatureDirector _director;
 
     public WorldState(ILogger<WorldState> logger, Navmesh navmesh, IWorldRepository worldDb, FactionStore factions,
         QuestStore quests, LevelStore levels, StatStore stats)
     {
         _factions = factions;
-        _quests = quests;
-        _levels = levels;
-        _stats = stats;
-        _director = new CreatureDirector(this, navmesh, worldDb, logger);
+        Quests = quests;
+        Levels = levels;
+        Stats = stats;
+        Director = new CreatureDirector(this, navmesh, worldDb, logger);
         _visibility = new PlayerVisibility(this, logger);
     }
 
     /// <summary>Режиссёр существ — для респавна из серверного тика (<see cref="WorldTick"/>, M7 S3).</summary>
-    internal CreatureDirector Director => _director;
+    internal CreatureDirector Director { get; }
 
     // --- Фасады сторов / фракции ---
 
     /// <summary>Характеристики по расе/классу/уровню (HP/мана/статы). M9.2.</summary>
-    public StatStore Stats => _stats;
+    public StatStore Stats { get; }
 
     /// <summary>Реестр квест-связей (иконки !/?). M6.5.</summary>
-    public QuestStore Quests => _quests;
+    public QuestStore Quests { get; }
 
     /// <summary>Прогрессия (кривая XP + XP за килл). M9.1.</summary>
-    public LevelStore Levels => _levels;
+    public LevelStore Levels { get; }
 
     /// <summary>Враждебна ли фракция существа к фракции игрока (авто-агро M6.7).</summary>
     public bool IsHostile(uint creatureFactionTemplate, uint playerFactionTemplate)
@@ -228,42 +223,42 @@ public sealed class WorldState
 
     /// <inheritdoc cref="CreatureDirector.MoveCreatureAsync"/>
     public Task MoveCreatureAsync(WorldCreature creature, float nx, float ny, float nz, uint durationMs, CancellationToken ct)
-        => _director.MoveCreatureAsync(creature, nx, ny, nz, durationMs, ct);
+        => Director.MoveCreatureAsync(creature, nx, ny, nz, durationMs, ct);
 
     /// <inheritdoc cref="CreatureDirector.FaceCreatureAsync"/>
     public Task FaceCreatureAsync(WorldCreature creature, ulong targetGuid, CancellationToken ct)
-        => _director.FaceCreatureAsync(creature, targetGuid, ct);
+        => Director.FaceCreatureAsync(creature, targetGuid, ct);
 
     /// <inheritdoc cref="CreatureDirector.FindGroundPath"/>
     public IReadOnlyList<(float X, float Y, float Z)>? FindGroundPath(uint map,
         float sx, float sy, float sz, float ex, float ey, float ez)
-        => _director.FindGroundPath(map, sx, sy, sz, ex, ey, ez);
+        => Director.FindGroundPath(map, sx, sy, sz, ex, ey, ez);
 
     /// <inheritdoc cref="CreatureDirector.SummonTrainingDummyAsync"/>
     public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
-        => _director.SummonTrainingDummyAsync(session, ct);
+        => Director.SummonTrainingDummyAsync(session, ct);
 
     /// <inheritdoc cref="CreatureDirector.SummonDevNpcAsync"/>
     public Task<bool> SummonDevNpcAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
-        => _director.SummonDevNpcAsync(session, entry, slot, ct);
+        => Director.SummonDevNpcAsync(session, entry, slot, ct);
 
     /// <inheritdoc cref="CreatureDirector.DespawnDevNpcAsync"/>
     public Task<bool> DespawnDevNpcAsync(WorldSession session, string slot, CancellationToken ct)
-        => _director.DespawnDevNpcAsync(session, slot, ct);
+        => Director.DespawnDevNpcAsync(session, slot, ct);
 
     /// <inheritdoc cref="CreatureDirector.SummonDevGoAsync"/>
     public Task<bool> SummonDevGoAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
-        => _director.SummonDevGoAsync(session, entry, slot, ct);
+        => Director.SummonDevGoAsync(session, entry, slot, ct);
 
     /// <inheritdoc cref="CreatureDirector.DespawnDevGoAsync"/>
     public Task<bool> DespawnDevGoAsync(WorldSession session, string slot, CancellationToken ct)
-        => _director.DespawnDevGoAsync(session, slot, ct);
+        => Director.DespawnDevGoAsync(session, slot, ct);
 
     /// <inheritdoc cref="CreatureDirector.DevCleanGosAsync"/>
     public Task DevCleanGosAsync(WorldSession session, CancellationToken ct)
-        => _director.DevCleanGosAsync(session, ct);
+        => Director.DevCleanGosAsync(session, ct);
 
     /// <inheritdoc cref="CreatureDirector.DevCleanAsync"/>
     public Task DevCleanAsync(WorldSession session, CancellationToken ct)
-        => _director.DevCleanAsync(session, ct);
+        => Director.DevCleanAsync(session, ct);
 }

@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
@@ -69,12 +69,14 @@ internal sealed class SpawnHandlers(IWorldRepository worldDb) : IOpcodeHandlerMo
         {
             var t = await worldDb.GetCreatureTemplateAsync(entry, ct);
             if (t is not null)
+            {
                 return new CreatureTemplate(t.Entry, t.Name, t.SubName ?? string.Empty, t.DisplayId1,
                     t.MinLevel, t.Faction, t.CreatureType, t.Scale, t.NpcFlags, t.UnitClass);
+            }
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("CREATURE_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            session.Logger.LogDebug(ex, "CREATURE_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
         }
         return Npcs.Find(entry); // fallback на тестовый реестр
     }

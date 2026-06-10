@@ -30,7 +30,7 @@ public sealed class VmapTile
             var v = new float[count * 9];
             var src = bytes.AsSpan(12);
             for (var i = 0; i < v.Length; i++)
-                v[i] = BinaryPrimitives.ReadSingleLittleEndian(src.Slice(i * 4));
+                v[i] = BinaryPrimitives.ReadSingleLittleEndian(src[(i * 4)..]);
             return new VmapTile(v);
         }
         catch

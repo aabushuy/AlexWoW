@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -44,7 +44,7 @@ internal sealed class KillRewardService(
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("Лут {Entry}: БД мира недоступна ({Msg})", creature.Template.Entry, ex.Message);
+            session.Logger.LogDebug(ex, "Лут {Entry}: БД мира недоступна ({Msg})", creature.Template.Entry, ex.Message);
             return;
         }
         if (data is null)

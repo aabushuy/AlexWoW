@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -38,7 +38,7 @@ public sealed class StatStore(IPlayerDataRepository worldDb, ILogger<StatStore> 
             }
             catch (Exception ex)
             {
-                logger.LogWarning("player_levelstats не загружены ({Msg}) — статы по уровню флэтом", ex.Message);
+                logger.LogWarning(ex, "player_levelstats не загружены ({Msg}) — статы по уровню флэтом", ex.Message);
             }
             _loaded = true;
         }
@@ -58,7 +58,9 @@ public sealed class StatStore(IPlayerDataRepository worldDb, ILogger<StatStore> 
     {
         if (!_levelStats.TryGetValue((race, cls, level), out var s)
             || !_classLevel.TryGetValue((cls, level), out var hm))
+        {
             return null;
+        }
 
         var maxHp = hm.Hp + HealthFromStamina(s.Sta);
         var maxMana = hm.Mana > 0 ? hm.Mana + ManaFromIntellect(s.Int) : 0u; // мана только у мана-классов

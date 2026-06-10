@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -34,7 +34,7 @@ public sealed class QuestStore(IQuestTemplateRepository worldDb, ILogger<QuestSt
             }
             catch (Exception ex)
             {
-                logger.LogWarning("Квест-связи не загружены ({Msg}) — иконки квестов отключены", ex.Message);
+                logger.LogWarning(ex, "Квест-связи не загружены ({Msg}) — иконки квестов отключены", ex.Message);
                 _giverQuests = new Dictionary<uint, uint[]>();
                 _enderQuests = new Dictionary<uint, uint[]>();
             }

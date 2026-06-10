@@ -9,7 +9,7 @@ internal sealed class SessionQuestState
     /// <summary>Журнал квестов: слот (0..24) → прогресс (null — пусто). Персист — позже. M6.5.</summary>
     internal World.QuestProgress?[] QuestSlots { get; } = new World.QuestProgress?[Protocol.UpdateField.QuestLogSlots];
     /// <summary>Сданные квесты (для предусловий PrevQuestId и анти-повтора). Персист — позже. M6.5.</summary>
-    internal HashSet<uint> CompletedQuests { get; } = new();
+    internal HashSet<uint> CompletedQuests { get; } = [];
 
     /// <summary>Сброс при выходе из мира (как в LeaveWorld и раньше).</summary>
     internal void Reset()

@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -29,7 +29,7 @@ internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICh
         // Клиент шлёт button(u8) + packedData(u32) = action(24)|type(8). packed=0 → снять ярлык.
         var packed = r.UInt32();
         try { await charState.SetActionButtonAsync(session.InWorldGuid, button, packed, ct); }
-        catch (Exception ex) { session.Logger.LogDebug("SET_ACTION_BUTTON {Btn}: {Msg}", button, ex.Message); }
+        catch (Exception ex) { session.Logger.LogDebug(ex, "SET_ACTION_BUTTON {Btn}: {Msg}", button, ex.Message); }
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSetActionbarToggles)]
@@ -45,7 +45,7 @@ internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICh
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
                 m => m.SetBytes(UpdateField.PlayerFieldBytes, 0, 0, actionBars, 0)), ct);
         try { await characters.SetActionBarsAsync(session.InWorldGuid, actionBars, ct); }
-        catch (Exception ex) { session.Logger.LogDebug("SET_ACTIONBAR_TOGGLES: {Msg}", ex.Message); }
+        catch (Exception ex) { session.Logger.LogDebug(ex, "SET_ACTIONBAR_TOGGLES: {Msg}", ex.Message); }
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICh
         try { buttons = await charState.GetActionButtonsAsync(session.InWorldGuid, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("ACTION_BUTTONS load '{User}': {Msg}", session.Account, ex.Message);
+            session.Logger.LogDebug(ex, "ACTION_BUTTONS load '{User}': {Msg}", session.Account, ex.Message);
             buttons = new Dictionary<byte, uint>();
         }
 

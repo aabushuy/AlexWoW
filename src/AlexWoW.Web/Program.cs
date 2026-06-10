@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console());
+    .WriteTo.Console(formatProvider: System.Globalization.CultureInfo.InvariantCulture));
 
 builder.Services.Configure<WebOptions>(builder.Configuration.GetSection(WebOptions.SectionName));
 

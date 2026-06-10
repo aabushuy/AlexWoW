@@ -47,8 +47,10 @@ internal sealed class QuestProgressService(
             if (p is null || p.Complete)
                 continue;
             for (var i = 0; i < 4; i++)
+            {
                 if (p.ReqItem[i] == itemId && CountItem(session, itemId) < p.ReqItemCount[i])
                     return true;
+            }
         }
         return false;
     }
@@ -132,6 +134,7 @@ internal sealed class QuestProgressService(
 
             var changed = false;
             for (var i = 0; i < 4; i++)
+            {
                 if (p.Creature[i] == (int)creatureEntry && p.Count[i] < p.Required[i])
                 {
                     p.Count[i]++;
@@ -139,6 +142,8 @@ internal sealed class QuestProgressService(
                     await session.SendAsync(WorldOpcode.SmsgQuestupdateAddKill,
                         QuestPackets.BuildAddKill(p.QuestId, creatureEntry, p.Count[i], p.Required[i], creatureGuid), ct);
                 }
+            }
+
             if (!changed)
                 continue;
 

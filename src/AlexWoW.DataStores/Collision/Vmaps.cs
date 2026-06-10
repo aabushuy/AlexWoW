@@ -62,7 +62,9 @@ public sealed class Vmaps(string vmapsPath)
         var gy1 = Grid(MathF.Max(y1, y2));
         var gy2 = Grid(MathF.Min(y1, y2));
         for (var gx = gx1; gx <= gx2; gx++)
+        {
             for (var gy = gy1; gy <= gy2; gy++)
                 yield return (gx, gy);
+        }
     }
 }

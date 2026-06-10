@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
@@ -28,7 +28,7 @@ internal sealed class CharScreenHandlers(
         try { declined = await characters.GetGuidsWithDeclinedNamesAsync(list.Select(c => c.Guid).ToList(), ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("CHAR_ENUM declined-флаги: {Msg}", ex.Message);
+            session.Logger.LogDebug(ex, "CHAR_ENUM declined-флаги: {Msg}", ex.Message);
             declined = new HashSet<uint>();
         }
 
@@ -68,7 +68,7 @@ internal sealed class CharScreenHandlers(
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("CHAR_ENUM paperdoll: БД мира недоступна ({Msg})", ex.Message);
+            session.Logger.LogDebug(ex, "CHAR_ENUM paperdoll: БД мира недоступна ({Msg})", ex.Message);
             return new Dictionary<uint, CharEnum.SlotDisplay[]>();
         }
 
@@ -77,8 +77,11 @@ internal sealed class CharScreenHandlers(
         {
             var slots = new CharEnum.SlotDisplay[InventorySlots.EquipmentEnd];
             foreach (var item in equipped)
+            {
                 if (displays.TryGetValue(item.ItemEntry, out var d))
                     slots[item.Slot] = new CharEnum.SlotDisplay(d.DisplayId, d.InventoryType);
+            }
+
             result[guid] = slots;
         }
         return result;
@@ -172,7 +175,7 @@ internal sealed class CharScreenHandlers(
 
         // Сохраняем — иначе ruRU-клиент спрашивает склонения при каждом входе.
         try { await characters.SetDeclinedNamesAsync((uint)guid, declined, ct); }
-        catch (Exception ex) { session.Logger.LogWarning("SET_DECLINED_NAMES guid={Guid}: {Msg}", guid, ex.Message); }
+        catch (Exception ex) { session.Logger.LogWarning(ex, "SET_DECLINED_NAMES guid={Guid}: {Msg}", guid, ex.Message); }
 
         var w = new ByteWriter(12)
             .UInt32(0)        // result = 0 (успех)
@@ -218,8 +221,11 @@ internal sealed class CharScreenHandlers(
          .UInt8(character.Class)
          .UInt8((byte)(hasDeclined ? 1 : 0));   // has_declined_names
         if (hasDeclined)
+        {
             for (var i = 0; i < 5; i++)
                 w.CString(declined!.ElementAtOrDefault(i) ?? string.Empty);
+        }
+
         await session.SendAsync(WorldOpcode.SmsgNameQueryResponse, w.ToArray(), ct);
     }
 
@@ -272,7 +278,7 @@ internal sealed class CharScreenHandlers(
         if (ownerId != 0)
         {
             try { await charState.UpsertAccountDataAsync(ownerId, isChar, (byte)dataType, time, blob, ct); }
-            catch (Exception ex) { session.Logger.LogDebug("UPDATE_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
+            catch (Exception ex) { session.Logger.LogDebug(ex, "UPDATE_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
         }
 
         // Подтверждаем приём (иначе клиент зацикливается при входе).
@@ -295,7 +301,7 @@ internal sealed class CharScreenHandlers(
                 var stored = await charState.GetAccountDataAsync(ownerId, isChar, (byte)dataType, ct);
                 if (stored is { } s) { time = s.Time; blob = s.Data; }
             }
-            catch (Exception ex) { session.Logger.LogDebug("REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
+            catch (Exception ex) { session.Logger.LogDebug(ex, "REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
         }
 
         // SMSG_UPDATE_ACCOUNT_DATA (3.3.5, формат CMaNGOS — он эталон против клиента; wow_messages
@@ -329,7 +335,7 @@ internal sealed class CharScreenHandlers(
             if (session.InWorldGuid != 0)
                 charTimes = await charState.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
         }
-        catch (Exception ex) { session.Logger.LogDebug("ACCOUNT_DATA_TIMES: {Msg}", ex.Message); }
+        catch (Exception ex) { session.Logger.LogDebug(ex, "ACCOUNT_DATA_TIMES: {Msg}", ex.Message); }
 
         var w = new ByteWriter(48)
             .UInt32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds())

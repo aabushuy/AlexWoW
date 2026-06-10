@@ -23,7 +23,7 @@ public sealed class LootRepository(string connectionString)
         var minGold = Convert.ToUInt32(h["MinLootGold"], CultureInfo.InvariantCulture);
         var maxGold = Convert.ToUInt32(h["MaxLootGold"], CultureInfo.InvariantCulture);
 
-        IReadOnlyList<CreatureLootEntry> drops = [];
+        List<CreatureLootEntry> drops = [];
         if (lootId != 0)
         {
             var rows = await db.QueryAsync<CreatureLootEntry>(new CommandDefinition("""

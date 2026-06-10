@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
@@ -53,7 +53,7 @@ internal sealed class TalentHandlers(
         try { all = await worldDb.GetAllTalentsAsync(ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("LEARN_TALENT: БД талантов недоступна ({Msg})", ex.Message);
+            session.Logger.LogDebug(ex, "LEARN_TALENT: БД талантов недоступна ({Msg})", ex.Message);
             return;
         }
         if (!all.TryGetValue(talentId, out var t))
@@ -77,8 +77,11 @@ internal sealed class TalentHandlers(
         {
             uint spentInTab = 0;
             foreach (var (lid, lrank) in session.Progression.LearnedTalents)
+            {
                 if (all.TryGetValue(lid, out var lt) && lt.TalentTab == t.TalentTab)
                     spentInTab += (uint)(lrank + 1);
+            }
+
             if (spentInTab < 5 * t.Tier)
                 return;
         }
@@ -86,7 +89,9 @@ internal sealed class TalentHandlers(
         // Пререквизит-талант.
         if (t.DependsOn != 0
             && (!session.Progression.LearnedTalents.TryGetValue(t.DependsOn, out var depRank) || depRank < t.DependsOnRank))
+        {
             return;
+        }
 
         // Выучить ранг-спелл (персист character_spell + LEARNED/SUPERCEDED), записать талант.
         var rankSpell = t.RankSpell(nextRank);

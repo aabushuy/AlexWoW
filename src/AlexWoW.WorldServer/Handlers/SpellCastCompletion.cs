@@ -1,4 +1,4 @@
-using AlexWoW.WorldServer.Net;
+﻿using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
@@ -37,7 +37,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             }
             catch (Exception ex)
             {
-                session.Logger.LogDebug("Завершение каста '{User}': {Msg}", session.Account, ex.Message);
+                session.Logger.LogDebug(ex, "Завершение каста '{User}': {Msg}", session.Account, ex.Message);
             }
         });
     }
@@ -64,7 +64,9 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
                 }
             }
             else
+            {
                 await combatResources.SpendPowerAsync(session, info.PowerType, cost, ct);
+            }
         }
 
         // Кулдаун: запускаем у клиента (полоска на кнопке) и запоминаем для отказа при раннем рекасте.

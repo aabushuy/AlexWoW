@@ -106,7 +106,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         public int Sub(int parent, string label) => Node(parent, "cat", label);
         public void Cmd(int parent, string label, string command) => Node(parent, "cmd", label, command);
         public void Prompt(int parent, string label, string prefix, string hint) => Node(parent, "prompt", label, prefix, hint);
-        public void Tp(int parent, string cityName, uint cityId) => Node(parent, "tp", cityName, cityId.ToString());
+        public void Tp(int parent, string cityName, uint cityId)
+            => Node(parent, "tp", cityName, cityId.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         private int Node(int parent, string kind, string label, params string[] payload)
         {

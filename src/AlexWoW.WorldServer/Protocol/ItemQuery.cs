@@ -56,8 +56,10 @@ public static class ItemQuery
         w.Single(t.RangedModRange);
 
         foreach (var sp in t.Spells)
+        {
             w.UInt32(sp.Id).UInt32(sp.Trigger).Int32(sp.Charges)
              .Int32(sp.Cooldown).UInt32(sp.Category).Int32(sp.CategoryCooldown);
+        }
 
         w.UInt32(t.Bonding);
         w.CString(t.Description);

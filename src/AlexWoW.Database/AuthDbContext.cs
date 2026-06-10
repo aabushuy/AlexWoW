@@ -26,9 +26,9 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<AccountDataBlob> AccountDataBlobs => Set<AccountDataBlob>();
     public DbSet<TeleportLocation> TeleportLocations => Set<TeleportLocation>();
 
-    protected override void OnModelCreating(ModelBuilder b)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        b.Entity<Account>(e =>
+        modelBuilder.Entity<Account>(e =>
         {
             e.ToTable("account");
             e.HasKey(x => x.Id);
@@ -49,7 +49,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.Username).IsUnique().HasDatabaseName("uk_account_username");
         });
 
-        b.Entity<Realm>(e =>
+        modelBuilder.Entity<Realm>(e =>
         {
             e.ToTable("realmlist");
             e.HasKey(x => x.Id);
@@ -64,7 +64,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("uk_realmlist_name");
         });
 
-        b.Entity<Character>(e =>
+        modelBuilder.Entity<Character>(e =>
         {
             e.ToTable("characters");
             e.HasKey(x => x.Guid);
@@ -95,7 +95,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.AccountId).HasDatabaseName("ix_characters_account");
         });
 
-        b.Entity<CharacterItem>(e =>
+        modelBuilder.Entity<CharacterItem>(e =>
         {
             e.ToTable("character_items");
             e.HasKey(x => x.ItemGuid);
@@ -108,7 +108,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_items_owner");
         });
 
-        b.Entity<DeclinedName>(e =>
+        modelBuilder.Entity<DeclinedName>(e =>
         {
             e.ToTable("character_declined_names");
             e.HasKey(x => x.OwnerGuid);
@@ -120,7 +120,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.N4).HasColumnName("n4").HasMaxLength(24).HasDefaultValue("").IsRequired();
         });
 
-        b.Entity<CharacterQuestStatus>(e =>
+        modelBuilder.Entity<CharacterQuestStatus>(e =>
         {
             e.ToTable("character_queststatus");
             e.HasKey(x => new { x.OwnerGuid, x.QuestId });
@@ -135,7 +135,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_qs_owner");
         });
 
-        b.Entity<CharacterSpell>(e =>
+        modelBuilder.Entity<CharacterSpell>(e =>
         {
             e.ToTable("character_spell");
             e.HasKey(x => new { x.OwnerGuid, x.Spell });
@@ -144,7 +144,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_spell_owner");
         });
 
-        b.Entity<CharacterTalent>(e =>
+        modelBuilder.Entity<CharacterTalent>(e =>
         {
             e.ToTable("character_talent");
             e.HasKey(x => new { x.OwnerGuid, x.TalentId });
@@ -154,7 +154,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_talent_owner");
         });
 
-        b.Entity<CharacterSkill>(e =>
+        modelBuilder.Entity<CharacterSkill>(e =>
         {
             e.ToTable("character_skill");
             e.HasKey(x => new { x.OwnerGuid, x.SkillId });
@@ -166,7 +166,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_skill_owner");
         });
 
-        b.Entity<CharacterAura>(e =>
+        modelBuilder.Entity<CharacterAura>(e =>
         {
             e.ToTable("character_aura");
             e.HasKey(x => new { x.OwnerGuid, x.Spell });
@@ -177,7 +177,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_aura_owner");
         });
 
-        b.Entity<CharacterActionButton>(e =>
+        modelBuilder.Entity<CharacterActionButton>(e =>
         {
             e.ToTable("character_action");
             e.HasKey(x => new { x.OwnerGuid, x.Button });
@@ -186,7 +186,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.PackedData).HasColumnName("packed_data");
         });
 
-        b.Entity<AccountDataBlob>(e =>
+        modelBuilder.Entity<AccountDataBlob>(e =>
         {
             e.ToTable("account_data");
             e.HasKey(x => new { x.OwnerId, x.IsChar, x.DataType });
@@ -197,7 +197,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.Data).HasColumnName("data").HasColumnType("longblob");
         });
 
-        b.Entity<TeleportLocation>(e =>
+        modelBuilder.Entity<TeleportLocation>(e =>
         {
             e.ToTable("dev_teleport");
             e.HasKey(x => x.Id);

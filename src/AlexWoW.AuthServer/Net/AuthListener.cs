@@ -62,7 +62,7 @@ public sealed class AuthListener(
             catch (Exception ex) when (attempt < MaxAttempts && !ct.IsCancellationRequested)
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(5, attempt));
-                logger.LogWarning("БД недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
+                logger.LogWarning(ex, "БД недоступна (попытка {Attempt}/{Max}): {Message}. Повтор через {Delay}s",
                     attempt, MaxAttempts, ex.Message, delay.TotalSeconds);
                 await Task.Delay(delay, ct);
             }

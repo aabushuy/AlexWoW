@@ -28,12 +28,15 @@ public static class QuestPackets
         w.UInt32(1);   // emote (1 = talk)
         w.UInt8((byte)Math.Min(quests.Count, 32));
         foreach (var q in quests.Take(32))
+        {
             w.UInt32(q.QuestId)
              .UInt32(QuestIconAvailable)
              .Int32(q.QuestLevel)
              .UInt32(ClientFlags(q.QuestFlags))
              .UInt8(0)            // repeatable
              .CString(q.Title);
+        }
+
         return w.ToArray();
     }
 
@@ -190,8 +193,11 @@ public static class QuestPackets
         for (var i = 0; i < 4; i++) if (q.RewItemId[i] != 0) n++;
         w.UInt32((uint)n);
         for (var i = 0; i < 4; i++)
+        {
             if (q.RewItemId[i] != 0)
                 w.UInt32(q.RewItemId[i]).UInt32(q.RewItemCount[i] == 0 ? 1u : q.RewItemCount[i]);
+        }
+
         return w.ToArray();
     }
 

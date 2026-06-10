@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
@@ -42,9 +42,9 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
         catch (Exception ex)
         {
             // БД мира недоступна: при первом пересчёте покажем одного тестового NPC.
-            if (session.Visibility.VisibleNpcs.Count == 0)
+            if (session.Visibility.VisibleNpcs.IsEmpty)
             {
-                session.Logger.LogWarning("БД мира недоступна ({Msg}) — показываю тестового NPC", ex.Message);
+                session.Logger.LogWarning(ex, "БД мира недоступна ({Msg}) — показываю тестового NPC", ex.Message);
                 await SendTestNpcAsync(session, x, y, session.PosZ, ct);
             }
             return;
@@ -110,8 +110,10 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
         }
 
         if (added > 0 || gone.Length > 0)
+        {
             session.Logger.LogDebug("Видимость NPC '{User}': +{Added} -{Gone} (всего {Total})",
                 session.Account, added, gone.Length, session.Visibility.VisibleNpcs.Count);
+        }
     }
 
     /// <summary>

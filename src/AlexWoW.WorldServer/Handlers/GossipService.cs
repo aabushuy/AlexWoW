@@ -67,7 +67,9 @@ internal sealed class GossipService(
         // GOSSIP → клиент ждёт меню, прямой SMSG_TRAINER_LIST игнорирует; список — на выбор пункта.
         if (trainerCatalog.IsTrainerNpc(session, npcGuid)
             && await trainerCatalog.TrySendTrainerGossipAsync(session, npcGuid, ct))
+        {
             return;
+        }
 
         // Не квестгивер/тренер (или без доступных квестов) — попробуем как вендора.
         await vendor.SendVendorListAsync(session, npcGuid, ct);
