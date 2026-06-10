@@ -9,6 +9,6 @@ namespace AlexWoW.Database.Abstractions;
 public interface IWorldRepository
     : ICreatureRepository, IGameObjectRepository, IItemTemplateRepository, IVendorRepository,
       ITrainerRepository, ILootRepository, IQuestTemplateRepository, IFactionRepository, IPlayerDataRepository,
-      ISpellTemplateRepository
+      ISpellTemplateRepository, ITalentRepository
 {
 }

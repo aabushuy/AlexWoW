@@ -18,7 +18,8 @@ public sealed class WorldRepository(
     IQuestTemplateRepository quests,
     IFactionRepository factions,
     IPlayerDataRepository playerData,
-    ISpellTemplateRepository spells) : IWorldRepository
+    ISpellTemplateRepository spells,
+    ITalentRepository talents) : IWorldRepository
 {
     // ---- ICreatureRepository ----
     public Task<long> CountCreaturesAsync(CancellationToken ct = default)
@@ -57,6 +58,10 @@ public sealed class WorldRepository(
         => trainers.GetClassTrainerEntryAsync(classId, ct);
     public Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default)
         => trainers.GetProfessionTrainerEntryAsync(subnameKeyword, ct);
+
+    // ---- ITalentRepository ----
+    public Task<IReadOnlyDictionary<uint, TalentData>> GetAllTalentsAsync(CancellationToken ct = default)
+        => talents.GetAllTalentsAsync(ct);
 
     // ---- ISpellTemplateRepository ----
     public Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default)

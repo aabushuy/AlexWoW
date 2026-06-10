@@ -14,6 +14,18 @@ public interface ICharacterStateRepository
     /// <summary>Сохраняет изученный спелл (идемпотентно).</summary>
     Task AddLearnedSpellAsync(uint ownerGuid, uint spell, CancellationToken ct = default);
 
+    /// <summary>Удаляет изученный спелл (сброс талантов M9.8).</summary>
+    Task RemoveLearnedSpellAsync(uint ownerGuid, uint spell, CancellationToken ct = default);
+
+    /// <summary>Изученные таланты персонажа: (talentId, rank 0-индекс). M9.7.</summary>
+    Task<IReadOnlyList<(uint TalentId, byte Rank)>> GetTalentsAsync(uint ownerGuid, CancellationToken ct = default);
+
+    /// <summary>Ставит/обновляет ранг таланта (upsert). M9.7.</summary>
+    Task SetTalentRankAsync(uint ownerGuid, uint talentId, byte rank, CancellationToken ct = default);
+
+    /// <summary>Удаляет все таланты персонажа (сброс M9.8).</summary>
+    Task ClearTalentsAsync(uint ownerGuid, CancellationToken ct = default);
+
     /// <summary>Сохранённые ауры персонажа: (spell, form, remainingMs). remainingMs=0 — перманентный
     /// переключатель; &gt;0 — временны́й бафф/HoT с остатком длительности (M10.5).</summary>
     Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default);
