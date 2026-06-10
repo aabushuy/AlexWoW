@@ -7,14 +7,14 @@ namespace AlexWoW.WorldServer.World;
 /// Оркестрация серверного тика мира (SRP-часть рефактора #30, DI-синглтон M7 S3): раз в ~250 мс
 /// (из <see cref="WorldUpdateLoop"/>) продвигает по-игроку (мили-свинги/реген/ауры/авто-агро/time-sync) и
 /// по-существу (ИИ возврат/бой/реген, респавн мёртвых). Исключения по сессии/существу ловятся поштучно,
-/// чтобы не валить весь тик. Тик-сервисы (бой/реген/ауры/периодика) — DI (бой — S4); time-sync — пока
-/// легаси-статик (WorldEntryHandlers, конверсия в S7).
+/// чтобы не валить весь тик. Тик-сервисы (бой/реген/ауры/периодика/time-sync) — DI (бой — S4,
+/// time-sync — <see cref="Handlers.TimeSyncService"/>, S7).
 /// </summary>
 internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     AuraService auras, PeriodicsService periodics,
     PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
-    ILogger<WorldTick> logger)
+    TimeSyncService timeSync, ILogger<WorldTick> logger)
 {
     /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
     private const long TimeSyncIntervalMs = 10_000;
@@ -40,7 +40,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
-                    await WorldEntryHandlers.SendTimeSyncReqAsync(player.Session, ct);
+                    await timeSync.SendTimeSyncReqAsync(player.Session, ct);
             }
             catch (Exception ex)
             {

@@ -317,8 +317,7 @@ internal sealed class CharScreenHandlers(
     /// вход в мир — per-character (0xEA). Шлём реальные времена сохранённых блобов, чтобы клиент знал,
     /// что на сервере есть данные, и запросил их (CMSG_REQUEST_ACCOUNT_DATA). M7 #17.
     /// </summary>
-    // статик-мост до S7 (#41): зовёт легаси-статик WorldEntryHandlers
-    public static async Task SendAccountDataTimesAsync(WorldSession session, uint mask, CancellationToken ct)
+    internal async Task SendAccountDataTimesAsync(WorldSession session, uint mask, CancellationToken ct)
     {
         // Времена: для глобальных типов — по аккаунту, для per-character — по персонажу.
         IReadOnlyDictionary<byte, uint> accountTimes = new Dictionary<byte, uint>();
@@ -326,9 +325,9 @@ internal sealed class CharScreenHandlers(
         try
         {
             if (session.AccountId != 0)
-                accountTimes = await session.CharState.GetAccountDataTimesAsync(session.AccountId, false, ct);
+                accountTimes = await charState.GetAccountDataTimesAsync(session.AccountId, false, ct);
             if (session.InWorldGuid != 0)
-                charTimes = await session.CharState.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
+                charTimes = await charState.GetAccountDataTimesAsync(session.InWorldGuid, true, ct);
         }
         catch (Exception ex) { session.Logger.LogDebug("ACCOUNT_DATA_TIMES: {Msg}", ex.Message); }
 

@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -7,152 +8,22 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Видимость и существа (M5): спавн NPC у клиента (SMSG_UPDATE_OBJECT) и ответ на
-/// CMSG_CREATURE_QUERY. Источник — БД мира CMaNGOS (creature/creature_template);
-/// при её недоступности — fallback на один захардкоженный тестовый NPC.
+/// Запросы шаблонов существ и гейм-объектов (M5; DI-модуль M7 S7): CMSG_CREATURE_QUERY и
+/// CMSG_GAMEOBJECT_QUERY. Источник — БД мира CMaNGOS (creature_template/gameobject_template);
+/// при её недоступности — fallback на тестовый реестр <see cref="Npcs"/>. Пересчёт видимых
+/// NPC/GO вынесен в <see cref="World.VisibilityService"/> (S7).
 /// </summary>
-public static class SpawnHandlers
+internal sealed class SpawnHandlers(IWorldRepository worldDb) : IOpcodeHandlerModule
 {
-    /// <summary>Сколько существ максимум держим видимыми (защита от перегруза в городах).</summary>
-    private const int MaxNearbyNpcs = 150;
-
-    /// <summary>Дистанция (ярды), при превышении которой пересчитываем видимость NPC при движении.</summary>
-    public const float VisRefreshStep = 20f;
-
-    /// <summary>
-    /// Пересчитывает видимый набор NPC для текущей позиции игрока: шлёт CREATE для новых,
-    /// DESTROY для ушедших из зоны. Используется и на входе (набор пуст → все CREATE),
-    /// и при движении (троттлинг — см. MovementHandlers).
-    /// </summary>
-    internal static async Task RefreshVisibleNpcsAsync(WorldSession session, uint map, float x, float y, CancellationToken ct)
-    {
-        session.LastVisX = x;
-        session.LastVisY = y;
-
-        IReadOnlyList<CreatureSpawnData> rows;
-        try
-        {
-            rows = await session.WorldDb.GetCreaturesNearAsync(
-                map, x, y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
-        }
-        catch (Exception ex)
-        {
-            // БД мира недоступна: при первом пересчёте покажем одного тестового NPC.
-            if (session.VisibleNpcs.Count == 0)
-            {
-                session.Logger.LogWarning("БД мира недоступна ({Msg}) — показываю тестового NPC", ex.Message);
-                await SendTestNpcAsync(session, x, y, session.PosZ, ct);
-            }
-            return;
-        }
-
-        var newSet = new Dictionary<ulong, World.WorldCreature>(rows.Count);
-        foreach (var row in rows)
-        {
-            if (row.DisplayId == 0)
-                continue; // нет модели — не отрисуется
-            var guid = Npcs.UnitGuid(row.Entry, row.Guid);
-            // M6.3: одна авторитетная сущность на GUID для всех наблюдателей (общее HP/смерть/респавн).
-            var creature = session.World.GetOrAddCreature(guid, () =>
-            {
-                var template = new CreatureTemplate(
-                    row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
-                    row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
-                // Манекен (#28) — большой фиксированный HP, чтобы переживал тесты; остальные — по уровню.
-                var maxHealth = Npcs.IsTrainingDummy(row.Entry)
-                    ? Npcs.TrainingDummyHealth
-                    : World.WorldCreature.MaxHealthFor(row.MinLevel);
-                return new World.WorldCreature
-                {
-                    Guid = guid, Map = map, Template = template,
-                    X = row.X, Y = row.Y, Z = row.Z, O = row.O,
-                    HomeX = row.X, HomeY = row.Y, HomeZ = row.Z, HomeO = row.O,
-                    MaxHealth = maxHealth, Health = maxHealth,
-                };
-            });
-            newSet[guid] = creature;
-        }
-
-        var time = (uint)Environment.TickCount;
-
-        // Ушедшие из зоны → DESTROY. Dev-сущности (.trainer и т.п.) «липкие» — не из БД, при пересчёте
-        // их нет в newSet; не сносим, иначе пропадали бы при ходьбе (D1).
-        var gone = session.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g) && !session.IsDevNpc(g)).ToArray();
-        foreach (var guid in gone)
-        {
-            await session.SendAsync(WorldOpcode.SmsgDestroyObject,
-                new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-            session.VisibleNpcs.TryRemove(guid, out _);
-        }
-
-        // Новые в зоне → CREATE.
-        var added = 0;
-        foreach (var (guid, creature) in newSet)
-        {
-            if (session.VisibleNpcs.ContainsKey(guid))
-                continue;
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(creature, time), ct);
-            session.VisibleNpcs[guid] = creature;
-            added++;
-        }
-
-        if (added > 0 || gone.Length > 0)
-            session.Logger.LogDebug("Видимость NPC '{User}': +{Added} -{Gone} (всего {Total})",
-                session.Account, added, gone.Length, session.VisibleNpcs.Count);
-    }
-
-    /// <summary>
-    /// Пересчёт видимых гейм-объектов для текущей позиции (диф: CREATE новых / DESTROY ушедших).
-    /// Аналогично NPC, вызывается на входе и при движении (в той же троттлинг-точке).
-    /// </summary>
-    internal static async Task RefreshVisibleGameObjectsAsync(WorldSession session, uint map, float x, float y, CancellationToken ct)
-    {
-        IReadOnlyList<GameObjectSpawnData> rows;
-        try
-        {
-            rows = await session.WorldDb.GetGameObjectsNearAsync(
-                map, x, y, World.WorldState.VisibilityRange, MaxNearbyNpcs, ct);
-        }
-        catch
-        {
-            return; // БД мира недоступна — без гейм-объектов
-        }
-
-        var newSet = new Dictionary<ulong, GoSpawn>(rows.Count);
-        foreach (var row in rows)
-        {
-            var guid = GameObjects.GameObjectGuid(row.Entry, row.Guid);
-            var template = new GoTemplate(row.Entry, row.Type, row.DisplayId, row.Name, row.Faction, row.Flags, row.Size);
-            newSet[guid] = new GoSpawn(guid, template, row.X, row.Y, row.Z, row.O,
-                row.Rot0, row.Rot1, row.Rot2, row.Rot3);
-        }
-
-        var gone = session.VisibleGos.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
-        foreach (var guid in gone)
-        {
-            await session.SendAsync(WorldOpcode.SmsgDestroyObject,
-                new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-            session.VisibleGos.Remove(guid);
-        }
-
-        foreach (var (guid, go) in newSet)
-        {
-            if (session.VisibleGos.ContainsKey(guid))
-                continue;
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, GameObjectUpdate.BuildCreateObject(go), ct);
-            session.VisibleGos[guid] = go;
-        }
-    }
-
     [WorldOpcodeHandler(WorldOpcode.CmsgGameObjectQuery)]
-    public static async Task OnGameObjectQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnGameObjectQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var entry = reader.UInt32();
         // далее u64 guid — для ответа не нужен.
 
         GameObjectTemplateData? t = null;
-        try { t = await session.WorldDb.GetGameObjectTemplateAsync(entry, ct); }
+        try { t = await worldDb.GetGameObjectTemplateAsync(entry, ct); }
         catch { /* БД недоступна */ }
 
         if (t is null)
@@ -174,27 +45,8 @@ public static class SpawnHandlers
         await session.SendAsync(WorldOpcode.SmsgGameObjectQueryResponse, w.ToArray(), ct);
     }
 
-    private static async Task SendTestNpcAsync(WorldSession session, float x, float y, float z, CancellationToken ct)
-    {
-        var guid = Npcs.UnitGuid(Npcs.TestDummy.Entry, counter: 1);
-        var creature = session.World.GetOrAddCreature(guid, () =>
-        {
-            var maxHealth = World.WorldCreature.MaxHealthFor(Npcs.TestDummy.Level);
-            return new World.WorldCreature
-            {
-                Guid = guid, Map = session.Character?.Map ?? 0, Template = Npcs.TestDummy,
-                X = x + 4f, Y = y, Z = z, O = MathF.PI,
-                HomeX = x + 4f, HomeY = y, HomeZ = z, HomeO = MathF.PI,
-                MaxHealth = maxHealth, Health = maxHealth,
-            };
-        });
-        session.VisibleNpcs[guid] = creature;
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
-    }
-
     [WorldOpcodeHandler(WorldOpcode.CmsgCreatureQuery)]
-    public static async Task OnCreatureQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnCreatureQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var entry = reader.UInt32();
@@ -211,11 +63,11 @@ public static class SpawnHandlers
         await session.SendAsync(WorldOpcode.SmsgCreatureQueryResponse, BuildQueryResponse(template), ct);
     }
 
-    private static async Task<CreatureTemplate?> ResolveTemplateAsync(WorldSession session, uint entry, CancellationToken ct)
+    private async Task<CreatureTemplate?> ResolveTemplateAsync(WorldSession session, uint entry, CancellationToken ct)
     {
         try
         {
-            var t = await session.WorldDb.GetCreatureTemplateAsync(entry, ct);
+            var t = await worldDb.GetCreatureTemplateAsync(entry, ct);
             if (t is not null)
                 return new CreatureTemplate(t.Entry, t.Name, t.SubName ?? string.Empty, t.DisplayId1,
                     t.MinLevel, t.Faction, t.CreatureType, t.Scale, t.NpcFlags, t.UnitClass);

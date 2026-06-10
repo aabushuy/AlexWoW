@@ -122,6 +122,14 @@ builder.Services.AddSingleton<SpellLearnService>();
 builder.Services.AddSingleton<ProgressionService>();
 builder.Services.AddSingleton<TrainerCatalogService>();
 builder.Services.AddSingleton<StartingGearService>();
+// M7 S7: финал миграции хендлеров — последние статики сконвертированы (оркестрация входа в мир,
+// видимость окрестных NPC/GO, синхронизация часов, телепорт); опкод-входы — модули
+// WorldEntryOpcodeHandlers/SpawnHandlers/GameObjectUseHandlers (регистрируются assembly-сканом выше).
+// Статический фолбэк роутера удалён: остаточный [WorldOpcodeHandler]-статик валит старт.
+builder.Services.AddSingleton<VisibilityService>();
+builder.Services.AddSingleton<TimeSyncService>();
+builder.Services.AddSingleton<LoginSequenceService>();
+builder.Services.AddSingleton<TeleportService>();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();
