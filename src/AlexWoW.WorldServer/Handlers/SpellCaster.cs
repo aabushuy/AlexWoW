@@ -230,6 +230,10 @@ public static class SpellCaster
         // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
         if (info.AuraBuff)
             await Periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
+
+        // M7 #33: движущий эффект — рывок к цели (Charge/Intercept/Intervene/Feral Charge).
+        if (info.Movement == SpellCatalog.SpellMovement.Charge)
+            await SpellEffects.ApplyChargeAsync(session, targetGuid, ct);
     }
 
     /// <summary>

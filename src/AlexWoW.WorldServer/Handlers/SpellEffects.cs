@@ -40,6 +40,58 @@ public static class SpellEffects
         await CombatHandlers.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
     }
 
+    /// <summary>Монотонный id сплайна для движущих эффектов игрока (SMSG_MONSTER_MOVE). M7 #33.</summary>
+    private static int _splineId;
+
+    /// <summary>Базовая скорость рывка (ярд/с), как BASE_CHARGE_SPEED в CMaNGOS. M7 #33.</summary>
+    private const float ChargeSpeed = 25f;
+
+    /// <summary>
+    /// Рывок (SPELL_EFFECT_CHARGE): двигает ИГРОКА к цели линейным сплайном (SMSG_MONSTER_MOVE с guid игрока —
+    /// самому игроку и соседям; клиент двигает свой персонаж по сплайну). Точка приземления — у цели со
+    /// смещением назад к кастеру (combat reach), Z цели. Обновляет авторитетную позицию сессии. M7 #33.
+    /// </summary>
+    internal static async Task ApplyChargeAsync(WorldSession session, ulong targetGuid, CancellationToken ct)
+    {
+        if (session.Player is not { } player || targetGuid == 0)
+            return;
+
+        // Позиция цели (существо или игрок).
+        float tx, ty, tz;
+        if (session.World.FindCreature(targetGuid) is { } creature)
+        {
+            tx = creature.X; ty = creature.Y; tz = creature.Z;
+        }
+        else if (session.World.FindPlayer(targetGuid) is { } tp)
+        {
+            tx = tp.X; ty = tp.Y; tz = tp.Z;
+        }
+        else
+        {
+            return; // цель не найдена в мире
+        }
+
+        float sx = session.PosX, sy = session.PosY, sz = session.PosZ;
+        float dx = tx - sx, dy = ty - sy;
+        var dist = MathF.Sqrt(dx * dx + dy * dy);
+        if (dist < 0.5f)
+            return; // уже вплотную
+
+        const float stop = 1.5f; // не приземляться ВНУТРЬ цели (combat reach)
+        var k = MathF.Max(0f, (dist - stop) / dist);
+        float lx = sx + dx * k, ly = sy + dy * k, lz = tz;
+        var durationMs = (uint)MathF.Max(100f, dist / ChargeSpeed * 1000f);
+        var splineId = (uint)System.Threading.Interlocked.Increment(ref _splineId);
+
+        var packet = MonsterMove.Build((ulong)session.InWorldGuid, sx, sy, sz, lx, ly, lz, durationMs, splineId);
+        await session.SendAsync(WorldOpcode.SmsgMonsterMove, packet, ct);                    // самому игроку
+        await session.World.BroadcastToNeighborsAsync(player, WorldOpcode.SmsgMonsterMove, packet, ct); // соседям
+
+        session.PosX = lx; session.PosY = ly; session.PosZ = lz;
+        session.PosO = MathF.Atan2(dy, dx); // лицом к цели
+        session.Logger.LogDebug("CHARGE '{User}' → ({X:F1};{Y:F1};{Z:F1}) dist={D:F1}", session.Account, lx, ly, lz, dist);
+    }
+
     /// <summary>
     /// Величина урона спелла (M10.4a): мили-абилка (WeaponDamage) — бросок урона оружия + бонус
     /// (BasePoints); процентная (WeaponPercent) — доля от урона оружия; иначе — школьный урон диапазоном.
