@@ -7,14 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Таланты (M9.6+): отправка состояния (<c>SMSG_TALENTS_INFO</c>), изучение и сброс. В каркасе (M9.6) —
-/// только отправка очков/изученных при входе; деревья клиент рисует сам из своей DBC. Изучение
-/// (<c>CMSG_LEARN_TALENT</c>) и сброс — M9.7/M9.8.
+/// Таланты (M9.6+, DI-модуль M7 S6): отправка состояния (<c>SMSG_TALENTS_INFO</c>), изучение
+/// (<c>CMSG_LEARN_TALENT</c>, M9.7) и сброс (M9.8). Деревья клиент рисует сам из своей DBC.
 /// </summary>
-public static class TalentHandlers
+internal sealed class TalentHandlers(SpellLearnService spellLearn) : IOpcodeHandlerModule
 {
     /// <summary>Шлёт текущее состояние талантов игрока (свободные очки + изученные таланты). M9.6.</summary>
-    public static Task SendTalentsInfoAsync(WorldSession session, CancellationToken ct)
+    internal Task SendTalentsInfoAsync(WorldSession session, CancellationToken ct)
     {
         var talents = session.LearnedTalents.Select(kv => (kv.Key, kv.Value)).ToList();
         return session.SendAsync(WorldOpcode.SmsgTalentsInfo,
@@ -22,7 +21,7 @@ public static class TalentHandlers
     }
 
     /// <summary>Пересчитывает свободные очки талантов: MaxPoints(класс,уровень) − потрачено (Σ rank+1). M9.6.</summary>
-    public static void RecomputePoints(WorldSession session, byte classId, byte level)
+    internal void RecomputePoints(WorldSession session, byte classId, byte level)
     {
         var max = World.TalentMath.MaxPoints(classId, level);
         uint spent = 0;
@@ -34,10 +33,10 @@ public static class TalentHandlers
     /// <summary>
     /// CMSG_LEARN_TALENT (M9.7): вложить очко в талант. Валидация (CMaNGOS <c>Player::LearnTalent</c>):
     /// класс↔дерево, следующий ранг, свободное очко, тир-гейт (5×Tier очков в этом дереве), пререквизит.
-    /// Грант ранг-спелла через <see cref="SpellLearn.GrantAsync"/> (книга/персист), запись таланта, пересчёт очков.
+    /// Грант ранг-спелла через <see cref="SpellLearnService.GrantAsync"/> (книга/персист), запись таланта, пересчёт очков.
     /// </summary>
     [WorldOpcodeHandler(WorldOpcode.CmsgLearnTalent)]
-    public static async Task OnLearnTalent(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnLearnTalent(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var r = packet.Reader();
         var talentId = r.UInt32();
@@ -86,7 +85,7 @@ public static class TalentHandlers
 
         // Выучить ранг-спелл (персист character_spell + LEARNED/SUPERCEDED), записать талант.
         var rankSpell = t.RankSpell(nextRank);
-        await SpellLearn.GrantAsync(session, rankSpell, ct);
+        await spellLearn.GrantAsync(session, rankSpell, ct);
         session.LearnedTalents[talentId] = (byte)nextRank;
         await session.CharState.SetTalentRankAsync(session.InWorldGuid, talentId, (byte)nextRank, ct);
 
@@ -111,7 +110,7 @@ public static class TalentHandlers
 
     /// <summary>Госсип «Сбросить таланты» → MSG_TALENT_WIPE_CONFIRM (npc + стоимость): открывает окно
     /// подтверждения у клиента. M9.8.</summary>
-    internal static Task SendWipeConfirmAsync(WorldSession session, ulong npcGuid, CancellationToken ct)
+    internal Task SendWipeConfirmAsync(WorldSession session, ulong npcGuid, CancellationToken ct)
     {
         var cost = NextResetCost(session.Character?.TalentResetCost ?? 0);
         return session.SendAsync(WorldOpcode.MsgTalentWipeConfirm,
@@ -120,7 +119,7 @@ public static class TalentHandlers
 
     /// <summary>MSG_TALENT_WIPE_CONFIRM (клиент подтвердил, u64 npc): сброс талантов за золото. M9.8.</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgTalentWipeConfirm)]
-    public static async Task OnTalentWipeConfirm(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnTalentWipeConfirm(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         packet.Reader().UInt64(); // npc guid — не используем
         if (session.InWorldGuid == 0 || session.Character is not { } c)
@@ -136,7 +135,7 @@ public static class TalentHandlers
     /// (<c>SMSG_REMOVED_SPELL</c>), очистить character_talent, вернуть очки, списать <paramref name="cost"/>
     /// (0 — бесплатно, для дев-команды D5). M9.8.
     /// </summary>
-    internal static async Task ResetTalentsAsync(WorldSession session, uint cost, CancellationToken ct)
+    internal async Task ResetTalentsAsync(WorldSession session, uint cost, CancellationToken ct)
     {
         var c = session.Character!;
         IReadOnlyDictionary<uint, TalentData> all;

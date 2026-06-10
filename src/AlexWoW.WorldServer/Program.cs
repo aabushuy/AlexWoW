@@ -111,6 +111,17 @@ builder.Services.AddSingleton<QuestDialogService>();
 builder.Services.AddSingleton<GossipService>();
 builder.Services.AddSingleton<InventoryGrantService>();
 builder.Services.AddSingleton<KillRewardService>();
+// M7 S6: инвентарь/вендор/тренер/прогрессия — статики сконвертированы в stateless DI-синглтоны
+// (перемещение/сплит/выброс предметов, ресинк клиенту, навыки, изучение спеллов, опыт/уровни, каталог
+// тренеров, стартовая экипировка); опкод-входы — модули InventoryOpcodeHandlers/VendorHandlers/
+// TrainerHandlers/TalentHandlers (регистрируются assembly-сканом выше).
+builder.Services.AddSingleton<InventoryClientSync>();
+builder.Services.AddSingleton<InventoryMoveService>();
+builder.Services.AddSingleton<SkillsService>();
+builder.Services.AddSingleton<SpellLearnService>();
+builder.Services.AddSingleton<ProgressionService>();
+builder.Services.AddSingleton<TrainerCatalogService>();
+builder.Services.AddSingleton<StartingGearService>();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();

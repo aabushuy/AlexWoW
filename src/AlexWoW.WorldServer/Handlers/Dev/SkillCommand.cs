@@ -24,7 +24,7 @@ internal sealed class SkillCommand : IDevCommand
         if (max < value)
             max = value;
 
-        await Skills.GrantAsync(ctx.Session, skillId, value, max, ct);
+        await ctx.Session.Skills.GrantAsync(ctx.Session, skillId, value, max, ct); // мост сессии (до S8)
         await ctx.ReplyAsync($"Навык {skillId} = {value}/{max}", ct);
     }
 }

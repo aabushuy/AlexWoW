@@ -5,14 +5,15 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Выдача стартовой экипировки (M6.1). Источник — playercreateinfo_item (наполнен офлайн из
-/// CharStartOutfit.dbc, см. tools/MapExtractor). Экипируемое раскладываем по слотам экипировки
-/// (0..18) по InventoryType, прочее — в рюкзак (23..38). Слот сохраняется в character_items.
+/// Выдача стартовой экипировки (M6.1, DI-сервис M7 S6 — бывший статик StartingGear). Источник —
+/// playercreateinfo_item (наполнен офлайн из CharStartOutfit.dbc, см. tools/MapExtractor). Экипируемое
+/// раскладываем по слотам экипировки (0..18) по InventoryType, прочее — в рюкзак (23..38). Слот
+/// сохраняется в character_items.
 /// </summary>
-public static class StartingGear
+internal sealed class StartingGearService
 {
     /// <summary>Выдаёт стартовый набор персонажу (если БД мира доступна). Идемпотентность — на вызывающем.</summary>
-    public static async Task GiveAsync(WorldSession session, uint charGuid, byte race, byte cls, CancellationToken ct)
+    internal async Task GiveAsync(WorldSession session, uint charGuid, byte race, byte cls, CancellationToken ct)
     {
         IReadOnlyList<Database.Models.StartingItem> starting;
         try

@@ -42,7 +42,7 @@ public static class GameObjectUseHandlers
         // Прокачка навыка сбора.
         var chance = Professions.SkillUpChance(sk.Value, node.ReqSkill);
         if (chance > 0 && Random.Shared.Next(100) < chance)
-            await Skills.AddValueAsync(session, node.SkillId, 1, ct);
+            await session.Skills.AddValueAsync(session, node.SkillId, 1, ct); // мост сессии (до конверсии модуля)
 
         // Истощить ноду: dev-ноду снять из реестра, иначе — DESTROY у клиента (разовый сбор).
         var slot = session.DevGos.FirstOrDefault(kv => kv.Value == guid).Key;

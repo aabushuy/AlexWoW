@@ -17,7 +17,7 @@ internal sealed class XpCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .xp [add] N", ct);
             return;
         }
-        await Progression.GiveXpAsync(ctx.Session, amount, ct);
+        await ctx.Session.Progression.GiveXpAsync(ctx.Session, amount, ct); // мост сессии (до S8)
         await ctx.ReplyAsync($"Опыт +{amount}", ct);
     }
 }
