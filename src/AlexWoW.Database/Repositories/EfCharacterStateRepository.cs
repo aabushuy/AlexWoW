@@ -27,6 +27,37 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task RemoveLearnedSpellAsync(uint ownerGuid, uint spell, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.CharacterSpells.Where(x => x.OwnerGuid == ownerGuid && x.Spell == spell).ExecuteDeleteAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<(uint TalentId, byte Rank)>> GetTalentsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.CharacterTalents.AsNoTracking()
+            .Where(x => x.OwnerGuid == ownerGuid).Select(x => new { x.TalentId, x.Rank }).ToListAsync(ct);
+        return rows.Select(x => (x.TalentId, x.Rank)).ToList();
+    }
+
+    public async Task SetTalentRankAsync(uint ownerGuid, uint talentId, byte rank, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var e = await db.CharacterTalents.FindAsync([ownerGuid, talentId], ct);
+        if (e is null)
+            db.CharacterTalents.Add(new CharacterTalent { OwnerGuid = ownerGuid, TalentId = talentId, Rank = rank });
+        else
+            e.Rank = rank;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task ClearTalentsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.CharacterTalents.Where(x => x.OwnerGuid == ownerGuid).ExecuteDeleteAsync(ct);
+    }
+
     public async Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

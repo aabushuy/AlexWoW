@@ -109,7 +109,11 @@ public static class WorldEntryHandlers
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
         await SendTimeSyncReqAsync(session, ct);
 
-        // M9.6: свободные очки талантов (MaxPoints − потрачено; M9.7 загрузит изученные до этой точки).
+        // M9.7: загрузить изученные таланты (для панели + расчёта потраченных очков). Ранг-спеллы уже
+        // в KnownSpells (character_spell). M9.6: свободные очки = MaxPoints − потрачено.
+        session.LearnedTalents.Clear();
+        foreach (var (tid, rank) in await session.CharState.GetTalentsAsync(character.Guid, ct))
+            session.LearnedTalents[tid] = rank;
         TalentHandlers.RecomputePoints(session, character.Class, character.Level);
 
         // M9.1: XP-бар — текущий опыт + порог следующего уровня. M9.6: очки талантов в то же поле-апдейт.
