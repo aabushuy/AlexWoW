@@ -31,6 +31,29 @@ public sealed class ItemTemplateRepository(string connectionString)
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<uint, ItemBagInfo>> GetItemBagInfoAsync(
+        IReadOnlyCollection<uint> entries, CancellationToken ct = default)
+    {
+        var result = new Dictionary<uint, ItemBagInfo>();
+        if (entries.Count == 0)
+            return result;
+
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync(new CommandDefinition(
+            "SELECT entry AS Entry, class AS Class, ContainerSlots, MaxDurability FROM item_template WHERE entry IN @entries;",
+            new { entries }, cancellationToken: ct));
+        foreach (var row in rows)
+        {
+            var d = (IDictionary<string, object>)row;
+            var entry = Convert.ToUInt32(d["Entry"], CultureInfo.InvariantCulture);
+            result[entry] = new ItemBagInfo(
+                Convert.ToUInt32(d["Class"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["ContainerSlots"], CultureInfo.InvariantCulture),
+                Convert.ToUInt32(d["MaxDurability"], CultureInfo.InvariantCulture));
+        }
+        return result;
+    }
+
     public async Task<ItemTemplateData?> GetItemTemplateAsync(uint entry, CancellationToken ct = default)
     {
         await using var db = await OpenAsync(ct);

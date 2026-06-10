@@ -41,7 +41,11 @@ public static class InventoryGrant
         {
             var t = await session.WorldDb.GetItemTemplateAsync(itemEntry, ct);
             if (t is not null)
+            {
                 maxStack = (uint)Math.Max(1, t.Stackable);
+                // M6.13: запомнить bag-info — чтобы выданный предмет-сумка создался как TYPEID_CONTAINER.
+                session.ItemBagInfo[itemEntry] = new ItemBagInfo(t.Class, t.ContainerSlots, t.MaxDurability);
+            }
         }
         catch { /* без шаблона — кладём как нестакающийся */ }
 
@@ -79,7 +83,7 @@ public static class InventoryGrant
                 Bag = InventorySlots.MainBag, Slot = (byte)slot, StackCount = portion,
             };
             session.Inventory.Add(item);
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid), ct);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid, session.ItemBagInfo), ct);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 PlayerSpawn.BuildInvSlotUpdate(ownerGuid, slot, ItemObject.ItemGuid(itemLow)), ct);
             remaining -= portion;

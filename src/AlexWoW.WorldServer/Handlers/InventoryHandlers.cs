@@ -123,7 +123,7 @@ public static class InventoryHandlers
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            ItemObject.BuildItemsCreate(new[] { newItem }, owner), ct);
+            ItemObject.BuildItemsCreate(new[] { newItem }, owner, session.ItemBagInfo), ct);
         await ReassertAsync(session, ct, dst);
         session.Logger.LogDebug("SPLIT '{User}': {Entry} {Amt} в слот {Dst}", session.Account, item.ItemEntry, amount, dst);
     }

@@ -11,4 +11,8 @@ public interface IItemTemplateRepository
     /// <summary>displayid + InventoryType по набору entry (для paperdoll в SMSG_CHAR_ENUM).</summary>
     Task<IReadOnlyDictionary<uint, (uint DisplayId, byte InventoryType)>> GetItemDisplaysAsync(
         IReadOnlyCollection<uint> entries, CancellationToken ct = default);
+
+    /// <summary>class + ContainerSlots + MaxDurability по набору entry — для раскладки инвентаря/сумок (M6.13).</summary>
+    Task<IReadOnlyDictionary<uint, ItemBagInfo>> GetItemBagInfoAsync(
+        IReadOnlyCollection<uint> entries, CancellationToken ct = default);
 }

@@ -60,6 +60,12 @@ public static class UpdateField
     public const int ItemDurability = 0x003C;
     public const int ItemMaxDurability = 0x003D;
 
+    // CONTAINER (сумки): ITEM_END = 0x40. NUM_SLOTS + слоты (guid на слот, stride 2). CMaNGOS UpdateFields.h (3.3.5a). M6.13.
+    public const int ContainerNumSlots = 0x0040;  // CONTAINER_FIELD_NUM_SLOTS (size 1)
+    public const int ContainerSlot1 = 0x0042;     // CONTAINER_FIELD_SLOT_1 (до 36 слотов × 2 поля)
+    /// <summary>Поле guid предмета в слоте сумки 0..35 (CONTAINER_FIELD_SLOT_1 + i*2).</summary>
+    public static int ContainerSlotGuid(int innerSlot) => ContainerSlot1 + innerSlot * 2;
+
     // GAMEOBJECT (OBJECT_END = 0x06)
     public const int GoDisplayId = 0x0008;
     public const int GoFlags = 0x0009;
@@ -127,12 +133,16 @@ public static class TypeMask
 {
     public const uint Object = 0x0001;
     public const uint Item = 0x0002;
+    public const uint Container = 0x0004;
     public const uint Unit = 0x0008;
     public const uint Player = 0x0010;
     public const uint GameObject = 0x0020;
 
     /// <summary>Маска для предмета: Object | Item.</summary>
     public const uint ItemObject = Object | Item; // 0x03
+
+    /// <summary>Маска для контейнера (сумки): Object | Item | Container.</summary>
+    public const uint ContainerObject = Object | Item | Container; // 0x07
 
     /// <summary>Маска для игрока: Object | Unit | Player.</summary>
     public const uint PlayerObject = Object | Unit | Player; // 0x19
@@ -148,6 +158,7 @@ public static class TypeMask
 public static class TypeId
 {
     public const byte Item = 1;
+    public const byte Container = 2;   // TYPEID_CONTAINER (сумки) — сверено с CMaNGOS ObjectGuid.h
     public const byte Unit = 3;
     public const byte Player = 4;
     public const byte GameObject = 5;
