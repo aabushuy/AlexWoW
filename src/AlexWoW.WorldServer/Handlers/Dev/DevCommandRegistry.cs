@@ -15,7 +15,7 @@ internal sealed class DevCommandRegistry
 
     public DevCommandRegistry(IEnumerable<IDevCommand> commands)
     {
-        Ordered = commands.OrderBy(c => c.Order).ToList();
+        Ordered = [.. commands.OrderBy(c => c.Order)];
         foreach (var c in Ordered)
         {
             foreach (var name in c.Names)

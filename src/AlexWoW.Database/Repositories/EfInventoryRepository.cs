@@ -22,7 +22,7 @@ public sealed class EfInventoryRepository(IDbContextFactory<AuthDbContext> facto
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.CharacterItems.AsNoTracking()
             .Where(x => x.OwnerGuid == ownerGuid).OrderBy(x => x.Bag).ThenBy(x => x.Slot).ToListAsync(ct);
-        return rows.Select(x => new ModelInventoryItem
+        return [.. rows.Select(x => new ModelInventoryItem
         {
             ItemGuid = x.ItemGuid,
             OwnerGuid = x.OwnerGuid,
@@ -30,7 +30,7 @@ public sealed class EfInventoryRepository(IDbContextFactory<AuthDbContext> facto
             Bag = x.Bag,
             Slot = x.Slot,
             StackCount = x.StackCount,
-        }).ToList();
+        })];
     }
 
     public async Task<uint> AddItemAsync(uint ownerGuid, uint itemEntry, byte bag, byte slot,

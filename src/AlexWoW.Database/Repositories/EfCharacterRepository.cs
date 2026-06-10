@@ -24,7 +24,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.Characters.AsNoTracking()
             .Where(x => x.AccountId == accountId).OrderBy(x => x.Guid).ToListAsync(ct);
-        return rows.Select(ToModel).ToList();
+        return [.. rows.Select(ToModel)];
     }
 
     public async Task<ModelCharacter?> GetByGuidAsync(uint guid, CancellationToken ct = default)
@@ -112,7 +112,7 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
             .Where(x => guids.Contains(x.OwnerGuid)
                 && (x.N0 != "" || x.N1 != "" || x.N2 != "" || x.N3 != "" || x.N4 != ""))
             .Select(x => x.OwnerGuid).ToListAsync(ct);
-        return rows.ToHashSet();
+        return [.. rows];
     }
 
     public async Task<string[]?> GetDeclinedNamesAsync(uint ownerGuid, CancellationToken ct = default)

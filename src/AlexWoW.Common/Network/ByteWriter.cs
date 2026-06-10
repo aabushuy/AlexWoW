@@ -8,7 +8,7 @@ namespace AlexWoW.Common.Network;
 /// </summary>
 public sealed class ByteWriter(int capacity = 64)
 {
-    private readonly List<byte> _buffer = new List<byte>(capacity);
+    private readonly List<byte> _buffer = new(capacity);
 
     public int Length => _buffer.Count;
 
@@ -75,5 +75,5 @@ public sealed class ByteWriter(int capacity = 64)
         return this;
     }
 
-    public byte[] ToArray() => _buffer.ToArray();
+    public byte[] ToArray() => [.. _buffer];
 }

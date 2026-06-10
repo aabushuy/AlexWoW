@@ -15,7 +15,7 @@ public sealed class EfQuestRepository(IDbContextFactory<AuthDbContext> factory) 
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.QuestStatuses.AsNoTracking().Where(x => x.OwnerGuid == ownerGuid).ToListAsync(ct);
-        return rows.Select(x => new ModelQuestStatusRow
+        return [.. rows.Select(x => new ModelQuestStatusRow
         {
             QuestId = x.QuestId,
             Slot = x.Slot,
@@ -24,7 +24,7 @@ public sealed class EfQuestRepository(IDbContextFactory<AuthDbContext> factory) 
             Counter1 = x.Counter1,
             Counter2 = x.Counter2,
             Counter3 = x.Counter3,
-        }).ToList();
+        })];
     }
 
     public async Task UpsertQuestStatusAsync(uint ownerGuid, uint questId, byte slot, byte status,

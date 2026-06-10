@@ -14,7 +14,7 @@ public sealed class EfTeleportRepository(IDbContextFactory<AuthDbContext> factor
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.TeleportLocations.AsNoTracking().OrderBy(x => x.SortOrder).ThenBy(x => x.Id).ToListAsync(ct);
-        return rows.Select(Map).ToList();
+        return [.. rows.Select(Map)];
     }
 
     public async Task<ModelTeleport?> GetByIdAsync(uint id, CancellationToken ct = default)
