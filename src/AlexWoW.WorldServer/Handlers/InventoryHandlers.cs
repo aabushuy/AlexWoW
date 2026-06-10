@@ -69,6 +69,18 @@ public static class InventoryHandlers
         }
 
         var inv = await InvTypeAsync(session, item.ItemEntry, ct);
+
+        // M6.13: сумка (INVTYPE_BAG) — надеть в первый свободный bag-слот 19..22; если все заняты,
+        // свопнуть с первой ПУСТОЙ надетой сумкой; иначе отказ.
+        if (inv == InventorySlots.InvTypeBag)
+        {
+            var bagSlot = FreeBagSlot(session);
+            if (bagSlot < 0) bagSlot = FirstEmptyEquippedBagSlot(session);
+            if (bagSlot < 0) { await ReassertAsync(session, ct, src); return; }
+            await MoveOrSwapAsync(session, src, bagSlot, ct);
+            return;
+        }
+
         var slot = InventorySlots.EquipSlotFor(inv);
         if (slot < 0) { await ReassertAsync(session, ct, src); return; } // не экипируется
 
@@ -173,6 +185,18 @@ public static class InventoryHandlers
             && !InventorySlots.CanEquipInSlot(await InvTypeAsync(session, dst.ItemEntry, ct), srcSlot))
         { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
 
+        // M6.13: bag-слот (19..22) принимает только сумку (INVTYPE_BAG); непустую сумку нельзя
+        // снять/переместить (CMaNGOS EQUIP_ERR_CAN_ONLY_DO_WITH_EMPTY_BAGS).
+        if (InventorySlots.IsBagSlot(dstSlot)
+            && await InvTypeAsync(session, src.ItemEntry, ct) != InventorySlots.InvTypeBag)
+        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
+        if (dst is not null && InventorySlots.IsBagSlot(srcSlot)
+            && await InvTypeAsync(session, dst.ItemEntry, ct) != InventorySlots.InvTypeBag)
+        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
+        if ((InventorySlots.IsBagSlot(srcSlot) && BagHasItems(session, srcSlot))
+            || (dst is not null && InventorySlots.IsBagSlot(dstSlot) && BagHasItems(session, dstSlot)))
+        { await ReassertAsync(session, ct, srcSlot, dstSlot); return; }
+
         src.Slot = (byte)dstSlot;
         await session.Items.MoveItemAsync(src.ItemGuid, InventorySlots.MainBag, (byte)dstSlot, ct);
         if (dst is not null)
@@ -224,6 +248,26 @@ public static class InventoryHandlers
             if (!taken.Contains(s)) return s;
         return -1;
     }
+
+    /// <summary>Первый свободный bag-слот 19..22 (нет надетой сумки), либо -1. M6.13.</summary>
+    private static int FreeBagSlot(WorldSession session)
+    {
+        for (var s = InventorySlots.BagSlotStart; s < InventorySlots.BagSlotEnd; s++)
+            if (ItemAt(session, s) is null) return s;
+        return -1;
+    }
+
+    /// <summary>Первый bag-слот с НАДЕТОЙ, но ПУСТОЙ сумкой (для свопа при автоэкипировке), либо -1. M6.13.</summary>
+    private static int FirstEmptyEquippedBagSlot(WorldSession session)
+    {
+        for (var s = InventorySlots.BagSlotStart; s < InventorySlots.BagSlotEnd; s++)
+            if (ItemAt(session, s) is not null && !BagHasItems(session, s)) return s;
+        return -1;
+    }
+
+    /// <summary>Есть ли предметы внутри надетой сумки в bag-слоте <paramref name="bagSlot"/> (Bag==bagSlot). M6.13.</summary>
+    private static bool BagHasItems(WorldSession session, int bagSlot)
+        => session.Inventory.Any(i => i.Bag == (byte)bagSlot);
 
     private static bool IsMain(int bag) => bag == InventorySlots.MainBag;
 }

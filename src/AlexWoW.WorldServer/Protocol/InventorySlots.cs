@@ -12,11 +12,19 @@ public static class InventorySlots
     public const int EquipmentStart = 0;
     public const int EquipmentEnd = 19;    // EQUIPMENT_SLOT_END (слоты 0..18)
     public const byte MainHandSlot = 15;   // EQUIPMENT_SLOT_MAINHAND (M9.2 — урон оружия)
+    public const int BagSlotStart = 19;    // INVENTORY_SLOT_BAG_START (надеваемые сумки)
+    public const int BagSlotEnd = 23;      // INVENTORY_SLOT_BAG_END (слоты 19..22)
     public const int BackpackStart = 23;   // INVENTORY_SLOT_ITEM_START
     public const int BackpackEnd = 39;     // INVENTORY_SLOT_ITEM_END (слоты 23..38)
 
+    /// <summary>InventoryType сумки (INVTYPE_BAG). M6.13.</summary>
+    public const uint InvTypeBag = 18;
+
     /// <summary>Слот экипировки (0..18)?</summary>
     public static bool IsEquipmentSlot(int slot) => slot >= EquipmentStart && slot < EquipmentEnd;
+
+    /// <summary>Слот надеваемой сумки (19..22)? M6.13.</summary>
+    public static bool IsBagSlot(int slot) => slot >= BagSlotStart && slot < BagSlotEnd;
 
     /// <summary>Слот основного рюкзака (23..38)?</summary>
     public static bool IsBackpackSlot(int slot) => slot >= BackpackStart && slot < BackpackEnd;
