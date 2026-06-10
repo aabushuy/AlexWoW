@@ -39,6 +39,12 @@ public static class SpellLearn
                 var value = (ushort)Math.Max(curValue, 1);
                 var max = (ushort)Math.Max(curMax, (int)grant.Max);
                 await Skills.GrantAsync(session, grant.SkillId, value, max, ct);
+
+                // Доп. спеллы профессии (напр. Mining → Smelting: окно плавки). 2656 — эффект TRADE_SKILL,
+                // навык не выдаёт → без рекурсии.
+                if (World.Professions.AutoGrantSpells.TryGetValue(grant.SkillId, out var extras))
+                    foreach (var extra in extras)
+                        await GrantAsync(session, extra, ct);
             }
         }
         catch { /* БД мира недоступна — навык не выдаём, спелл всё равно изучен */ }
