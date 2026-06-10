@@ -278,7 +278,7 @@ internal sealed class LoginSequenceService(
         }
 
         var book = known.Where(s => !hiddenSpells.Contains(s)).ToList();
-        var w = new ByteWriter(8 + book.Count * 6)
+        var w = new ByteWriter(8 + (book.Count * 6))
             .UInt8(0)
             .UInt16((ushort)book.Count);
         foreach (var spell in book)
@@ -300,7 +300,7 @@ internal sealed class LoginSequenceService(
     private static async Task SendInitializeFactionsAsync(WorldSession session, CancellationToken ct)
     {
         const int FactionCount = 128; // mangostwo (wrath) = 0x80
-        var w = new ByteWriter(4 + FactionCount * 5);
+        var w = new ByteWriter(4 + (FactionCount * 5));
         w.UInt32(FactionCount);
         for (var i = 0; i < FactionCount; i++)
             w.UInt8(0).UInt32(0); // flag=0 (невидима/не-at-war), standing=0 (база)

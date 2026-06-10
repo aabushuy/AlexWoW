@@ -62,7 +62,7 @@ internal sealed class ActionBarHandlers(ICharacterStateRepository charState, ICh
             buttons = new Dictionary<byte, uint>();
         }
 
-        var w = new ByteWriter(1 + MaxActionButtons * 4).UInt8(1); // 1 = INITIAL (как CMaNGOS)
+        var w = new ByteWriter(1 + (MaxActionButtons * 4)).UInt8(1); // 1 = INITIAL (как CMaNGOS)
         for (var button = 0; button < MaxActionButtons; button++)
             w.UInt32(buttons.TryGetValue((byte)button, out var packed) ? packed : 0u);
         await session.SendAsync(WorldOpcode.SmsgActionButtons, w.ToArray(), ct);
