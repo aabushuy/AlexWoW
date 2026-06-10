@@ -99,5 +99,6 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         SessionKey = a.SessionKey,
         LastIp = a.LastIp,
         IsAdmin = a.IsAdmin != 0,
+        CreatedAt = a.CreatedAt,
     };
 }
