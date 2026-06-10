@@ -176,6 +176,9 @@ public static class Progression
         var hpDiff = session.MaxHealth > oldMaxHp ? session.MaxHealth - oldMaxHp : 0;
         var powerType = DisplayData.PowerTypeForClass(c.Class);
 
+        // M9.6: очки талантов растут с уровнем (MaxPoints − потрачено).
+        TalentHandlers.RecomputePoints(session, c.Class, c.Level);
+
         if (ding)
         {
             // SMSG_LEVELUP_INFO (wrath): new_level + health + 7 powers + 5 статов (диффы). Мана/статы — 0 (упрощённо).
@@ -205,6 +208,10 @@ public static class Progression
                     m.SetUInt32(UpdateField.UnitBaseHealth, s.MaxHealth);
                     m.SetUInt32(UpdateField.UnitBaseMana, s.MaxMana);
                 }
+                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.TalentPoints); // M9.6
             }), ct);
+
+        if (ding) // M9.6: обновить панель талантов (новые свободные очки)
+            await TalentHandlers.SendTalentsInfoAsync(session, ct);
     }
 }

@@ -119,6 +119,13 @@ public enum WorldOpcode : uint
     SmsgTrainerBuyFailed = 0x1B4,                // guid + spell + reason (только консоль клиента)
     SmsgLearnedSpell = 0x12B,                    // spell + u16 — добавить абилку в книгу
     SmsgSupercededSpell = 0x12C,                 // u32 old + u32 new — высший ранг заменяет низший (M10.3)
+    SmsgRemovedSpell = 0x203,                    // u32 spell — убрать абилку из книги (сброс талантов M9.8)
+
+    // Таланты (M9.6–M9.8). Опкоды/форматы сверены с CMaNGOS Opcodes.h / wow_messages (3.3.5a).
+    SmsgTalentsInfo = 0x4C0,                      // состояние талантов при входе (очки + изученные)
+    CmsgLearnTalent = 0x251,                      // u32 talentId + u32 requestedRank — вложить очко
+    CmsgUnlearnTalents = 0x213,                   // сброс всех талантов (полный)
+    MsgTalentWipeConfirm = 0x2AA,                 // c→s: u64 npc; s→c: u64 npc + u32 cost — сброс у тренера
 
     // Квесты (M6.5)
     CmsgQuestQuery = 0x05C,                     // u32 quest_id — данные квеста для журнала
