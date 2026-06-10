@@ -23,4 +23,10 @@ public interface ITrainerRepository
     /// (Grand Master) — фракция тренера не важна, dev-спавн делает его дружелюбным ко всем. null — не найден.
     /// </summary>
     Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default);
+
+    /// <summary>
+    /// Требование навыка для рецепта (по <c>npc_trainer[_template]</c>): (skillId, reqSkillValue) или null.
+    /// Источник привязки «рецепт → навык» для skill-up крафта (skill_line_ability нет в дампе). M11.
+    /// </summary>
+    Task<(ushort SkillId, ushort ReqSkill)?> GetRecipeSkillAsync(uint spellId, CancellationToken ct = default);
 }

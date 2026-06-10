@@ -41,16 +41,39 @@ public static class Crafting
         await SkillUpForRecipeAsync(session, spellId, ct);
     }
 
-    /// <summary>Ролл прокачки навыка за крафт (если рецепт привязан к навыку в сиде). M11.5-формула.</summary>
+    /// <summary>Кэш привязки рецепт→(навык, req) из npc_trainer (иммутабельно), чтобы не дёргать БД каждый крафт.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<uint, (ushort SkillId, ushort ReqSkill)?> RecipeSkillCache = new();
+
+    /// <summary>
+    /// Ролл прокачки навыка за крафт. Привязка рецепт→навык: сначала сид <see cref="Professions.Recipes"/>
+    /// (плавка и пр., которых нет у тренера), затем npc_trainer (reqskill/reqskillvalue) — покрывает все
+    /// рецепты, изучаемые у тренера. Формула цвета — <see cref="Professions.SkillUpChance"/>. M11.5.
+    /// </summary>
     private static async Task SkillUpForRecipeAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
-        if (!Professions.Recipes.TryGetValue(spellId, out var recipe))
+        (ushort SkillId, ushort ReqSkill)? recipe = Professions.Recipes.TryGetValue(spellId, out var seed)
+            ? (seed.SkillId, seed.ReqSkill)
+            : await ResolveFromTrainerAsync(session, spellId, ct);
+        if (recipe is not { } r)
             return;
-        var sk = session.SkillBook.Get(recipe.SkillId);
+
+        var sk = session.SkillBook.Get(r.SkillId);
         if (sk is null)
             return; // профессия не изучена — не качаем
-        var chance = Professions.SkillUpChance(sk.Value, recipe.ReqSkill);
+        var chance = Professions.SkillUpChance(sk.Value, r.ReqSkill);
         if (chance > 0 && Random.Shared.Next(100) < chance)
-            await Skills.AddValueAsync(session, recipe.SkillId, 1, ct);
+            await Skills.AddValueAsync(session, r.SkillId, 1, ct);
+    }
+
+    private static async Task<(ushort SkillId, ushort ReqSkill)?> ResolveFromTrainerAsync(
+        WorldSession session, uint spellId, CancellationToken ct)
+    {
+        if (RecipeSkillCache.TryGetValue(spellId, out var cached))
+            return cached;
+        (ushort, ushort)? result = null;
+        try { result = await session.WorldDb.GetRecipeSkillAsync(spellId, ct); }
+        catch { /* БД мира недоступна — без skill-up */ }
+        RecipeSkillCache[spellId] = result;
+        return result;
     }
 }
