@@ -3,33 +3,22 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using AlexWoW.Common.Network;
 using AlexWoW.Cryptography;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AlexWoW.WorldServer.Handlers;
 
-/// <summary>Handshake world-сессии: вызов и проверка аутентификации.</summary>
-public static class AuthHandlers
+/// <summary>Handshake world-сессии: проверка аутентификации (DI-модуль, M7 #35; вызов — <see cref="AuthChallengeSender"/>).</summary>
+internal sealed class AuthHandlers(IAccountRepository accounts, IOptions<WorldServerOptions> options)
+    : IOpcodeHandlerModule
 {
-    /// <summary>Сервер инициирует handshake: SMSG_AUTH_CHALLENGE сразу при подключении.</summary>
-    public static async Task SendAuthChallengeAsync(WorldSession session, CancellationToken ct)
-    {
-        Span<byte> seedBytes = stackalloc byte[4];
-        RandomNumberGenerator.Fill(seedBytes);
-        session.AuthSeed = BinaryPrimitives.ReadUInt32LittleEndian(seedBytes);
-
-        var payload = new ByteWriter(40)
-            .UInt32(1)
-            .UInt32(session.AuthSeed)
-            .Bytes(RandomNumberGenerator.GetBytes(32)) // seed1/seed2 — нашей схемой не используются
-            .ToArray();
-        await session.SendAsync(WorldOpcode.SmsgAuthChallenge, payload, ct);
-        session.Logger.LogInformation("Отправлен SMSG_AUTH_CHALLENGE на {Ip}", session.RemoteIp);
-    }
+    private readonly WorldServerOptions _options = options.Value;
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAuthSession)]
-    public static async Task OnAuthSession(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnAuthSession(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var build = reader.UInt32();
@@ -50,14 +39,14 @@ public static class AuthHandlers
         session.Logger.LogInformation("CMSG_AUTH_SESSION: '{User}' (build {Build}) от {Ip}",
             account, build, session.RemoteIp);
 
-        if (build != session.Options.ExpectedBuild)
+        if (build != _options.ExpectedBuild)
         {
             session.Logger.LogWarning("Неподдерживаемый build {Build} (ожидается {Expected}) от {Ip}",
-                build, session.Options.ExpectedBuild, session.RemoteIp);
+                build, _options.ExpectedBuild, session.RemoteIp);
             return;
         }
 
-        var dbAccount = await session.Database.GetAccountByUsernameAsync(account, ct);
+        var dbAccount = await accounts.GetAccountByUsernameAsync(account, ct);
         if (dbAccount?.SessionKey is null)
         {
             session.Logger.LogWarning("Нет session key для '{User}' — клиент не проходил логин?", account);
@@ -175,7 +164,7 @@ public static class AuthHandlers
     ];
 
     [WorldOpcodeHandler(WorldOpcode.CmsgPing)]
-    public static async Task OnPing(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnPing(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var ping = reader.UInt32();

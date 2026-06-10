@@ -11,20 +11,16 @@ using Microsoft.Extensions.Options;
 
 namespace AlexWoW.WorldServer.Net;
 
-/// <summary>Принимает world-соединения и запускает <see cref="WorldSession"/> на каждое.</summary>
-public sealed class WorldListener(
+/// <summary>Принимает world-соединения и запускает <see cref="WorldSession"/> на каждое (через фабрику, M7 #35).</summary>
+internal sealed class WorldListener(
     IOptions<WorldServerOptions> options,
-    IAccountRepository database,
+    WorldSessionFactory sessions,
+    Handlers.WorldPacketRouter router,
     ICharacterRepository characters,
-    IInventoryRepository items,
-    IQuestRepository quests,
-    ICharacterStateRepository charState,
-    ITeleportRepository teleports,
     IWorldRepository worldDatabase,
     TerrainMaps terrain,
     Vmaps vmaps,
     Navmesh navmesh,
-    WorldState world,
     ILogger<WorldListener> logger) : BackgroundService
 {
     private readonly WorldServerOptions _options = options.Value;
@@ -44,7 +40,7 @@ public sealed class WorldListener(
         listener.Bind(endpoint);
         listener.Listen(128);
         logger.LogInformation("WorldServer слушает {Endpoint} ({Handlers} опкодов зарегистрировано)",
-            endpoint, Handlers.WorldPacketRouter.HandlerCount);
+            endpoint, router.HandlerCount);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -62,11 +58,7 @@ public sealed class WorldListener(
             // их батчинг даёт рывки/«полёт» у соседних игроков. Нужна минимальная задержка.
             client.NoDelay = true;
 
-            _ = Task.Run(
-                () => new WorldSession(client, database, characters, items, quests, charState,
-                        teleports, worldDatabase, terrain, world, _options, logger)
-                    .RunAsync(stoppingToken),
-                stoppingToken);
+            _ = Task.Run(() => sessions.Create(client).RunAsync(stoppingToken), stoppingToken);
         }
     }
 

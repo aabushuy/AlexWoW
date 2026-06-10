@@ -6,6 +6,7 @@ using AlexWoW.DataStores.Collision;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
+using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
 using Microsoft.EntityFrameworkCore;
@@ -78,6 +79,12 @@ builder.Services.AddSingleton<QuestStore>();
 builder.Services.AddSingleton<LevelStore>();
 builder.Services.AddSingleton<StatStore>();
 builder.Services.AddSingleton<WorldState>();
+// Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
+// с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
+builder.Services.AddWorldOpcodeHandlers();
+builder.Services.AddSingleton<AuthChallengeSender>();
+builder.Services.AddSingleton<WorldSessionServices>();
+builder.Services.AddSingleton<WorldSessionFactory>();
 builder.Services.AddHostedService<WorldUpdateLoop>();
 builder.Services.AddHostedService<WorldListener>();
 
