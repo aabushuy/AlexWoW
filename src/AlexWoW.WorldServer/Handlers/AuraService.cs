@@ -32,8 +32,10 @@ internal sealed class AuraService(ICharacterStateRepository charState)
         // Эксклюзивность переключателя: снять прочие ауры той же группы. Форму НЕ сбрасываем в 0, если новая
         // тоже задаёт форму (resetForm:false) — иначе подсветка стойки мигает/запаздывает (M7 #21).
         if (group != 0)
+        {
             foreach (var g in session.Progression.Auras.Where(a => a.Group == group).ToList())
                 await RemoveInternalAsync(session, g, resetForm: form == 0, ct);
+        }
 
         // Рефреш: повтор того же спелла — снять старый экземпляр.
         var dup = session.Progression.Auras.FirstOrDefault(a => a.SpellId == spellId);
@@ -73,8 +75,10 @@ internal sealed class AuraService(ICharacterStateRepository charState)
         }
 
         if (doPersist)
+        {
             try { await charState.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
             catch { /* персист не критичен для текущей сессии */ }
+        }
     }
 
     /// <summary>Снимает ауру по spellId, если есть (M6.11).</summary>
@@ -107,11 +111,16 @@ internal sealed class AuraService(ICharacterStateRepository charState)
             await BroadcastFormAsync(session, ct);
         }
         if (aura.Persist)
+        {
             try { await charState.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
             catch { /* персист не критичен */ }
+        }
+
         if (session.Player is { } player)
+        {
             await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,
                 AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
+        }
     }
 
     /// <summary>VALUES-апдейт UNIT_FIELD_BYTES_2 (байт 3 = форма) себе и наблюдателям. M6.11.
@@ -129,8 +138,11 @@ internal sealed class AuraService(ICharacterStateRepository charState)
     internal static byte FirstFreeSlot(WorldSession session)
     {
         for (var slot = 0; slot < MaxAuraSlots; slot++)
+        {
             if (session.Progression.Auras.All(a => a.Slot != slot))
                 return (byte)slot;
+        }
+
         return (byte)(MaxAuraSlots - 1); // переполнение — переиспользуем последний (крайний случай)
     }
 }

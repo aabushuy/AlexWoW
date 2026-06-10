@@ -26,10 +26,10 @@ public sealed class DefaultRealmOptions
     /// <summary>IP world-сервера, который увидит клиент. Должен быть доступен с машины игрока.</summary>
     public string Address { get; set; } = "127.0.0.1";
     public ushort Port { get; set; } = 8085;
-    public byte Type { get; set; } = 0;
-    public byte Flags { get; set; } = 0;
+    public byte Type { get; set; }
+    public byte Flags { get; set; }
     public byte Timezone { get; set; } = 1;
-    public float Population { get; set; } = 0f;
+    public float Population { get; set; }
 }
 
 /// <summary>Маппинг конфигурации реалма в модель БД — общий для сервера и CLI (S10, DRY).</summary>

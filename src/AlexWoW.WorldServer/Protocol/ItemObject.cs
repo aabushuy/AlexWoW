@@ -35,8 +35,11 @@ public static class ItemObject
                 // её слоты сразу показывали предметы. Сумка в рюкзаке (Slot 23..38) содержимого не имеет.
                 List<(int Slot, ulong Guid)>? contents = null;
                 if (InventorySlots.IsBagSlot(item.Slot))
+                {
                     contents = items.Where(i => i.Bag == item.Slot)
                         .Select(i => ((int)i.Slot, ItemGuid(i.ItemGuid))).ToList();
+                }
+
                 ContainerObject.WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid,
                     item.StackCount, info.MaxDurability, info.ContainerSlots, contents);
             }

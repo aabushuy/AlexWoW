@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -54,7 +54,7 @@ internal sealed class ProfTrainerCommand(IWorldRepository worldDb) : IDevCommand
         try { entry = await worldDb.GetProfessionTrainerEntryAsync(keyword, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("PROFTRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
+            session.Logger.LogDebug(ex, "PROFTRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
             await ctx.ReplyAsync("БД мира недоступна", ct);
             return;
         }

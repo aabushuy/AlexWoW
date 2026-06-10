@@ -45,8 +45,11 @@ public static class BagInventory
             return -1;
         var taken = session.Inv.Inventory.Where(i => i.Bag == (byte)bagSlot).Select(i => (int)i.Slot).ToHashSet();
         for (var s = 0; s < cap; s++)
+        {
             if (!taken.Contains(s))
                 return s;
+        }
+
         return -1;
     }
 
@@ -56,8 +59,11 @@ public static class BagInventory
     {
         var taken = session.Inv.Inventory.Where(i => i.Bag == InventorySlots.MainBag).Select(i => (int)i.Slot).ToHashSet();
         for (var s = InventorySlots.BackpackStart; s < InventorySlots.BackpackEnd; s++)
+        {
             if (!taken.Contains(s))
                 return s;
+        }
+
         return -1;
     }
 
@@ -69,8 +75,11 @@ public static class BagInventory
     public static int FreeBagSlot(WorldSession session)
     {
         for (var s = InventorySlots.BagSlotStart; s < InventorySlots.BagSlotEnd; s++)
+        {
             if (MainItemAt(session, s) is null)
                 return s;
+        }
+
         return -1;
     }
 
@@ -78,8 +87,11 @@ public static class BagInventory
     public static int FirstEmptyEquippedBagSlot(WorldSession session)
     {
         for (var s = InventorySlots.BagSlotStart; s < InventorySlots.BagSlotEnd; s++)
+        {
             if (MainItemAt(session, s) is not null && !HasItems(session, s))
                 return s;
+        }
+
         return -1;
     }
 

@@ -1,4 +1,4 @@
-using AlexWoW.WorldServer.Handlers;
+﻿using AlexWoW.WorldServer.Handlers;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -44,7 +44,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
             }
             catch (Exception ex)
             {
-                logger.LogDebug("Тик '{User}': {Msg}", player.Character.Name, ex.Message);
+                logger.LogDebug(ex, "Тик '{User}': {Msg}", player.Character.Name, ex.Message);
             }
         }
 
@@ -68,7 +68,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
             }
             catch (Exception ex)
             {
-                logger.LogDebug("Тик существа {Guid}: {Msg}", creature.Guid, ex.Message);
+                logger.LogDebug(ex, "Тик существа {Guid}: {Msg}", creature.Guid, ex.Message);
             }
         }
     }

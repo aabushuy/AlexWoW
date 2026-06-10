@@ -159,11 +159,14 @@ public static class Professions
             (t.Effect3, t.EffectMiscValue3, t.EffectBasePoints3),
         ];
         foreach (var (eff, misc, bp) in effects)
+        {
             if ((eff == EffectSkill || eff == EffectSkillStep) && misc > 0 && SkillLines.Contains((ushort)misc))
             {
                 var max = (ushort)Math.Clamp(Math.Max(1, bp) * 75, ApprenticeMax, TierMax[^1]);
                 return new SkillGrant((ushort)misc, max);
             }
+        }
+
         return null;
     }
 }

@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -33,7 +33,7 @@ public sealed class LevelStore(IPlayerDataRepository worldDb, ILogger<LevelStore
             }
             catch (Exception ex)
             {
-                logger.LogWarning("player_xp_for_level не загружен ({Msg}) — прокачка отключена", ex.Message);
+                logger.LogWarning(ex, "player_xp_for_level не загружен ({Msg}) — прокачка отключена", ex.Message);
                 _xpForNext = new Dictionary<uint, uint>();
             }
             _loaded = true;

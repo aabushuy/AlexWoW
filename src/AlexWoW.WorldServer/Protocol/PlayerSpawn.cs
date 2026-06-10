@@ -55,12 +55,15 @@ public static class PlayerSpawn
         var m = new UpdateMask();
         var any = false;
         foreach (var item in inventory)
+        {
             if (item.Bag == InventorySlots.MainBag
                 && item.Slot >= InventorySlots.EquipmentStart && item.Slot < InventorySlots.EquipmentEnd)
             {
                 m.SetUInt32(UpdateField.VisibleItemEntry(item.Slot), item.ItemEntry);
                 any = true;
             }
+        }
+
         if (!any)
             return null;
 
@@ -182,6 +185,7 @@ public static class PlayerSpawn
 
         // M11.1: профессии и прочие навыки — в слотах после языковых (приватные, только себе).
         if (isSelf && skills is not null)
+        {
             for (var i = 0; i < skills.Count; i++)
             {
                 var baseIdx = UpdateField.PlayerSkillInfo11 + (languageSkills.Count + i) * 3;
@@ -189,6 +193,7 @@ public static class PlayerSpawn
                 m.SetUInt32(baseIdx + 1, (uint)(skills[i].Value | (skills[i].Max << 16)));   // value | max
                 m.SetUInt32(baseIdx + 2, 0);
             }
+        }
 
         // M6.2: деньги (private-поле) — только себе.
         if (isSelf)
@@ -205,19 +210,24 @@ public static class PlayerSpawn
         // M6.1: экипировка. Видимые предметы (entry) одевают модель — у всех наблюдателей;
         // guid'ы слотов-контейнеров — private-поля, шлём только себе.
         if (inventory is not null)
+        {
             foreach (var item in inventory)
             {
                 if (item.Bag == InventorySlots.MainBag
                     && item.Slot >= InventorySlots.EquipmentStart && item.Slot < InventorySlots.EquipmentEnd)
+                {
                     m.SetUInt32(UpdateField.VisibleItemEntry(item.Slot), item.ItemEntry);
+                }
 
                 if (isSelf && item.Bag == InventorySlots.MainBag)
                     m.SetUInt64(UpdateField.InvSlotGuid(item.Slot), ItemObject.ItemGuid(item.ItemGuid));
             }
+        }
 
         // M6.10: журнал квестов в НАЧАЛЬНОМ спавне (private) — иначе досылка отдельным VALUES-апдейтом
         // воспринимается клиентом как новое взятие квеста (звук + «Получено задание») при релоге.
         if (isSelf && questSlots is not null)
+        {
             for (var slot = 0; slot < questSlots.Count; slot++)
             {
                 var p = questSlots[slot];
@@ -230,6 +240,7 @@ public static class PlayerSpawn
                 m.SetUInt32(UpdateField.QuestLogSlotCounters23(slot),
                     (p.Count[2] & 0xFFFF) | ((p.Count[3] & 0xFFFF) << 16));
             }
+        }
 
         return m;
     }

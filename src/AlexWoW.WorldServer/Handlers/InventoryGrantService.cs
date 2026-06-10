@@ -23,8 +23,11 @@ internal sealed class InventoryGrantService(
     {
         uint total = 0;
         foreach (var it in session.Inv.Inventory)
+        {
             if (it.ItemEntry == itemEntry)
                 total += it.StackCount;
+        }
+
         return total;
     }
 
@@ -49,8 +52,10 @@ internal sealed class InventoryGrantService(
                 await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                     new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
                 if (item.Bag == InventorySlots.MainBag)
+                {
                     await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                         PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
+                }
             }
             else
             {
@@ -130,8 +135,10 @@ internal sealed class InventoryGrantService(
             await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid, session.Inv.ItemBagInfo), ct);
             // Уведомить о позиции: осн. контейнер — поле игрока; внутри сумки — слот сумки + CONTAINED.
             if (pos.Bag == InventorySlots.MainBag)
+            {
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     PlayerSpawn.BuildInvSlotUpdate(ownerGuid, pos.Slot, itemGuid), ct);
+            }
             else
             {
                 var bagGuid = BagInventory.BagGuid(session, pos.Bag);

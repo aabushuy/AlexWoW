@@ -16,14 +16,14 @@ internal sealed class SessionVisibilityState
     internal System.Collections.Concurrent.ConcurrentDictionary<ulong, WorldCreature> VisibleNpcs { get; } = new();
 
     /// <summary>Гейм-объекты, показанные клиенту этой сессии (guid → спавн). M5.6b.</summary>
-    internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
+    internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = [];
 
     /// <summary>
     /// Реестр dev-сущностей-существ этой сессии (слот → guid): класс-тренер/проф-тренер/вендор реагентов.
     /// Per-session (привязаны к месту/виду игрока): replace по слоту, снятие через <c>.devclean</c>, и
     /// «липкость» в видимости (см. <see cref="IsDevNpc"/>) — не сносятся при ходьбе. D1.
     /// </summary>
-    internal Dictionary<string, ulong> DevNpcs { get; } = new();
+    internal Dictionary<string, ulong> DevNpcs { get; } = [];
 
     /// <summary>Является ли NPC dev-сущностью этой сессии — чтобы пересчёт видимости не слал DESTROY. D1.</summary>
     internal bool IsDevNpc(ulong guid) => DevNpcs.Count > 0 && DevNpcs.ContainsValue(guid);
@@ -33,7 +33,7 @@ internal sealed class SessionVisibilityState
     /// прямой посылкой и НЕ кладутся в <see cref="VisibleGos"/> — пересчёт видимости их не трогает (липкость
     /// «бесплатно»). Снимаются через <c>.craft off</c>/<c>.devclean</c>. D3.
     /// </summary>
-    internal Dictionary<string, ulong> DevGos { get; } = new();
+    internal Dictionary<string, ulong> DevGos { get; } = [];
 
     /// <summary>
     /// Другие игроки, показанные клиенту этой сессии (set guid'ов). Доступ из нескольких потоков

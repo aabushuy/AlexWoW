@@ -1,4 +1,4 @@
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using System.Security.Cryptography;
 using AlexWoW.AuthServer.Protocol;
 using AlexWoW.Common.Network;
@@ -58,7 +58,7 @@ public sealed class AuthSession(
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or InvalidOperationException)
         {
-            logger.LogDebug("Соединение {Ip} закрыто: {Message}", _remoteIp, ex.Message);
+            logger.LogDebug(ex, "Соединение {Ip} закрыто: {Message}", _remoteIp, ex.Message);
         }
         finally
         {

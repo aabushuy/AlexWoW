@@ -40,9 +40,14 @@ public static class ContainerObject
         for (var i = 0; i < numSlots; i++)
             m.SetUInt64(UpdateField.ContainerSlotGuid(i), 0UL); // слоты инициализируем пустыми
         if (contents is not null)
+        {
             foreach (var (slot, itemGuid) in contents)
+            {
                 if (slot >= 0 && slot < numSlots)
                     m.SetUInt64(UpdateField.ContainerSlotGuid(slot), itemGuid); // заполнить содержимым
+            }
+        }
+
         m.WriteTo(w);
     }
 

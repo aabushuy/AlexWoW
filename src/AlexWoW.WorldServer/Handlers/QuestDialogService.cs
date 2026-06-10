@@ -35,8 +35,11 @@ internal sealed class QuestDialogService(
         if (session.Quest.CompletedQuests.Contains(q.QuestId))
             return false;
         foreach (var s in session.Quest.QuestSlots)
+        {
             if (s?.QuestId == q.QuestId)
                 return false; // уже в журнале
+        }
+
         return true;
     }
 
@@ -86,8 +89,10 @@ internal sealed class QuestDialogService(
 
         // M6.10: списать квест-предметы цели (освобождает слоты под предметы-награды).
         for (var i = 0; i < 4; i++)
+        {
             if (quest.ReqItemId[i] != 0 && quest.ReqItemCount[i] > 0)
                 await inventoryGrant.ConsumeAsync(session, quest.ReqItemId[i], quest.ReqItemCount[i], ct);
+        }
 
         // Деньги-награда.
         if (quest.RewOrReqMoney > 0)
@@ -99,11 +104,16 @@ internal sealed class QuestDialogService(
         }
         // Гарантированные предметы + выбранный из choice.
         for (var i = 0; i < 4; i++)
+        {
             if (quest.RewItemId[i] != 0)
                 await inventoryGrant.TryGiveAsync(session, quest.RewItemId[i], quest.RewItemCount[i] == 0 ? 1 : quest.RewItemCount[i], ct);
+        }
+
         if (rewardIndex < 6 && quest.RewChoiceItemId[rewardIndex] != 0)
+        {
             await inventoryGrant.TryGiveAsync(session, quest.RewChoiceItemId[rewardIndex],
                 quest.RewChoiceItemCount[rewardIndex] == 0 ? 1 : quest.RewChoiceItemCount[rewardIndex], ct);
+        }
 
         // Убрать из журнала, пометить сданным.
         session.Quest.QuestSlots[slot] = null;

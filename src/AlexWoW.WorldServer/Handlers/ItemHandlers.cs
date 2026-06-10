@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -19,7 +19,7 @@ internal sealed class ItemHandlers(IWorldRepository worldDb) : IOpcodeHandlerMod
 
         Database.Models.ItemTemplateData? t = null;
         try { t = await worldDb.GetItemTemplateAsync(entry, ct); }
-        catch (Exception ex) { session.Logger.LogDebug("ITEM_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message); }
+        catch (Exception ex) { session.Logger.LogDebug(ex, "ITEM_QUERY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message); }
 
         if (t is null)
         {

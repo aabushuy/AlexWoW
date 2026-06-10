@@ -45,11 +45,16 @@ internal sealed class SpellLearnService(
         catch { /* БД мира недоступна — просто LEARNED */ }
 
         if (prev != 0 && session.Progression.KnownSpells.Contains(prev))
+        {
             await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
                 new ByteWriter(8).UInt32(prev).UInt32(spellId).ToArray(), ct);
+        }
         else
+        {
             await session.SendAsync(WorldOpcode.SmsgLearnedSpell,
                 new ByteWriter(6).UInt32(spellId).UInt16(0).ToArray(), ct);
+        }
+
         return true;
     }
 
@@ -116,7 +121,9 @@ internal sealed class SpellLearnService(
     {
         if (World.Professions.SkillGrantedBy(tpl) is { } g
             && World.Professions.AutoGrantSpells.TryGetValue(g.SkillId, out var extras))
+        {
             foreach (var extra in extras)
                 await GrantAsync(session, extra, ct);
+        }
     }
 }

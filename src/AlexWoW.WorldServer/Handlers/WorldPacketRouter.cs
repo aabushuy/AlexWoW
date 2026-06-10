@@ -34,8 +34,10 @@ internal sealed class WorldPacketRouter
                     foreach (var opcode in attribute.Opcodes)
                     {
                         if (!table.TryAdd(opcode, handler))
+                        {
                             logger.LogWarning("Опкод {Opcode}: двойная регистрация в модулях ({Module}.{Method} проигнорирован)",
                                 opcode, module.GetType().Name, method.Name);
+                        }
                     }
                 }
             }
@@ -49,9 +51,11 @@ internal sealed class WorldPacketRouter
             .Select(m => $"{m.DeclaringType?.Name}.{m.Name}")
             .ToArray();
         if (orphans.Length > 0)
+        {
             throw new InvalidOperationException(
                 $"Статические методы с [WorldOpcodeHandler] вне DI-модулей: {string.Join(", ", orphans)} — " +
                 "сконвертируйте их в IOpcodeHandlerModule (миграция M7 завершена, фолбэка нет)");
+        }
 
         _handlers = table.ToFrozenDictionary();
     }
@@ -64,7 +68,9 @@ internal sealed class WorldPacketRouter
         if (_handlers.TryGetValue(packet.Opcode, out var handler))
             await handler(session, packet, ct);
         else
+        {
             session.Logger.LogInformation("Опкод {Opcode} (0x{Value:X}) от {Ip} — без обработчика",
                 packet.Opcode, (uint)packet.Opcode, session.RemoteIp);
+        }
     }
 }

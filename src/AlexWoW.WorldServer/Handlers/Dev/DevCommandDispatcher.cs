@@ -1,4 +1,4 @@
-using AlexWoW.WorldServer.Net;
+﻿using AlexWoW.WorldServer.Net;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -49,7 +49,7 @@ internal sealed class DevCommandDispatcher(DevCommandRegistry registry, ChatNoti
         }
         catch (Exception ex)
         {
-            session.Logger.LogWarning("DEV команда '.{Cmd}' ошибка: {Msg}", name, ex.Message);
+            session.Logger.LogWarning(ex, "DEV команда '.{Cmd}' ошибка: {Msg}", name, ex.Message);
             await chat.SendSystemAsync(session, $"Ошибка: {ex.Message}", ct);
         }
         return true;

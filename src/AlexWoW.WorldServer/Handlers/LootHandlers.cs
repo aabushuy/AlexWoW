@@ -107,6 +107,7 @@ internal sealed class LootHandlers(
         w.UInt32(loot.Gold);
         w.UInt8((byte)items.Count);
         foreach (var s in items)
+        {
             w.UInt8(s.Index)
              .UInt32(s.ItemId)
              .UInt32(s.Count)
@@ -114,6 +115,8 @@ internal sealed class LootHandlers(
              .UInt32(0)            // random suffix
              .UInt32(0)            // random property id
              .UInt8(LootSlotAllow);
+        }
+
         return w.ToArray();
     }
 }

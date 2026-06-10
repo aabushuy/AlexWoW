@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Terrain;
@@ -90,7 +90,7 @@ internal sealed class LoginSequenceService(
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("M6.13: bag-info недоступен ({Msg}) — сумки как обычные предметы", ex.Message);
+            session.Logger.LogDebug(ex, "M6.13: bag-info недоступен ({Msg}) — сумки как обычные предметы", ex.Message);
         }
 
         // M9.2: статы/HP/мана по классу+уровню (player_levelstats); фолбэк — флэт. Полное HP при входе.
@@ -114,8 +114,10 @@ internal sealed class LoginSequenceService(
         session.Combat.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
         session.Combat.LastResourceTickMs = Environment.TickCount64;
         if (session.Inv.Inventory.Count > 0)
+        {
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildItemsCreate(session.Inv.Inventory, character.Guid, session.Inv.ItemBagInfo), ct);
+        }
 
         // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
@@ -161,8 +163,10 @@ internal sealed class LoginSequenceService(
         // M5.5: проверка рельефа — высота земли в точке входа против сохранённой Z.
         var ground = terrain.GetHeight(character.Map, character.X, character.Y);
         if (ground is { } g)
+        {
             session.Logger.LogInformation("Рельеф: земля в ({X};{Y}) = {Ground:F2} (Z персонажа {Z:F2}, дельта {Delta:F2})",
                 character.X, character.Y, g, character.Z, character.Z - g);
+        }
 
         // M5.1/M5.6: показать существ и гейм-объекты из БД мира вокруг (диф-видимость).
         await visibility.RefreshVisibleNpcsAsync(session, character.Map, character.X, character.Y, ct);
@@ -190,7 +194,7 @@ internal sealed class LoginSequenceService(
             }
             catch (Exception ex)
             {
-                session.Logger.LogDebug("Повторная досылка соседей '{User}': {Msg}", session.Account, ex.Message);
+                session.Logger.LogDebug(ex, "Повторная досылка соседей '{User}': {Msg}", session.Account, ex.Message);
             }
         }, ct);
     }
@@ -218,14 +222,16 @@ internal sealed class LoginSequenceService(
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("INITIAL_SPELLS '{User}': стартовые спеллы из БД недоступны ({Msg})",
+            session.Logger.LogDebug(ex, "INITIAL_SPELLS '{User}': стартовые спеллы из БД недоступны ({Msg})",
                 session.Account, ex.Message);
         }
 
         // M6.4: боевые спеллы-заглушки умеет кастовать только маг (их эффекты хардкожены под мага).
         if (character.Class == ClassMage)
+        {
             foreach (var s in World.SpellCatalog.GrantedCombatSpells)
                 known.Add((uint)s);
+        }
 
         // Изученное у тренера (персист).
         foreach (var s in await charState.GetLearnedSpellsAsync(character.Guid, ct))
@@ -261,12 +267,14 @@ internal sealed class LoginSequenceService(
                         session.Progression.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
                 }
                 else
+                {
                     session.Progression.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
+                }
             }
         }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("INITIAL_SPELLS '{User}': причёсывание профессий пропущено ({Msg})", session.Account, ex.Message);
+            session.Logger.LogDebug(ex, "INITIAL_SPELLS '{User}': причёсывание профессий пропущено ({Msg})", session.Account, ex.Message);
         }
 
         var book = known.Where(s => !hiddenSpells.Contains(s)).ToList();

@@ -84,9 +84,11 @@ public sealed class ItemTemplateRepository(string connectionString)
 
         var spells = new ItemSpell[5];
         for (var i = 0; i < 5; i++)
+        {
             spells[i] = new ItemSpell(U(r, $"spellid_{i + 1}"), U(r, $"spelltrigger_{i + 1}"),
                 I(r, $"spellcharges_{i + 1}"), I(r, $"spellcooldown_{i + 1}"),
                 U(r, $"spellcategory_{i + 1}"), I(r, $"spellcategorycooldown_{i + 1}"));
+        }
 
         var sockets = new ItemSocket[3];
         for (var i = 0; i < 3; i++)

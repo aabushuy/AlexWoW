@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
@@ -58,7 +58,7 @@ internal sealed class TrainerCatalogService(
         try { trainer = await worldDb.GetTrainerAsync(entry, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("TRAINER gossip {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            session.Logger.LogDebug(ex, "TRAINER gossip {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
             return false;
         }
         if (trainer is null || !FitsPlayer(session, trainer))
@@ -76,9 +76,12 @@ internal sealed class TrainerCatalogService(
             .UInt8(GossipIconTrainer).UInt8(0).UInt32(0)
             .Bytes(learn).UInt8(0).UInt8(0);
         if (showReset)
+        {
             w.UInt32(ResetTalentsOptionId)   // пункт «сбросить таланты»
                 .UInt8(GossipIconChat).UInt8(0).UInt32(0)
                 .Bytes(reset).UInt8(0).UInt8(0);
+        }
+
         w.UInt32(0);                         // amount_of_quests
         await session.SendAsync(WorldOpcode.SmsgGossipMessage, w.ToArray(), ct);
         session.Logger.LogDebug("TRAINER gossip entry={Entry}: меню «обучиться» (класс {Class})",
@@ -97,7 +100,7 @@ internal sealed class TrainerCatalogService(
         try { trainer = await worldDb.GetTrainerAsync(entry, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("TRAINER_LIST {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            session.Logger.LogDebug(ex, "TRAINER_LIST {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
             return false;
         }
         if (trainer is null || !FitsPlayer(session, trainer))
@@ -220,7 +223,9 @@ internal sealed class TrainerCatalogService(
         if ((s.ReqAbility1 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility1))
             || (s.ReqAbility2 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility2))
             || (s.ReqAbility3 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility3)))
+        {
             return StateRed;
+        }
         // M11: гейт по навыку профессии — рецепт недоступен, если навык игрока ниже требуемого
         // (reqskill/reqskillvalue из npc_trainer). Теперь у нас есть навыки (M11.1).
         if (s.ReqSkill != 0)

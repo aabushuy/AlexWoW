@@ -17,8 +17,10 @@ internal sealed class DevCommandRegistry
     {
         Ordered = commands.OrderBy(c => c.Order).ToList();
         foreach (var c in Ordered)
+        {
             foreach (var name in c.Names)
                 _byName[name] = c;
+        }
     }
 
     /// <summary>Команда по имени/алиасу (без точки), либо null.</summary>

@@ -1,4 +1,4 @@
-using AlexWoW.Database.Abstractions;
+﻿using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -52,7 +52,7 @@ internal sealed class TrainerCommand(IWorldRepository worldDb) : IDevCommand
         try { entry = await worldDb.GetClassTrainerEntryAsync(classId, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("TRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
+            session.Logger.LogDebug(ex, "TRAINER cmd: БД мира недоступна ({Msg})", ex.Message);
             await ctx.ReplyAsync("БД мира недоступна", ct);
             return;
         }

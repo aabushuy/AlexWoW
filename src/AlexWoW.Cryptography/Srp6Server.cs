@@ -11,7 +11,6 @@ namespace AlexWoW.Cryptography;
 public sealed class Srp6Server
 {
     private readonly string _username;
-    private readonly byte[] _salt;       // 32 байта little-endian
     private readonly BigInteger _verifier;
     private readonly BigInteger _b;      // приватное эфемерное
     private readonly BigInteger _bigB;   // публичное эфемерное B
@@ -24,7 +23,7 @@ public sealed class Srp6Server
             throw new ArgumentException($"Соль должна быть {Srp6.SaltLength} байт.", nameof(salt));
 
         _username = username;
-        _salt = salt;
+        Salt = salt;
         _verifier = Srp6.FromLittleEndian(verifier);
 
         // b — приватное эфемерное число (256 бит случайных).
@@ -41,7 +40,7 @@ public sealed class Srp6Server
     public byte[] B => Srp6.ToFixedLittleEndian(_bigB, Srp6.KeyLength);
 
     /// <summary>Соль аккаунта (32 байта little-endian).</summary>
-    public byte[] Salt => _salt;
+    public byte[] Salt { get; }
 
     /// <summary>
     /// Проверяет доказательство клиента (M1). При успехе возвращает session key и серверное
@@ -83,7 +82,7 @@ public sealed class Srp6Server
 
         var hashUser = Srp6.HashAccountName(_username);
 
-        var expectedM1 = Srp6.Sha1(xorNg, hashUser, _salt, aBytes, bBytes, key);
+        var expectedM1 = Srp6.Sha1(xorNg, hashUser, Salt, aBytes, bBytes, key);
 
         if (!CryptographicOperations.FixedTimeEquals(expectedM1, clientM1))
             return false;

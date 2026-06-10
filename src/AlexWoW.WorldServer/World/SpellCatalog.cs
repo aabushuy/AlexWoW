@@ -110,7 +110,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int min = 0, max = 0;
         uint weaponPercent = 0;
         if (chosen.Eff == EffectWeaponPercentDamage)
+        {
             weaponPercent = (uint)Math.Max(0, chosen.Bp); // BasePoints = % урона оружия
+        }
         else if (chosen.Eff != 0)
         {
             // CMaNGOS: value = (BasePoints+1) .. (BasePoints+DieSides). DieSides<=1 → фиксированная величина.
@@ -184,7 +186,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
     {
         if (item > 0 && count > 0)
-            (reagents ??= new List<(uint, uint)>()).Add(((uint)item, count));
+            (reagents ??= []).Add(((uint)item, count));
     }
 
     /// <summary>

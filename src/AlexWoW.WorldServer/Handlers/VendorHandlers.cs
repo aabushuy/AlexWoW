@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
@@ -35,7 +35,7 @@ internal sealed class VendorHandlers(
         try { items = await worldDb.GetVendorItemsAsync(entry, ct); }
         catch (Exception ex)
         {
-            session.Logger.LogDebug("LIST_INVENTORY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            session.Logger.LogDebug(ex, "LIST_INVENTORY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
             return;
         }
 
@@ -128,14 +128,18 @@ internal sealed class VendorHandlers(
         await session.SendAsync(WorldOpcode.SmsgDestroyObject,
             new ByteWriter(9).UInt64(ItemObject.ItemGuid(itemLow)).UInt8(0).ToArray(), ct);
         if (item.Bag == InventorySlots.MainBag)
+        {
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
+        }
         else if (InventorySlots.IsBagSlot(item.Bag)) // M6.13: продажа из надетой сумки — очистить её слот
         {
             var bagGuid = BagInventory.BagGuid(session, item.Bag);
             if (bagGuid != 0)
+            {
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     ContainerObject.BuildSlotUpdate(bagGuid, item.Slot, 0), ct);
+            }
         }
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Inv.Money), ct);

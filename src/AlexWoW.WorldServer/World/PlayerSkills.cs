@@ -15,8 +15,8 @@ public sealed class PlayerSkill
 /// </summary>
 public sealed class PlayerSkillBook
 {
-    private readonly List<PlayerSkill> _skills = new();
-    private readonly Dictionary<ushort, PlayerSkill> _byId = new();
+    private readonly List<PlayerSkill> _skills = [];
+    private readonly Dictionary<ushort, PlayerSkill> _byId = [];
 
     /// <summary>Число языковых слотов (0..L-1), занятых до профессий; задаётся при входе по расе.</summary>
     public int LanguageSlots { get; private set; }

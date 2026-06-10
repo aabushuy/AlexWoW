@@ -6,11 +6,9 @@ namespace AlexWoW.Common.Network;
 /// <summary>
 /// Помощник для сборки бинарных пакетов в little-endian (порядок байт протокола WoW).
 /// </summary>
-public sealed class ByteWriter
+public sealed class ByteWriter(int capacity = 64)
 {
-    private readonly List<byte> _buffer;
-
-    public ByteWriter(int capacity = 64) => _buffer = new List<byte>(capacity);
+    private readonly List<byte> _buffer = new List<byte>(capacity);
 
     public int Length => _buffer.Count;
 

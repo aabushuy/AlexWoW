@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using AlexWoW.Database.Models;
 using Microsoft.AspNetCore.Authentication;
@@ -19,7 +20,7 @@ internal static class AuthSessionExtensions
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, account.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, account.Id.ToString(CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, account.Email ?? account.Username),
             new(GameAccountClaim, account.Username),
         };

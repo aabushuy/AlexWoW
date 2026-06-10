@@ -1,4 +1,4 @@
-using AlexWoW.Common.Network;
+﻿using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Navigation;
@@ -151,7 +151,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         try { row = await worldDb.GetCreatureTemplateAsync(entry, ct); }
         catch (Exception ex)
         {
-            logger.LogDebug("DEV summon entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            logger.LogDebug(ex, "DEV summon entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
             return false;
         }
         if (row is null)
@@ -227,7 +227,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         try { t = await worldDb.GetGameObjectTemplateAsync(entry, ct); }
         catch (Exception ex)
         {
-            logger.LogDebug("DEV craft entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
+            logger.LogDebug(ex, "DEV craft entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
             return false;
         }
         if (t is null)
