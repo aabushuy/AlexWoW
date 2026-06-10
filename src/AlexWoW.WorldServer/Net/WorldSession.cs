@@ -226,6 +226,10 @@ public sealed class WorldSession
     /// <summary>Книга навыков персонажа (профессии и пр.). Загружается при входе в мир. M11.1.</summary>
     internal World.PlayerSkillBook SkillBook { get; } = new();
 
+    /// <summary>Текущий тир-спелл каждой профессии в книге: skillId → (spell, потолок). Высший тир
+    /// supercede'ит низшие (в книге показывается один). Заполняется при входе/изучении. M11.</summary>
+    internal Dictionary<ushort, (uint Spell, ushort Max)> ProfessionRankSpell { get; } = new();
+
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
     internal List<World.ActiveAura> Auras { get; } = new();
     /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
@@ -283,6 +287,7 @@ public sealed class WorldSession
         KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
         LearnedTalents.Clear(); // M9.6: таланты перезагружаем при следующем входе
         SkillBook.Clear();    // M11.1: навыки перезагружаем при следующем входе
+        ProfessionRankSpell.Clear();
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;
