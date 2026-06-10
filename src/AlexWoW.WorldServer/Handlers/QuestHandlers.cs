@@ -50,45 +50,12 @@ public static class QuestHandlers
     /// целые предметы удаляет (DestroyObject + очистка слота), частичную стопку уменьшает
     /// (ITEM_FIELD_STACK_COUNT), с персистом. Освобождает слоты под награду.
     /// </summary>
-    private static async Task ConsumeItemsAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
-    {
-        var ownerGuid = session.InWorldGuid;
-        var remaining = count;
-        foreach (var item in session.Inventory.Where(i => i.ItemEntry == itemEntry).ToList())
-        {
-            if (remaining == 0)
-                break;
-            if (item.StackCount <= remaining)
-            {
-                remaining -= item.StackCount;
-                session.Inventory.Remove(item);
-                await session.Items.RemoveItemAsync(item.ItemGuid, ct);
-                await session.SendAsync(WorldOpcode.SmsgDestroyObject,
-                    new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
-                if (item.Bag == InventorySlots.MainBag)
-                    await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                        PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
-            }
-            else
-            {
-                item.StackCount -= remaining;
-                remaining = 0;
-                await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
-                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                    ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
-            }
-        }
-    }
+    private static Task ConsumeItemsAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
+        => InventoryGrant.ConsumeAsync(session, itemEntry, count, ct);
 
     /// <summary>Сколько предметов entry в сумках игрока (для item-целей). M6.10.</summary>
     private static uint CountItem(WorldSession session, uint itemEntry)
-    {
-        uint total = 0;
-        foreach (var it in session.Inventory)
-            if (it.ItemEntry == itemEntry)
-                total += it.StackCount;
-        return total;
-    }
+        => InventoryGrant.CountItem(session, itemEntry);
 
     /// <summary>
     /// Зачёт получения предмета (лут/выдача) в item-цели квестов: если новый предмет завершил квест —

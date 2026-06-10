@@ -29,7 +29,8 @@ public static class PlayerSpawn
     /// </summary>
     public static byte[] BuildCreateObject(Character c, float x, float y, float z, float o,
         uint serverTimeMs, bool isSelf, IReadOnlyList<InventoryItem>? inventory = null,
-        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null)
+        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null,
+        IReadOnlyList<PlayerSkill>? skills = null)
     {
         var w = new ByteWriter(256);
 
@@ -39,7 +40,7 @@ public static class PlayerSpawn
         w.UInt8(TypeId.Player);
 
         WriteMovementBlock(w, x, y, z, o, serverTimeMs, isSelf);
-        BuildValues(c, inventory, isSelf, questSlots, stats).WriteTo(w);
+        BuildValues(c, inventory, isSelf, questSlots, stats, skills).WriteTo(w);
 
         return w.ToArray();
     }
@@ -117,7 +118,8 @@ public static class PlayerSpawn
     }
 
     private static UpdateMask BuildValues(Character c, IReadOnlyList<InventoryItem>? inventory, bool isSelf,
-        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null)
+        IReadOnlyList<QuestProgress?>? questSlots = null, PlayerStats? stats = null,
+        IReadOnlyList<PlayerSkill>? skills = null)
     {
         var powerType = DisplayData.PowerTypeForClass(c.Class);
         var model = DisplayData.ModelForRace(c.Race, c.Gender);
@@ -177,6 +179,16 @@ public static class PlayerSpawn
             m.SetUInt32(baseIdx + 1, 300u | (300u << 16));    // value | max
             m.SetUInt32(baseIdx + 2, 0);                      // временный/постоянный бонус
         }
+
+        // M11.1: профессии и прочие навыки — в слотах после языковых (приватные, только себе).
+        if (isSelf && skills is not null)
+            for (var i = 0; i < skills.Count; i++)
+            {
+                var baseIdx = UpdateField.PlayerSkillInfo11 + (languageSkills.Count + i) * 3;
+                m.SetUInt32(baseIdx, skills[i].SkillId);                                     // skillId | step(0)
+                m.SetUInt32(baseIdx + 1, (uint)(skills[i].Value | (skills[i].Max << 16)));   // value | max
+                m.SetUInt32(baseIdx + 2, 0);
+            }
 
         // M6.2: деньги (private-поле) — только себе.
         if (isSelf)

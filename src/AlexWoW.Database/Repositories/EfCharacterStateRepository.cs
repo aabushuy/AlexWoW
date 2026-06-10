@@ -58,6 +58,29 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await db.CharacterTalents.Where(x => x.OwnerGuid == ownerGuid).ExecuteDeleteAsync(ct);
     }
 
+    public async Task<IReadOnlyList<(ushort SkillId, ushort Value, ushort Max)>> GetSkillsAsync(uint ownerGuid, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.CharacterSkills.AsNoTracking()
+            .Where(x => x.OwnerGuid == ownerGuid)
+            .Select(x => new { x.SkillId, x.Value, x.Max }).ToListAsync(ct);
+        return rows.Select(x => (x.SkillId, x.Value, x.Max)).ToList();
+    }
+
+    public async Task UpsertSkillAsync(uint ownerGuid, ushort skillId, ushort value, ushort max, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var e = await db.CharacterSkills.FindAsync([ownerGuid, skillId], ct);
+        if (e is null)
+            db.CharacterSkills.Add(new CharacterSkill { OwnerGuid = ownerGuid, SkillId = skillId, Value = value, Max = max });
+        else
+        {
+            e.Value = value;
+            e.Max = max;
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

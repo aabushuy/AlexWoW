@@ -42,4 +42,29 @@ public sealed record SpellTemplateData
     public int EffectTriggerSpell1 { get; init; }
     public int EffectTriggerSpell2 { get; init; }
     public int EffectTriggerSpell3 { get; init; }
+    /// <summary>Misc-значение эффекта: для SKILL(118)/SKILL_STEP(44) — id навыка профессии. M11.2.</summary>
+    public int EffectMiscValue1 { get; init; }
+    public int EffectMiscValue2 { get; init; }
+    public int EffectMiscValue3 { get; init; }
+    /// <summary>Создаваемый предмет эффекта CREATE_ITEM(24) — entry результата крафта. M11.3.</summary>
+    public uint EffectItemType1 { get; init; }
+    public uint EffectItemType2 { get; init; }
+    public uint EffectItemType3 { get; init; }
+    /// <summary>Реагенты рецепта (item entry) и их количество — расходуются при крафте. M11.3.</summary>
+    public int Reagent1 { get; init; }
+    public int Reagent2 { get; init; }
+    public int Reagent3 { get; init; }
+    public int Reagent4 { get; init; }
+    public int Reagent5 { get; init; }
+    public int Reagent6 { get; init; }
+    public int Reagent7 { get; init; }
+    public int Reagent8 { get; init; }
+    public uint ReagentCount1 { get; init; }
+    public uint ReagentCount2 { get; init; }
+    public uint ReagentCount3 { get; init; }
+    public uint ReagentCount4 { get; init; }
+    public uint ReagentCount5 { get; init; }
+    public uint ReagentCount6 { get; init; }
+    public uint ReagentCount7 { get; init; }
+    public uint ReagentCount8 { get; init; }
 }

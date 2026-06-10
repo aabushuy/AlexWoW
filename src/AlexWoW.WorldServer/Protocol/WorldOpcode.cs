@@ -162,6 +162,7 @@ public enum WorldOpcode : uint
     SmsgCreatureQueryResponse = 0x061,
     CmsgGameObjectQuery = 0x05E,
     SmsgGameObjectQueryResponse = 0x05F,
+    CmsgGameObjUse = 0x0B1,        // использование гейм-объекта (нода сбора профессии) — M11.4
 
     // Персонажи (M3)
     CmsgCharCreate = 0x036,
