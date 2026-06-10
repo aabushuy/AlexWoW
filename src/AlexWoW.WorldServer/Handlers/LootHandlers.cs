@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -12,7 +13,9 @@ namespace AlexWoW.WorldServer.Handlers;
 /// смерти существа и lootable-пометка — <see cref="KillRewardService"/>.
 /// Тап/раздел добычи в группе — позже; сейчас обыскать может любой наблюдатель.
 /// </summary>
-internal sealed class LootHandlers(InventoryGrantService inventoryGrant) : IOpcodeHandlerModule
+internal sealed class LootHandlers(
+    InventoryGrantService inventoryGrant,
+    ICharacterRepository characters) : IOpcodeHandlerModule
 {
     private const byte LootTypeCorpse = 1;        // SMSG_LOOT_RESPONSE loot_method = CORPSE
     private const byte LootSlotAllow = 0;         // LootSlotType TYPE_ALLOW_LOOT
@@ -25,35 +28,35 @@ internal sealed class LootHandlers(InventoryGrantService inventoryGrant) : IOpco
         if (creature is null || !creature.Lootable || creature.Loot is not { } loot)
             return; // нечего лутать
 
-        session.LootGuid = guid;
+        session.Inv.LootGuid = guid;
         await session.SendAsync(WorldOpcode.SmsgLootResponse, BuildLootResponse(guid, loot), ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLootMoney)]
     public async Task OnLootMoney(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        var creature = session.World.FindCreature(session.LootGuid);
+        var creature = session.World.FindCreature(session.Inv.LootGuid);
         if (creature?.Loot is not { } loot || loot.Gold == 0)
             return;
 
         var gold = loot.Gold;
         loot.Gold = 0;
-        session.Money += gold;
-        await session.Characters.SetMoneyAsync(session.InWorldGuid, session.Money, ct);
+        session.Inv.Money += gold;
+        await characters.SetMoneyAsync(session.InWorldGuid, session.Inv.Money, ct);
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildCoinageUpdate(session.InWorldGuid, session.Money), ct);
+            PlayerSpawn.BuildCoinageUpdate(session.InWorldGuid, session.Inv.Money), ct);
         await session.SendAsync(WorldOpcode.SmsgLootClearMoney, [], ct);
         await ClearLootIfEmptyAsync(session, creature, ct);
         session.Logger.LogInformation("LOOT money '{User}': +{Gold} меди (всего {Money})",
-            session.Account, gold, session.Money);
+            session.Account, gold, session.Inv.Money);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAutostoreLootItem)]
     public async Task OnAutostoreLootItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var slotIndex = packet.Reader().UInt8();
-        var creature = session.World.FindCreature(session.LootGuid);
+        var creature = session.World.FindCreature(session.Inv.LootGuid);
         if (creature?.Loot is not { } loot)
             return;
         var slot = loot.Slots.FirstOrDefault(s => s.Index == slotIndex && !s.Taken);
@@ -74,7 +77,7 @@ internal sealed class LootHandlers(InventoryGrantService inventoryGrant) : IOpco
     public async Task OnLootRelease(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var guid = packet.Reader().UInt64();
-        session.LootGuid = 0;
+        session.Inv.LootGuid = 0;
         await session.SendAsync(WorldOpcode.SmsgLootReleaseResponse,
             new ByteWriter(9).UInt64(guid).UInt8(1).ToArray(), ct);
     }

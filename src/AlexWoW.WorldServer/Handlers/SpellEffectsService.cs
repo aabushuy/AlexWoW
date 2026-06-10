@@ -1,3 +1,4 @@
+using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -11,7 +12,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (<see cref="SpellCastCompletion"/>) по SRP. Урон идёт общим путём с мили
 /// (<see cref="World.WorldState.ApplyCreatureDamage"/>); хил опирается на авторитетное HP (M6.7).
 /// </summary>
-internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewardService killReward)
+internal sealed class SpellEffectsService(
+    CreatureCombatAI creatureAi,
+    KillRewardService killReward,
+    TerrainMaps terrain)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
     internal async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
@@ -21,7 +25,7 @@ internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewar
         if (creature is null || !creature.IsAlive)
             return; // цель пропала/мертва — спелл «впустую»
 
-        session.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
+        session.Combat.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
         var damage = ComputeDamage(session, info);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
@@ -135,7 +139,7 @@ internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewar
             ny = session.PosY + MathF.Sin(session.PosO) * dist;
             no = session.PosO;
             var map = session.Character?.Map ?? 0;
-            nz = session.Terrain.GetHeight(map, nx, ny) ?? session.PosZ;
+            nz = terrain.GetHeight(map, nx, ny) ?? session.PosZ;
         }
 
         var guid = (ulong)session.InWorldGuid;
@@ -165,8 +169,8 @@ internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewar
     /// <summary>Случайный бросок урона оружия главной руки (min..max из RefreshMeleeAsync). M10.4a.</summary>
     private static int WeaponRoll(WorldSession session)
     {
-        var min = (int)MathF.Max(1f, session.WeaponMinDamage);
-        var max = (int)MathF.Max(min, session.WeaponMaxDamage);
+        var min = (int)MathF.Max(1f, session.Combat.WeaponMinDamage);
+        var max = (int)MathF.Max(min, session.Combat.WeaponMaxDamage);
         return Random.Shared.Next(min, max + 1);
     }
 
@@ -182,14 +186,14 @@ internal sealed class SpellEffectsService(CreatureCombatAI creatureAi, KillRewar
         var target = targetGuid == 0 || targetGuid == caster
             ? session.Player
             : session.World.FindPlayer(targetGuid) ?? session.Player;
-        if (target is null || target.Session.IsDead) // мёртвого хилом не поднять (это воскрешение)
+        if (target is null || target.Session.Combat.IsDead) // мёртвого хилом не поднять (это воскрешение)
             return;
 
         var ts = target.Session;
         var amount = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
-        var before = ts.Health;
-        ts.Health = Math.Min(ts.MaxHealth, before + amount);
-        var effective = ts.Health - before;
+        var before = ts.Combat.Health;
+        ts.Combat.Health = Math.Min(ts.Combat.MaxHealth, before + amount);
+        var effective = ts.Combat.Health - before;
         var overheal = amount - effective;
 
         await session.World.BroadcastToPlayerObserversAsync(target, WorldOpcode.SmsgSpellHealLog,

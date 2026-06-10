@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,8 @@ internal sealed class GossipService(
     QuestProgressService questProgress,
     QuestDialogService dialog,
     TrainerCatalogService trainerCatalog,
-    VendorHandlers vendor)
+    VendorHandlers vendor,
+    IWorldRepository worldDb)
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
@@ -32,8 +34,8 @@ internal sealed class GossipService(
         // Сдача: NPC принимает завершённый квест из журнала → окно награды.
         if (session.World.Quests.IsEnder(entry))
         {
-            var enderIds = await session.WorldDb.GetEnderQuestIdsAsync(entry, ct);
-            var done = Array.Find(session.QuestSlots, s => s is { Complete: true } p && enderIds.Contains(p.QuestId));
+            var enderIds = await worldDb.GetEnderQuestIdsAsync(entry, ct);
+            var done = Array.Find(session.Quest.QuestSlots, s => s is { Complete: true } p && enderIds.Contains(p.QuestId));
             if (done is not null)
             {
                 await dialog.SendOfferRewardAsync(session, npcGuid, done.QuestId, ct);
@@ -43,7 +45,7 @@ internal sealed class GossipService(
 
         if (session.World.Quests.IsGiver(entry))
         {
-            var all = await session.WorldDb.GetGiverQuestsAsync(entry, ct);
+            var all = await worldDb.GetGiverQuestsAsync(entry, ct);
             var quests = all.Where(q => QuestDialogService.CanTakeQuest(session, q)).ToList(); // фильтр пригодности
             session.Logger.LogDebug("QUEST hello '{User}': npc={Entry}, {Take}/{All} берущихся",
                 session.Account, entry, quests.Count, all.Count);

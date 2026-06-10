@@ -1,10 +1,9 @@
 using System.Buffers.Binary;
 using System.Net.Sockets;
 using AlexWoW.Cryptography;
-using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
-using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.Handlers;
+using AlexWoW.WorldServer.Net.SessionState;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
@@ -14,6 +13,9 @@ namespace AlexWoW.WorldServer.Net;
 /// <summary>
 /// Контекст одного world-соединения: транспорт (сокет, RC4, фрейминг) + состояние сессии.
 /// Логику опкодов держат классы в Handlers/, получая эту сессию как контекст.
+/// Состояние сгруппировано по областям в компоненты <c>Net/SessionState</c> (Combat/Cast/Visibility/
+/// Quest/Progression/Inv) — у самой сессии остаются транспорт, идентичность, присутствие в мире и
+/// синхронизация часов (M7 S9 #43).
 /// Заголовки (3.3.5a): сервер→клиент 2b size(BE)+2b opcode(LE); клиент→сервер 2b size(BE)+4b opcode(LE);
 /// size включает длину opcode. После handshake заголовки шифруются RC4, тело — открытым текстом.
 /// </summary>
@@ -34,19 +36,10 @@ public sealed class WorldSession
         _services = services;
     }
 
-    // --- Контекст для обработчиков (мост до S9 #43: репозитории читаются через сессию) ---
-    internal IAccountRepository Database => _services.Accounts;
-    internal ICharacterRepository Characters => _services.Characters;
-    internal IInventoryRepository Items => _services.Items;
-    internal IQuestRepository Quests => _services.Quests;
-    internal ICharacterStateRepository CharState => _services.CharState;
-    internal ITeleportRepository Teleports => _services.Teleports;
-    internal IWorldRepository WorldDb => _services.WorldDb;
-    internal TerrainMaps Terrain => _services.Terrain;
+    // --- Контекст для обработчиков (M7 S9 #43: мосты репозиториев сняты — модули/сервисы/dev-команды
+    // получают репозитории ctor-инъекцией; через сессию остаются только мир, опции и логгер by design) ---
     internal WorldState World => _services.World;
     internal WorldServerOptions Options => _services.Options;
-    // M7 S8: мосты игровых сервисов сняты — dev-команды получают сервисы ctor-инъекцией
-    // (DI-скан DevCommandRegistration); через сессию остаются только репозитории (мост до S9 #43).
     internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 
@@ -68,69 +61,19 @@ public sealed class WorldSession
     /// <summary>Представление в реестре мира, пока персонаж в мире (null вне мира). M5.</summary>
     internal WorldPlayer? Player { get; set; }
 
-    /// <summary>Инвентарь персонажа в мире (предметы во всех слотах). Загружается при входе. M6.1.</summary>
-    internal List<InventoryItem> Inventory { get; } = new();
-
-    /// <summary>Кэш class/ContainerSlots/MaxDurability по entry предметов инвентаря (батч при входе) —
-    /// чтобы знать, какие предметы суммки (контейнеры), без запроса БД на каждый предмет. M6.13.</summary>
-    internal Dictionary<uint, ItemBagInfo> ItemBagInfo { get; } = new();
-
-    /// <summary>Деньги персонажа (медь) в мире. Загружается при входе, меняется торговлей. M6.2.</summary>
-    internal uint Money { get; set; }
-
-    /// <summary>
-    /// Существа (NPC), показанные клиенту этой сессии (guid → авторитетная сущность). M5/M6.3.
-    /// Потокобезопасный: пишет поток сессии (видимость), читает поток тика (рассылка боя/HP).
-    /// </summary>
-    internal System.Collections.Concurrent.ConcurrentDictionary<ulong, WorldCreature> VisibleNpcs { get; } = new();
-
-    /// <summary>Гейм-объекты, показанные клиенту этой сессии (guid → спавн). M5.6b.</summary>
-    internal Dictionary<ulong, GoSpawn> VisibleGos { get; } = new();
-
-    /// <summary>
-    /// Реестр dev-сущностей-существ этой сессии (слот → guid): класс-тренер/проф-тренер/вендор реагентов.
-    /// Per-session (привязаны к месту/виду игрока): replace по слоту, снятие через <c>.devclean</c>, и
-    /// «липкость» в видимости (см. <see cref="IsDevNpc"/>) — не сносятся при ходьбе. D1.
-    /// </summary>
-    internal Dictionary<string, ulong> DevNpcs { get; } = new();
-
-    /// <summary>Является ли NPC dev-сущностью этой сессии — чтобы пересчёт видимости не слал DESTROY. D1.</summary>
-    internal bool IsDevNpc(ulong guid) => DevNpcs.Count > 0 && DevNpcs.ContainsValue(guid);
-
-    /// <summary>
-    /// Реестр dev-гейм-объектов этой сессии (слот → guid): крафт-станки/почта (<c>.craft</c>). Спавнятся
-    /// прямой посылкой и НЕ кладутся в <see cref="VisibleGos"/> — пересчёт видимости их не трогает (липкость
-    /// «бесплатно»). Снимаются через <c>.craft off</c>/<c>.devclean</c>. D3.
-    /// </summary>
-    internal Dictionary<string, ulong> DevGos { get; } = new();
-
-    /// <summary>
-    /// Другие игроки, показанные клиенту этой сессии (set guid'ов). Доступ из нескольких потоков
-    /// (сосед спавнит нас из своего потока) — потокобезопасный. Динамическая видимость игроков (M6).
-    /// </summary>
-    internal System.Collections.Concurrent.ConcurrentDictionary<ulong, byte> VisiblePlayers { get; } = new();
-
-    /// <summary>Позиция последнего пересчёта видимости NPC (троттлинг по дистанции). M5.6.</summary>
-    internal float LastVisX { get; set; }
-    internal float LastVisY { get; set; }
-
-    /// <summary>Текущая цель (CMSG_SET_SELECTION). 0 — нет. M6.3.</summary>
-    internal ulong SelectionGuid { get; set; }
-
-    /// <summary>Авторитетное здоровье игрока (UNIT_FIELD_HEALTH). Меняется уроном существ. M6.7.</summary>
-    internal uint Health { get; set; }
-    internal uint MaxHealth { get; set; }
-    /// <summary>Текущий опыт на уровне (PLAYER_XP). Прокачка M9.1.</summary>
-    internal uint Xp { get; set; }
-    /// <summary>Время последней боевой активности (нанёс/получил урон) — для внебоевого регена HP. M6.7.</summary>
-    internal long LastCombatMs { get; set; }
-    /// <summary>Время последнего тика регена HP (кадэнс 1 с). M6.7.</summary>
-    internal long LastHealthRegenMs { get; set; }
-    /// <summary>Игрок мёртв (HP=0, ждёт release/возрождения). M6.7.</summary>
-    internal bool IsDead { get; set; }
-
-    /// <summary>GUID трупа с открытым окном лута (0 — окно закрыто). M6.6.</summary>
-    internal ulong LootGuid { get; set; }
+    // --- Компоненты состояния сессии (M7 S9 #43: плоские поля сгруппированы по областям, SRP) ---
+    /// <summary>Боевое состояние: цель, HP, мили, ярость/энергия. M7 S9 #43.</summary>
+    internal SessionCombatState Combat { get; } = new();
+    /// <summary>Состояние каста: текущий каст, GCD, мана, кулдауны. M7 S9 #43.</summary>
+    internal SessionCastState Cast { get; } = new();
+    /// <summary>Видимость: показанные NPC/GO/игроки, dev-сущности. M7 S9 #43.</summary>
+    internal SessionVisibilityState Visibility { get; } = new();
+    /// <summary>Квесты: журнал и сданные. M7 S9 #43.</summary>
+    internal SessionQuestState Quest { get; } = new();
+    /// <summary>Прогрессия: опыт, спеллы, таланты, навыки, ауры. M7 S9 #43.</summary>
+    internal SessionProgressionState Progression { get; } = new();
+    /// <summary>Инвентарь: предметы, сумки, деньги, лут. M7 S9 #43.</summary>
+    internal SessionInventoryState Inv { get; } = new();
 
     /// <summary>Счётчик телепортов (movement order counter в MSG_MOVE_TELEPORT_ACK). M7 #33.</summary>
     private uint _teleportCounter;
@@ -138,20 +81,6 @@ public sealed class WorldSession
 
     /// <summary>Идёт кросс-карта телепорт: отправлен SMSG_NEW_WORLD, ждём MSG_MOVE_WORLDPORT_ACK. #79.</summary>
     internal bool PendingWorldport { get; set; }
-
-    /// <summary>Журнал квестов: слот (0..24) → прогресс (null — пусто). Персист — позже. M6.5.</summary>
-    internal World.QuestProgress?[] QuestSlots { get; } = new World.QuestProgress?[Protocol.UpdateField.QuestLogSlots];
-    /// <summary>Сданные квесты (для предусловий PrevQuestId и анти-повтора). Персист — позже. M6.5.</summary>
-    internal HashSet<uint> CompletedQuests { get; } = new();
-
-    /// <summary>GUID существа, по которому идёт авто-атака (0 — не в бою). Читается тиком. M6.3.</summary>
-    internal ulong CombatTargetGuid { get; set; }
-
-    /// <summary>Время следующего мили-свинга (<see cref="Environment.TickCount64"/>, мс). M6.3.</summary>
-    internal long NextMeleeSwingMs { get; set; }
-
-    /// <summary>Послали ли клиенту «вне радиуса» для текущего эпизода (анти-спам). M6.3.</summary>
-    internal bool MeleeNotInRangeNotified { get; set; }
 
     // --- Синхронизация часов (M6.3 ч.2: нормализация времени движения) ---
     /// <summary>Следующий счётчик для SMSG_TIME_SYNC_REQ.</summary>
@@ -164,68 +93,6 @@ public sealed class WorldSession
     internal long LastTimeSyncDispatchMs { get; set; }
     /// <summary>Дельта часов: <c>serverMs − clientTicks</c>. null — пока не синхронизировано.</summary>
     internal long? ClockDeltaMs { get; set; }
-
-    // --- Каст спелла (M6.4) ---
-    /// <summary>Спелл, который сейчас кастуется (0 — нет каста). Завершается в тике.</summary>
-    internal uint CastingSpellId { get; set; }
-    // cast_count и target теперь протаскиваются параметрами каста (не через сессию) — повторное нажатие
-    // во время каста не перезатирает счётчик завершаемого каста (M10.4a фикс залипания завершения).
-    /// <summary>Позиция в начале каста — для прерывания при сдвиге (движение, не поворот). M6.4.</summary>
-    internal float CastStartX { get; set; }
-    internal float CastStartY { get; set; }
-    /// <summary>Поколение каста: инкремент на каждый каст; отложенное завершение проверяет совпадение
-    /// (чтобы не завершить отменённый/перебитый каст). M6.4.</summary>
-    internal int CastGeneration { get; set; }
-    /// <summary>Момент окончания глобального кулдауна (GCD, <see cref="Environment.TickCount64"/>, мс). M10.3.</summary>
-    internal long GcdEndMs { get; set; }
-
-    /// <summary>Текущая/макс. мана (UNIT_FIELD_POWER1). MaxMana=0 — класс без маны (rage/energy):
-    /// расход не применяется. Инициализируется при входе в мир. M6.4 инкремент 2.</summary>
-    internal uint Mana { get; set; }
-    internal uint MaxMana { get; set; }
-    /// <summary>Время последнего успешного каста — «правило 5 секунд» (реген маны паузится). M6.4.</summary>
-    internal long LastSpellCastMs { get; set; }
-    /// <summary>Время последнего тика регена маны (кадэнс 1 с). M6.4.</summary>
-    internal long LastManaRegenMs { get; set; }
-
-    // --- Боевые ресурсы: ярость/энергия (M6.12) ---
-    /// <summary>Ярость воина/друида (UNIT_FIELD_POWER1+1). Хранится ×10 (0..1000 = 0..100 у клиента).
-    /// Копится от мили-урона, распадается вне боя. 0 у не-ярость-классов. M6.12.</summary>
-    internal uint Rage { get; set; }
-    /// <summary>Энергия разбойника (UNIT_FIELD_POWER1+3), 0..100. Реген ~постоянный. M6.12.</summary>
-    internal uint Energy { get; set; }
-    /// <summary>Скорость оружия главной руки (мс) — для формулы ярости. Ставится в RefreshMeleeAsync. M6.12.</summary>
-    internal uint MainHandSpeedMs { get; set; } = 2000;
-    /// <summary>Урон оружия главной руки (min/max) — для мили-абилок (WEAPON_DAMAGE). RefreshMeleeAsync. M10.4a.</summary>
-    internal float WeaponMinDamage { get; set; } = 1f;
-    internal float WeaponMaxDamage { get; set; } = 2f;
-    /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
-    internal long LastResourceTickMs { get; set; }
-    /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
-    internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = new();
-
-    /// <summary>Известные игроку спеллы (стартовые по классу + языковые + изученные у тренера). Для
-    /// HasSpell-проверок тренера и анти-дубля. Загружается при входе в мир. M9.3.</summary>
-    internal HashSet<uint> KnownSpells { get; } = new();
-
-    /// <summary>Свободные очки талантов (PLAYER_CHARACTER_POINTS1). Вычисляются: MaxPoints(level) − потрачено. M9.6.</summary>
-    internal uint TalentPoints { get; set; }
-    /// <summary>Изученные таланты: talentId → ранг (0-индексный). Загружается при входе. M9.6/M9.7.</summary>
-    internal Dictionary<uint, byte> LearnedTalents { get; } = new();
-
-    /// <summary>Книга навыков персонажа (профессии и пр.). Загружается при входе в мир. M11.1.</summary>
-    internal World.PlayerSkillBook SkillBook { get; } = new();
-
-    /// <summary>Текущий тир-спелл каждой профессии в книге: skillId → (spell, потолок). Высший тир
-    /// supercede'ит низшие (в книге показывается один). Заполняется при входе/изучении. M11.</summary>
-    internal Dictionary<ushort, (uint Spell, ushort Max)> ProfessionRankSpell { get; } = new();
-
-    /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
-    internal List<World.ActiveAura> Auras { get; } = new();
-    /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
-    internal List<Handlers.PeriodicEffect> Periodics { get; } = new();
-    /// <summary>Текущая форма шейпшифта (стойка воина/форма друида); 0 — нет формы. UNIT_FIELD_BYTES_2 байт 3. M6.11.</summary>
-    internal byte ShapeshiftForm { get; set; }
 
     internal void InitCrypt(byte[] sessionKey) => _crypt.Init(sessionKey);
 
@@ -266,30 +133,15 @@ public sealed class WorldSession
         await _services.AuraPersistence.SaveTimedAurasAsync(this, InWorldGuid, ct);
         Player = null;
         InWorldGuid = 0;
-        CombatTargetGuid = 0; // M6.3: вне мира боя нет
-        SelectionGuid = 0;
-        IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
-        LootGuid = 0;         // M6.6: окно лута закрыто
-        Array.Clear(QuestSlots); // M6.5: журнал квестов (в памяти) сбрасывается при выходе
-        CompletedQuests.Clear();
-        CastingSpellId = 0;   // M6.4: каст прерывается при выходе
-        SpellCooldowns.Clear();
-        KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
-        LearnedTalents.Clear(); // M9.6: таланты перезагружаем при следующем входе
-        SkillBook.Clear();    // M11.1: навыки перезагружаем при следующем входе
-        ProfessionRankSpell.Clear();
-        Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
-        Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
-        ShapeshiftForm = 0;
-        foreach (var guid in DevNpcs.Values) // D1: снять dev-сущности с глобального реестра существ
+        // M7 S9 #43: пер-полевые сбросы перенесены в Reset() компонентов (семантика сохранена 1:1).
+        Combat.Reset();      // M6.3/M6.7: цель/бой/смерть
+        Quest.Reset();       // M6.5: журнал квестов (в памяти)
+        Cast.Reset();        // M6.4: каст/кулдауны
+        Progression.Reset(); // M9.3/M9.6/M11.1/M6.11/M10.4b: спеллы/таланты/навыки/ауры
+        foreach (var guid in Visibility.DevNpcs.Values) // D1: снять dev-сущности с глобального реестра существ
             World.RemoveCreature(guid);
-        DevNpcs.Clear();
-        DevGos.Clear();      // D3: dev-станки (клиент выгрузил мир)
-        VisibleNpcs.Clear(); // клиент выгрузил мир — при повторном входе пересоздаём с нуля
-        VisibleGos.Clear();
-        VisiblePlayers.Clear();
-        Inventory.Clear();
-        ItemBagInfo.Clear(); // M6.13: кэш сумок перезагружается при следующем входе
+        Visibility.Reset();  // D1/D3/M5.6: dev-реестры и видимые NPC/GO/игроки
+        Inv.Reset();         // M6.6/M6.13: окно лута, инвентарь, кэш сумок
         try
         {
             await World.LeaveWorldAsync(player, ct);
@@ -307,7 +159,7 @@ public sealed class WorldSession
             return;
         try
         {
-            await Characters.SavePositionAsync(InWorldGuid, PosX, PosY, PosZ, Character?.Map ?? 0, ct);
+            await _services.Characters.SavePositionAsync(InWorldGuid, PosX, PosY, PosZ, Character?.Map ?? 0, ct);
             Logger.LogInformation("Позиция '{User}' сохранена: ({X};{Y};{Z})", Account, PosX, PosY, PosZ);
         }
         catch (Exception ex)

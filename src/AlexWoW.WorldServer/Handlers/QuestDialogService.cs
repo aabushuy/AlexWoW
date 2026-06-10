@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,9 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class QuestDialogService(
     InventoryGrantService inventoryGrant,
     QuestProgressService questProgress,
-    QuestGiverStatusService giverStatus)
+    QuestGiverStatusService giverStatus,
+    IWorldRepository worldDb,
+    ICharacterRepository characters)
 {
     /// <summary>Может ли игрок взять квест: уровень, раса, класс, предыдущий квест, не в журнале/не сдан. M6.5.
     /// Чистая функция от сессии и квеста — static, зовётся и из <see cref="QuestGiverStatusService"/>.</summary>
@@ -27,11 +30,11 @@ internal sealed class QuestDialogService(
             return false;
         if (q.RequiredClasses != 0 && (q.RequiredClasses & (1u << (c.Class - 1))) == 0)
             return false;
-        if (q.PrevQuestId != 0 && !session.CompletedQuests.Contains(q.PrevQuestId))
+        if (q.PrevQuestId != 0 && !session.Quest.CompletedQuests.Contains(q.PrevQuestId))
             return false;
-        if (session.CompletedQuests.Contains(q.QuestId))
+        if (session.Quest.CompletedQuests.Contains(q.QuestId))
             return false;
-        foreach (var s in session.QuestSlots)
+        foreach (var s in session.Quest.QuestSlots)
             if (s?.QuestId == q.QuestId)
                 return false; // уже в журнале
         return true;
@@ -40,14 +43,14 @@ internal sealed class QuestDialogService(
     /// <summary>Грузит квест + displayId предметов-наград и шлёт SMSG_QUESTGIVER_QUEST_DETAILS.</summary>
     internal async Task SendQuestDetailsAsync(WorldSession session, ulong npcGuid, uint questId, CancellationToken ct)
     {
-        var quest = await session.WorldDb.GetQuestAsync(questId, ct);
+        var quest = await worldDb.GetQuestAsync(questId, ct);
         if (quest is null)
             return;
 
         var rewardEntries = quest.RewItemId.Concat(quest.RewChoiceItemId).Where(id => id != 0).ToArray();
         IReadOnlyDictionary<uint, (uint DisplayId, byte InvType)> displays =
             rewardEntries.Length > 0
-                ? await session.WorldDb.GetItemDisplaysAsync(rewardEntries, ct)
+                ? await worldDb.GetItemDisplaysAsync(rewardEntries, ct)
                 : new Dictionary<uint, (uint, byte)>();
 
         await session.SendAsync(WorldOpcode.SmsgQuestgiverQuestDetails,
@@ -57,12 +60,12 @@ internal sealed class QuestDialogService(
     /// <summary>Шлёт окно сдачи (SMSG_QUESTGIVER_OFFER_REWARD) с наградами квеста.</summary>
     internal async Task SendOfferRewardAsync(WorldSession session, ulong npcGuid, uint questId, CancellationToken ct)
     {
-        var quest = await session.WorldDb.GetQuestAsync(questId, ct);
+        var quest = await worldDb.GetQuestAsync(questId, ct);
         if (quest is null)
             return;
         var rewardEntries = quest.RewItemId.Concat(quest.RewChoiceItemId).Where(id => id != 0).ToArray();
         IReadOnlyDictionary<uint, (uint DisplayId, byte InvType)> displays = rewardEntries.Length > 0
-            ? await session.WorldDb.GetItemDisplaysAsync(rewardEntries, ct)
+            ? await worldDb.GetItemDisplaysAsync(rewardEntries, ct)
             : new Dictionary<uint, (uint, byte)>();
         await session.SendAsync(WorldOpcode.SmsgQuestgiverOfferReward,
             QuestPackets.BuildOfferReward(npcGuid, quest, displays), ct);
@@ -74,10 +77,10 @@ internal sealed class QuestDialogService(
     /// </summary>
     internal async Task ChooseRewardAsync(WorldSession session, uint questId, uint rewardIndex, CancellationToken ct)
     {
-        var slot = Array.FindIndex(session.QuestSlots, s => s?.QuestId == questId);
-        if (slot < 0 || session.QuestSlots[slot] is not { Complete: true })
+        var slot = Array.FindIndex(session.Quest.QuestSlots, s => s?.QuestId == questId);
+        if (slot < 0 || session.Quest.QuestSlots[slot] is not { Complete: true })
             return;
-        var quest = await session.WorldDb.GetQuestAsync(questId, ct);
+        var quest = await worldDb.GetQuestAsync(questId, ct);
         if (quest is null)
             return;
 
@@ -89,10 +92,10 @@ internal sealed class QuestDialogService(
         // Деньги-награда.
         if (quest.RewOrReqMoney > 0)
         {
-            session.Money += (uint)quest.RewOrReqMoney;
-            await session.Characters.SetMoneyAsync(session.InWorldGuid, session.Money, ct);
+            session.Inv.Money += (uint)quest.RewOrReqMoney;
+            await characters.SetMoneyAsync(session.InWorldGuid, session.Inv.Money, ct);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Money), ct);
+                PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Inv.Money), ct);
         }
         // Гарантированные предметы + выбранный из choice.
         for (var i = 0; i < 4; i++)
@@ -103,8 +106,8 @@ internal sealed class QuestDialogService(
                 quest.RewChoiceItemCount[rewardIndex] == 0 ? 1 : quest.RewChoiceItemCount[rewardIndex], ct);
 
         // Убрать из журнала, пометить сданным.
-        session.QuestSlots[slot] = null;
-        session.CompletedQuests.Add(questId);
+        session.Quest.QuestSlots[slot] = null;
+        session.Quest.CompletedQuests.Add(questId);
         await questProgress.MarkRewardedAsync(session, questId, ct); // M6.10: персист сдачи
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>

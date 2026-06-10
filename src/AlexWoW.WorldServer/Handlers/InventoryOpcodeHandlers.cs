@@ -60,7 +60,7 @@ internal sealed class InventoryOpcodeHandlers(InventoryMoveService move) : IOpco
         var itemGuid = r.UInt64();
         int dst = r.UInt8();
         var low = (uint)(itemGuid & 0xFFFFFFFF);
-        var item = session.Inventory.FirstOrDefault(i => i.ItemGuid == low);
+        var item = session.Inv.Inventory.FirstOrDefault(i => i.ItemGuid == low);
         if (item is null) return;
         await move.MoveOrSwapAsync(session, item.Bag, item.Slot, InventorySlots.MainBag, dst, ct);
     }

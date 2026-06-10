@@ -30,8 +30,8 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
     /// </summary>
     internal async Task RefreshVisibleNpcsAsync(WorldSession session, uint map, float x, float y, CancellationToken ct)
     {
-        session.LastVisX = x;
-        session.LastVisY = y;
+        session.Visibility.LastVisX = x;
+        session.Visibility.LastVisY = y;
 
         IReadOnlyList<CreatureSpawnData> rows;
         try
@@ -42,7 +42,7 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
         catch (Exception ex)
         {
             // БД мира недоступна: при первом пересчёте покажем одного тестового NPC.
-            if (session.VisibleNpcs.Count == 0)
+            if (session.Visibility.VisibleNpcs.Count == 0)
             {
                 session.Logger.LogWarning("БД мира недоступна ({Msg}) — показываю тестового NPC", ex.Message);
                 await SendTestNpcAsync(session, x, y, session.PosZ, ct);
@@ -81,28 +81,28 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
 
         // Ушедшие из зоны → DESTROY. Dev-сущности (.trainer и т.п.) «липкие» — не из БД, при пересчёте
         // их нет в newSet; не сносим, иначе пропадали бы при ходьбе (D1).
-        var gone = session.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g) && !session.IsDevNpc(g)).ToArray();
+        var gone = session.Visibility.VisibleNpcs.Keys.Where(g => !newSet.ContainsKey(g) && !session.Visibility.IsDevNpc(g)).ToArray();
         foreach (var guid in gone)
         {
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-            session.VisibleNpcs.TryRemove(guid, out _);
+            session.Visibility.VisibleNpcs.TryRemove(guid, out _);
         }
 
         // Новые в зоне → CREATE.
         var added = 0;
         foreach (var (guid, creature) in newSet)
         {
-            if (session.VisibleNpcs.ContainsKey(guid))
+            if (session.Visibility.VisibleNpcs.ContainsKey(guid))
                 continue;
             await session.SendAsync(WorldOpcode.SmsgUpdateObject, CreatureUpdate.BuildCreateObject(creature, time), ct);
-            session.VisibleNpcs[guid] = creature;
+            session.Visibility.VisibleNpcs[guid] = creature;
             added++;
         }
 
         if (added > 0 || gone.Length > 0)
             session.Logger.LogDebug("Видимость NPC '{User}': +{Added} -{Gone} (всего {Total})",
-                session.Account, added, gone.Length, session.VisibleNpcs.Count);
+                session.Account, added, gone.Length, session.Visibility.VisibleNpcs.Count);
     }
 
     /// <summary>
@@ -131,20 +131,20 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
                 row.Rot0, row.Rot1, row.Rot2, row.Rot3);
         }
 
-        var gone = session.VisibleGos.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
+        var gone = session.Visibility.VisibleGos.Keys.Where(g => !newSet.ContainsKey(g)).ToArray();
         foreach (var guid in gone)
         {
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-            session.VisibleGos.Remove(guid);
+            session.Visibility.VisibleGos.Remove(guid);
         }
 
         foreach (var (guid, go) in newSet)
         {
-            if (session.VisibleGos.ContainsKey(guid))
+            if (session.Visibility.VisibleGos.ContainsKey(guid))
                 continue;
             await session.SendAsync(WorldOpcode.SmsgUpdateObject, GameObjectUpdate.BuildCreateObject(go), ct);
-            session.VisibleGos[guid] = go;
+            session.Visibility.VisibleGos[guid] = go;
         }
     }
 
@@ -162,7 +162,7 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
                 MaxHealth = maxHealth, Health = maxHealth,
             };
         });
-        session.VisibleNpcs[guid] = creature;
+        session.Visibility.VisibleNpcs[guid] = creature;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
     }

@@ -35,7 +35,7 @@ internal sealed class CombatResourcesService
     {
         if (session.Character is not { } c || DisplayData.PowerTypeForClass(c.Class) != PowerRage)
             return;
-        if (damage == 0 || session.Rage >= MaxRage)
+        if (damage == 0 || session.Combat.Rage >= MaxRage)
             return;
 
         float level = Math.Max((byte)1, c.Level);
@@ -43,7 +43,7 @@ internal sealed class CombatResourcesService
         float add;
         if (attacker)
         {
-            var speedSec = session.MainHandSpeedMs / 1000f;
+            var speedSec = session.Combat.MainHandSpeedMs / 1000f;
             add = (damage / conversion * 7.5f + speedSec * 3.5f) / 2f; // mainhand hit factor
         }
         else
@@ -52,8 +52,8 @@ internal sealed class CombatResourcesService
         }
 
         var units = (uint)MathF.Max(1f, add * 10f); // ярость хранится ×10
-        session.Rage = Math.Min(MaxRage, session.Rage + units);
-        await SendPowerAsync(session, PowerRage, session.Rage, ct);
+        session.Combat.Rage = Math.Min(MaxRage, session.Combat.Rage + units);
+        await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
     }
 
     /// <summary>
@@ -67,24 +67,24 @@ internal sealed class CombatResourcesService
         var powerType = DisplayData.PowerTypeForClass(c.Class);
         if (powerType != PowerRage && powerType != PowerEnergy)
             return; // мана-класс — реген маны отдельно
-        if (now - session.LastResourceTickMs < ResourceTickMs)
+        if (now - session.Combat.LastResourceTickMs < ResourceTickMs)
             return;
-        session.LastResourceTickMs = now;
+        session.Combat.LastResourceTickMs = now;
 
         if (powerType == PowerEnergy)
         {
-            if (session.Energy >= MaxEnergy)
+            if (session.Combat.Energy >= MaxEnergy)
                 return;
-            session.Energy = Math.Min(MaxEnergy, session.Energy + EnergyPerTick);
-            await SendPowerAsync(session, PowerEnergy, session.Energy, ct);
+            session.Combat.Energy = Math.Min(MaxEnergy, session.Combat.Energy + EnergyPerTick);
+            await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
             return;
         }
 
         // Ярость: вне боя (спустя паузу) — распад до нуля.
-        if (session.Rage == 0 || now - session.LastCombatMs < OutOfCombatDelayMs)
+        if (session.Combat.Rage == 0 || now - session.Combat.LastCombatMs < OutOfCombatDelayMs)
             return;
-        session.Rage = session.Rage > RageDecayPerTick ? session.Rage - RageDecayPerTick : 0;
-        await SendPowerAsync(session, PowerRage, session.Rage, ct);
+        session.Combat.Rage = session.Combat.Rage > RageDecayPerTick ? session.Combat.Rage - RageDecayPerTick : 0;
+        await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
     }
 
     /// <summary>
@@ -96,12 +96,12 @@ internal sealed class CombatResourcesService
         switch (powerType)
         {
             case PowerRage:
-                session.Rage = session.Rage > amount ? session.Rage - amount : 0;
-                await SendPowerAsync(session, PowerRage, session.Rage, ct);
+                session.Combat.Rage = session.Combat.Rage > amount ? session.Combat.Rage - amount : 0;
+                await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
                 break;
             case PowerEnergy:
-                session.Energy = session.Energy > amount ? session.Energy - amount : 0;
-                await SendPowerAsync(session, PowerEnergy, session.Energy, ct);
+                session.Combat.Energy = session.Combat.Energy > amount ? session.Combat.Energy - amount : 0;
+                await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
                 break;
         }
     }

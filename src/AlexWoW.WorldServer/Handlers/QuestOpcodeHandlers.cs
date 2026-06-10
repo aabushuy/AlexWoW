@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 
@@ -14,7 +15,8 @@ internal sealed class QuestOpcodeHandlers(
     GossipService gossip,
     QuestProgressService questProgress,
     QuestDialogService dialog,
-    QuestGiverStatusService giverStatus) : IOpcodeHandlerModule
+    QuestGiverStatusService giverStatus,
+    IWorldRepository worldDb) : IOpcodeHandlerModule
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
@@ -59,7 +61,7 @@ internal sealed class QuestOpcodeHandlers(
     public async Task OnQuestQuery(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var questId = packet.Reader().UInt32();
-        var quest = await session.WorldDb.GetQuestAsync(questId, ct);
+        var quest = await worldDb.GetQuestAsync(questId, ct);
         if (quest is null)
             return;
         await session.SendAsync(WorldOpcode.SmsgQuestQueryResponse, QuestPackets.BuildQuestQueryResponse(quest), ct);

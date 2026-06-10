@@ -1,5 +1,6 @@
 using System.Text;
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -13,7 +14,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (списать деньги → выучить через <see cref="SpellLearnService"/>). Ассортимент/требования — из
 /// npc_trainer (дамп CMaNGOS). Парсер Spell.dbc не нужен — клиент рисует книгу/каст сам.
 /// </summary>
-internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
+internal sealed class TrainerCatalogService(
+    SpellLearnService spellLearn,
+    IWorldRepository worldDb,
+    ICharacterRepository characters)
 {
     // TrainerSpellState (wow_messages 3.3.5): GREEN=доступен, RED=недоступен, GRAY=уже изучен.
     private const byte StateGreen = 0;
@@ -51,7 +55,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
     {
         var entry = CreatureEntry(npcGuid);
         TrainerData? trainer;
-        try { trainer = await session.WorldDb.GetTrainerAsync(entry, ct); }
+        try { trainer = await worldDb.GetTrainerAsync(entry, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("TRAINER gossip {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
@@ -90,7 +94,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
     {
         var entry = CreatureEntry(npcGuid);
         TrainerData? trainer;
-        try { trainer = await session.WorldDb.GetTrainerAsync(entry, ct); }
+        try { trainer = await worldDb.GetTrainerAsync(entry, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("TRAINER_LIST {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
@@ -144,7 +148,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
             return;
 
         TrainerData? trainer;
-        try { trainer = await session.WorldDb.GetTrainerAsync(entry, ct); }
+        try { trainer = await worldDb.GetTrainerAsync(entry, ct); }
         catch { await FailAsync(FailUnavailable); return; }
         if (trainer is null || !FitsPlayer(session, trainer))
         {
@@ -158,7 +162,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
             await FailAsync(FailUnavailable); // нет в списке / не доступна (уровень/известна/предусловие)
             return;
         }
-        if (session.Money < spell.SpellCost)
+        if (session.Inv.Money < spell.SpellCost)
         {
             await FailAsync(FailNotEnoughMoney);
             return;
@@ -167,10 +171,10 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
         // Списать деньги.
         if (spell.SpellCost > 0)
         {
-            session.Money -= spell.SpellCost;
-            await session.Characters.SetMoneyAsync(session.InWorldGuid, session.Money, ct);
+            session.Inv.Money -= spell.SpellCost;
+            await characters.SetMoneyAsync(session.InWorldGuid, session.Inv.Money, ct);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Money), ct);
+                PlayerSpawn.BuildCoinageUpdate((ulong)session.InWorldGuid, session.Inv.Money), ct);
         }
 
         // Выучить: персист + клиентский грант (LEARNED, либо SUPERCEDED для высшего ранга). M10.3.
@@ -178,7 +182,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
         await session.SendAsync(WorldOpcode.SmsgTrainerBuySucceeded,
             new ByteWriter(12).UInt64(npcGuid).UInt32(spellId).ToArray(), ct);
         session.Logger.LogInformation("TRAINER BUY '{User}': spell={Spell} за {Cost}, осталось {Money}",
-            session.Account, spellId, spell.SpellCost, session.Money);
+            session.Account, spellId, spell.SpellCost, session.Inv.Money);
     }
 
     /// <summary>Подходит ли тренер игроку: классовый — только своему классу; расовый гейт, если задан. M9.3.</summary>
@@ -209,19 +213,19 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
 
     private static byte StateFor(WorldSession session, byte level, TrainerSpell s)
     {
-        if (session.KnownSpells.Contains(s.Spell))
+        if (session.Progression.KnownSpells.Contains(s.Spell))
             return StateGray;
         if (level < EffectiveReqLevel(s))
             return StateRed;
-        if ((s.ReqAbility1 != 0 && !session.KnownSpells.Contains(s.ReqAbility1))
-            || (s.ReqAbility2 != 0 && !session.KnownSpells.Contains(s.ReqAbility2))
-            || (s.ReqAbility3 != 0 && !session.KnownSpells.Contains(s.ReqAbility3)))
+        if ((s.ReqAbility1 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility1))
+            || (s.ReqAbility2 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility2))
+            || (s.ReqAbility3 != 0 && !session.Progression.KnownSpells.Contains(s.ReqAbility3)))
             return StateRed;
         // M11: гейт по навыку профессии — рецепт недоступен, если навык игрока ниже требуемого
         // (reqskill/reqskillvalue из npc_trainer). Теперь у нас есть навыки (M11.1).
         if (s.ReqSkill != 0)
         {
-            var sk = session.SkillBook.Get((ushort)s.ReqSkill);
+            var sk = session.Progression.SkillBook.Get((ushort)s.ReqSkill);
             if (sk is null || sk.Value < s.ReqSkillValue)
                 return StateRed;
         }
@@ -230,7 +234,7 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
 
     /// <summary>Несёт ли NPC флаг тренера (UNIT_NPC_FLAG_TRAINER). Для дешёвого хука госсипа. M9.3.</summary>
     internal bool IsTrainerNpc(WorldSession session, ulong npcGuid)
-        => session.VisibleNpcs.TryGetValue(npcGuid, out var creature)
+        => session.Visibility.VisibleNpcs.TryGetValue(npcGuid, out var creature)
            && (creature.Template.NpcFlags & NpcFlagTrainer) != 0;
 
     /// <summary>
@@ -247,12 +251,12 @@ internal sealed class TrainerCatalogService(SpellLearnService spellLearn)
 
         // Среди видимых тренеров найти первого, подходящего игроку по классу/расе.
         TrainerData? trainer = null;
-        foreach (var creature in session.VisibleNpcs.Values)
+        foreach (var creature in session.Visibility.VisibleNpcs.Values)
         {
             if ((creature.Template.NpcFlags & NpcFlagTrainer) == 0)
                 continue;
             TrainerData? t;
-            try { t = await session.WorldDb.GetTrainerAsync(CreatureEntry(creature.Guid), ct); }
+            try { t = await worldDb.GetTrainerAsync(CreatureEntry(creature.Guid), ct); }
             catch { continue; }
             if (t is not null && FitsPlayer(session, t))
             {

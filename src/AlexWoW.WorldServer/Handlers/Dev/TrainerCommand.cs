@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -7,7 +8,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// <c>.trainer off</c> — снять. Entry резолвится data-driven (<c>GetClassTrainerEntryAsync</c>), спавн —
 /// через каркас dev-сущностей (<see cref="World.CreatureDirector.SummonDevNpcAsync"/>). D1.
 /// </summary>
-internal sealed class TrainerCommand : IDevCommand
+internal sealed class TrainerCommand(IWorldRepository worldDb) : IDevCommand
 {
     /// <summary>Имена классов → id (WotLK).</summary>
     private static readonly Dictionary<string, byte> ClassByName = new()
@@ -39,7 +40,7 @@ internal sealed class TrainerCommand : IDevCommand
         }
 
         uint? entry;
-        try { entry = await session.WorldDb.GetClassTrainerEntryAsync(classId, ct); }
+        try { entry = await worldDb.GetClassTrainerEntryAsync(classId, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("TRAINER cmd: БД мира недоступна ({Msg})", ex.Message);

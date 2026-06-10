@@ -21,15 +21,15 @@ internal sealed class RegenService
     /// </summary>
     internal async Task TickPlayerRegenAsync(WorldSession session, long now, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0 || session.IsDead || session.Health >= session.MaxHealth)
+        if (session.InWorldGuid == 0 || session.Combat.IsDead || session.Combat.Health >= session.Combat.MaxHealth)
             return;
-        if (now - session.LastCombatMs < OutOfCombatRegenDelayMs)       // ещё «в бою» — реген на паузе
+        if (now - session.Combat.LastCombatMs < OutOfCombatRegenDelayMs)       // ещё «в бою» — реген на паузе
             return;
-        if (now - session.LastHealthRegenMs < HealthRegenIntervalMs)
+        if (now - session.Combat.LastHealthRegenMs < HealthRegenIntervalMs)
             return;
 
-        session.LastHealthRegenMs = now;
-        session.Health = Math.Min(session.MaxHealth, session.Health + Math.Max(1u, session.MaxHealth / 10));
+        session.Combat.LastHealthRegenMs = now;
+        session.Combat.Health = Math.Min(session.Combat.MaxHealth, session.Combat.Health + Math.Max(1u, session.Combat.MaxHealth / 10));
         if (session.Player is { } player)
             await session.World.BroadcastPlayerHealthAsync(player, ct);
     }

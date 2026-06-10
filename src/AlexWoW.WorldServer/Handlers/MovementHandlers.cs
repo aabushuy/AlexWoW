@@ -57,7 +57,7 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
 
         // M6.4: сдвиг игрока прерывает текущий каст (клиент гасит бар локально, но серверу не шлёт
         // CANCEL_CAST — без этого эффект применился бы и анимация залипала).
-        if (session.CastingSpellId != 0)
+        if (session.Cast.CastingSpellId != 0)
             await spellCast.InterruptOnMoveAsync(session, ct);
 
         // M5.3: ретранслируем движение соседям (с нормализацией поля time, если часы синхронизированы).
@@ -72,8 +72,8 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
         // M5.6: пересчёт видимости NPC/GO (запрос в БД) — троттлим по дистанции.
         if (session.Character is { } character)
         {
-            var dx = session.PosX - session.LastVisX;
-            var dy = session.PosY - session.LastVisY;
+            var dx = session.PosX - session.Visibility.LastVisX;
+            var dy = session.PosY - session.Visibility.LastVisY;
             if (dx * dx + dy * dy >= VisibilityService.VisRefreshStep * VisibilityService.VisRefreshStep)
             {
                 await visibility.RefreshVisibleNpcsAsync(session, character.Map, session.PosX, session.PosY, ct);

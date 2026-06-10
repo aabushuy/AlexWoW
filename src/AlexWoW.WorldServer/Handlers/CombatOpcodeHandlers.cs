@@ -17,7 +17,7 @@ internal sealed class CombatOpcodeHandlers(PlayerMeleeService playerMelee) : IOp
     public Task OnSetSelection(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
-        session.SelectionGuid = reader.UInt64(); // plain Guid (не packed)
+        session.Combat.SelectionGuid = reader.UInt64(); // plain Guid (не packed)
         return Task.CompletedTask;
     }
 
@@ -32,7 +32,7 @@ internal sealed class CombatOpcodeHandlers(PlayerMeleeService playerMelee) : IOp
     [WorldOpcodeHandler(WorldOpcode.CmsgAttackStop)]
     public async Task OnAttackStop(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        var enemy = session.CombatTargetGuid;
+        var enemy = session.Combat.CombatTargetGuid;
         if (enemy != 0)
             await playerMelee.StopAttackAsync(session, enemy, ct);
     }
@@ -44,10 +44,10 @@ internal sealed class CombatOpcodeHandlers(PlayerMeleeService playerMelee) : IOp
     [WorldOpcodeHandler(WorldOpcode.CmsgRepopRequest)]
     public async Task OnRepopRequest(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
-        if (!session.IsDead || session.Player is not { } player)
+        if (!session.Combat.IsDead || session.Player is not { } player)
             return;
-        session.IsDead = false;
-        session.Health = session.MaxHealth;
+        session.Combat.IsDead = false;
+        session.Combat.Health = session.Combat.MaxHealth;
         await session.World.BroadcastPlayerHealthAsync(player, ct);
         session.Logger.LogInformation("RESPAWN '{User}' возродился на месте (полное HP)", session.Account);
     }

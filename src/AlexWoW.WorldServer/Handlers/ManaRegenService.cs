@@ -25,15 +25,15 @@ internal sealed class ManaRegenService
     /// </summary>
     internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
-        if (session.MaxMana == 0 || session.Mana >= session.MaxMana || session.InWorldGuid == 0)
+        if (session.Cast.MaxMana == 0 || session.Cast.Mana >= session.Cast.MaxMana || session.InWorldGuid == 0)
             return;
-        if (now - session.LastSpellCastMs < FiveSecondRuleMs)        // правило 5 секунд — реген на паузе
+        if (now - session.Cast.LastSpellCastMs < FiveSecondRuleMs)        // правило 5 секунд — реген на паузе
             return;
-        if (now - session.LastManaRegenMs < ManaRegenIntervalMs)
+        if (now - session.Cast.LastManaRegenMs < ManaRegenIntervalMs)
             return;
 
-        session.LastManaRegenMs = now;
-        session.Mana = Math.Min(session.MaxMana, session.Mana + ManaRegenPerSec);
+        session.Cast.LastManaRegenMs = now;
+        session.Cast.Mana = Math.Min(session.Cast.MaxMana, session.Cast.Mana + ManaRegenPerSec);
         await SendManaUpdateAsync(session, ct);
     }
 
@@ -45,8 +45,8 @@ internal sealed class ManaRegenService
     internal async Task SendManaUpdateAsync(WorldSession session, CancellationToken ct)
     {
         var guid = (ulong)session.InWorldGuid;
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject, PlayerSpawn.BuildPowerUpdate(guid, session.Mana), ct);
-        await session.SendAsync(WorldOpcode.SmsgPowerUpdate, BuildPowerUpdatePacket(guid, session.Mana), ct);
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject, PlayerSpawn.BuildPowerUpdate(guid, session.Cast.Mana), ct);
+        await session.SendAsync(WorldOpcode.SmsgPowerUpdate, BuildPowerUpdatePacket(guid, session.Cast.Mana), ct);
     }
 
     /// <summary>SMSG_POWER_UPDATE (3.3.5): PackedGuid unit + u8 power(MANA=0) + u32 amount.</summary>

@@ -65,11 +65,11 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
     internal async Task TickAggroScanAsync(WorldState world, WorldPlayer player, long now, CancellationToken ct)
     {
         var session = player.Session;
-        if (session.IsDead || session.InWorldGuid == 0)
+        if (session.Combat.IsDead || session.InWorldGuid == 0)
             return;
         var playerFt = DisplayData.FactionForRace(player.Character.Race);
 
-        foreach (var creature in session.VisibleNpcs.Values)
+        foreach (var creature in session.Visibility.VisibleNpcs.Values)
         {
             if (!creature.IsAlive || creature.CombatTargetGuid != 0 || creature.Evading)
                 continue;
@@ -97,7 +97,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
     {
         var player = world.FindPlayer(creature.CombatTargetGuid);
         // Цель пропала/вне мира/мертва/на другой карте — возврат на спавн (evade + реген).
-        if (player is null || player.Session.InWorldGuid == 0 || player.Session.IsDead || player.Map != creature.Map)
+        if (player is null || player.Session.InWorldGuid == 0 || player.Session.Combat.IsDead || player.Map != creature.Map)
         {
             await BeginEvadeAsync(world, creature, ct);
             return;
@@ -132,7 +132,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
 
             var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
             var (_, died) = world.ApplyPlayerDamage(player, damage);
-            player.Session.LastCombatMs = now; // M6.7: получил урон → пауза регена
+            player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена
             await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
@@ -231,14 +231,14 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
     private static async Task HandlePlayerDeathAsync(WorldState world, WorldPlayer player, WorldCreature killer, CancellationToken ct)
     {
         var session = player.Session;
-        session.IsDead = true;
+        session.Combat.IsDead = true;
         await BeginEvadeAsync(world, killer, ct);                  // существо возвращается на спавн
-        if (session.CombatTargetGuid != 0)                         // игрок прекращает свою атаку
+        if (session.Combat.CombatTargetGuid != 0)                         // игрок прекращает свою атаку
         {
             // Стоп-атака инлайном (та же последовательность, что PlayerMeleeService.StopAttackAsync):
             // ссылка на сервис мили создала бы цикл DI (мили → ИИ → мили). M7 S4.
-            var enemy = session.CombatTargetGuid;
-            session.CombatTargetGuid = 0;
+            var enemy = session.Combat.CombatTargetGuid;
+            session.Combat.CombatTargetGuid = 0;
             await session.SendAsync(WorldOpcode.SmsgAttackStop,
                 CombatPackets.BuildAttackStop((ulong)session.InWorldGuid, enemy), ct);
         }

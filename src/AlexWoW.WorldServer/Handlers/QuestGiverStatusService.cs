@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 
@@ -8,7 +9,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Иконки квестгиверов «!»/«?» (M6.5/M6.10, DI-сервис M7 S5 — вынос из god-класса QuestHandlers):
 /// расчёт статуса NPC и рассылка SMSG_QUESTGIVER_STATUS / SMSG_QUESTGIVER_STATUS_MULTIPLE.
 /// </summary>
-internal sealed class QuestGiverStatusService
+internal sealed class QuestGiverStatusService(IWorldRepository worldDb)
 {
     // QuestGiverStatus (3.3.5, сверено с TrinityCore QuestDef.h): NONE=0, INCOMPLETE=5 (серый «?»),
     // AVAILABLE=8 («!» жёлтый), REWARD=10 («?» жёлтый — можно сдать).
@@ -29,7 +30,7 @@ internal sealed class QuestGiverStatusService
         if (quests.IsEnder(entry))
         {
             var enderIds = quests.EnderQuestIds(entry);
-            foreach (var p in session.QuestSlots)
+            foreach (var p in session.Quest.QuestSlots)
             {
                 if (p is null || Array.IndexOf(enderIds, p.QuestId) < 0)
                     continue;
@@ -40,7 +41,7 @@ internal sealed class QuestGiverStatusService
         }
         if (quests.IsGiver(entry))
         {
-            var all = await session.WorldDb.GetGiverQuestsAsync(entry, ct);
+            var all = await worldDb.GetGiverQuestsAsync(entry, ct);
             if (all.Any(q => QuestDialogService.CanTakeQuest(session, q)))
                 return StatusAvailable;    // есть берущийся квест → «!»
         }
@@ -58,7 +59,7 @@ internal sealed class QuestGiverStatusService
         if (session.InWorldGuid == 0)
             return;
         await session.World.Quests.EnsureLoadedAsync(ct);
-        foreach (var (guid, creature) in session.VisibleNpcs)
+        foreach (var (guid, creature) in session.Visibility.VisibleNpcs)
         {
             var entry = creature.Template.Entry;
             if (!session.World.Quests.IsGiver(entry) && !session.World.Quests.IsEnder(entry))
@@ -80,7 +81,7 @@ internal sealed class QuestGiverStatusService
         await session.World.Quests.EnsureLoadedAsync(ct);
 
         var reports = new List<(ulong Guid, byte Status)>();
-        foreach (var (guid, creature) in session.VisibleNpcs)
+        foreach (var (guid, creature) in session.Visibility.VisibleNpcs)
         {
             var status = await StatusForAsync(session, creature.Template.Entry, ct);
             if (status != StatusNone)

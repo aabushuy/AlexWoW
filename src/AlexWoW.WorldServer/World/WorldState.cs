@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -26,14 +27,14 @@ public sealed class WorldState
     private readonly PlayerVisibility _visibility;
     private readonly CreatureDirector _director;
 
-    public WorldState(ILogger<WorldState> logger, Navmesh navmesh, FactionStore factions,
+    public WorldState(ILogger<WorldState> logger, Navmesh navmesh, IWorldRepository worldDb, FactionStore factions,
         QuestStore quests, LevelStore levels, StatStore stats)
     {
         _factions = factions;
         _quests = quests;
         _levels = levels;
         _stats = stats;
-        _director = new CreatureDirector(this, navmesh, logger);
+        _director = new CreatureDirector(this, navmesh, worldDb, logger);
         _visibility = new PlayerVisibility(this, logger);
     }
 
@@ -132,7 +133,7 @@ public sealed class WorldState
 
     /// <summary>Наблюдатели существа: игроки на его карте, у кого оно в видимом наборе. M6.3.</summary>
     public IEnumerable<WorldPlayer> ObserversOf(WorldCreature creature)
-        => _players.Values.Where(p => p.Map == creature.Map && p.Session.VisibleNpcs.ContainsKey(creature.Guid));
+        => _players.Values.Where(p => p.Map == creature.Map && p.Session.Visibility.VisibleNpcs.ContainsKey(creature.Guid));
 
     // --- Рассылка наблюдателям ---
 
@@ -171,7 +172,7 @@ public sealed class WorldState
     public Task BroadcastPlayerHealthAsync(WorldPlayer player, CancellationToken ct)
         => BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate(player.Guid,
-                m => m.SetUInt32(UpdateField.UnitHealth, player.Session.Health)), ct);
+                m => m.SetUInt32(UpdateField.UnitHealth, player.Session.Combat.Health)), ct);
 
     // --- Урон (мутация авторитетного состояния) ---
 
@@ -197,9 +198,9 @@ public sealed class WorldState
     public (uint Dealt, bool Died) ApplyPlayerDamage(WorldPlayer player, uint damage)
     {
         var s = player.Session;
-        var dealt = Math.Min(damage, s.Health);
-        s.Health -= dealt;
-        return (dealt, s.Health == 0);
+        var dealt = Math.Min(damage, s.Combat.Health);
+        s.Combat.Health -= dealt;
+        return (dealt, s.Combat.Health == 0);
     }
 
     // --- Делегации к SRP-коллабораторам (API не меняется для потребителей) ---

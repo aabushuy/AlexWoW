@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -11,7 +12,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Зовётся из путей смерти существа (мили M6.3 / спелл M6.4 / DoT M10.4b). Окно/раздача лута —
 /// модуль <see cref="LootHandlers"/>.
 /// </summary>
-internal sealed class KillRewardService(QuestProgressService questProgress, ProgressionService progression)
+internal sealed class KillRewardService(
+    QuestProgressService questProgress,
+    ProgressionService progression,
+    IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
     private const uint DynFlagLootable = 0x1;
@@ -36,7 +40,7 @@ internal sealed class KillRewardService(QuestProgressService questProgress, Prog
         Database.Models.CreatureLootData? data;
         try
         {
-            data = await session.WorldDb.GetCreatureLootAsync(creature.Template.Entry, ct);
+            data = await worldDb.GetCreatureLootAsync(creature.Template.Entry, ct);
         }
         catch (Exception ex)
         {

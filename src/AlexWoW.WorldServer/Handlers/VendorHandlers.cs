@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -12,7 +13,11 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Класс невелик — листинг/покупка/продажа в одном модуле; госсип (<see cref="GossipService"/>)
 /// инжектит модуль и зовёт <see cref="SendVendorListAsync"/>.
 /// </summary>
-internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOpcodeHandlerModule
+internal sealed class VendorHandlers(
+    InventoryGrantService inventoryGrant,
+    IWorldRepository worldDb,
+    ICharacterRepository characters,
+    IInventoryRepository items) : IOpcodeHandlerModule
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
@@ -27,7 +32,7 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
     {
         var entry = CreatureEntry(vendorGuid);
         IReadOnlyList<VendorItem> items;
-        try { items = await session.WorldDb.GetVendorItemsAsync(entry, ct); }
+        try { items = await worldDb.GetVendorItemsAsync(entry, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("LIST_INVENTORY {Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
@@ -56,7 +61,7 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
 
         var entry = CreatureEntry(vendorGuid);
         IReadOnlyList<VendorItem> items;
-        try { items = await session.WorldDb.GetVendorItemsAsync(entry, ct); }
+        try { items = await worldDb.GetVendorItemsAsync(entry, ct); }
         catch { await FailAsync(BuyResult.CantFindItem); return; }
 
         var vi = items.FirstOrDefault(x => x.ItemId == itemEntry);
@@ -66,7 +71,7 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
         var buyCount = vi.BuyCount == 0 ? 1u : vi.BuyCount;
         var qty = amount * buyCount;          // сколько физических предметов выдать
         var cost = vi.BuyPrice * amount;
-        if (session.Money < cost) { await FailAsync(BuyResult.NotEnoughMoney); return; }
+        if (session.Inv.Money < cost) { await FailAsync(BuyResult.NotEnoughMoney); return; }
 
         var ownerGuid = session.InWorldGuid;
         // M7 #20: выдать со стаканием в существующие стопки (как лут/награда). null → нет места.
@@ -74,12 +79,12 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
         var placed = await inventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
         if (placed is null) { await FailAsync(BuyResult.InventoryFull); return; }
 
-        session.Money -= cost;
-        await session.Characters.SetMoneyAsync(ownerGuid, session.Money, ct);
+        session.Inv.Money -= cost;
+        await characters.SetMoneyAsync(ownerGuid, session.Inv.Money, ct);
 
         // Обновить деньги, подтвердить покупку (предмет/стопку уже создал TryGiveAsync).
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Money), ct);
+            PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Inv.Money), ct);
 
         var buy = new ByteWriter(20)
             .UInt64(vendorGuid)
@@ -88,7 +93,7 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
             .UInt32(qty);
         await session.SendAsync(WorldOpcode.SmsgBuyItem, buy.ToArray(), ct);
         session.Logger.LogInformation("BUY '{User}': item={Item} x{Qty} (лотов {Amt}) за {Cost}, осталось {Money}",
-            session.Account, itemEntry, qty, amount, cost, session.Money);
+            session.Account, itemEntry, qty, amount, cost, session.Inv.Money);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSellItem)]
@@ -103,21 +108,21 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
             new ByteWriter(17).UInt64(vendorGuid).UInt64(itemGuid).UInt8((byte)r).ToArray(), ct);
 
         var itemLow = (uint)(itemGuid & 0xFFFFFFFF);
-        var item = session.Inventory.FirstOrDefault(i => i.ItemGuid == itemLow);
+        var item = session.Inv.Inventory.FirstOrDefault(i => i.ItemGuid == itemLow);
         if (item is null) { await FailAsync(SellResult.CantFindItem); return; }
 
         ItemTemplateData? t;
-        try { t = await session.WorldDb.GetItemTemplateAsync(item.ItemEntry, ct); }
+        try { t = await worldDb.GetItemTemplateAsync(item.ItemEntry, ct); }
         catch { await FailAsync(SellResult.CantFindItem); return; }
         if (t is null || t.SellPrice == 0) { await FailAsync(SellResult.CantSellItem); return; }
 
         var ownerGuid = session.InWorldGuid;
         var gain = t.SellPrice * Math.Max(1u, item.StackCount);
 
-        await session.Items.RemoveItemAsync(itemLow, ct);
-        session.Inventory.Remove(item);
-        session.Money += gain;
-        await session.Characters.SetMoneyAsync(ownerGuid, session.Money, ct);
+        await items.RemoveItemAsync(itemLow, ct);
+        session.Inv.Inventory.Remove(item);
+        session.Inv.Money += gain;
+        await characters.SetMoneyAsync(ownerGuid, session.Inv.Money, ct);
 
         // Убрать предмет у клиента, очистить слот, обновить деньги.
         await session.SendAsync(WorldOpcode.SmsgDestroyObject,
@@ -133,9 +138,9 @@ internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOp
                     ContainerObject.BuildSlotUpdate(bagGuid, item.Slot, 0), ct);
         }
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Money), ct);
+            PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Inv.Money), ct);
         session.Logger.LogInformation("SELL '{User}': item={Item} (guid={Guid}) за {Gain}, теперь {Money}",
-            session.Account, item.ItemEntry, itemLow, gain, session.Money);
+            session.Account, item.ItemEntry, itemLow, gain, session.Inv.Money);
     }
 
 }

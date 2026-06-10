@@ -23,7 +23,7 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
 
         foreach (var other in world.PlayersInRangeOf(player))
         {
-            if (other.Session.VisiblePlayers.TryAdd(player.Guid, 1))
+            if (other.Session.Visibility.VisiblePlayers.TryAdd(player.Guid, 1))
             {
                 logger.LogDebug("[vis] CREATE '{P}'(eq={N}) → '{O}' (enter)",
                     player.Character.Name, EquipCount(player), other.Character.Name);
@@ -51,14 +51,14 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
         foreach (var other in nearby)
         {
             nearbyGuids.Add(other.Guid);
-            if (me.Session.VisiblePlayers.TryAdd(other.Guid, 1))
+            if (me.Session.Visibility.VisiblePlayers.TryAdd(other.Guid, 1))
             {
                 logger.LogDebug("[vis] CREATE '{Other}'(eq={N}) → '{Me}' (refresh)",
                     other.Character.Name, EquipCount(other), me.Character.Name);
                 await me.Session.SendAsync(WorldOpcode.SmsgUpdateObject, BuildPlayerCreate(other), ct);
             }
             // обоюдно: чтобы стоящий на месте сосед тоже увидел подошедшего.
-            if (other.Session.VisiblePlayers.TryAdd(me.Guid, 1))
+            if (other.Session.Visibility.VisiblePlayers.TryAdd(me.Guid, 1))
             {
                 logger.LogDebug("[vis] CREATE '{Me}'(eq={N}) → '{Other}' (refresh-sym)",
                     me.Character.Name, EquipCount(me), other.Character.Name);
@@ -66,9 +66,9 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
             }
         }
 
-        foreach (var guid in me.Session.VisiblePlayers.Keys.Where(g => !nearbyGuids.Contains(g)).ToList())
+        foreach (var guid in me.Session.Visibility.VisiblePlayers.Keys.Where(g => !nearbyGuids.Contains(g)).ToList())
         {
-            me.Session.VisiblePlayers.TryRemove(guid, out _);
+            me.Session.Visibility.VisiblePlayers.TryRemove(guid, out _);
             await me.Session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
         }
@@ -83,7 +83,7 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
     {
         foreach (var other in world.PlayersInRangeOf(me))
         {
-            var pkt = PlayerSpawn.BuildEquipmentValuesUpdate(other.Character, other.Session.Inventory);
+            var pkt = PlayerSpawn.BuildEquipmentValuesUpdate(other.Character, other.Session.Inv.Inventory);
             if (pkt is not null)
                 await me.Session.SendAsync(WorldOpcode.SmsgUpdateObject, pkt, ct);
         }
@@ -100,7 +100,7 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
         {
             if (other.Guid == player.Guid)
                 continue;
-            if (other.Session.VisiblePlayers.TryRemove(player.Guid, out _))
+            if (other.Session.Visibility.VisiblePlayers.TryRemove(player.Guid, out _))
                 await other.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
         }
 
@@ -136,10 +136,10 @@ public sealed class PlayerVisibility(WorldState world, ILogger logger)
 
     /// <summary>ДИАГНОСТИКА: число надетых видимых предметов (слоты экипировки 0..18).</summary>
     private static int EquipCount(WorldPlayer p)
-        => p.Session.Inventory.Count(i => i.Bag == InventorySlots.MainBag
+        => p.Session.Inv.Inventory.Count(i => i.Bag == InventorySlots.MainBag
             && i.Slot < InventorySlots.EquipmentEnd);
 
     private static byte[] BuildPlayerCreate(WorldPlayer p)
         => PlayerSpawn.BuildCreateObject(p.Character, p.X, p.Y, p.Z, p.O, (uint)Environment.TickCount,
-            isSelf: false, p.Session.Inventory);
+            isSelf: false, p.Session.Inv.Inventory);
 }

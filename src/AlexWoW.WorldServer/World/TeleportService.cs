@@ -49,13 +49,13 @@ internal sealed class TeleportService(
         // Кросс-карта: снять с реестра и DESTROY соседям старой карты (клиент выгрузит мир на загрузочном
         // экране), обновить авторитетную позицию+карту, анонсировать переход и загрузить новую карту.
         await session.World.LeaveWorldAsync(player, ct);
-        session.VisibleNpcs.Clear();
-        session.VisibleGos.Clear();
-        session.VisiblePlayers.Clear();
+        session.Visibility.VisibleNpcs.Clear();
+        session.Visibility.VisibleGos.Clear();
+        session.Visibility.VisiblePlayers.Clear();
 
         character.Map = map;
         session.PosX = x; session.PosY = y; session.PosZ = z; session.PosO = o;
-        session.LastVisX = 0; session.LastVisY = 0; // форсировать пересчёт видимости после входа
+        session.Visibility.LastVisX = 0; session.Visibility.LastVisY = 0; // форсировать пересчёт видимости после входа
         await characters.SavePositionAsync(session.InWorldGuid, x, y, z, map, ct);
 
         session.PendingWorldport = true;
