@@ -35,7 +35,7 @@ public static class GameObjectUseHandlers
         var count = node.MaxCount <= node.MinCount
             ? node.MinCount
             : (uint)Random.Shared.Next((int)node.MinCount, (int)node.MaxCount + 1);
-        await InventoryGrant.TryGiveAsync(session, node.Item, count, ct);
+        await session.InventoryGrant.TryGiveAsync(session, node.Item, count, ct); // мост сессии (до конверсии модуля)
         session.Logger.LogInformation("GATHER '{User}': node entry={Entry} → {Count}×{Item} ({Skill})",
             session.Account, entry, count, node.Item, Professions.SkillName(node.SkillId));
 

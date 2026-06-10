@@ -28,7 +28,11 @@ public sealed class PeriodicEffect
 /// бафф-иконку системы аур (M6.11) + тикает хил. Величина/интервал/длительность — из spell_template
 /// (BasePoints+1, EffectAmplitude, SpellDuration.dbc).
 /// </summary>
-internal sealed class PeriodicsService(AuraService auras, SpellCatalog spellCatalog, CreatureCombatAI creatureAi)
+internal sealed class PeriodicsService(
+    AuraService auras,
+    SpellCatalog spellCatalog,
+    CreatureCombatAI creatureAi,
+    KillRewardService killReward)
 {
     /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
     /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо полной длительности (восстановление с остатком, M10.5).</summary>
@@ -194,8 +198,7 @@ internal sealed class PeriodicsService(AuraService auras, SpellCatalog spellCata
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
         if (died)
         {
-            // Лут — пока легаси-статик (конверсия в S5).
-            await LootHandlers.OnCreatureKilledAsync(session, creature, ct);
+            await killReward.OnCreatureKilledAsync(session, creature, ct);
             await RemoveAsync(session, p, ct);
         }
         else

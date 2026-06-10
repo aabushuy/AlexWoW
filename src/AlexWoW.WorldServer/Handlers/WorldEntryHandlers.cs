@@ -99,7 +99,7 @@ public static class WorldEntryHandlers
 
         // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
-        await QuestHandlers.LoadQuestStateAsync(session, ct);
+        await session.QuestProgress.LoadQuestStateAsync(session, ct); // мост сессии (до конверсии в S7)
 
         // M11.1: навыки персонажа (профессии и пр.) — загрузить ДО спавна, чтобы лечь в слоты PLAYER_SKILL_INFO.
         await Skills.LoadAsync(session, character.Guid, character.Race, ct);

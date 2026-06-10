@@ -29,6 +29,8 @@ internal sealed class WorldSessionServices(
     SpellCatalog spellCatalog,
     AuraService auras,
     AuraPersistenceService auraPersistence,
+    InventoryGrantService inventoryGrant,
+    QuestProgressService questProgress,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -47,5 +49,8 @@ internal sealed class WorldSessionServices(
     public SpellCatalog SpellCatalog { get; } = spellCatalog;
     public AuraService AuraService { get; } = auras;
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
+    // Квест/лут-кластер (M7 S5): мосты легаси-статикам до их конверсии.
+    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;   // мост до S6/S8 (вендор, GO-сбор, dev)
+    public QuestProgressService QuestProgress { get; } = questProgress;      // мост до S7 (WorldEntryHandlers)
     public ILogger<WorldSession> Logger { get; } = logger;
 }

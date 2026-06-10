@@ -51,6 +51,10 @@ public sealed class WorldSession
     internal SpellCatalog SpellCatalog => _services.SpellCatalog;
     internal AuraService AuraService => _services.AuraService;
     internal AuraPersistenceService AuraPersistence => _services.AuraPersistence;
+    // мост до S6/S8 (M7 S5): легаси-статики (VendorHandlers, GameObjectUseHandlers, dev-команды) выдают предметы.
+    internal InventoryGrantService InventoryGrant => _services.InventoryGrant;
+    // мост до S7 (M7 S5): WorldEntryHandlers восстанавливает состояние квестов при входе в мир.
+    internal QuestProgressService QuestProgress => _services.QuestProgress;
     internal ILogger Logger => _services.Logger;
     internal string RemoteIp { get; }
 

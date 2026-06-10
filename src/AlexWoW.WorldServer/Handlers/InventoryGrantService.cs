@@ -6,13 +6,16 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Общая выдача предмета в рюкзак (M6.6): первый свободный слот → БД + сессия + создание объекта у
-/// клиента + привязка к слоту. Используется лутом (M6.6) и торговлей (M6.2).
+/// Общая выдача предмета в рюкзак (M6.6, DI-сервис M7 S5 — бывший статик InventoryGrant): первый свободный
+/// слот → БД + сессия + создание объекта у клиента + привязка к слоту. Используется лутом (M6.6), торговлей
+/// (M6.2), наградами квестов (M6.5), крафтом/сбором (M11). Зачёт item-целей квестов после выдачи —
+/// <see cref="QuestProgressService.OnItemGainedAsync"/> (цикл со статиками разорван конверсией в DI).
 /// </summary>
-public static class InventoryGrant
+internal sealed class InventoryGrantService(QuestProgressService questProgress)
 {
-    /// <summary>Сколько предметов entry в сумках игрока (item-цели квестов, реагенты крафта).</summary>
-    public static uint CountItem(WorldSession session, uint itemEntry)
+    /// <summary>Сколько предметов entry в сумках игрока (item-цели квестов, реагенты крафта).
+    /// Чистая функция от сессии — static.</summary>
+    internal static uint CountItem(WorldSession session, uint itemEntry)
     {
         uint total = 0;
         foreach (var it in session.Inventory)
@@ -21,12 +24,26 @@ public static class InventoryGrant
         return total;
     }
 
+    /// <summary>Первый свободный слот рюкзака (23..38) основного контейнера; -1 если места нет.
+    /// Чистая функция от сессии — static.</summary>
+    internal static int FreeBackpackSlot(WorldSession session)
+    {
+        var taken = new HashSet<byte>();
+        foreach (var i in session.Inventory)
+            if (i.Bag == InventorySlots.MainBag)
+                taken.Add(i.Slot);
+        for (var s = InventorySlots.BackpackStart; s < InventorySlots.BackpackEnd; s++)
+            if (!taken.Contains((byte)s))
+                return s;
+        return -1;
+    }
+
     /// <summary>
     /// Списывает <paramref name="count"/> предметов entry из сумок (квест-предметы при сдаче M6.10,
     /// реагенты крафта M11.3): целые предметы удаляет (DestroyObject + очистка слота), частичную стопку
     /// уменьшает (ITEM_FIELD_STACK_COUNT), с персистом.
     /// </summary>
-    public static async Task ConsumeAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
+    internal async Task ConsumeAsync(WorldSession session, uint itemEntry, uint count, CancellationToken ct)
     {
         var ownerGuid = session.InWorldGuid;
         var remaining = count;
@@ -56,26 +73,13 @@ public static class InventoryGrant
         }
     }
 
-    /// <summary>Первый свободный слот рюкзака (23..38) основного контейнера; -1 если места нет.</summary>
-    public static int FreeBackpackSlot(WorldSession session)
-    {
-        var taken = new HashSet<byte>();
-        foreach (var i in session.Inventory)
-            if (i.Bag == InventorySlots.MainBag)
-                taken.Add(i.Slot);
-        for (var s = InventorySlots.BackpackStart; s < InventorySlots.BackpackEnd; s++)
-            if (!taken.Contains((byte)s))
-                return s;
-        return -1;
-    }
-
     /// <summary>
     /// Кладёт <paramref name="qty"/> предметов в рюкзак (M6.6 + M7 #20): сперва ДОЛИВАЕТ существующие
     /// стопки того же предмета до лимита (`item_template.stackable`), затем остаток — в новые слоты
     /// (по лимиту на слот). Persist (character_items) + сессия + апдейты клиенту (stack/create/слот).
     /// Возвращает последний затронутый предмет или null, если ничего не поместилось (нет места).
     /// </summary>
-    public static async Task<InventoryItem?> TryGiveAsync(WorldSession session, uint itemEntry, uint qty, CancellationToken ct)
+    internal async Task<InventoryItem?> TryGiveAsync(WorldSession session, uint itemEntry, uint qty, CancellationToken ct)
     {
         if (qty == 0)
             qty = 1;
@@ -147,7 +151,7 @@ public static class InventoryGrant
         }
 
         if (last is not null)
-            await QuestHandlers.OnItemGainedAsync(session, itemEntry, ct); // M6.10: зачёт item-целей квестов
+            await questProgress.OnItemGainedAsync(session, itemEntry, ct); // M6.10: зачёт item-целей квестов
         return last;
     }
 }

@@ -110,7 +110,7 @@ public static class TrainerHandlers
     }
 
     /// <summary>
-    /// Хук госсипа (QuestHandlers.OnHello): если NPC — тренер, подходящий игроку, шлёт МЕНЮ госсипа с
+    /// Хук госсипа (<see cref="GossipService.OnHelloAsync"/>): если NPC — тренер, подходящий игроку, шлёт МЕНЮ госсипа с
     /// пунктом «обучиться» (SMSG_GOSSIP_MESSAGE). У тренеров стоит флаг GOSSIP — клиент ждёт меню и
     /// игнорирует прямой SMSG_TRAINER_LIST; список абилок шлём уже на выбор пункта (см.
     /// <see cref="OnGossipSelect"/>). Возвращает true, если меню отправлено (приоритет над вендором). M9.3.

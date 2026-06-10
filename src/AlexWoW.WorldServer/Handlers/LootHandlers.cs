@@ -7,81 +7,18 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Лут с трупа (M6.6): при смерти существа роллим лут (деньги + предметы из creature_loot_template),
-/// помечаем труп lootable (UNIT_DYNAMIC_FLAGS). Игрок открывает окно (CMSG_LOOT), забирает деньги
-/// (CMSG_LOOT_MONEY) и предметы (CMSG_AUTOSTORE_LOOT_ITEM), закрывает (CMSG_LOOT_RELEASE).
+/// Лут с трупа (M6.6, DI-модуль M7 S5 — бывший статик): игрок открывает окно (CMSG_LOOT), забирает деньги
+/// (CMSG_LOOT_MONEY) и предметы (CMSG_AUTOSTORE_LOOT_ITEM), закрывает (CMSG_LOOT_RELEASE). Ролл лута при
+/// смерти существа и lootable-пометка — <see cref="KillRewardService"/>.
 /// Тап/раздел добычи в группе — позже; сейчас обыскать может любой наблюдатель.
 /// </summary>
-public static class LootHandlers
+internal sealed class LootHandlers(InventoryGrantService inventoryGrant) : IOpcodeHandlerModule
 {
-    /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
-    private const uint DynFlagLootable = 0x1;
-
     private const byte LootTypeCorpse = 1;        // SMSG_LOOT_RESPONSE loot_method = CORPSE
     private const byte LootSlotAllow = 0;         // LootSlotType TYPE_ALLOW_LOOT
 
-    /// <summary>
-    /// Существо убито: роллим лут и помечаем труп lootable (для наблюдателей). Зовётся из путей
-    /// смерти существа (мили M6.3 / спелл M6.4). При недоступности БД/пустом луте — труп не lootable.
-    /// </summary>
-    internal static async Task OnCreatureKilledAsync(WorldSession session, WorldCreature creature, CancellationToken ct)
-    {
-        // M6.5: зачёт убийства в цели активных квестов.
-        await QuestHandlers.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
-
-        // M9.1: опыт за убийство (убийце).
-        if (session.Character is { } pc && pc.Level < World.LevelStore.MaxLevel)
-        {
-            var xp = session.World.Levels.KillXp(pc.Level, creature.Template.Level);
-            if (xp > 0)
-                await Progression.GiveXpAsync(session, xp, ct);
-        }
-
-        Database.Models.CreatureLootData? data;
-        try
-        {
-            data = await session.WorldDb.GetCreatureLootAsync(creature.Template.Entry, ct);
-        }
-        catch (Exception ex)
-        {
-            session.Logger.LogDebug("Лут {Entry}: БД мира недоступна ({Msg})", creature.Template.Entry, ex.Message);
-            return;
-        }
-        if (data is null)
-            return; // у существа нет лута
-
-        var gold = data.MaxGold > 0
-            ? (uint)Random.Shared.Next((int)data.MinGold, (int)data.MaxGold + 1)
-            : 0u;
-
-        var slots = new List<LootSlot>();
-        byte index = 0;
-        foreach (var d in data.Drops)
-        {
-            // M6.10: квест-предметы (Chance < 0) падают только держателю нужного квеста, по |chance|%.
-            if (d.Chance < 0 && !QuestHandlers.NeedsQuestItem(session, d.ItemId))
-                continue;
-            if (Random.Shared.NextDouble() * 100.0 >= Math.Abs(d.Chance))
-                continue; // не выпал
-            var lo = (uint)Math.Max(1, d.MinCount);
-            var hi = Math.Max(lo, d.MaxCount);
-            var count = lo == hi ? lo : (uint)Random.Shared.Next((int)lo, (int)hi + 1);
-            slots.Add(new LootSlot { Index = index++, ItemId = d.ItemId, Count = count, DisplayId = d.DisplayId });
-        }
-
-        if (gold == 0 && slots.Count == 0)
-            return; // ничего не выпало
-
-        creature.Loot = new CreatureLoot { Gold = gold, Slots = slots };
-        creature.Lootable = true;
-        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
-            CreatureUpdate.BuildDynamicFlagsUpdate(creature.Guid, DynFlagLootable), ct);
-        session.Logger.LogDebug("Лут трупа '{Name}': {Gold} меди, {Items} предметов",
-            creature.Template.Name, gold, slots.Count);
-    }
-
     [WorldOpcodeHandler(WorldOpcode.CmsgLoot)]
-    public static async Task OnLoot(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnLoot(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var guid = packet.Reader().UInt64();
         var creature = session.World.FindCreature(guid);
@@ -93,7 +30,7 @@ public static class LootHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLootMoney)]
-    public static async Task OnLootMoney(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnLootMoney(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var creature = session.World.FindCreature(session.LootGuid);
         if (creature?.Loot is not { } loot || loot.Gold == 0)
@@ -113,7 +50,7 @@ public static class LootHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgAutostoreLootItem)]
-    public static async Task OnAutostoreLootItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnAutostoreLootItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var slotIndex = packet.Reader().UInt8();
         var creature = session.World.FindCreature(session.LootGuid);
@@ -123,7 +60,7 @@ public static class LootHandlers
         if (slot is null)
             return;
 
-        var item = await InventoryGrant.TryGiveAsync(session, slot.ItemId, slot.Count, ct);
+        var item = await inventoryGrant.TryGiveAsync(session, slot.ItemId, slot.Count, ct);
         if (item is null)
             return; // рюкзак полон — оставляем предмет в трупе (клиент покажет «инвентарь полон»)
 
@@ -134,7 +71,7 @@ public static class LootHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgLootRelease)]
-    public static async Task OnLootRelease(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnLootRelease(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var guid = packet.Reader().UInt64();
         session.LootGuid = 0;
