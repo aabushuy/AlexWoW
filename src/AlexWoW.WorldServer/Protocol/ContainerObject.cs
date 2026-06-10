@@ -11,9 +11,12 @@ namespace AlexWoW.WorldServer.Protocol;
 /// </summary>
 public static class ContainerObject
 {
-    /// <summary>Блок CREATE_OBJECT2 для одной сумки: поля предмета + NUM_SLOTS + обнулённые слоты 0..numSlots-1.</summary>
+    /// <summary>Блок CREATE_OBJECT2 для одной сумки: поля предмета + NUM_SLOTS + слоты 0..numSlots-1
+    /// (обнулённые, затем заполненные guid'ами содержимого <paramref name="contents"/> — чтобы при релоге
+    /// сумка показывала свои предметы). M6.13.</summary>
     public static void WriteCreateBlock(ByteWriter w, ulong guid, uint entry, ulong owner,
-        uint stackCount, uint maxDurability, uint numSlots)
+        uint stackCount, uint maxDurability, uint numSlots,
+        IReadOnlyList<(int Slot, ulong Guid)>? contents = null)
     {
         w.UInt8(UpdateType.CreateObject2);
         PackedGuid.Write(w, guid);
@@ -36,6 +39,10 @@ public static class ContainerObject
         m.SetUInt32(UpdateField.ContainerNumSlots, numSlots);
         for (var i = 0; i < numSlots; i++)
             m.SetUInt64(UpdateField.ContainerSlotGuid(i), 0UL); // слоты инициализируем пустыми
+        if (contents is not null)
+            foreach (var (slot, itemGuid) in contents)
+                if (slot >= 0 && slot < numSlots)
+                    m.SetUInt64(UpdateField.ContainerSlotGuid(slot), itemGuid); // заполнить содержимым
         m.WriteTo(w);
     }
 

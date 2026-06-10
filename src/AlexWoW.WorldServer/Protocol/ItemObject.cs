@@ -30,10 +30,27 @@ public static class ItemObject
         {
             var info = bagInfo is not null && bagInfo.TryGetValue(item.ItemEntry, out var bi) ? bi : default;
             if (info.IsContainer)
+            {
+                // Содержимое НАДЕТОЙ сумки (предметы с Bag == слот этой сумки 19..22) — чтобы при релоге
+                // её слоты сразу показывали предметы. Сумка в рюкзаке (Slot 23..38) содержимого не имеет.
+                List<(int Slot, ulong Guid)>? contents = null;
+                if (InventorySlots.IsBagSlot(item.Slot))
+                    contents = items.Where(i => i.Bag == item.Slot)
+                        .Select(i => ((int)i.Slot, ItemGuid(i.ItemGuid))).ToList();
                 ContainerObject.WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid,
-                    item.StackCount, info.MaxDurability, info.ContainerSlots);
+                    item.StackCount, info.MaxDurability, info.ContainerSlots, contents);
+            }
             else
-                WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid, item.StackCount, info.MaxDurability);
+            {
+                // Предмет внутри надетой сумки → ITEM_FIELD_CONTAINED = guid сумки (иначе guid игрока).
+                var contained = ownerGuid;
+                if (InventorySlots.IsBagSlot(item.Bag))
+                {
+                    var bagItem = items.FirstOrDefault(i => i.Bag == InventorySlots.MainBag && i.Slot == item.Bag);
+                    if (bagItem is not null) contained = ItemGuid(bagItem.ItemGuid);
+                }
+                WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid, item.StackCount, info.MaxDurability, contained);
+            }
         }
         return w.ToArray();
     }
@@ -51,8 +68,22 @@ public static class ItemObject
         return w.ToArray();
     }
 
+    /// <summary>VALUES-апдейт контейнера предмета (ITEM_FIELD_CONTAINED = guid сумки или игрока). M6.13.
+    /// Держим синхронно с CONTAINER_FIELD_SLOT_x сумки при перемещении предмета в/из сумки.</summary>
+    public static byte[] BuildContainedUpdate(ulong itemGuid, ulong containerGuid)
+    {
+        var m = new UpdateMask();
+        m.SetUInt64(UpdateField.ItemContained, containerGuid);
+        var w = new ByteWriter(32);
+        w.UInt32(1);
+        w.UInt8(UpdateType.Values);
+        PackedGuid.Write(w, itemGuid);
+        m.WriteTo(w);
+        return w.ToArray();
+    }
+
     private static void WriteCreateBlock(ByteWriter w, ulong itemGuid, uint entry, ulong owner,
-        uint stackCount, uint maxDurability)
+        uint stackCount, uint maxDurability, ulong contained)
     {
         w.UInt8(UpdateType.CreateObject2);
         PackedGuid.Write(w, itemGuid);
@@ -68,7 +99,7 @@ public static class ItemObject
         m.SetUInt32(UpdateField.ObjectEntry, entry);
         m.SetFloat(UpdateField.ObjectScaleX, 1.0f);
         m.SetUInt64(UpdateField.ItemOwner, owner);
-        m.SetUInt64(UpdateField.ItemContained, owner); // рюкзак/экипировка — контейнер = сам игрок
+        m.SetUInt64(UpdateField.ItemContained, contained); // рюкзак/экипировка = игрок; внутри сумки = guid сумки
         m.SetUInt32(UpdateField.ItemStackCount, stackCount == 0 ? 1u : stackCount);
         m.SetUInt32(UpdateField.ItemDurability, maxDurability);
         m.SetUInt32(UpdateField.ItemMaxDurability, maxDurability);
