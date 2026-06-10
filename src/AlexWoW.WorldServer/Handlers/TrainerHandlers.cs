@@ -287,6 +287,14 @@ public static class TrainerHandlers
             || (s.ReqAbility2 != 0 && !session.KnownSpells.Contains(s.ReqAbility2))
             || (s.ReqAbility3 != 0 && !session.KnownSpells.Contains(s.ReqAbility3)))
             return StateRed;
+        // M11: гейт по навыку профессии — рецепт недоступен, если навык игрока ниже требуемого
+        // (reqskill/reqskillvalue из npc_trainer). Теперь у нас есть навыки (M11.1).
+        if (s.ReqSkill != 0)
+        {
+            var sk = session.SkillBook.Get((ushort)s.ReqSkill);
+            if (sk is null || sk.Value < s.ReqSkillValue)
+                return StateRed;
+        }
         return StateGreen;
     }
 

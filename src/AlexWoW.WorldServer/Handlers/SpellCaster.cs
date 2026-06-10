@@ -39,6 +39,8 @@ public static class SpellCaster
         if ((targetFlags & SpellPackets.TargetFlagUnit) != 0)
             targetGuid = r.PackedGuid();
 
+        session.Logger.LogInformation("CASTRECV '{User}': spell={Spell}", session.Account, spellId); // диагностика M11 #2 (временно)
+
         // M6.12/M7 #21: переключатели (стойки/ауры/аспекты) — мгновенная перманентная аура, без маны/цели/КД.
         if (await SpellToggles.TryToggleAsync(session, spellId, castCount, ct))
             return;

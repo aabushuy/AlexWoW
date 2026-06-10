@@ -256,10 +256,38 @@ public static class WorldEntryHandlers
         foreach (var s in await session.CharState.GetLearnedSpellsAsync(character.Guid, ct))
             known.Add(s);
 
-        var w = new ByteWriter(8 + known.Count * 6)
+        // M11 (#3): среди известных оставить в КНИГЕ только высший тир каждой профессии (низшие
+        // superceded — иначе показывались бы «Горное дело (ученик)» и «(подмастерье)» вместе). Низшие
+        // остаются в KnownSpells (для каста/валидации не важно), но в книгу не шлём. Один батч-запрос.
+        session.ProfessionRankSpell.Clear();
+        var hiddenLowerTiers = new HashSet<uint>();
+        try
+        {
+            foreach (var tpl in await session.WorldDb.GetSpellsAsync(known.ToList(), ct))
+            {
+                if (World.Professions.SkillGrantedBy(tpl) is not { } g)
+                    continue;
+                if (session.ProfessionRankSpell.TryGetValue(g.SkillId, out var cur))
+                {
+                    var lower = g.Max > cur.Max ? cur.Spell : tpl.Id;
+                    hiddenLowerTiers.Add(lower);
+                    if (g.Max > cur.Max)
+                        session.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
+                }
+                else
+                    session.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
+            }
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug("INITIAL_SPELLS '{User}': дедуп профессий пропущен ({Msg})", session.Account, ex.Message);
+        }
+
+        var book = known.Where(s => !hiddenLowerTiers.Contains(s)).ToList();
+        var w = new ByteWriter(8 + book.Count * 6)
             .UInt8(0)
-            .UInt16((ushort)known.Count);
-        foreach (var spell in known)
+            .UInt16((ushort)book.Count);
+        foreach (var spell in book)
             w.UInt32(spell).UInt16(0); // 3.3.5: spellId — u32 + u16
         w.UInt16(0); // нет кулдаунов
         await session.SendAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
