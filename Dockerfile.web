@@ -1,0 +1,8 @@
+# Runtime-only образ веб-панели (AlexWoW.Web). Сборка ЛОКАЛЬНАЯ: копируем готовые
+# бинарники из publish/web. Нужен ASP.NET Core рантайм (не базовый dotnet/runtime).
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY publish/web/ ./
+# Kestrel слушает 8080 внутри контейнера (дефолт ASP.NET Core); наружу проксирует Caddy.
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "AlexWoW.Web.dll"]

@@ -67,8 +67,30 @@ services:
     networks:
       - alexwow
 
+  alexwow-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: alexwow-web
+    restart: unless-stopped
+    environment:
+      # Та же БД alexwow_auth, что и у игровых серверов (общие аккаунты/персонажи).
+      Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+    ports:
+      - "8090:8080"   # HTTP; наружу (alexwow.home.srv) проксирует Caddy на 192.168.2.210:8090
+    volumes:
+      # Ключи Data Protection (cookie/antiforgery) в named-volume — переживают пересборку
+      # контейнера, иначе каждый деплой разлогинивал бы всех.
+      - alexwow-web-keys:/root/.aspnet/DataProtection-Keys
+    depends_on:
+      alexwow-mysql:
+        condition: service_healthy
+    networks:
+      - alexwow
+
 volumes:
   alexwow-mysql-data:
+  alexwow-web-keys:
 
 networks:
   alexwow:

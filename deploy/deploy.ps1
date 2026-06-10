@@ -26,14 +26,17 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot   = Split-Path -Parent $PSScriptRoot
 $AuthProj   = Join-Path $RepoRoot 'src/AlexWoW.AuthServer/AlexWoW.AuthServer.csproj'
 $WorldProj  = Join-Path $RepoRoot 'src/AlexWoW.WorldServer/AlexWoW.WorldServer.csproj'
+$WebProj    = Join-Path $RepoRoot 'src/AlexWoW.Web/AlexWoW.Web.csproj'
 $PublishDir = Join-Path $RepoRoot 'publish'
 
-Write-Host '==> 1/4 Publish AuthServer + WorldServer (Release)...' -ForegroundColor Cyan
+Write-Host '==> 1/4 Publish AuthServer + WorldServer + Web (Release)...' -ForegroundColor Cyan
 if (Test-Path $PublishDir) { Remove-Item $PublishDir -Recurse -Force }
 dotnet publish $AuthProj  -c Release -o (Join-Path $PublishDir 'auth')
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish (auth) failed.' }
 dotnet publish $WorldProj -c Release -o (Join-Path $PublishDir 'world')
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish (world) failed.' }
+dotnet publish $WebProj   -c Release -o (Join-Path $PublishDir 'web')
+if ($LASTEXITCODE -ne 0) { throw 'dotnet publish (web) failed.' }
 
 Write-Host '==> 2/4 Preparing remote directory...' -ForegroundColor Cyan
 # Wipe the dir fully (MySQL data lives in a named volume, not here).
@@ -45,7 +48,7 @@ Write-Host '==> 3/4 Copying binaries and configs...' -ForegroundColor Cyan
 # from the repo root (no colon).
 Push-Location $RepoRoot
 try {
-    scp -r publish Dockerfile.auth Dockerfile.world docker-compose.yml "${RemoteHost}:${RemoteDir}/"
+    scp -r publish Dockerfile.auth Dockerfile.world Dockerfile.web docker-compose.yml "${RemoteHost}:${RemoteDir}/"
     if ($LASTEXITCODE -ne 0) { throw 'scp failed.' }
 }
 finally {
