@@ -23,7 +23,7 @@ internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant
         if (!Professions.Nodes.TryGetValue(entry, out var node))
             return;
 
-        var sk = session.SkillBook.Get(node.SkillId);
+        var sk = session.Progression.SkillBook.Get(node.SkillId);
         if (sk is null || sk.Value < node.ReqSkill)
         {
             await chat.SendSystemAsync(session,
@@ -45,7 +45,7 @@ internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant
             await skills.AddValueAsync(session, node.SkillId, 1, ct);
 
         // Истощить ноду: dev-ноду снять из реестра, иначе — DESTROY у клиента (разовый сбор).
-        var slot = session.DevGos.FirstOrDefault(kv => kv.Value == guid).Key;
+        var slot = session.Visibility.DevGos.FirstOrDefault(kv => kv.Value == guid).Key;
         if (slot is not null)
             await session.World.DespawnDevGoAsync(session, slot, ct);
         else

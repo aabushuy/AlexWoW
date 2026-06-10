@@ -31,16 +31,16 @@ internal sealed class PlayerMeleeService(
     /// </summary>
     internal async Task StartAttackAsync(WorldSession session, ulong victimGuid, CancellationToken ct)
     {
-        if (session.IsDead)
+        if (session.Combat.IsDead)
             return; // мёртвый не атакует (M6.7)
 
         var creature = session.World.FindCreature(victimGuid);
         if (creature is null || !creature.IsAlive)
             return; // нечего атаковать (нет сущности/уже труп)
 
-        session.CombatTargetGuid = victimGuid;
-        session.NextMeleeSwingMs = Environment.TickCount64; // первый свинг — на ближайшем тике
-        session.MeleeNotInRangeNotified = false;
+        session.Combat.CombatTargetGuid = victimGuid;
+        session.Combat.NextMeleeSwingMs = Environment.TickCount64; // первый свинг — на ближайшем тике
+        session.Combat.MeleeNotInRangeNotified = false;
 
         var start = CombatPackets.BuildAttackStart((ulong)session.InWorldGuid, victimGuid);
         await session.SendAsync(WorldOpcode.SmsgAttackStart, start, ct);
@@ -57,11 +57,11 @@ internal sealed class PlayerMeleeService(
     /// </summary>
     internal async Task TickMeleeAsync(WorldSession session, long now, CancellationToken ct)
     {
-        var targetGuid = session.CombatTargetGuid;
+        var targetGuid = session.Combat.CombatTargetGuid;
         if (targetGuid == 0 || session.InWorldGuid == 0)
             return;
 
-        if (session.IsDead) // M6.7: мёртвый не свингает
+        if (session.Combat.IsDead) // M6.7: мёртвый не свингает
         {
             await StopAttackAsync(session, targetGuid, ct);
             return;
@@ -74,23 +74,23 @@ internal sealed class PlayerMeleeService(
             return;
         }
 
-        if (now < session.NextMeleeSwingMs)
+        if (now < session.Combat.NextMeleeSwingMs)
             return;
 
         // Мили-радиус: пока цель далеко — свинг «держим» (таймер не двигаем), клиенту один раз
         // шлём «слишком далеко». Подойдёт в радиус — удар пройдёт на ближайшем тике.
         if (!InMeleeRange(session, creature))
         {
-            if (!session.MeleeNotInRangeNotified)
+            if (!session.Combat.MeleeNotInRangeNotified)
             {
                 await session.SendAsync(WorldOpcode.SmsgAttackSwingNotInRange, [], ct);
-                session.MeleeNotInRangeNotified = true;
+                session.Combat.MeleeNotInRangeNotified = true;
             }
             return;
         }
-        session.MeleeNotInRangeNotified = false;
-        session.NextMeleeSwingMs = now + SwingIntervalMs;
-        session.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
+        session.Combat.MeleeNotInRangeNotified = false;
+        session.Combat.NextMeleeSwingMs = now + SwingIntervalMs;
+        session.Combat.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
@@ -118,7 +118,7 @@ internal sealed class PlayerMeleeService(
     /// <summary>Прекращает авто-атаку игрока: сброс цели + SMSG_ATTACKSTOP.</summary>
     internal async Task StopAttackAsync(WorldSession session, ulong enemyGuid, CancellationToken ct)
     {
-        session.CombatTargetGuid = 0;
+        session.Combat.CombatTargetGuid = 0;
         await session.SendAsync(WorldOpcode.SmsgAttackStop,
             CombatPackets.BuildAttackStop((ulong)session.InWorldGuid, enemyGuid), ct);
     }

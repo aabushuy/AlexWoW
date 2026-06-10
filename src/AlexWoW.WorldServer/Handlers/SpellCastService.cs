@@ -47,7 +47,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // M10.3: уже идёт каст-тайм спелл → новый каст нельзя (как на оффе: кнопка блокируется, текущий
         // каст сбивается только движением/прыжком). Без этого в окне «GCD истёк, но каст ещё идёт»
         // (каст > 1.5с) клиент перезапускал каст по повторному нажатию.
-        if (session.CastingSpellId != 0)
+        if (session.Cast.CastingSpellId != 0)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultSpellInProgress), ct);
@@ -69,7 +69,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         var cost = EffectivePowerCost(session, info);
 
         // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
-        if (session.SpellCooldowns.TryGetValue(spellId, out var readyAt) && now < readyAt)
+        if (session.Cast.SpellCooldowns.TryGetValue(spellId, out var readyAt) && now < readyAt)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNotReady), ct);
@@ -79,7 +79,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // GCD (M10.3): глобальный кулдаун от предыдущего каста (StartRecoveryTime, обычно 1500мс). Клиент
         // его предсказывает сам, поэтому это анти-спам; толеранс — против скью клиент/сервер (не режем
         // легитимный каст у границы GCD, только явный спам).
-        if (info.GcdMs > 0 && session.GcdEndMs - now > GcdToleranceMs)
+        if (info.GcdMs > 0 && session.Cast.GcdEndMs - now > GcdToleranceMs)
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultNotReady), ct);
@@ -105,7 +105,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
 
         // Запускаем GCD от этого каста (для последующих).
         if (info.GcdMs > 0)
-            session.GcdEndMs = now + info.GcdMs;
+            session.Cast.GcdEndMs = now + info.GcdMs;
 
         if (info.CastMs <= 0)
         {
@@ -116,10 +116,10 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // Каст с временем: каст-бар у клиента (timer). Завершение — ТОЧНО по времени каста через
         // Task.Delay (не грубый 250-мс тик): иначе GO опаздывает на 0–250 мс после заполнения полоски,
         // клиент не дожидается, шлёт CANCEL_CAST → рассинхрон, анимация каста залипает.
-        session.CastingSpellId = spellId;
-        session.CastStartX = session.PosX; // для прерывания при сдвиге
-        session.CastStartY = session.PosY;
-        var gen = ++session.CastGeneration;
+        session.Cast.CastingSpellId = spellId;
+        session.Cast.CastStartX = session.PosX; // для прерывания при сдвиге
+        session.Cast.CastStartY = session.PosY;
+        var gen = ++session.Cast.CastGeneration;
         await session.SendAsync(WorldOpcode.SmsgSpellStart,
             SpellPackets.BuildSpellStart((ulong)session.InWorldGuid, spellId, castCount, (uint)info.CastMs, targetGuid), ct);
         session.Logger.LogDebug("CAST start '{User}': spell={Spell} target={Target} ({Ms}мс)",
@@ -144,21 +144,21 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return info.ManaCost; // ярость/энергия — флэт
         if (info.ManaCost > 0)
             return info.ManaCost;
-        if (info.ManaCostPct > 0 && session.MaxMana > 0)
-            return Math.Max(1u, info.ManaCostPct * session.MaxMana / 100);
+        if (info.ManaCostPct > 0 && session.Cast.MaxMana > 0)
+            return Math.Max(1u, info.ManaCostPct * session.Cast.MaxMana / 100);
         return 0;
     }
 
     /// <summary>Текущий запас ресурса кастера по типу (мана/ярость/энергия). M10.4a.</summary>
     private static uint CurrentPower(WorldSession session, byte powerType) => powerType switch
     {
-        PowerRage => session.Rage,
-        PowerEnergy => session.Energy,
-        _ => session.Mana,
+        PowerRage => session.Combat.Rage,
+        PowerEnergy => session.Combat.Energy,
+        _ => session.Cast.Mana,
     };
 
     /// <summary>Клиент отменил каст (Esc) — снимаем pending, эффект не применяем.</summary>
-    internal void CancelCast(WorldSession session) => session.CastingSpellId = 0;
+    internal void CancelCast(WorldSession session) => session.Cast.CastingSpellId = 0;
 
     /// <summary>
     /// Прерывает текущий каст при сдвиге игрока (вызывается из MovementHandlers). Клиент на движении
@@ -167,14 +167,14 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     /// </summary>
     internal async Task InterruptOnMoveAsync(WorldSession session, CancellationToken ct)
     {
-        var spellId = session.CastingSpellId;
+        var spellId = session.Cast.CastingSpellId;
         if (spellId == 0)
             return;
-        var dx = session.PosX - session.CastStartX;
-        var dy = session.PosY - session.CastStartY;
+        var dx = session.PosX - session.Cast.CastStartX;
+        var dy = session.PosY - session.Cast.CastStartY;
         if (dx * dx + dy * dy < InterruptMoveSq)
             return; // только поворот/смена фейсинга — не прерываем
-        session.CastingSpellId = 0;
+        session.Cast.CastingSpellId = 0;
         await session.SendAsync(WorldOpcode.SmsgSpellFailure,
             SpellPackets.BuildSpellFailure((ulong)session.InWorldGuid, spellId, SpellFailedInterrupted), ct);
         session.Logger.LogDebug("CAST interrupt (move) '{User}': spell={Spell}", session.Account, spellId);

@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 
@@ -9,7 +10,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// CMSG_GOSSIP_SELECT_OPTION / CMSG_NPC_TEXT_QUERY / CMSG_TRAINER_BUY_SPELL и делегирование в
 /// <see cref="TrainerCatalogService"/> (списки/гейтинг/покупка) и <see cref="TalentHandlers"/> (сброс талантов).
 /// </summary>
-internal sealed class TrainerHandlers(TrainerCatalogService catalog, TalentHandlers talents) : IOpcodeHandlerModule
+internal sealed class TrainerHandlers(
+    TrainerCatalogService catalog,
+    TalentHandlers talents,
+    IWorldRepository worldDb) : IOpcodeHandlerModule
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
@@ -52,7 +56,7 @@ internal sealed class TrainerHandlers(TrainerCatalogService catalog, TalentHandl
         var greeting = "Чем я могу помочь?";
         try
         {
-            var trainer = await session.WorldDb.GetTrainerAsync(CreatureEntry(npcGuid), ct);
+            var trainer = await worldDb.GetTrainerAsync(CreatureEntry(npcGuid), ct);
             if (trainer is { Greeting.Length: > 0 })
                 greeting = trainer.Greeting;
         }

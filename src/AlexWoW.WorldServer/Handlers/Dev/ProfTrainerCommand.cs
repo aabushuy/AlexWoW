@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -7,7 +8,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// <c>.proftrainer off</c> — снять. Реюз каркаса dev-сущностей (D1); резолв entry — по подписи существа
 /// (в дампе нет skill_line_ability), берём самого полного — Grand Master. D2.
 /// </summary>
-internal sealed class ProfTrainerCommand : IDevCommand
+internal sealed class ProfTrainerCommand(IWorldRepository worldDb) : IDevCommand
 {
     /// <summary>Имена профессий → ключевое слово в SubName тренера.</summary>
     private static readonly Dictionary<string, string> ProfKeyword = new()
@@ -41,7 +42,7 @@ internal sealed class ProfTrainerCommand : IDevCommand
         }
 
         uint? entry;
-        try { entry = await session.WorldDb.GetProfessionTrainerEntryAsync(keyword, ct); }
+        try { entry = await worldDb.GetProfessionTrainerEntryAsync(keyword, ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug("PROFTRAINER cmd: БД мира недоступна ({Msg})", ex.Message);

@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Navigation;
 using AlexWoW.WorldServer.Net;
@@ -12,7 +13,7 @@ namespace AlexWoW.WorldServer.World;
 /// по навмешу, респавн, тренировочный манекен дев-команды. Реестр/рассылку берёт из
 /// <see cref="WorldState"/>; навмеш — для путей по земле.
 /// </summary>
-public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger logger)
+public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRepository worldDb, ILogger logger)
 {
     /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
     private int _splineId;
@@ -107,7 +108,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         foreach (var observer in world.ObserversOf(dummy).ToList())
         {
             await observer.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
-            observer.Session.VisibleNpcs.TryRemove(dummy.Guid, out _);
+            observer.Session.Visibility.VisibleNpcs.TryRemove(dummy.Guid, out _);
         }
 
         // Переставить (X/Y/Z мутабельны; Home — init, и не нужен: манекен пассивен, не евейдит/респавнит)
@@ -121,7 +122,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         dummy.Loot = null;
 
         // Показать вызвавшему на новом месте.
-        session.VisibleNpcs[dummy.Guid] = dummy;
+        session.Visibility.VisibleNpcs[dummy.Guid] = dummy;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildCreateObject(dummy, (uint)Environment.TickCount), ct);
     }
@@ -137,7 +138,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     public async Task<bool> SummonDevNpcAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
     {
         CreatureTemplateData? row;
-        try { row = await session.WorldDb.GetCreatureTemplateAsync(entry, ct); }
+        try { row = await worldDb.GetCreatureTemplateAsync(entry, ct); }
         catch (Exception ex)
         {
             logger.LogDebug("DEV summon entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
@@ -172,8 +173,8 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
             MaxHealth = hp, Health = hp,
         });
 
-        session.VisibleNpcs[guid] = creature;
-        session.DevNpcs[slot] = guid;
+        session.Visibility.VisibleNpcs[guid] = creature;
+        session.Visibility.DevNpcs[slot] = guid;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
         logger.LogDebug("DEV summon '{User}': slot={Slot} entry={Entry} guid={Guid}",
@@ -185,11 +186,11 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     /// Возвращает true, если что-то было снято. D1.</summary>
     public async Task<bool> DespawnDevNpcAsync(WorldSession session, string slot, CancellationToken ct)
     {
-        if (!session.DevNpcs.Remove(slot, out var guid))
+        if (!session.Visibility.DevNpcs.Remove(slot, out var guid))
             return false;
         await session.SendAsync(WorldOpcode.SmsgDestroyObject,
             new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
-        session.VisibleNpcs.TryRemove(guid, out _);
+        session.Visibility.VisibleNpcs.TryRemove(guid, out _);
         world.RemoveCreature(guid);
         return true;
     }
@@ -203,7 +204,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     public async Task<bool> SummonDevGoAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
     {
         Database.Models.GameObjectTemplateData? t;
-        try { t = await session.WorldDb.GetGameObjectTemplateAsync(entry, ct); }
+        try { t = await worldDb.GetGameObjectTemplateAsync(entry, ct); }
         catch (Exception ex)
         {
             logger.LogDebug("DEV craft entry={Entry}: БД мира недоступна ({Msg})", entry, ex.Message);
@@ -225,7 +226,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
         var template = new GoTemplate(t.Entry, t.Type, t.DisplayId, t.Name, 0, 0, t.Size <= 0 ? 1f : t.Size);
         var go = new GoSpawn(guid, template, x, y, z, o, 0f, 0f, rz, rw);
 
-        session.DevGos[slot] = guid;
+        session.Visibility.DevGos[slot] = guid;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, GameObjectUpdate.BuildCreateObject(go), ct);
         logger.LogDebug("DEV craft '{User}': slot={Slot} entry={Entry} guid={Guid}",
             session.Account, slot, entry, guid);
@@ -235,7 +236,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     /// <summary>Снимает dev-GO из слота <paramref name="slot"/> (DESTROY вызвавшему). true, если что-то снято. D3.</summary>
     public async Task<bool> DespawnDevGoAsync(WorldSession session, string slot, CancellationToken ct)
     {
-        if (!session.DevGos.Remove(slot, out var guid))
+        if (!session.Visibility.DevGos.Remove(slot, out var guid))
             return false;
         await session.SendAsync(WorldOpcode.SmsgDestroyObject,
             new ByteWriter(9).UInt64(guid).UInt8(0).ToArray(), ct);
@@ -245,7 +246,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     /// <summary>Снимает все dev-станки игрока (<c>.craft off</c>). D3.</summary>
     public async Task DevCleanGosAsync(WorldSession session, CancellationToken ct)
     {
-        foreach (var slot in session.DevGos.Keys.ToList())
+        foreach (var slot in session.Visibility.DevGos.Keys.ToList())
             await DespawnDevGoAsync(session, slot, ct);
     }
 
@@ -253,7 +254,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, ILogger 
     /// не затронут. D1/D3.</summary>
     public async Task DevCleanAsync(WorldSession session, CancellationToken ct)
     {
-        foreach (var slot in session.DevNpcs.Keys.ToList())
+        foreach (var slot in session.Visibility.DevNpcs.Keys.ToList())
             await DespawnDevNpcAsync(session, slot, ct);
         await DevCleanGosAsync(session, ct);
     }

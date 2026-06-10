@@ -75,18 +75,18 @@ internal sealed class LoginSequenceService(
         // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
         if (!await items.HasItemsAsync(character.Guid, ct))
             await startingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
-        session.Inventory.Clear();
-        session.Inventory.AddRange(await items.GetItemsAsync(character.Guid, ct));
-        session.Money = character.Money; // M6.2: деньги для торговли
+        session.Inv.Inventory.Clear();
+        session.Inv.Inventory.AddRange(await items.GetItemsAsync(character.Guid, ct));
+        session.Inv.Money = character.Money; // M6.2: деньги для торговли
 
         // M6.13: class/ContainerSlots/MaxDurability по entry'ям инвентаря (батч, кэш на сессии) — чтобы
         // предметы-сумки (class=1) создавались как TYPEID_CONTAINER (иначе клиент крашится, баг #31).
-        session.ItemBagInfo.Clear();
+        session.Inv.ItemBagInfo.Clear();
         try
         {
-            var entries = session.Inventory.Select(i => i.ItemEntry).Distinct().ToArray();
+            var entries = session.Inv.Inventory.Select(i => i.ItemEntry).Distinct().ToArray();
             foreach (var (entry, info) in await worldDb.GetItemBagInfoAsync(entries, ct))
-                session.ItemBagInfo[entry] = info;
+                session.Inv.ItemBagInfo[entry] = info;
         }
         catch (Exception ex)
         {
@@ -96,26 +96,26 @@ internal sealed class LoginSequenceService(
         // M9.2: статы/HP/мана по классу+уровню (player_levelstats); фолбэк — флэт. Полное HP при входе.
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(character.Race, character.Class, character.Level);
-        session.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(character.Level);
-        session.Health = session.MaxHealth;
-        session.IsDead = false;
-        session.LastCombatMs = 0;
+        session.Combat.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(character.Level);
+        session.Combat.Health = session.Combat.MaxHealth;
+        session.Combat.IsDead = false;
+        session.Combat.LastCombatMs = 0;
 
         // M6.4: мана для каста (полный пул при входе). MaxMana=0 у rage/energy-классов — расход не применяется.
-        session.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(character.Class, character.Level);
-        session.Mana = session.MaxMana;
-        session.Xp = character.Xp; // M9.1: текущий опыт на уровне
-        session.LastSpellCastMs = 0;
-        session.LastManaRegenMs = Environment.TickCount64;
-        session.SpellCooldowns.Clear();
+        session.Cast.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(character.Class, character.Level);
+        session.Cast.Mana = session.Cast.MaxMana;
+        session.Progression.Xp = character.Xp; // M9.1: текущий опыт на уровне
+        session.Cast.LastSpellCastMs = 0;
+        session.Cast.LastManaRegenMs = Environment.TickCount64;
+        session.Cast.SpellCooldowns.Clear();
 
         // M6.12: боевые ресурсы. Воин — ярость 0 (копится в бою); разбойник — энергия полная (регенит).
-        session.Rage = 0;
-        session.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
-        session.LastResourceTickMs = Environment.TickCount64;
-        if (session.Inventory.Count > 0)
+        session.Combat.Rage = 0;
+        session.Combat.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
+        session.Combat.LastResourceTickMs = Environment.TickCount64;
+        if (session.Inv.Inventory.Count > 0)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-                ItemObject.BuildItemsCreate(session.Inventory, character.Guid, session.ItemBagInfo), ct);
+                ItemObject.BuildItemsCreate(session.Inv.Inventory, character.Guid, session.Inv.ItemBagInfo), ct);
 
         // M6.10: восстановить состояние квестов ДО спавна — поля журнала кладутся в начальный спавн
         // (иначе досылка отдельным апдейтом = «новое взятие» со звуком при релоге).
@@ -126,7 +126,7 @@ internal sealed class LoginSequenceService(
 
         var spawn = PlayerSpawn.BuildCreateObject(character,
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
-            session.Inventory, session.QuestSlots, stats, session.SkillBook.Skills);
+            session.Inv.Inventory, session.Quest.QuestSlots, stats, session.Progression.SkillBook.Skills);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
@@ -134,9 +134,9 @@ internal sealed class LoginSequenceService(
 
         // M9.7: загрузить изученные таланты (для панели + расчёта потраченных очков). Ранг-спеллы уже
         // в KnownSpells (character_spell). M9.6: свободные очки = MaxPoints − потрачено.
-        session.LearnedTalents.Clear();
+        session.Progression.LearnedTalents.Clear();
         foreach (var (tid, rank) in await charState.GetTalentsAsync(character.Guid, ct))
-            session.LearnedTalents[tid] = rank;
+            session.Progression.LearnedTalents[tid] = rank;
         talents.RecomputePoints(session, character.Class, character.Level);
 
         // M9.1: XP-бар — текущий опыт + порог следующего уровня. M9.6: очки талантов в то же поле-апдейт.
@@ -144,9 +144,9 @@ internal sealed class LoginSequenceService(
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
-                m.SetUInt32(UpdateField.PlayerXp, session.Xp);
+                m.SetUInt32(UpdateField.PlayerXp, session.Progression.Xp);
                 m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(character.Level));
-                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.TalentPoints);
+                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.Progression.TalentPoints);
             }), ct);
 
         // M9.6: состояние талантов (открывает панель; деревья клиент рисует сам из своей DBC).
@@ -199,14 +199,14 @@ internal sealed class LoginSequenceService(
     /// SMSG_INITIAL_SPELLS (M9.3): книга заклинаний при входе. Набор = языковые спеллы расы ∪ стартовые
     /// абилки класса (playercreateinfo_spell) ∪ изученное у тренера (character_spell). Хардкод маг-спеллов
     /// из M6.4 (Fireball/Frostbolt/…) выдаём ТОЛЬКО магу (класс 8) — у остальных классов их в книге быть
-    /// не должно. Заполняет session.KnownSpells (для HasSpell-проверок тренера). БД мира недоступна → фолбэк
+    /// не должно. Заполняет session.Progression.KnownSpells (для HasSpell-проверок тренера). БД мира недоступна → фолбэк
     /// на языковые + (магу) боевые.
     /// </summary>
     private const byte ClassMage = 8;
 
     private async Task SendInitialSpellsAsync(WorldSession session, Character character, CancellationToken ct)
     {
-        var known = session.KnownSpells;
+        var known = session.Progression.KnownSpells;
         known.Clear();
         foreach (var s in LanguageSpells.ForRace(character.Race))
             known.Add((uint)s);
@@ -236,7 +236,7 @@ internal sealed class LoginSequenceService(
         //    окна (2018) добавляем в книгу/персист, если не выучен (самолечение персонажей до фикса #2);
         //  • тир-дедуп: показываем только высший тир каждой профессии (низшие superceded).
         // Спрятанные остаются в KnownSpells (для каста/валидации), но в книгу не шлём.
-        session.ProfessionRankSpell.Clear();
+        session.Progression.ProfessionRankSpell.Clear();
         var hiddenSpells = new HashSet<uint>();
         try
         {
@@ -254,14 +254,14 @@ internal sealed class LoginSequenceService(
             {
                 if (hiddenSpells.Contains(tpl.Id) || World.Professions.SkillGrantedBy(tpl) is not { } g)
                     continue;
-                if (session.ProfessionRankSpell.TryGetValue(g.SkillId, out var cur))
+                if (session.Progression.ProfessionRankSpell.TryGetValue(g.SkillId, out var cur))
                 {
                     hiddenSpells.Add(g.Max > cur.Max ? cur.Spell : tpl.Id);
                     if (g.Max > cur.Max)
-                        session.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
+                        session.Progression.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
                 }
                 else
-                    session.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
+                    session.Progression.ProfessionRankSpell[g.SkillId] = (tpl.Id, g.Max);
             }
         }
         catch (Exception ex)

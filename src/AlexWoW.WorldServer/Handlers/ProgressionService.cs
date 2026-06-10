@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -12,7 +13,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (player_xp_for_level), <c>SMSG_LEVELUP_INFO</c> (сплеш «ding») + апдейт полей (уровень/HP) + персист.
 /// Статы пока флэт по уровню (точные по классу — M9.2).
 /// </summary>
-internal sealed class ProgressionService(TalentHandlers talents)
+internal sealed class ProgressionService(
+    TalentHandlers talents,
+    ICharacterRepository characters,
+    IWorldRepository worldDb)
 {
     /// <summary>
     /// Начисляет <paramref name="amount"/> опыта игроку: копит, повышает уровень (с переносом остатка),
@@ -27,28 +31,28 @@ internal sealed class ProgressionService(TalentHandlers talents)
         if (!session.World.Levels.Available)
             return;
 
-        session.Xp += amount;
+        session.Progression.Xp += amount;
 
         uint next;
         while (c.Level < LevelStore.MaxLevel
             && (next = session.World.Levels.XpToNext(c.Level)) > 0
-            && session.Xp >= next)
+            && session.Progression.Xp >= next)
         {
-            session.Xp -= next;
+            session.Progression.Xp -= next;
             await ApplyLevelUpAsync(session, ct);
         }
         if (c.Level >= LevelStore.MaxLevel)
-            session.Xp = 0; // кап — опыт не копим
+            session.Progression.Xp = 0; // кап — опыт не копим
 
         var nextXp = session.World.Levels.XpToNext(c.Level);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
-                m.SetUInt32(UpdateField.PlayerXp, session.Xp);
+                m.SetUInt32(UpdateField.PlayerXp, session.Progression.Xp);
                 m.SetUInt32(UpdateField.PlayerNextLevelXp, nextXp);
             }), ct);
 
-        await session.Characters.SetLevelXpAsync(session.InWorldGuid, c.Level, session.Xp, ct);
+        await characters.SetLevelXpAsync(session.InWorldGuid, c.Level, session.Progression.Xp, ct);
     }
 
     /// <summary>
@@ -63,7 +67,7 @@ internal sealed class ProgressionService(TalentHandlers talents)
         level = Math.Clamp(level, (byte)1, LevelStore.MaxLevel);
         await session.World.Levels.EnsureLoadedAsync(ct);
         c.Level = level;
-        session.Xp = 0;
+        session.Progression.Xp = 0;
         await RecalcStatsAsync(session, ding: true, ct); // уровень/HP/мана/статы + ding
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
@@ -72,7 +76,7 @@ internal sealed class ProgressionService(TalentHandlers talents)
                 m.SetUInt32(UpdateField.PlayerXp, 0);
                 m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(level));
             }), ct);
-        await session.Characters.SetLevelXpAsync(session.InWorldGuid, level, 0, ct);
+        await characters.SetLevelXpAsync(session.InWorldGuid, level, 0, ct);
         session.Logger.LogInformation("DEV SETLEVEL '{User}' → {Level}", session.Account, level);
     }
 
@@ -88,13 +92,13 @@ internal sealed class ProgressionService(TalentHandlers talents)
             return;
         float min = 1f, max = 2f;
         uint attackTime = 2000;
-        var mh = session.Inventory.FirstOrDefault(i =>
+        var mh = session.Inv.Inventory.FirstOrDefault(i =>
             i.Bag == InventorySlots.MainBag && i.Slot == InventorySlots.MainHandSlot);
         if (mh is not null)
         {
             try
             {
-                var t = await session.WorldDb.GetItemTemplateAsync(mh.ItemEntry, ct);
+                var t = await worldDb.GetItemTemplateAsync(mh.ItemEntry, ct);
                 if (t is not null && (t.Damages[0].Min > 0 || t.Damages[0].Max > 0))
                 {
                     min = t.Damages[0].Min;
@@ -105,9 +109,9 @@ internal sealed class ProgressionService(TalentHandlers talents)
             }
             catch { /* БД мира недоступна — безоружный фолбэк */ }
         }
-        session.MainHandSpeedMs = attackTime; // M6.12: для формулы ярости
-        session.WeaponMinDamage = min;        // M10.4a: для мили-абилок (WEAPON_DAMAGE)
-        session.WeaponMaxDamage = max;
+        session.Combat.MainHandSpeedMs = attackTime; // M6.12: для формулы ярости
+        session.Combat.WeaponMinDamage = min;        // M10.4a: для мили-абилок (WEAPON_DAMAGE)
+        session.Combat.WeaponMaxDamage = max;
 
         // M7 #16: attack power (по статам класса). Без этих полей клиентский UnitDamage даёт percent=0 →
         // слот-тултип оружия показывает 1.#INF. Формула — CMaNGOS Player::UpdateAttackPowerAndDamage.
@@ -157,7 +161,7 @@ internal sealed class ProgressionService(TalentHandlers talents)
         c.Level = (byte)(c.Level + 1);
         await RecalcStatsAsync(session, ding: true, ct);
         session.Logger.LogInformation("LEVELUP '{User}' → уровень {Level} (HP {Hp})",
-            session.Account, c.Level, session.MaxHealth);
+            session.Account, c.Level, session.Combat.MaxHealth);
     }
 
     /// <summary>
@@ -169,12 +173,12 @@ internal sealed class ProgressionService(TalentHandlers talents)
         var c = session.Character!;
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(c.Race, c.Class, c.Level);
-        var oldMaxHp = session.MaxHealth;
-        session.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(c.Level);
-        session.Health = session.MaxHealth;                 // фулл-хил
-        session.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(c.Class, c.Level);
-        session.Mana = session.MaxMana;
-        var hpDiff = session.MaxHealth > oldMaxHp ? session.MaxHealth - oldMaxHp : 0;
+        var oldMaxHp = session.Combat.MaxHealth;
+        session.Combat.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(c.Level);
+        session.Combat.Health = session.Combat.MaxHealth;                 // фулл-хил
+        session.Cast.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(c.Class, c.Level);
+        session.Cast.Mana = session.Cast.MaxMana;
+        var hpDiff = session.Combat.MaxHealth > oldMaxHp ? session.Combat.MaxHealth - oldMaxHp : 0;
         var powerType = DisplayData.PowerTypeForClass(c.Class);
 
         // M9.6: очки талантов растут с уровнем (MaxPoints − потрачено).
@@ -192,12 +196,12 @@ internal sealed class ProgressionService(TalentHandlers talents)
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
                 m.SetUInt32(UpdateField.UnitLevel, c.Level);
-                m.SetUInt32(UpdateField.UnitMaxHealth, session.MaxHealth);
-                m.SetUInt32(UpdateField.UnitHealth, session.Health);
+                m.SetUInt32(UpdateField.UnitMaxHealth, session.Combat.MaxHealth);
+                m.SetUInt32(UpdateField.UnitHealth, session.Combat.Health);
                 if (powerType == 0) // мана-классам обновляем пул
                 {
-                    m.SetUInt32(UpdateField.UnitMaxPower1, session.MaxMana);
-                    m.SetUInt32(UpdateField.UnitPower1, session.Mana);
+                    m.SetUInt32(UpdateField.UnitMaxPower1, session.Cast.MaxMana);
+                    m.SetUInt32(UpdateField.UnitPower1, session.Cast.Mana);
                 }
                 if (stats is { } s)
                 {
@@ -209,7 +213,7 @@ internal sealed class ProgressionService(TalentHandlers talents)
                     m.SetUInt32(UpdateField.UnitBaseHealth, s.MaxHealth);
                     m.SetUInt32(UpdateField.UnitBaseMana, s.MaxMana);
                 }
-                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.TalentPoints); // M9.6
+                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.Progression.TalentPoints); // M9.6
             }), ct);
 
         if (ding) // M9.6: обновить панель талантов (новые свободные очки)

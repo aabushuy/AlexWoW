@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -13,22 +14,25 @@ namespace AlexWoW.WorldServer.Handlers;
 /// рангов — <c>spell_chain.prev_spell</c> (mangos). Сверено с CMaNGOS <c>Player::SendSupercededSpell</c>
 /// (SMSG_SUPERCEDED_SPELL = u32 old + u32 new).
 /// </summary>
-internal sealed class SpellLearnService(SkillsService skills)
+internal sealed class SpellLearnService(
+    SkillsService skills,
+    IWorldRepository worldDb,
+    ICharacterStateRepository charState)
 {
     /// <summary>
     /// Выдаёт спелл игроку. Возвращает true, если абилка действительно изучена (была неизвестна).
     /// При наличии известного предыдущего ранга шлёт SUPERCEDED(prev → spell) вместо LEARNED.
-    /// Низший ранг из <see cref="WorldSession.KnownSpells"/> НЕ удаляем (остаётся кастуемым).
+    /// Низший ранг из <see cref="Net.SessionState.SessionProgressionState.KnownSpells"/> НЕ удаляем (остаётся кастуемым).
     /// </summary>
     internal async Task<bool> GrantAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0 || !session.KnownSpells.Add(spellId))
+        if (session.InWorldGuid == 0 || !session.Progression.KnownSpells.Add(spellId))
             return false; // вне мира или уже известен
 
-        await session.CharState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
+        await charState.AddLearnedSpellAsync(session.InWorldGuid, spellId, ct);
 
         SpellTemplateData? tpl = null;
-        try { tpl = await session.WorldDb.GetSpellAsync(spellId, ct); }
+        try { tpl = await worldDb.GetSpellAsync(spellId, ct); }
         catch { /* БД мира недоступна — просто LEARNED */ }
 
         // M11.2/M11.5/#2: профессия — учитель (LEARN_SPELL) учит спелл-открывашку; либо спелл сам выдаёт
@@ -37,10 +41,10 @@ internal sealed class SpellLearnService(SkillsService skills)
             return true;
 
         uint prev = 0;
-        try { prev = await session.WorldDb.GetPrevRankAsync(spellId, ct); }
+        try { prev = await worldDb.GetPrevRankAsync(spellId, ct); }
         catch { /* БД мира недоступна — просто LEARNED */ }
 
-        if (prev != 0 && session.KnownSpells.Contains(prev))
+        if (prev != 0 && session.Progression.KnownSpells.Contains(prev))
             await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
                 new ByteWriter(8).UInt32(prev).UInt32(spellId).ToArray(), ct);
         else
@@ -79,17 +83,17 @@ internal sealed class SpellLearnService(SkillsService skills)
 
         var superceded = false;
         // #3: апгрейд тира — прежний тир-спелл заменяется в книге (SUPERCEDED + убрать из персиста).
-        if (session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var prevTier)
+        if (session.Progression.ProfessionRankSpell.TryGetValue(grant.SkillId, out var prevTier)
             && prevTier.Spell != tpl.Id && grant.Max >= prevTier.Max)
         {
             await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
                 new ByteWriter(8).UInt32(prevTier.Spell).UInt32(tpl.Id).ToArray(), ct);
-            session.KnownSpells.Remove(prevTier.Spell);
-            await session.CharState.RemoveLearnedSpellAsync(session.InWorldGuid, prevTier.Spell, ct);
+            session.Progression.KnownSpells.Remove(prevTier.Spell);
+            await charState.RemoveLearnedSpellAsync(session.InWorldGuid, prevTier.Spell, ct);
             superceded = true;
         }
-        if (!session.ProfessionRankSpell.TryGetValue(grant.SkillId, out var curTier) || grant.Max >= curTier.Max)
-            session.ProfessionRankSpell[grant.SkillId] = (tpl.Id, grant.Max);
+        if (!session.Progression.ProfessionRankSpell.TryGetValue(grant.SkillId, out var curTier) || grant.Max >= curTier.Max)
+            session.Progression.ProfessionRankSpell[grant.SkillId] = (tpl.Id, grant.Max);
 
         await GrantAutoSpellsAsync(session, tpl, ct);
         return superceded;
@@ -100,7 +104,7 @@ internal sealed class SpellLearnService(SkillsService skills)
     {
         if (World.Professions.SkillGrantedBy(tpl) is not { } grant)
             return;
-        var existing = session.SkillBook.Get(grant.SkillId);
+        var existing = session.Progression.SkillBook.Get(grant.SkillId);
         int curValue = existing?.Value ?? 0;
         int curMax = existing?.Max ?? 0;
         await skills.GrantAsync(session, grant.SkillId,

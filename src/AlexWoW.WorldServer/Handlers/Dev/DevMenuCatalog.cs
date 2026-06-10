@@ -1,4 +1,5 @@
 using System.Text;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 
 namespace AlexWoW.WorldServer.Handlers.Dev;
@@ -10,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// таблицы <c>dev_teleport</c> (alexwow_auth). Формат строк — см. <see cref="Builder"/> и AddonProtocol.
 /// DI-синглтон (M7 S8), потребитель — AddonProtocol.
 /// </summary>
-internal sealed class DevMenuCatalog
+internal sealed class DevMenuCatalog(ITeleportRepository teleports)
 {
     /// <summary>Префикс addon-сообщений (общий для запроса и ответа).</summary>
     public const string Prefix = "AlexDev";
@@ -77,7 +78,7 @@ internal sealed class DevMenuCatalog
 
         // Динамическая ветка «Телепорт» из БД (alexwow_auth.dev_teleport), сгруппирована по фракции.
         var teleport = b.Category("Телепорт");
-        var locations = await session.Teleports.GetAllAsync(ct);
+        var locations = await teleports.GetAllAsync(ct);
         var alliance = b.Sub(teleport, "Альянс");
         var horde = b.Sub(teleport, "Орда");
         var neutral = b.Sub(teleport, "Нейтральные");

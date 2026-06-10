@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -11,14 +12,17 @@ namespace AlexWoW.WorldServer.Handlers;
 /// (M6.2), наградами квестов (M6.5), крафтом/сбором (M11). Зачёт item-целей квестов после выдачи —
 /// <see cref="QuestProgressService.OnItemGainedAsync"/> (цикл со статиками разорван конверсией в DI).
 /// </summary>
-internal sealed class InventoryGrantService(QuestProgressService questProgress)
+internal sealed class InventoryGrantService(
+    QuestProgressService questProgress,
+    IInventoryRepository items,
+    IWorldRepository worldDb)
 {
     /// <summary>Сколько предметов entry в сумках игрока (item-цели квестов, реагенты крафта).
     /// Чистая функция от сессии — static.</summary>
     internal static uint CountItem(WorldSession session, uint itemEntry)
     {
         uint total = 0;
-        foreach (var it in session.Inventory)
+        foreach (var it in session.Inv.Inventory)
             if (it.ItemEntry == itemEntry)
                 total += it.StackCount;
         return total;
@@ -33,15 +37,15 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
     {
         var ownerGuid = session.InWorldGuid;
         var remaining = count;
-        foreach (var item in session.Inventory.Where(i => i.ItemEntry == itemEntry).ToList())
+        foreach (var item in session.Inv.Inventory.Where(i => i.ItemEntry == itemEntry).ToList())
         {
             if (remaining == 0)
                 break;
             if (item.StackCount <= remaining)
             {
                 remaining -= item.StackCount;
-                session.Inventory.Remove(item);
-                await session.Items.RemoveItemAsync(item.ItemGuid, ct);
+                session.Inv.Inventory.Remove(item);
+                await items.RemoveItemAsync(item.ItemGuid, ct);
                 await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                     new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
                 if (item.Bag == InventorySlots.MainBag)
@@ -52,7 +56,7 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
             {
                 item.StackCount -= remaining;
                 remaining = 0;
-                await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+                await items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
             }
@@ -75,12 +79,12 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
         uint maxStack = 1;
         try
         {
-            var t = await session.WorldDb.GetItemTemplateAsync(itemEntry, ct);
+            var t = await worldDb.GetItemTemplateAsync(itemEntry, ct);
             if (t is not null)
             {
                 maxStack = (uint)Math.Max(1, t.Stackable);
                 // M6.13: запомнить bag-info — чтобы выданный предмет-сумка создался как TYPEID_CONTAINER.
-                session.ItemBagInfo[itemEntry] = new ItemBagInfo(t.Class, t.ContainerSlots, t.MaxDurability);
+                session.Inv.ItemBagInfo[itemEntry] = new ItemBagInfo(t.Class, t.ContainerSlots, t.MaxDurability);
             }
         }
         catch { /* без шаблона — кладём как нестакающийся */ }
@@ -91,14 +95,14 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
         // 1) Долить существующие стопки того же предмета (только для стакающихся).
         if (maxStack > 1)
         {
-            foreach (var stack in session.Inventory.Where(i => i.ItemEntry == itemEntry && i.StackCount < maxStack).ToList())
+            foreach (var stack in session.Inv.Inventory.Where(i => i.ItemEntry == itemEntry && i.StackCount < maxStack).ToList())
             {
                 if (remaining == 0)
                     break;
                 var add = Math.Min(remaining, maxStack - stack.StackCount);
                 stack.StackCount += add;
                 remaining -= add;
-                await session.Items.SetItemStackAsync(stack.ItemGuid, stack.StackCount, ct);
+                await items.SetItemStackAsync(stack.ItemGuid, stack.StackCount, ct);
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                     ItemObject.BuildStackUpdate(ItemObject.ItemGuid(stack.ItemGuid), stack.StackCount), ct);
                 last = stack;
@@ -111,15 +115,15 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
             if (BagInventory.FirstFreeStoreSlot(session) is not { } pos)
                 break; // нет места — остаток не выдан (bag-full → почта, M7 #14)
             var portion = Math.Min(remaining, maxStack);
-            var itemLow = await session.Items.AddItemAsync(ownerGuid, itemEntry, (byte)pos.Bag, (byte)pos.Slot, portion, ct);
+            var itemLow = await items.AddItemAsync(ownerGuid, itemEntry, (byte)pos.Bag, (byte)pos.Slot, portion, ct);
             var item = new InventoryItem
             {
                 ItemGuid = itemLow, OwnerGuid = ownerGuid, ItemEntry = itemEntry,
                 Bag = (byte)pos.Bag, Slot = (byte)pos.Slot, StackCount = portion,
             };
-            session.Inventory.Add(item);
+            session.Inv.Inventory.Add(item);
             var itemGuid = ItemObject.ItemGuid(itemLow);
-            await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid, session.ItemBagInfo), ct);
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject, ItemObject.BuildItemsCreate(new[] { item }, ownerGuid, session.Inv.ItemBagInfo), ct);
             // Уведомить о позиции: осн. контейнер — поле игрока; внутри сумки — слот сумки + CONTAINED.
             if (pos.Bag == InventorySlots.MainBag)
                 await session.SendAsync(WorldOpcode.SmsgUpdateObject,

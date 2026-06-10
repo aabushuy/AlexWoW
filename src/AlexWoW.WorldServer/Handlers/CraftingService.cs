@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <c>spell_template</c> (см. <see cref="SpellCatalog"/>), привязка рецепт→навык для skill-up —
 /// <see cref="Professions.Recipes"/>.
 /// </summary>
-internal sealed class CraftingService(InventoryGrantService inventoryGrant, SkillsService skills)
+internal sealed class CraftingService(
+    InventoryGrantService inventoryGrant,
+    SkillsService skills,
+    IWorldRepository worldDb)
 {
     /// <summary>Есть ли у игрока все реагенты рецепта (для отказа на старте каста).</summary>
     internal bool HasReagents(WorldSession session, SpellCatalog.SpellInfo info)
@@ -55,11 +59,11 @@ internal sealed class CraftingService(InventoryGrantService inventoryGrant, Skil
     {
         (ushort SkillId, ushort ReqSkill)? recipe = Professions.Recipes.TryGetValue(spellId, out var seed)
             ? (seed.SkillId, seed.ReqSkill)
-            : await ResolveFromTrainerAsync(session, spellId, ct);
+            : await ResolveFromTrainerAsync(spellId, ct);
         if (recipe is not { } r)
             return;
 
-        var sk = session.SkillBook.Get(r.SkillId);
+        var sk = session.Progression.SkillBook.Get(r.SkillId);
         if (sk is null)
             return; // профессия не изучена — не качаем
         var chance = Professions.SkillUpChance(sk.Value, r.ReqSkill);
@@ -67,13 +71,14 @@ internal sealed class CraftingService(InventoryGrantService inventoryGrant, Skil
             await skills.AddValueAsync(session, r.SkillId, 1, ct);
     }
 
-    private static async Task<(ushort SkillId, ushort ReqSkill)?> ResolveFromTrainerAsync(
-        WorldSession session, uint spellId, CancellationToken ct)
+    // Не static (M7 S9): репозиторий мира приходит ctor-инъекцией, а не через сессию.
+    private async Task<(ushort SkillId, ushort ReqSkill)?> ResolveFromTrainerAsync(
+        uint spellId, CancellationToken ct)
     {
         if (RecipeSkillCache.TryGetValue(spellId, out var cached))
             return cached;
         (ushort, ushort)? result = null;
-        try { result = await session.WorldDb.GetRecipeSkillAsync(spellId, ct); }
+        try { result = await worldDb.GetRecipeSkillAsync(spellId, ct); }
         catch { /* БД мира недоступна — без skill-up */ }
         RecipeSkillCache[spellId] = result;
         return result;

@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// раскладываем по слотам экипировки (0..18) по InventoryType, прочее — в рюкзак (23..38). Слот
 /// сохраняется в character_items.
 /// </summary>
-internal sealed class StartingGearService
+internal sealed class StartingGearService(IWorldRepository worldDb, IInventoryRepository items)
 {
     /// <summary>Выдаёт стартовый набор персонажу (если БД мира доступна). Идемпотентность — на вызывающем.</summary>
     internal async Task GiveAsync(WorldSession session, uint charGuid, byte race, byte cls, CancellationToken ct)
@@ -18,7 +19,7 @@ internal sealed class StartingGearService
         IReadOnlyList<Database.Models.StartingItem> starting;
         try
         {
-            starting = await session.WorldDb.GetStartingItemsAsync(race, cls, ct);
+            starting = await worldDb.GetStartingItemsAsync(race, cls, ct);
         }
         catch (Exception ex)
         {
@@ -49,7 +50,7 @@ internal sealed class StartingGearService
             }
 
             var count = (uint)Math.Max(1, (int)item.Amount);
-            await session.Items.AddItemAsync(charGuid, item.ItemId, InventorySlots.MainBag, (byte)slot, count, ct);
+            await items.AddItemAsync(charGuid, item.ItemId, InventorySlots.MainBag, (byte)slot, count, ct);
             given++;
         }
 

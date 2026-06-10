@@ -29,9 +29,9 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             {
                 await Task.Delay(info.CastMs);
                 // Каст не отменён/не перебит новым кастом за это время?
-                if (session.CastGeneration == gen && session.CastingSpellId == spellId && session.InWorldGuid != 0)
+                if (session.Cast.CastGeneration == gen && session.Cast.CastingSpellId == spellId && session.InWorldGuid != 0)
                 {
-                    session.CastingSpellId = 0;
+                    session.Cast.CastingSpellId = 0;
                     await CompleteCastAsync(session, spellId, info, targetGuid, castCount, CancellationToken.None);
                 }
             }
@@ -51,15 +51,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // Расход ресурса: мана (правило 5 секунд: реген паузится от LastSpellCastMs) — или ярость/энергия
         // для мили-абилок (списание + апдейт полоски). M10.4a.
         var now = Environment.TickCount64;
-        session.LastSpellCastMs = now;
+        session.Cast.LastSpellCastMs = now;
         var cost = SpellCastService.EffectivePowerCost(session, info);
         if (cost > 0)
         {
             if (info.PowerType == SpellCastService.PowerMana)
             {
-                if (session.MaxMana > 0)
+                if (session.Cast.MaxMana > 0)
                 {
-                    session.Mana = session.Mana > cost ? session.Mana - cost : 0;
+                    session.Cast.Mana = session.Cast.Mana > cost ? session.Cast.Mana - cost : 0;
                     await manaRegen.SendManaUpdateAsync(session, ct);
                 }
             }
@@ -70,7 +70,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // Кулдаун: запускаем у клиента (полоска на кнопке) и запоминаем для отказа при раннем рекасте.
         if (info.CooldownMs > 0)
         {
-            session.SpellCooldowns[spellId] = now + info.CooldownMs;
+            session.Cast.SpellCooldowns[spellId] = now + info.CooldownMs;
             await session.SendAsync(WorldOpcode.SmsgSpellCooldown,
                 SpellPackets.BuildSpellCooldown((ulong)session.InWorldGuid, spellId, (uint)info.CooldownMs), ct);
         }

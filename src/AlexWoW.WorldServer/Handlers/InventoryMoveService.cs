@@ -1,4 +1,5 @@
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -12,7 +13,11 @@ namespace AlexWoW.WorldServer.Handlers;
 /// предмета — пара (bag, slot), см. <see cref="BagInventory"/>. Сервер авторитетен: при отказе
 /// пере-утверждаем текущее состояние через <see cref="InventoryClientSync"/>.
 /// </summary>
-internal sealed class InventoryMoveService(InventoryClientSync sync, ProgressionService progression)
+internal sealed class InventoryMoveService(
+    InventoryClientSync sync,
+    ProgressionService progression,
+    IInventoryRepository items,
+    IWorldRepository worldDb)
 {
     /// <summary>
     /// Перемещение/обмен предметов между позициями (bag,slot) с валидацией экипировки/сумок (M6.9 + M6.13).
@@ -32,8 +37,8 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
         }
         var dst = BagInventory.ItemAt(session, dstBag, dstSlot);
 
-        var srcInv = await InvTypeAsync(session, src.ItemEntry, ct);
-        var dstInv = dst is not null ? await InvTypeAsync(session, dst.ItemEntry, ct) : 0u;
+        var srcInv = await InvTypeAsync(src.ItemEntry, ct);
+        var dstInv = dst is not null ? await InvTypeAsync(dst.ItemEntry, ct) : 0u;
         bool srcMain = srcBag == InventorySlots.MainBag, dstMain = dstBag == InventorySlots.MainBag;
 
         // Отказ: SMSG_INVENTORY_CHANGE_FAILURE (вернуть предмет с курсора — иначе он залипает серым до релога)
@@ -74,11 +79,11 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
 
         // --- применяем ---
         src.Bag = (byte)dstBag; src.Slot = (byte)dstSlot;
-        await session.Items.MoveItemAsync(src.ItemGuid, (byte)dstBag, (byte)dstSlot, ct);
+        await items.MoveItemAsync(src.ItemGuid, (byte)dstBag, (byte)dstSlot, ct);
         if (dst is not null)
         {
             dst.Bag = (byte)srcBag; dst.Slot = (byte)srcSlot;
-            await session.Items.MoveItemAsync(dst.ItemGuid, (byte)srcBag, (byte)srcSlot, ct);
+            await items.MoveItemAsync(dst.ItemGuid, (byte)srcBag, (byte)srcSlot, ct);
         }
 
         await sync.ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot));
@@ -106,7 +111,7 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
             return;
         }
 
-        var inv = await InvTypeAsync(session, item.ItemEntry, ct);
+        var inv = await InvTypeAsync(item.ItemEntry, ct);
 
         // Сумка (INVTYPE_BAG) — надеть в первый свободный bag-слот 19..22 (или своп с пустой надетой). M6.13.
         if (inv == InventorySlots.InvTypeBag)
@@ -150,20 +155,20 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
 
         var owner = session.InWorldGuid;
         item.StackCount -= amount;
-        await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+        await items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
 
-        var newLow = await session.Items.AddItemAsync(owner, item.ItemEntry, (byte)dstBag, (byte)dst, amount, ct);
+        var newLow = await items.AddItemAsync(owner, item.ItemEntry, (byte)dstBag, (byte)dst, amount, ct);
         var newItem = new InventoryItem
         {
             ItemGuid = newLow, OwnerGuid = owner, ItemEntry = item.ItemEntry,
             Bag = (byte)dstBag, Slot = (byte)dst, StackCount = amount,
         };
-        session.Inventory.Add(newItem);
+        session.Inv.Inventory.Add(newItem);
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            ItemObject.BuildItemsCreate(new[] { newItem }, owner, session.ItemBagInfo), ct);
+            ItemObject.BuildItemsCreate(new[] { newItem }, owner, session.Inv.ItemBagInfo), ct);
         await sync.ReassertPosAsync(session, ct, (dstBag, dst));
         await sync.SendContainedAsync(session, newItem, ct);
         session.Logger.LogDebug("SPLIT '{User}': {Entry} {Amt} → bag={DB} slot={Dst}", session.Account, item.ItemEntry, amount, dstBag, dst);
@@ -182,8 +187,8 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
 
         if (amount == 0 || amount >= item.StackCount)
         {
-            await session.Items.RemoveItemAsync(item.ItemGuid, ct);
-            session.Inventory.Remove(item);
+            await items.RemoveItemAsync(item.ItemGuid, ct);
+            session.Inv.Inventory.Remove(item);
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
             await sync.ReassertPosAsync(session, ct, (bag, slot));
@@ -191,18 +196,19 @@ internal sealed class InventoryMoveService(InventoryClientSync sync, Progression
         else
         {
             item.StackCount -= amount;
-            await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
+            await items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
         }
         session.Logger.LogDebug("DESTROY '{User}': слот {Slot} x{Amt}", session.Account, slot, amount);
     }
 
-    private static async Task<uint> InvTypeAsync(WorldSession session, uint entry, CancellationToken ct)
+    // Не static (M7 S9): репозиторий мира приходит ctor-инъекцией, а не через сессию.
+    private async Task<uint> InvTypeAsync(uint entry, CancellationToken ct)
     {
         try
         {
-            var d = await session.WorldDb.GetItemDisplaysAsync(new[] { entry }, ct);
+            var d = await worldDb.GetItemDisplaysAsync(new[] { entry }, ct);
             return d.TryGetValue(entry, out var v) ? v.InventoryType : 0u;
         }
         catch { return 0u; }

@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -11,7 +12,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// M6.12; формы друида — позже). Фундамент под расход/эффекты абилок и баффы спеллов. Точка применения —
 /// каст спелла с аура-эффектом (SpellHandlers). Персист через релог — <see cref="AuraPersistenceService"/>.
 /// </summary>
-internal sealed class AuraService
+internal sealed class AuraService(ICharacterStateRepository charState)
 {
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
@@ -31,11 +32,11 @@ internal sealed class AuraService
         // Эксклюзивность переключателя: снять прочие ауры той же группы. Форму НЕ сбрасываем в 0, если новая
         // тоже задаёт форму (resetForm:false) — иначе подсветка стойки мигает/запаздывает (M7 #21).
         if (group != 0)
-            foreach (var g in session.Auras.Where(a => a.Group == group).ToList())
+            foreach (var g in session.Progression.Auras.Where(a => a.Group == group).ToList())
                 await RemoveInternalAsync(session, g, resetForm: form == 0, ct);
 
         // Рефреш: повтор того же спелла — снять старый экземпляр.
-        var dup = session.Auras.FirstOrDefault(a => a.SpellId == spellId);
+        var dup = session.Progression.Auras.FirstOrDefault(a => a.SpellId == spellId);
         if (dup is not null)
             await RemoveInternalAsync(session, dup, resetForm: true, ct);
 
@@ -57,7 +58,7 @@ internal sealed class AuraService
             DurationMs = durationMs,
             ExpiresAtMs = durationMs > 0 ? Environment.TickCount64 + durationMs : 0,
         };
-        session.Auras.Add(aura);
+        session.Progression.Auras.Add(aura);
 
         // Сначала аура (SMSG_AURA_UPDATE), затем форма (UNIT_FIELD_BYTES_2) — порядок как в CMaNGOS,
         // чтобы клиент сразу подсветил активную стойку (M7 #21).
@@ -67,19 +68,19 @@ internal sealed class AuraService
 
         if (form != 0)
         {
-            session.ShapeshiftForm = form;
+            session.Progression.ShapeshiftForm = form;
             await BroadcastFormAsync(session, ct);
         }
 
         if (doPersist)
-            try { await session.CharState.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
+            try { await charState.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
             catch { /* персист не критичен для текущей сессии */ }
     }
 
     /// <summary>Снимает ауру по spellId, если есть (M6.11).</summary>
     internal async Task RemoveAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
-        var aura = session.Auras.FirstOrDefault(a => a.SpellId == spellId);
+        var aura = session.Progression.Auras.FirstOrDefault(a => a.SpellId == spellId);
         if (aura is not null)
             await RemoveInternalAsync(session, aura, resetForm: true, ct);
     }
@@ -87,9 +88,9 @@ internal sealed class AuraService
     /// <summary>Тик истечения аур (M6.11): снимает ауры с вышедшим таймером. Из WorldTick.UpdateAsync.</summary>
     internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
-        if (session.Auras.Count == 0)
+        if (session.Progression.Auras.Count == 0)
             return;
-        foreach (var aura in session.Auras.Where(a => a.ExpiresAtMs != 0 && now >= a.ExpiresAtMs).ToList())
+        foreach (var aura in session.Progression.Auras.Where(a => a.ExpiresAtMs != 0 && now >= a.ExpiresAtMs).ToList())
             await RemoveInternalAsync(session, aura, resetForm: true, ct);
     }
 
@@ -99,14 +100,14 @@ internal sealed class AuraService
     /// </summary>
     private async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, bool resetForm, CancellationToken ct)
     {
-        session.Auras.Remove(aura);
-        if (resetForm && aura.ShapeshiftForm != 0 && session.ShapeshiftForm == aura.ShapeshiftForm)
+        session.Progression.Auras.Remove(aura);
+        if (resetForm && aura.ShapeshiftForm != 0 && session.Progression.ShapeshiftForm == aura.ShapeshiftForm)
         {
-            session.ShapeshiftForm = 0;
+            session.Progression.ShapeshiftForm = 0;
             await BroadcastFormAsync(session, ct);
         }
         if (aura.Persist)
-            try { await session.CharState.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
+            try { await charState.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
             catch { /* персист не критичен */ }
         if (session.Player is { } player)
             await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,
@@ -118,7 +119,7 @@ internal sealed class AuraService
     internal Task BroadcastFormAsync(WorldSession session, CancellationToken ct)
     {
         // sheath/pvp/pet байты пока не используем (0); форма — старший байт.
-        var bytes2 = (uint)session.ShapeshiftForm << 24;
+        var bytes2 = (uint)session.Progression.ShapeshiftForm << 24;
         return session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
                 m => m.SetUInt32(UpdateField.UnitBytes2, bytes2)), ct);
@@ -128,7 +129,7 @@ internal sealed class AuraService
     internal static byte FirstFreeSlot(WorldSession session)
     {
         for (var slot = 0; slot < MaxAuraSlots; slot++)
-            if (session.Auras.All(a => a.Slot != slot))
+            if (session.Progression.Auras.All(a => a.Slot != slot))
                 return (byte)slot;
         return (byte)(MaxAuraSlots - 1); // переполнение — переиспользуем последний (крайний случай)
     }

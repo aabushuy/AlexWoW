@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -10,21 +11,25 @@ namespace AlexWoW.WorldServer.Handlers;
 /// строки character_queststatus. Иконки квестгиверов — <see cref="QuestGiverStatusService"/>,
 /// диалоги/награды — <see cref="QuestDialogService"/>.
 /// </summary>
-internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
+internal sealed class QuestProgressService(
+    QuestGiverStatusService giverStatus,
+    IQuestRepository quests,
+    IWorldRepository worldDb)
 {
     // M6.10: статус строки character_queststatus. 0 = активен (в журнале), 1 = сдан.
     private const byte QuestStatusActive = 0;
     private const byte QuestStatusRewarded = 1;
 
-    /// <summary>Сохраняет активный квест (id/слот/счётчики) в character_queststatus. M6.10.</summary>
-    private static Task PersistActiveAsync(WorldSession session, int slot, World.QuestProgress p, CancellationToken ct)
-        => session.Quests.UpsertQuestStatusAsync(session.InWorldGuid, p.QuestId, (byte)slot, QuestStatusActive,
+    /// <summary>Сохраняет активный квест (id/слот/счётчики) в character_queststatus. M6.10.
+    /// Не static (M7 S9): репозиторий квестов приходит ctor-инъекцией, а не через сессию.</summary>
+    private Task PersistActiveAsync(WorldSession session, int slot, World.QuestProgress p, CancellationToken ct)
+        => quests.UpsertQuestStatusAsync(session.InWorldGuid, p.QuestId, (byte)slot, QuestStatusActive,
             (ushort)p.Count[0], (ushort)p.Count[1], (ushort)p.Count[2], (ushort)p.Count[3], ct);
 
     /// <summary>Помечает квест сданным в character_queststatus (сдача награды, M6.10). Константа статуса
     /// живёт здесь — персист квестов целиком в этом сервисе.</summary>
     internal Task MarkRewardedAsync(WorldSession session, uint questId, CancellationToken ct)
-        => session.Quests.UpsertQuestStatusAsync(session.InWorldGuid, questId, 0, QuestStatusRewarded,
+        => quests.UpsertQuestStatusAsync(session.InWorldGuid, questId, 0, QuestStatusRewarded,
             0, 0, 0, 0, ct);
 
     /// <summary>Сколько предметов entry в сумках игрока (для item-целей). M6.10.</summary>
@@ -37,7 +42,7 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
     /// </summary>
     internal bool NeedsQuestItem(WorldSession session, uint itemId)
     {
-        foreach (var p in session.QuestSlots)
+        foreach (var p in session.Quest.QuestSlots)
         {
             if (p is null || p.Complete)
                 continue;
@@ -55,9 +60,9 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
     /// </summary>
     internal async Task OnItemGainedAsync(WorldSession session, uint itemEntry, CancellationToken ct)
     {
-        for (var slot = 0; slot < session.QuestSlots.Length; slot++)
+        for (var slot = 0; slot < session.Quest.QuestSlots.Length; slot++)
         {
-            var p = session.QuestSlots[slot];
+            var p = session.Quest.QuestSlots[slot];
             if (p is null || p.Complete || Array.IndexOf(p.ReqItem, itemEntry) < 0)
                 continue;
             if (!p.ObjectivesMet(e => CountItem(session, e)))
@@ -77,13 +82,13 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
     {
         if (session.InWorldGuid == 0 || questId == 0)
             return;
-        if (Array.FindIndex(session.QuestSlots, s => s?.QuestId == questId) >= 0)
+        if (Array.FindIndex(session.Quest.QuestSlots, s => s?.QuestId == questId) >= 0)
             return; // уже в журнале
-        var slot = Array.IndexOf(session.QuestSlots, null);
+        var slot = Array.IndexOf(session.Quest.QuestSlots, null);
         if (slot < 0)
             return; // журнал полон (SMSG_QUESTLOG_FULL — позже)
 
-        var quest = await session.WorldDb.GetQuestAsync(questId, ct);
+        var quest = await worldDb.GetQuestAsync(questId, ct);
         if (quest is null)
             return;
 
@@ -100,7 +105,7 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
             prog.ReqItemCount[i] = quest.ReqItemCount[i];
         }
         prog.Complete = prog.ObjectivesMet(e => CountItem(session, e)); // M6.10: учёт item-целей по инвентарю
-        session.QuestSlots[slot] = prog;
+        session.Quest.QuestSlots[slot] = prog;
         await PersistActiveAsync(session, slot, prog, ct); // M6.10: персист
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
@@ -119,9 +124,9 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
     /// </summary>
     internal async Task CreditCreatureAsync(WorldSession session, uint creatureEntry, ulong creatureGuid, CancellationToken ct)
     {
-        for (var slot = 0; slot < session.QuestSlots.Length; slot++)
+        for (var slot = 0; slot < session.Quest.QuestSlots.Length; slot++)
         {
-            var p = session.QuestSlots[slot];
+            var p = session.Quest.QuestSlots[slot];
             if (p is null || p.Complete)
                 continue;
 
@@ -166,17 +171,17 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
     {
         if (session.InWorldGuid == 0)
             return;
-        var rows = await session.Quests.GetQuestStatusesAsync(session.InWorldGuid, ct);
+        var rows = await quests.GetQuestStatusesAsync(session.InWorldGuid, ct);
         foreach (var row in rows)
         {
             if (row.Status == QuestStatusRewarded)
             {
-                session.CompletedQuests.Add(row.QuestId);
+                session.Quest.CompletedQuests.Add(row.QuestId);
                 continue;
             }
-            if (row.Slot >= session.QuestSlots.Length)
+            if (row.Slot >= session.Quest.QuestSlots.Length)
                 continue;
-            var quest = await session.WorldDb.GetQuestAsync(row.QuestId, ct);
+            var quest = await worldDb.GetQuestAsync(row.QuestId, ct);
             if (quest is null)
                 continue;
 
@@ -195,9 +200,9 @@ internal sealed class QuestProgressService(QuestGiverStatusService giverStatus)
             prog.Count[0] = row.Counter0; prog.Count[1] = row.Counter1;
             prog.Count[2] = row.Counter2; prog.Count[3] = row.Counter3;
             prog.Complete = prog.ObjectivesMet(e => CountItem(session, e)); // M6.10: + item-цели
-            session.QuestSlots[row.Slot] = prog;
+            session.Quest.QuestSlots[row.Slot] = prog;
         }
         session.Logger.LogInformation("QUEST LOAD '{User}': {Active} активных, {Done} сданных",
-            session.Account, session.QuestSlots.Count(s => s is not null), session.CompletedQuests.Count);
+            session.Account, session.Quest.QuestSlots.Count(s => s is not null), session.Quest.CompletedQuests.Count);
     }
 }
