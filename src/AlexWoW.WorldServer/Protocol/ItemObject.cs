@@ -36,8 +36,7 @@ public static class ItemObject
                 List<(int Slot, ulong Guid)>? contents = null;
                 if (InventorySlots.IsBagSlot(item.Slot))
                 {
-                    contents = items.Where(i => i.Bag == item.Slot)
-                        .Select(i => ((int)i.Slot, ItemGuid(i.ItemGuid))).ToList();
+                    contents = [.. items.Where(i => i.Bag == item.Slot).Select(i => ((int)i.Slot, ItemGuid(i.ItemGuid)))];
                 }
 
                 ContainerObject.WriteCreateBlock(w, ItemGuid(item.ItemGuid), item.ItemEntry, ownerGuid,

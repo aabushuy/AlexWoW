@@ -43,7 +43,7 @@ internal sealed class DevCommandDispatcher(DevCommandRegistry registry, ChatNoti
             }
             else
             {
-                var ctx = new DevCommandContext(session, parts.Skip(1).ToArray(), chat, registry.Ordered);
+                var ctx = new DevCommandContext(session, [.. parts.Skip(1)], chat, registry.Ordered);
                 await command.ExecuteAsync(ctx, ct);
             }
         }

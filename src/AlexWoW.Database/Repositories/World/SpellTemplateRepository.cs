@@ -39,7 +39,7 @@ public sealed class SpellTemplateRepository(string connectionString)
         await using var db = await OpenAsync(ct);
         var rows = await db.QueryAsync<SpellTemplateData>(new CommandDefinition(
             SpellColumns + " WHERE Id IN @ids;", new { ids }, cancellationToken: ct));
-        return rows.ToList();
+        return [.. rows];
     }
 
     public async Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default)

@@ -14,7 +14,7 @@ public sealed class EfRealmRepository(IDbContextFactory<AuthDbContext> factory) 
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.Realms.AsNoTracking().OrderBy(x => x.Id).ToListAsync(ct);
-        return rows.Select(x => new ModelRealm
+        return [.. rows.Select(x => new ModelRealm
         {
             Id = x.Id,
             Name = x.Name,
@@ -24,6 +24,6 @@ public sealed class EfRealmRepository(IDbContextFactory<AuthDbContext> factory) 
             Flags = x.Flags,
             Timezone = x.Timezone,
             Population = x.Population,
-        }).ToList();
+        })];
     }
 }

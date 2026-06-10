@@ -38,7 +38,7 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.CharacterTalents.AsNoTracking()
             .Where(x => x.OwnerGuid == ownerGuid).Select(x => new { x.TalentId, x.Rank }).ToListAsync(ct);
-        return rows.Select(x => (x.TalentId, x.Rank)).ToList();
+        return [.. rows.Select(x => (x.TalentId, x.Rank))];
     }
 
     public async Task SetTalentRankAsync(uint ownerGuid, uint talentId, byte rank, CancellationToken ct = default)
@@ -64,7 +64,7 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         var rows = await db.CharacterSkills.AsNoTracking()
             .Where(x => x.OwnerGuid == ownerGuid)
             .Select(x => new { x.SkillId, x.Value, x.Max }).ToListAsync(ct);
-        return rows.Select(x => (x.SkillId, x.Value, x.Max)).ToList();
+        return [.. rows.Select(x => (x.SkillId, x.Value, x.Max))];
     }
 
     public async Task UpsertSkillAsync(uint ownerGuid, ushort skillId, ushort value, ushort max, CancellationToken ct = default)
@@ -89,7 +89,7 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         var rows = await db.CharacterAuras.AsNoTracking()
             .Where(x => x.OwnerGuid == ownerGuid)
             .Select(x => new { x.Spell, x.Form, x.RemainingMs }).ToListAsync(ct);
-        return rows.Select(x => (x.Spell, x.Form, x.RemainingMs)).ToList();
+        return [.. rows.Select(x => (x.Spell, x.Form, x.RemainingMs))];
     }
 
     public async Task AddAuraAsync(uint ownerGuid, uint spell, byte form, CancellationToken ct = default)

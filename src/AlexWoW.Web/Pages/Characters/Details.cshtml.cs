@@ -25,11 +25,10 @@ public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepo
         Character = character;
 
         var items = await inventory.GetItemsAsync(guid, ct);
-        Equipment = items
+        Equipment = [.. items
             .Where(i => i.Bag == InventorySlots.MainBag && GameData.EquipSlotName(i.Slot) is not null)
             .OrderBy(i => i.Slot)
-            .Select(i => new EquipItem(i.Slot, GameData.EquipSlotName(i.Slot)!, i.ItemEntry, i.StackCount))
-            .ToList();
+            .Select(i => new EquipItem(i.Slot, GameData.EquipSlotName(i.Slot)!, i.ItemEntry, i.StackCount))];
 
         return Page();
     }

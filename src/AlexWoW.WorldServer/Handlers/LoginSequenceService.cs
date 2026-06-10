@@ -246,7 +246,7 @@ internal sealed class LoginSequenceService(
         var hiddenSpells = new HashSet<uint>();
         try
         {
-            var templates = (await worldDb.GetSpellsAsync(known.ToList(), ct)).ToList();
+            var templates = (await worldDb.GetSpellsAsync([.. known], ct)).ToList();
             foreach (var tpl in templates)
             {
                 var taught = World.Professions.TaughtSpell(tpl);

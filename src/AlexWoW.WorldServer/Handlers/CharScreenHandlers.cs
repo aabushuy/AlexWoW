@@ -25,7 +25,7 @@ internal sealed class CharScreenHandlers(
         // M7 #16: персонажи с заданными склонениями → флаг CHARACTER_FLAG_DECLINED в enum,
         // иначе ruRU-клиент показывает диалог склонений при каждом заходе на экран выбора.
         IReadOnlySet<uint> declined;
-        try { declined = await characters.GetGuidsWithDeclinedNamesAsync(list.Select(c => c.Guid).ToList(), ct); }
+        try { declined = await characters.GetGuidsWithDeclinedNamesAsync([.. list.Select(c => c.Guid)], ct); }
         catch (Exception ex)
         {
             session.Logger.LogDebug(ex, "CHAR_ENUM declined-флаги: {Msg}", ex.Message);
@@ -272,7 +272,7 @@ internal sealed class CharScreenHandlers(
         var time = reader.UInt32();
         // Остаток тела = decompressed_size(u32) + zlib-данные. Храним как есть (кросс-девайс хранилище,
         // сервер не распаковывает). M7 #17.
-        var blob = packet.Body.Length > 8 ? packet.Body[8..] : Array.Empty<byte>();
+        var blob = packet.Body.Length > 8 ? packet.Body[8..] : [];
 
         var (ownerId, isChar) = OwnerFor(session, dataType);
         if (ownerId != 0)
@@ -293,7 +293,7 @@ internal sealed class CharScreenHandlers(
         var (ownerId, isChar) = OwnerFor(session, dataType);
 
         uint time = 0;
-        byte[] blob = Array.Empty<byte>();
+        byte[] blob = [];
         if (ownerId != 0)
         {
             try
