@@ -5,10 +5,10 @@ namespace AlexWoW.WorldServer.World;
 
 /// <summary>
 /// Серверный тик мира (M6.3): фиксированный цикл ~250 мс, продвигающий боевые свинги, смерть и
-/// респавн существ (<see cref="WorldState.UpdateAsync"/>). Фундамент под реген/ИИ/нормализацию
-/// времени движения (позже). Один на сервер (hosted service).
+/// респавн существ (<see cref="WorldTick.UpdateAsync"/>; тик — DI-синглтон, M7 S3). Фундамент под
+/// реген/ИИ/нормализацию времени движения (позже). Один на сервер (hosted service).
 /// </summary>
-public sealed class WorldUpdateLoop(WorldState world, ILogger<WorldUpdateLoop> logger) : BackgroundService
+internal sealed class WorldUpdateLoop(WorldTick tick, ILogger<WorldUpdateLoop> logger) : BackgroundService
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(250);
 
@@ -20,7 +20,7 @@ public sealed class WorldUpdateLoop(WorldState world, ILogger<WorldUpdateLoop> l
         {
             try
             {
-                await world.UpdateAsync(stoppingToken);
+                await tick.UpdateAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {

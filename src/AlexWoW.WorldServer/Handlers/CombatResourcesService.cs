@@ -5,12 +5,13 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Боевые ресурсы (M6.12): генерация ярости (воин/друид) от нанесённого/полученного мили-урона и
-/// её распад вне боя; постоянный реген энергии (разбойник). Мана — отдельно (M6.4, SpellHandlers).
-/// Поле ресурса = <c>UNIT_FIELD_POWER1 + powerType</c>; полоску двигает VALUES-апдейт + SMSG_POWER_UPDATE
-/// (как мана). Расход ресурса абилками — когда абилки появятся.
+/// Боевые ресурсы (M6.12, DI-сервис M7 S3 — бывший статик CombatResources): генерация ярости (воин/друид)
+/// от нанесённого/полученного мили-урона и её распад вне боя; постоянный реген энергии (разбойник).
+/// Мана — отдельно (M6.4, <see cref="ManaRegenService"/>). Поле ресурса = <c>UNIT_FIELD_POWER1 + powerType</c>;
+/// полоску двигает VALUES-апдейт + SMSG_POWER_UPDATE (как мана). Расход ресурса абилками —
+/// <see cref="SpellCastCompletion"/> (зовёт <see cref="SpendPowerAsync"/>).
 /// </summary>
-public static class CombatResources
+internal sealed class CombatResourcesService
 {
     private const byte PowerRage = 1;     // powertype ярости
     private const byte PowerEnergy = 3;   // powertype энергии
@@ -30,7 +31,7 @@ public static class CombatResources
     /// Начисляет ярость от мили-урона (формула CMaNGOS <c>Player::RewardRage</c>): атакующему — больше
     /// (+ фактор скорости оружия), получившему урон — меньше. Только для ярость-классов. M6.12.
     /// </summary>
-    internal static async Task GainRageAsync(WorldSession session, uint damage, bool attacker, CancellationToken ct)
+    internal async Task GainRageAsync(WorldSession session, uint damage, bool attacker, CancellationToken ct)
     {
         if (session.Character is not { } c || DisplayData.PowerTypeForClass(c.Class) != PowerRage)
             return;
@@ -56,10 +57,10 @@ public static class CombatResources
     }
 
     /// <summary>
-    /// Тик ресурса (M6.12, из <see cref="World.WorldState.UpdateAsync"/>): энергии — постоянный реген до
-    /// максимума; ярости — распад вне боя (после паузы). Кадэнс 1 с. Мана — в SpellHandlers.
+    /// Тик ресурса (M6.12, из <see cref="World.WorldTick.UpdateAsync"/>): энергии — постоянный реген до
+    /// максимума; ярости — распад вне боя (после паузы). Кадэнс 1 с. Мана — в <see cref="ManaRegenService"/>.
     /// </summary>
-    internal static async Task TickAsync(WorldSession session, long now, CancellationToken ct)
+    internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
         if (session.InWorldGuid == 0 || session.Character is not { } c)
             return;
@@ -88,9 +89,9 @@ public static class CombatResources
 
     /// <summary>
     /// Списывает ресурс (ярость/энергия) на каст мили-абилки и двигает полоску. Мана списывается отдельно
-    /// (SpellCaster, правило 5 секунд). M10.4a.
+    /// (<see cref="SpellCastCompletion"/>, правило 5 секунд). M10.4a.
     /// </summary>
-    internal static async Task SpendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
+    internal async Task SpendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
     {
         switch (powerType)
         {
@@ -107,7 +108,7 @@ public static class CombatResources
 
     /// <summary>
     /// Шлёт текущее значение ресурса себе: VALUES-апдейт <c>UNIT_FIELD_POWER1+powerType</c> (консистентность
-    /// поля) + SMSG_POWER_UPDATE (двигает полоску у клиента 3.3.5a). Аналог регена маны в SpellHandlers.
+    /// поля) + SMSG_POWER_UPDATE (двигает полоску у клиента 3.3.5a). Аналог регена маны (<see cref="ManaRegenService"/>).
     /// </summary>
     private static async Task SendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
     {

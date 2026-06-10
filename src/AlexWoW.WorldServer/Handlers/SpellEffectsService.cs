@@ -6,14 +6,15 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Применение эффекта завершённого каста (M6.4): прямой урон по существу или хил игрока. Отделено от
-/// оркестрации каста (<see cref="SpellCaster"/>) по SRP. Урон идёт общим путём с мили
+/// Применение эффекта завершённого каста (M6.4, DI-сервис M7 S3 — бывший статик SpellEffects): прямой урон
+/// по существу или хил игрока, движущие эффекты (рывок/телепорт, M7 #33). Отделено от оркестрации каста
+/// (<see cref="SpellCastCompletion"/>) по SRP. Урон идёт общим путём с мили
 /// (<see cref="World.WorldState.ApplyCreatureDamage"/>); хил опирается на авторитетное HP (M6.7).
 /// </summary>
-public static class SpellEffects
+internal sealed class SpellEffectsService
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
-    internal static async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
+    internal async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
         ulong targetGuid, long now, CancellationToken ct)
     {
         var creature = targetGuid != 0 ? session.World.FindCreature(targetGuid) : null;
@@ -30,6 +31,7 @@ public static class SpellEffects
 
         if (died)
         {
+            // Лут — пока легаси-статик (конверсия в S5).
             await LootHandlers.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("SPELL KILL '{User}' убил '{Name}' спеллом {Spell}",
                 session.Account, creature.Template.Name, spellId);
@@ -40,7 +42,8 @@ public static class SpellEffects
         await CombatHandlers.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
     }
 
-    /// <summary>Монотонный id сплайна для движущих эффектов игрока (SMSG_MONSTER_MOVE). M7 #33.</summary>
+    /// <summary>Монотонный id сплайна для движущих эффектов игрока (SMSG_MONSTER_MOVE). M7 #33.
+    /// Static: глобальный счётчик (не состояние сервиса), инкремент атомарный.</summary>
     private static int _splineId;
 
     /// <summary>Базовая скорость рывка (ярд/с), как BASE_CHARGE_SPEED в CMaNGOS. M7 #33.</summary>
@@ -51,7 +54,7 @@ public static class SpellEffects
     /// самому игроку и соседям; клиент двигает свой персонаж по сплайну). Точка приземления — у цели со
     /// смещением назад к кастеру (combat reach), Z цели. Обновляет авторитетную позицию сессии. M7 #33.
     /// </summary>
-    internal static async Task ApplyChargeAsync(WorldSession session, ulong targetGuid, CancellationToken ct)
+    internal async Task ApplyChargeAsync(WorldSession session, ulong targetGuid, CancellationToken ct)
     {
         if (session.Player is not { } player || targetGuid == 0)
             return;
@@ -97,7 +100,7 @@ public static class SpellEffects
     /// (Shadowstep). Мгновенно — MSG_MOVE_TELEPORT_ACK игроку (клиент применяет позицию + отвечает) +
     /// MSG_MOVE_TELEPORT наблюдателям. Обновляет авторитетную позицию сессии. Z — рельеф (вперёд) или Z цели.
     /// </summary>
-    internal static async Task ApplyTeleportAsync(WorldSession session, ulong targetGuid, bool behind, CancellationToken ct)
+    internal async Task ApplyTeleportAsync(WorldSession session, ulong targetGuid, bool behind, CancellationToken ct)
     {
         if (session.Player is not { } player)
             return;
@@ -173,7 +176,7 @@ public static class SpellEffects
     /// дружественный игрок; фолбэк — себя). Поднимает HP до максимума, шлёт SMSG_SPELLHEALLOG (зелёное
     /// число + овёрхил) и VALUES-апдейт HP наблюдателям. Реализуемо благодаря авторитетному HP из M6.7.
     /// </summary>
-    internal static async Task ApplyHealAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
+    internal async Task ApplyHealAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
         ulong targetGuid, CancellationToken ct)
     {
         var caster = (ulong)session.InWorldGuid;

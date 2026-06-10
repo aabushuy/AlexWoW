@@ -83,6 +83,21 @@ builder.Services.AddSingleton<WorldState>();
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();
 builder.Services.AddSingleton<AddonProtocol>(); // не модуль (своих опкодов нет) — сервис для ChatHandlers (M7 #36)
+// M7 S3: спелл-кластер — статики сконвертированы в stateless DI-синглтоны (данные спеллов, оркестрация
+// каста и его завершение, ауры/периодика и их персист, реген ресурсов, переключатели, эффекты, крафт).
+builder.Services.AddSingleton<SpellCatalog>();
+builder.Services.AddSingleton<SpellGoSender>();
+builder.Services.AddSingleton<SpellCastService>();
+builder.Services.AddSingleton<SpellCastCompletion>();
+builder.Services.AddSingleton<SpellTogglesService>();
+builder.Services.AddSingleton<SpellEffectsService>();
+builder.Services.AddSingleton<AuraService>();
+builder.Services.AddSingleton<PeriodicsService>();
+builder.Services.AddSingleton<AuraPersistenceService>();
+builder.Services.AddSingleton<ManaRegenService>();
+builder.Services.AddSingleton<CombatResourcesService>();
+builder.Services.AddSingleton<CraftingService>();
+builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();
 builder.Services.AddSingleton<WorldSessionFactory>();

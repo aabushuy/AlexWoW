@@ -5,8 +5,8 @@ using AlexWoW.WorldServer.World;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.
-/// (DI-модуль, M7 #36.)</summary>
-internal sealed class MovementHandlers : IOpcodeHandlerModule
+/// (DI-модуль, M7 #36; прерывание каста движением — <see cref="SpellCastService"/>, S3.)</summary>
+internal sealed class MovementHandlers(SpellCastService spellCast) : IOpcodeHandlerModule
 {
     /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
     /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
@@ -56,7 +56,7 @@ internal sealed class MovementHandlers : IOpcodeHandlerModule
         // M6.4: сдвиг игрока прерывает текущий каст (клиент гасит бар локально, но серверу не шлёт
         // CANCEL_CAST — без этого эффект применился бы и анимация залипала).
         if (session.CastingSpellId != 0)
-            await SpellCaster.InterruptOnMoveAsync(session, ct);
+            await spellCast.InterruptOnMoveAsync(session, ct);
 
         // M5.3: ретранслируем движение соседям (с нормализацией поля time, если часы синхронизированы).
         if (session.Player is { } player)

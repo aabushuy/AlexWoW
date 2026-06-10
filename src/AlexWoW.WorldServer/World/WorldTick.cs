@@ -1,14 +1,18 @@
+using AlexWoW.WorldServer.Handlers;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
 
 /// <summary>
-/// Оркестрация серверного тика мира (SRP-часть <see cref="WorldState"/>, рефактор #30): раз в ~250 мс
+/// Оркестрация серверного тика мира (SRP-часть рефактора #30, DI-синглтон M7 S3): раз в ~250 мс
 /// (из <see cref="WorldUpdateLoop"/>) продвигает по-игроку (мили-свинги/реген/ауры/авто-агро/time-sync) и
 /// по-существу (ИИ возврат/бой/реген, респавн мёртвых). Исключения по сессии/существу ловятся поштучно,
-/// чтобы не валить весь тик.
+/// чтобы не валить весь тик. Тик-сервисы (реген/ауры/периодика) — DI; бой/time-sync — пока легаси-статики
+/// (CombatHandlers/WorldEntryHandlers, конверсия в S4/S7).
 /// </summary>
-public sealed class WorldTick(WorldState world, CreatureDirector creatures, FactionStore factions, ILogger logger)
+internal sealed class WorldTick(WorldState world, FactionStore factions,
+    ManaRegenService manaRegen, CombatResourcesService combatResources,
+    AuraService auras, PeriodicsService periodics, ILogger<WorldTick> logger)
 {
     /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
     private const long TimeSyncIntervalMs = 10_000;
@@ -22,19 +26,19 @@ public sealed class WorldTick(WorldState world, CreatureDirector creatures, Fact
         {
             try
             {
-                await Handlers.CombatHandlers.TickMeleeAsync(player.Session, now, ct);
-                // M6.4: завершение каста — точно по времени (Task.Delay в SpellCaster), не в тике;
+                await CombatHandlers.TickMeleeAsync(player.Session, now, ct);
+                // M6.4: завершение каста — точно по времени (Task.Delay в SpellCastCompletion), не в тике;
                 // здесь — реген маны (вне «правила 5 секунд»).
-                await Handlers.ManaRegen.TickAsync(player.Session, now, ct);
-                await Handlers.CombatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
-                await Handlers.Auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
-                await Handlers.Periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
-                await Handlers.CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
-                await Handlers.CombatHandlers.TickAggroScanAsync(world, player, now, ct);     // M6.7: авто-агро по фракции
+                await manaRegen.TickAsync(player.Session, now, ct);
+                await combatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
+                await auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
+                await periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
+                await CombatHandlers.TickPlayerRegenAsync(player.Session, now, ct); // M6.7: внебоевой реген HP
+                await CombatHandlers.TickAggroScanAsync(world, player, now, ct);     // M6.7: авто-агро по фракции
 
                 // M6.3 ч.2: периодическая синхронизация часов клиента (для нормализации движения).
                 if (now - player.Session.LastTimeSyncDispatchMs >= TimeSyncIntervalMs)
-                    await Handlers.WorldEntryHandlers.SendTimeSyncReqAsync(player.Session, ct);
+                    await WorldEntryHandlers.SendTimeSyncReqAsync(player.Session, ct);
             }
             catch (Exception ex)
             {
@@ -50,15 +54,15 @@ public sealed class WorldTick(WorldState world, CreatureDirector creatures, Fact
                 if (creature.IsAlive)
                 {
                     if (creature.Evading)
-                        await Handlers.CombatHandlers.TickEvadeAsync(world, creature, now, ct);
+                        await CombatHandlers.TickEvadeAsync(world, creature, now, ct);
                     else if (creature.CombatTargetGuid != 0)
-                        await Handlers.CombatHandlers.TickCreatureCombatAsync(world, creature, now, ct);
+                        await CombatHandlers.TickCreatureCombatAsync(world, creature, now, ct);
                     else
-                        await Handlers.CombatHandlers.TickRegenAsync(world, creature, now, ct);
+                        await CombatHandlers.TickRegenAsync(world, creature, now, ct);
                     continue;
                 }
                 if (creature.RespawnAtMs is { } at && now >= at)
-                    await creatures.RespawnCreatureAsync(creature, ct);
+                    await world.Director.RespawnCreatureAsync(creature, ct);
             }
             catch (Exception ex)
             {
