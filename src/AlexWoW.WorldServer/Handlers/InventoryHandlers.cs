@@ -108,24 +108,27 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int srcBag = r.UInt8(), src = r.UInt8(), dstBag = r.UInt8(), dst = r.UInt8();
         var amount = r.UInt32();
-        if (!IsMain(srcBag) || !IsMain(dstBag)) return; // дробление в/из сумок — B4
+        if (!ValidContainer(session, srcBag) || !ValidContainer(session, dstBag)) return;
 
-        var item = ItemAt(session, src);
-        if (item is null) { await ReassertAsync(session, ct, src, dst); return; }
-        if (amount == 0 || amount >= item.StackCount) { await ReassertAsync(session, ct, src, dst); return; }
-        if (!InventorySlots.IsBackpackSlot(dst) || ItemAt(session, dst) is not null)
-        { await ReassertAsync(session, ct, src, dst); return; } // только в пустой слот рюкзака
+        var item = ItemAt(session, srcBag, src);
+        if (item is null) { await ReassertPosAsync(session, ct, (srcBag, src), (dstBag, dst)); return; }
+        if (amount == 0 || amount >= item.StackCount) { await ReassertPosAsync(session, ct, (srcBag, src), (dstBag, dst)); return; }
+        // dst — пустой слот хранения: рюкзак (осн.) или внутренность сумки (по ёмкости).
+        var dstOk = dstBag == InventorySlots.MainBag
+            ? InventorySlots.IsBackpackSlot(dst)
+            : dst < BagInventory.Capacity(session, dstBag);
+        if (!dstOk || ItemAt(session, dstBag, dst) is not null)
+        { await ReassertPosAsync(session, ct, (srcBag, src), (dstBag, dst)); return; }
 
         var owner = session.InWorldGuid;
         item.StackCount -= amount;
         await session.Items.SetItemStackAsync(item.ItemGuid, item.StackCount, ct);
 
-        var newLow = await session.Items.AddItemAsync(owner, item.ItemEntry,
-            InventorySlots.MainBag, (byte)dst, amount, ct);
+        var newLow = await session.Items.AddItemAsync(owner, item.ItemEntry, (byte)dstBag, (byte)dst, amount, ct);
         var newItem = new InventoryItem
         {
             ItemGuid = newLow, OwnerGuid = owner, ItemEntry = item.ItemEntry,
-            Bag = InventorySlots.MainBag, Slot = (byte)dst, StackCount = amount,
+            Bag = (byte)dstBag, Slot = (byte)dst, StackCount = amount,
         };
         session.Inventory.Add(newItem);
 
@@ -133,8 +136,9 @@ public static class InventoryHandlers
             ItemObject.BuildStackUpdate(ItemObject.ItemGuid(item.ItemGuid), item.StackCount), ct);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             ItemObject.BuildItemsCreate(new[] { newItem }, owner, session.ItemBagInfo), ct);
-        await ReassertAsync(session, ct, dst);
-        session.Logger.LogDebug("SPLIT '{User}': {Entry} {Amt} в слот {Dst}", session.Account, item.ItemEntry, amount, dst);
+        await ReassertPosAsync(session, ct, (dstBag, dst));
+        await SendContainedAsync(session, newItem, ct);
+        session.Logger.LogDebug("SPLIT '{User}': {Entry} {Amt} → bag={DB} slot={Dst}", session.Account, item.ItemEntry, amount, dstBag, dst);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgDestroyItem)]
@@ -143,10 +147,14 @@ public static class InventoryHandlers
         var r = packet.Reader();
         int bag = r.UInt8(), slot = r.UInt8();
         var amount = r.UInt8();
-        if (!IsMain(bag)) return; // уничтожение из сумок — B4
+        if (!ValidContainer(session, bag)) return;
 
-        var item = ItemAt(session, slot);
+        var item = ItemAt(session, bag, slot);
         if (item is null) return;
+
+        // Нельзя уничтожить непустую надетую сумку.
+        if (bag == InventorySlots.MainBag && InventorySlots.IsBagSlot(slot) && BagInventory.HasItems(session, slot))
+        { await ReassertPosAsync(session, ct, (bag, slot)); return; }
 
         if (amount == 0 || amount >= item.StackCount)
         {
@@ -154,7 +162,7 @@ public static class InventoryHandlers
             session.Inventory.Remove(item);
             await session.SendAsync(WorldOpcode.SmsgDestroyObject,
                 new ByteWriter(9).UInt64(ItemObject.ItemGuid(item.ItemGuid)).UInt8(0).ToArray(), ct);
-            await ReassertAsync(session, ct, slot);
+            await ReassertPosAsync(session, ct, (bag, slot));
         }
         else
         {
@@ -324,6 +332,4 @@ public static class InventoryHandlers
     private static bool ValidContainer(WorldSession session, int bag)
         => bag == InventorySlots.MainBag
            || (InventorySlots.IsBagSlot(bag) && BagInventory.MainItemAt(session, bag) is not null);
-
-    private static bool IsMain(int bag) => bag == InventorySlots.MainBag;
 }
