@@ -62,7 +62,7 @@ public static class InventoryHandlers
         {
             var free = BagInventory.FirstFreeStoreSlot(session);
             if (free is { } f) await MoveOrSwapAsync(session, srcBag, src, f.Bag, f.Slot, ct);
-            else await ReassertAsync(session, ct, src);
+            else await RejectEquipAsync(session, EquipErrInventoryFull, item, ct, (srcBag, src));
             return;
         }
 
@@ -73,13 +73,13 @@ public static class InventoryHandlers
         {
             var bagSlot = FreeBagSlot(session);
             if (bagSlot < 0) bagSlot = FirstEmptyEquippedBagSlot(session);
-            if (bagSlot < 0) { await ReassertPosAsync(session, ct, (srcBag, src)); return; }
+            if (bagSlot < 0) { await RejectEquipAsync(session, EquipErrInventoryFull, item, ct, (srcBag, src)); return; }
             await MoveOrSwapAsync(session, srcBag, src, InventorySlots.MainBag, bagSlot, ct);
             return;
         }
 
         var slot = InventorySlots.EquipSlotFor(inv);
-        if (slot < 0) { await ReassertPosAsync(session, ct, (srcBag, src)); return; } // не экипируется
+        if (slot < 0) { await RejectEquipAsync(session, EquipErrItemDoesntGoToSlot, item, ct, (srcBag, src)); return; } // не экипируется
 
         // кольцо/тринкет: если основной слот занят, а альтернативный свободен — берём альтернативный.
         if (ItemAt(session, slot) is not null)
@@ -154,7 +154,7 @@ public static class InventoryHandlers
 
         // Нельзя уничтожить непустую надетую сумку.
         if (bag == InventorySlots.MainBag && InventorySlots.IsBagSlot(slot) && BagInventory.HasItems(session, slot))
-        { await ReassertPosAsync(session, ct, (bag, slot)); return; }
+        { await RejectEquipAsync(session, EquipErrOnlyWithEmptyBags, item, ct, (bag, slot)); return; }
 
         if (amount == 0 || amount >= item.StackCount)
         {
@@ -183,39 +183,54 @@ public static class InventoryHandlers
     {
         if (srcBag == dstBag && srcSlot == dstSlot) return;
         var src = ItemAt(session, srcBag, srcSlot);
-        if (src is null) { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        if (src is null)
+        {
+            // Источник пуст — освободить курсор (иначе клиент держит «поднятый» предмет серым).
+            await SendEquipErrorAsync(session, EquipErrItemDoesntGoToSlot, 0, 0, ct);
+            await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot));
+            return;
+        }
         var dst = ItemAt(session, dstBag, dstSlot);
 
         var srcInv = await InvTypeAsync(session, src.ItemEntry, ct);
         var dstInv = dst is not null ? await InvTypeAsync(session, dst.ItemEntry, ct) : 0u;
         bool srcMain = srcBag == InventorySlots.MainBag, dstMain = dstBag == InventorySlots.MainBag;
 
+        // Отказ: SMSG_INVENTORY_CHANGE_FAILURE (вернуть предмет с курсора — иначе он залипает серым до релога)
+        // + пере-утвердить слоты. M6.13 (баг с залипанием сумки).
+        async Task RejectAsync(byte err)
+        {
+            await SendEquipErrorAsync(session, err,
+                ItemObject.ItemGuid(src.ItemGuid), dst is null ? 0UL : ItemObject.ItemGuid(dst.ItemGuid), ct);
+            await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot));
+        }
+
         // Экипировка (осн. контейнер): можно класть только подходящий тип.
         if (dstMain && InventorySlots.IsEquipmentSlot(dstSlot)
             && !InventorySlots.CanEquipInSlot(srcInv, dstSlot))
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
         if (dst is not null && srcMain && InventorySlots.IsEquipmentSlot(srcSlot)
             && !InventorySlots.CanEquipInSlot(dstInv, srcSlot))
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
 
         // bag-слот осн. контейнера (19..22): только сумка; непустую сумку нельзя снять/вытеснить.
         if (dstMain && InventorySlots.IsBagSlot(dstSlot) && srcInv != InventorySlots.InvTypeBag)
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
         if (dst is not null && srcMain && InventorySlots.IsBagSlot(srcSlot) && dstInv != InventorySlots.InvTypeBag)
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
         if ((srcMain && InventorySlots.IsBagSlot(srcSlot) && BagInventory.HasItems(session, srcSlot))
             || (dst is not null && dstMain && InventorySlots.IsBagSlot(dstSlot) && BagInventory.HasItems(session, dstSlot)))
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrOnlyWithEmptyBags); return; }
 
         // Внутрь сумки (dstBag 19..22): по ёмкости; без вложенности (сумку в сумку нельзя).
         if (!dstMain)
         {
             var cap = BagInventory.Capacity(session, dstBag);
             if (cap == 0 || dstSlot >= cap || srcInv == InventorySlots.InvTypeBag)
-            { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+            { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
         }
         if (dst is not null && !srcMain && dstInv == InventorySlots.InvTypeBag)
-        { await ReassertPosAsync(session, ct, (srcBag, srcSlot), (dstBag, dstSlot)); return; }
+        { await RejectAsync(EquipErrItemDoesntGoToSlot); return; }
 
         // --- применяем ---
         src.Bag = (byte)dstBag; src.Slot = (byte)dstSlot;
@@ -281,6 +296,33 @@ public static class InventoryHandlers
         }
         return session.SendAsync(WorldOpcode.SmsgUpdateObject,
             ItemObject.BuildContainedUpdate(ItemObject.ItemGuid(item.ItemGuid), container), ct);
+    }
+
+    // InventoryResult (SMSG_INVENTORY_CHANGE_FAILURE) — сверено с CMaNGOS Item.h.
+    private const byte EquipErrItemDoesntGoToSlot = 3;
+    private const byte EquipErrOnlyWithEmptyBags = 31;   // непустую сумку нельзя снять/уничтожить
+    private const byte EquipErrInventoryFull = 50;
+
+    /// <summary>
+    /// SMSG_INVENTORY_CHANGE_FAILURE (3.3.5): отклоняет операцию инвентаря и ВОЗВРАЩАЕТ предмет с курсора.
+    /// Без него клиент держит «поднятый» предмет (серый в слоте) до релога — отсюда залипание сумки. M6.13.
+    /// Формат: u8 result; если result≠OK — u64 item1, u64 item2, u8 bag_subclass(0). (Level-поле только для
+    /// CANT_EQUIP_LEVEL_I=1, нам не нужно.)
+    /// </summary>
+    private static Task SendEquipErrorAsync(WorldSession session, byte result, ulong item1, ulong item2, CancellationToken ct)
+    {
+        var w = new ByteWriter(20).UInt8(result);
+        if (result != 0)
+            w.UInt64(item1).UInt64(item2).UInt8(0);
+        return session.SendAsync(WorldOpcode.SmsgInventoryChangeFailure, w.ToArray(), ct);
+    }
+
+    /// <summary>Отказ авто-операции: вернуть предмет с курсора (SMSG_INVENTORY_CHANGE_FAILURE) + пере-утвердить. M6.13.</summary>
+    private static async Task RejectEquipAsync(WorldSession session, byte err, InventoryItem item,
+        CancellationToken ct, params (int Bag, int Slot)[] positions)
+    {
+        await SendEquipErrorAsync(session, err, ItemObject.ItemGuid(item.ItemGuid), 0, ct);
+        await ReassertPosAsync(session, ct, positions);
     }
 
     private static InventoryItem? ItemAt(WorldSession session, int bag, int slot)
