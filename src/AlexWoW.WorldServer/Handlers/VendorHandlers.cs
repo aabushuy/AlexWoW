@@ -123,6 +123,13 @@ public static class VendorHandlers
         if (item.Bag == InventorySlots.MainBag)
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
                 PlayerSpawn.BuildInvSlotUpdate(ownerGuid, item.Slot, 0), ct);
+        else if (InventorySlots.IsBagSlot(item.Bag)) // M6.13: продажа из надетой сумки — очистить её слот
+        {
+            var bagGuid = BagInventory.BagGuid(session, item.Bag);
+            if (bagGuid != 0)
+                await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                    ContainerObject.BuildSlotUpdate(bagGuid, item.Slot, 0), ct);
+        }
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildCoinageUpdate(ownerGuid, session.Money), ct);
         session.Logger.LogInformation("SELL '{User}': item={Item} (guid={Guid}) за {Gain}, теперь {Money}",
