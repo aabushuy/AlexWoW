@@ -45,6 +45,14 @@ if (args.Length >= 2 && args[0].Equals("spelldurations", StringComparison.Ordina
     return;
 }
 
+// Таланты: talent <dataDir> <out.sql> — Talent.dbc + TalentTab.dbc → SQL для talent/talent_tab (M9.6/M9.7).
+if (args.Length >= 3 && args[0].Equals("talent", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqT = new MpqChain(args[1]);
+    TalentDump.ExtractToSql(mpqT, args[2]);
+    return;
+}
+
 // Диагностика Faction.dbc: faction <dataDir> <id> [id2 ...] — печать reputationListID и base standing.
 if (args.Length >= 3 && args[0].Equals("faction", StringComparison.OrdinalIgnoreCase))
 {

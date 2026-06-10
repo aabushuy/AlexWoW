@@ -109,14 +109,21 @@ public static class WorldEntryHandlers
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
         await SendTimeSyncReqAsync(session, ct);
 
-        // M9.1: XP-бар — текущий опыт + порог следующего уровня.
+        // M9.6: свободные очки талантов (MaxPoints − потрачено; M9.7 загрузит изученные до этой точки).
+        TalentHandlers.RecomputePoints(session, character.Class, character.Level);
+
+        // M9.1: XP-бар — текущий опыт + порог следующего уровня. M9.6: очки талантов в то же поле-апдейт.
         await session.World.Levels.EnsureLoadedAsync(ct);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
                 m.SetUInt32(UpdateField.PlayerXp, session.Xp);
                 m.SetUInt32(UpdateField.PlayerNextLevelXp, session.World.Levels.XpToNext(character.Level));
+                m.SetUInt32(UpdateField.PlayerCharacterPoints1, session.TalentPoints);
             }), ct);
+
+        // M9.6: состояние талантов (открывает панель; деревья клиент рисует сам из своей DBC).
+        await TalentHandlers.SendTalentsInfoAsync(session, ct);
 
         // M9.2: боевые поля (урон/скорость) из экипированного оружия — чтобы чарпейн не показывал INF.
         await Progression.RefreshMeleeAsync(session, ct);

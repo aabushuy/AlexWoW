@@ -113,6 +113,10 @@ public static class UpdateField
     /// <summary>Деньги игрока (медь). Задел под торговлю (M6.2).</summary>
     public const int PlayerFieldCoinage = 0x0492;
 
+    /// <summary>PLAYER_CHARACTER_POINTS1 — свободные очки талантов (private; сверено с CMaNGOS
+    /// UpdateFields.cpp, калибровка по COINAGE=0x492). M9.6.</summary>
+    public const int PlayerCharacterPoints1 = 0x03FC;
+
     /// <summary>Поле OBJECT_FIELD_ENTRYID видимого предмета для слота экипировки 0..18.</summary>
     public static int VisibleItemEntry(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2;
 

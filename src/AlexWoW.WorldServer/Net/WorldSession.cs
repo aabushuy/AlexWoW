@@ -208,6 +208,11 @@ public sealed class WorldSession
     /// HasSpell-проверок тренера и анти-дубля. Загружается при входе в мир. M9.3.</summary>
     internal HashSet<uint> KnownSpells { get; } = new();
 
+    /// <summary>Свободные очки талантов (PLAYER_CHARACTER_POINTS1). Вычисляются: MaxPoints(level) − потрачено. M9.6.</summary>
+    internal uint TalentPoints { get; set; }
+    /// <summary>Изученные таланты: talentId → ранг (0-индексный). Загружается при входе. M9.6/M9.7.</summary>
+    internal Dictionary<uint, byte> LearnedTalents { get; } = new();
+
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
     internal List<World.ActiveAura> Auras { get; } = new();
     /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
@@ -263,6 +268,7 @@ public sealed class WorldSession
         CastingSpellId = 0;   // M6.4: каст прерывается при выходе
         SpellCooldowns.Clear();
         KnownSpells.Clear();  // M9.3: набор спеллов перезагружаем при следующем входе
+        LearnedTalents.Clear(); // M9.6: таланты перезагружаем при следующем входе
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;
