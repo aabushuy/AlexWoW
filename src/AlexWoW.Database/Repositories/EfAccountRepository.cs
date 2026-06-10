@@ -20,6 +20,14 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         return a is null ? null : ToModel(a);
     }
 
+    public async Task<ModelAccount?> GetAccountByEmailAsync(string email, CancellationToken ct = default)
+    {
+        var e = email.ToLowerInvariant();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Email == e, ct);
+        return a is null ? null : ToModel(a);
+    }
+
     public async Task<bool> AccountExistsAsync(string username, CancellationToken ct = default)
     {
         var u = username.ToUpperInvariant();
@@ -27,12 +35,21 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         return await db.Accounts.AsNoTracking().AnyAsync(x => x.Username == u, ct);
     }
 
-    public async Task CreateAccountAsync(string username, byte[] salt, byte[] verifier, CancellationToken ct = default)
+    public async Task<bool> EmailExistsAsync(string email, CancellationToken ct = default)
+    {
+        var e = email.ToLowerInvariant();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Accounts.AsNoTracking().AnyAsync(x => x.Email == e, ct);
+    }
+
+    public async Task CreateAccountAsync(string username, byte[] salt, byte[] verifier, string? email = null,
+        CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         db.Accounts.Add(new Account
         {
             Username = username.ToUpperInvariant(),
+            Email = email?.ToLowerInvariant(),
             Salt = salt,
             Verifier = verifier,
         });
@@ -76,6 +93,7 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
     {
         Id = a.Id,
         Username = a.Username,
+        Email = a.Email,
         Salt = a.Salt,
         Verifier = a.Verifier,
         SessionKey = a.SessionKey,

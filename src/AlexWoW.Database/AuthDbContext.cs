@@ -34,6 +34,10 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.Id).HasColumnName("id");
             // M8.2: логин = email, поэтому username расширен до 255 (было 32).
             e.Property(x => x.Username).HasColumnName("username").HasMaxLength(255).IsRequired();
+            // M8: email для входа на сайт. Nullable (у игровых/CLI-аккаунтов его нет); уникальный
+            // (в MySQL уникальный индекс допускает несколько NULL).
+            e.Property(x => x.Email).HasColumnName("email").HasMaxLength(255);
+            e.HasIndex(x => x.Email).IsUnique().HasDatabaseName("uk_account_email");
             e.Property(x => x.Salt).HasColumnName("salt").HasColumnType("binary(32)").IsRequired();
             e.Property(x => x.Verifier).HasColumnName("verifier").HasColumnType("binary(32)").IsRequired();
             e.Property(x => x.SessionKey).HasColumnName("session_key").HasColumnType("binary(40)");

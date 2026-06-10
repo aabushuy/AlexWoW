@@ -11,9 +11,17 @@ public interface IAccountRepository
 {
     Task<Account?> GetAccountByUsernameAsync(string username, CancellationToken ct = default);
 
+    /// <summary>Аккаунт по email (вход на сайт, M8). Сравнение без учёта регистра.</summary>
+    Task<Account?> GetAccountByEmailAsync(string email, CancellationToken ct = default);
+
     Task<bool> AccountExistsAsync(string username, CancellationToken ct = default);
 
-    Task CreateAccountAsync(string username, byte[] salt, byte[] verifier, CancellationToken ct = default);
+    /// <summary>Занят ли email (M8). Сравнение без учёта регистра.</summary>
+    Task<bool> EmailExistsAsync(string email, CancellationToken ct = default);
+
+    /// <summary>Создаёт аккаунт. <paramref name="email"/> — для входа на сайт (M8), null у игровых/CLI.</summary>
+    Task CreateAccountAsync(string username, byte[] salt, byte[] verifier, string? email = null,
+        CancellationToken ct = default);
 
     /// <summary>Все имена аккаунтов (для массовых операций, напр. сброса пароля).</summary>
     Task<IReadOnlyList<string>> GetAllUsernamesAsync(CancellationToken ct = default);
