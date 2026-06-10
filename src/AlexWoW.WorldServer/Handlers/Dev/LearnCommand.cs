@@ -15,7 +15,7 @@ internal sealed class LearnCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .learn SPELL", ct);
             return;
         }
-        await SpellLearn.GrantAsync(ctx.Session, spellId, ct);
+        await ctx.Session.SpellLearn.GrantAsync(ctx.Session, spellId, ct); // мост сессии (до S8)
         await ctx.ReplyAsync($"Изучен спелл {spellId}", ct);
     }
 }

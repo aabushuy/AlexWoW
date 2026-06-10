@@ -11,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Зовётся из путей смерти существа (мили M6.3 / спелл M6.4 / DoT M10.4b). Окно/раздача лута —
 /// модуль <see cref="LootHandlers"/>.
 /// </summary>
-internal sealed class KillRewardService(QuestProgressService questProgress)
+internal sealed class KillRewardService(QuestProgressService questProgress, ProgressionService progression)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
     private const uint DynFlagLootable = 0x1;
@@ -25,12 +25,12 @@ internal sealed class KillRewardService(QuestProgressService questProgress)
         // M6.5: зачёт убийства в цели активных квестов.
         await questProgress.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
 
-        // M9.1: опыт за убийство (убийце). Progression — легаси-статик (конверсия в S6).
+        // M9.1: опыт за убийство (убийце).
         if (session.Character is { } pc && pc.Level < World.LevelStore.MaxLevel)
         {
             var xp = session.World.Levels.KillXp(pc.Level, creature.Template.Level);
             if (xp > 0)
-                await Progression.GiveXpAsync(session, xp, ct);
+                await progression.GiveXpAsync(session, xp, ct);
         }
 
         Database.Models.CreatureLootData? data;

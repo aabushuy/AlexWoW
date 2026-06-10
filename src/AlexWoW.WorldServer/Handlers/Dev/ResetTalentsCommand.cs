@@ -11,7 +11,7 @@ internal sealed class ResetTalentsCommand : IDevCommand
 
     public async Task ExecuteAsync(DevCommandContext ctx, CancellationToken ct)
     {
-        await TalentHandlers.ResetTalentsAsync(ctx.Session, 0, ct);
+        await ctx.Session.Talents.ResetTalentsAsync(ctx.Session, 0, ct); // мост сессии (до S8)
         await ctx.ReplyAsync("Таланты сброшены (бесплатно)", ct);
     }
 }

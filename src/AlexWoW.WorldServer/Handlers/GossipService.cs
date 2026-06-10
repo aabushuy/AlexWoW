@@ -7,9 +7,12 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <summary>
 /// Оркестрация правого клика по NPC (M6.5/M9.3, DI-сервис M7 S5 — вынос из god-класса QuestHandlers):
 /// маршрутизация госсипа «приёмщик квеста → квестгивер → тренер → вендор».
-/// Тренер/вендор — пока легаси-статики (конверсия в S6).
 /// </summary>
-internal sealed class GossipService(QuestProgressService questProgress, QuestDialogService dialog)
+internal sealed class GossipService(
+    QuestProgressService questProgress,
+    QuestDialogService dialog,
+    TrainerCatalogService trainerCatalog,
+    VendorHandlers vendor)
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
@@ -60,12 +63,11 @@ internal sealed class GossipService(QuestProgressService questProgress, QuestDia
         // Тренер класса (M9.3): если NPC — тренер, подходящий игроку, открыть меню госсипа с пунктом
         // «обучиться» (приоритет над вендором — классовые тренеры обычно не торгуют). У тренеров флаг
         // GOSSIP → клиент ждёт меню, прямой SMSG_TRAINER_LIST игнорирует; список — на выбор пункта.
-        // Легаси-статики (конверсия в S6) — инстанс-сервису звать их можно.
-        if (TrainerHandlers.IsTrainerNpc(session, npcGuid)
-            && await TrainerHandlers.TrySendTrainerGossipAsync(session, npcGuid, ct))
+        if (trainerCatalog.IsTrainerNpc(session, npcGuid)
+            && await trainerCatalog.TrySendTrainerGossipAsync(session, npcGuid, ct))
             return;
 
         // Не квестгивер/тренер (или без доступных квестов) — попробуем как вендора.
-        await VendorHandlers.SendVendorListAsync(session, npcGuid, ct);
+        await vendor.SendVendorListAsync(session, npcGuid, ct);
     }
 }

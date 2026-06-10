@@ -10,7 +10,7 @@ internal sealed class LearnAllCommand : IDevCommand
 
     public async Task ExecuteAsync(DevCommandContext ctx, CancellationToken ct)
     {
-        var n = await TrainerHandlers.LearnAllFromNearbyTrainerAsync(ctx.Session, ct);
+        var n = await ctx.Session.TrainerCatalog.LearnAllFromNearbyTrainerAsync(ctx.Session, ct); // мост сессии (до S8)
         await ctx.ReplyAsync(n < 0
             ? "Рядом нет подходящего классового тренера"
             : $"Выучено абилок: {n}", ct);

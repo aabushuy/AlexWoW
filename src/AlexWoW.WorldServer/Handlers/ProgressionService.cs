@@ -7,17 +7,18 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Прогрессия (M9.1): начисление опыта и повышение уровня. XP за килл/квест → <see cref="GiveXpAsync"/> →
-/// накопление, level-up при достижении порога (player_xp_for_level), <c>SMSG_LEVELUP_INFO</c> (сплеш «ding»)
-/// + апдейт полей (уровень/HP) + персист. Статы пока флэт по уровню (точные по классу — M9.2).
+/// Прогрессия (M9.1, DI-сервис M7 S6 — бывший статик Progression): начисление опыта и повышение уровня.
+/// XP за килл/квест → <see cref="GiveXpAsync"/> → накопление, level-up при достижении порога
+/// (player_xp_for_level), <c>SMSG_LEVELUP_INFO</c> (сплеш «ding») + апдейт полей (уровень/HP) + персист.
+/// Статы пока флэт по уровню (точные по классу — M9.2).
 /// </summary>
-public static class Progression
+internal sealed class ProgressionService(TalentHandlers talents)
 {
     /// <summary>
     /// Начисляет <paramref name="amount"/> опыта игроку: копит, повышает уровень (с переносом остатка),
     /// шлёт level-up визуал/поля, обновляет PLAYER_XP, персистит уровень+опыт. На капе опыт не копится.
     /// </summary>
-    internal static async Task GiveXpAsync(WorldSession session, uint amount, CancellationToken ct)
+    internal async Task GiveXpAsync(WorldSession session, uint amount, CancellationToken ct)
     {
         var c = session.Character;
         if (c is null || session.InWorldGuid == 0 || amount == 0 || c.Level >= LevelStore.MaxLevel)
@@ -54,7 +55,7 @@ public static class Progression
     /// Выставляет уровень напрямую (дев-команда M9.4): пересчёт HP, фулл-хил, сброс опыта, апдейт полей +
     /// SMSG_LEVELUP_INFO. Клампится 1..80.
     /// </summary>
-    internal static async Task SetLevelAsync(WorldSession session, byte level, CancellationToken ct)
+    internal async Task SetLevelAsync(WorldSession session, byte level, CancellationToken ct)
     {
         var c = session.Character;
         if (c is null || session.InWorldGuid == 0)
@@ -81,7 +82,7 @@ public static class Progression
     /// = 1.0), скорость = задержка оружия; без оружия — 1-2 / 2.0с. Зовётся после спавна и при смене
     /// экипировки (M6.9 — позже подключить). VALUES-апдейт себе.
     /// </summary>
-    internal static async Task RefreshMeleeAsync(WorldSession session, CancellationToken ct)
+    internal async Task RefreshMeleeAsync(WorldSession session, CancellationToken ct)
     {
         if (session.InWorldGuid == 0 || session.Character is not { } c)
             return;
@@ -132,7 +133,7 @@ public static class Progression
             }), ct);
     }
 
-    /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS. M7 #16.</summary>
+    /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS. M7 #16. (Чистая математика — static.)</summary>
     private static uint MeleeAttackPower(byte cls, byte level, uint str, uint agi)
     {
         float ap = cls switch
@@ -150,7 +151,7 @@ public static class Progression
         => cls == 3 ? (uint)Math.Max(0f, level * 2f + agi - 10f) : 0u;
 
     /// <summary>Повышение на один уровень: +1 к уровню, пересчёт статов/HP/маны, ding.</summary>
-    private static async Task ApplyLevelUpAsync(WorldSession session, CancellationToken ct)
+    private async Task ApplyLevelUpAsync(WorldSession session, CancellationToken ct)
     {
         var c = session.Character!;
         c.Level = (byte)(c.Level + 1);
@@ -163,7 +164,7 @@ public static class Progression
     /// Пересчёт статов/HP/маны по текущему уровню (M9.2: player_levelstats; фолбэк — флэт), фулл-хил,
     /// апдейт полей (уровень/HP/мана/статы). <paramref name="ding"/> — ещё и SMSG_LEVELUP_INFO («ding»).
     /// </summary>
-    private static async Task RecalcStatsAsync(WorldSession session, bool ding, CancellationToken ct)
+    private async Task RecalcStatsAsync(WorldSession session, bool ding, CancellationToken ct)
     {
         var c = session.Character!;
         await session.World.Stats.EnsureLoadedAsync(ct);
@@ -177,7 +178,7 @@ public static class Progression
         var powerType = DisplayData.PowerTypeForClass(c.Class);
 
         // M9.6: очки талантов растут с уровнем (MaxPoints − потрачено).
-        TalentHandlers.RecomputePoints(session, c.Class, c.Level);
+        talents.RecomputePoints(session, c.Class, c.Level);
 
         if (ding)
         {
@@ -212,6 +213,6 @@ public static class Progression
             }), ct);
 
         if (ding) // M9.6: обновить панель талантов (новые свободные очки)
-            await TalentHandlers.SendTalentsInfoAsync(session, ct);
+            await talents.SendTalentsInfoAsync(session, ct);
     }
 }

@@ -13,7 +13,8 @@ internal sealed class CharScreenHandlers(
     ICharacterRepository characters,
     IInventoryRepository items,
     IWorldRepository worldDb,
-    ICharacterStateRepository charState) : IOpcodeHandlerModule
+    ICharacterStateRepository charState,
+    StartingGearService startingGear) : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgCharEnum)]
     public async Task OnCharEnum(WorldSession session, IncomingPacket packet, CancellationToken ct)
@@ -150,7 +151,7 @@ internal sealed class CharScreenHandlers(
         var newGuid = await characters.CreateAsync(character, ct);
 
         // M6.1: выдать стартовую экипировку (шмот/оружие), чтобы персонаж входил в мир не голым.
-        await StartingGear.GiveAsync(session, newGuid, race, charClass, ct);
+        await startingGear.GiveAsync(session, newGuid, race, charClass, ct);
 
         return CharResponse.CreateSuccess;
     }

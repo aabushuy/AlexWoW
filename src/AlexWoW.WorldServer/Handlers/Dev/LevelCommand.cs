@@ -15,7 +15,7 @@ internal sealed class LevelCommand : IDevCommand
             await ctx.ReplyAsync("Использование: .level N", ct);
             return;
         }
-        await Progression.SetLevelAsync(ctx.Session, lvl, ct);
+        await ctx.Session.Progression.SetLevelAsync(ctx.Session, lvl, ct); // мост сессии (до S8)
         await ctx.ReplyAsync($"Уровень: {Math.Clamp(lvl, (byte)1, World.LevelStore.MaxLevel)}", ct);
     }
 }

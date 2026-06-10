@@ -6,20 +6,21 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Изучение спелла (M9.3 → M10.3): добавляет абилку в кэш/персист и шлёт клиенту либо
-/// <c>SMSG_LEARNED_SPELL</c> (новая абилка), либо <c>SMSG_SUPERCEDED_SPELL</c> (высший ранг заменяет
-/// известный низший — кнопка/книга апгрейдятся, низший убирается из книги). Единая точка для тренера,
-/// <c>.learn</c> и <c>.learnall</c>. Цепочки рангов — <c>spell_chain.prev_spell</c> (mangos).
-/// Сверено с CMaNGOS <c>Player::SendSupercededSpell</c> (SMSG_SUPERCEDED_SPELL = u32 old + u32 new).
+/// Изучение спелла (M9.3 → M10.3, DI-сервис M7 S6 — бывший статик SpellLearn): добавляет абилку в
+/// кэш/персист и шлёт клиенту либо <c>SMSG_LEARNED_SPELL</c> (новая абилка), либо
+/// <c>SMSG_SUPERCEDED_SPELL</c> (высший ранг заменяет известный низший — кнопка/книга апгрейдятся, низший
+/// убирается из книги). Единая точка для тренера, талантов, <c>.learn</c> и <c>.learnall</c>. Цепочки
+/// рангов — <c>spell_chain.prev_spell</c> (mangos). Сверено с CMaNGOS <c>Player::SendSupercededSpell</c>
+/// (SMSG_SUPERCEDED_SPELL = u32 old + u32 new).
 /// </summary>
-public static class SpellLearn
+internal sealed class SpellLearnService(SkillsService skills)
 {
     /// <summary>
     /// Выдаёт спелл игроку. Возвращает true, если абилка действительно изучена (была неизвестна).
     /// При наличии известного предыдущего ранга шлёт SUPERCEDED(prev → spell) вместо LEARNED.
     /// Низший ранг из <see cref="WorldSession.KnownSpells"/> НЕ удаляем (остаётся кастуемым).
     /// </summary>
-    internal static async Task<bool> GrantAsync(WorldSession session, uint spellId, CancellationToken ct)
+    internal async Task<bool> GrantAsync(WorldSession session, uint spellId, CancellationToken ct)
     {
         if (session.InWorldGuid == 0 || !session.KnownSpells.Add(spellId))
             return false; // вне мира или уже известен
@@ -58,7 +59,7 @@ public static class SpellLearn
     /// </list>
     /// Возвращает true, если уже сообщил клиенту (LEARNED открывашки / SUPERCEDED) — обычный LEARNED не нужен.
     /// </summary>
-    private static async Task<bool> TryGrantProfessionAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
+    private async Task<bool> TryGrantProfessionAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
     {
         // Учитель (LEARN_SPELL): выдаём навык/тир из его SKILL_STEP, учим реальный спелл (открывашку),
         // доп. спеллы; сам учитель в книгу не идёт (return true, LEARNED не шлём).
@@ -95,19 +96,19 @@ public static class SpellLearn
     }
 
     /// <summary>Выдаёт навык-линию по SKILL/SKILL_STEP спелла (не понижая текущее значение/потолок).</summary>
-    private static async Task GrantSkillFromAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
+    private async Task GrantSkillFromAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
     {
         if (World.Professions.SkillGrantedBy(tpl) is not { } grant)
             return;
         var existing = session.SkillBook.Get(grant.SkillId);
         int curValue = existing?.Value ?? 0;
         int curMax = existing?.Max ?? 0;
-        await Skills.GrantAsync(session, grant.SkillId,
+        await skills.GrantAsync(session, grant.SkillId,
             (ushort)Math.Max(curValue, 1), (ushort)Math.Max(curMax, (int)grant.Max), ct);
     }
 
     /// <summary>Доп. спеллы профессии (Mining → Smelting). Выдаваемые навык не несут → без рекурсии.</summary>
-    private static async Task GrantAutoSpellsAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
+    private async Task GrantAutoSpellsAsync(WorldSession session, SpellTemplateData tpl, CancellationToken ct)
     {
         if (World.Professions.SkillGrantedBy(tpl) is { } g
             && World.Professions.AutoGrantSpells.TryGetValue(g.SkillId, out var extras))

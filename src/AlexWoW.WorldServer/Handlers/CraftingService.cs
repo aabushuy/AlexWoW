@@ -10,7 +10,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <c>spell_template</c> (см. <see cref="SpellCatalog"/>), привязка рецепт→навык для skill-up —
 /// <see cref="Professions.Recipes"/>.
 /// </summary>
-internal sealed class CraftingService(InventoryGrantService inventoryGrant)
+internal sealed class CraftingService(InventoryGrantService inventoryGrant, SkillsService skills)
 {
     /// <summary>Есть ли у игрока все реагенты рецепта (для отказа на старте каста).</summary>
     internal bool HasReagents(WorldSession session, SpellCatalog.SpellInfo info)
@@ -64,7 +64,7 @@ internal sealed class CraftingService(InventoryGrantService inventoryGrant)
             return; // профессия не изучена — не качаем
         var chance = Professions.SkillUpChance(sk.Value, r.ReqSkill);
         if (chance > 0 && Random.Shared.Next(100) < chance)
-            await Skills.AddValueAsync(session, r.SkillId, 1, ct);
+            await skills.AddValueAsync(session, r.SkillId, 1, ct);
     }
 
     private static async Task<(ushort SkillId, ushort ReqSkill)?> ResolveFromTrainerAsync(

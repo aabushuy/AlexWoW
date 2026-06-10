@@ -31,6 +31,12 @@ internal sealed class WorldSessionServices(
     AuraPersistenceService auraPersistence,
     InventoryGrantService inventoryGrant,
     QuestProgressService questProgress,
+    SkillsService skills,
+    SpellLearnService spellLearn,
+    ProgressionService progression,
+    TalentHandlers talents,
+    TrainerCatalogService trainerCatalog,
+    StartingGearService startingGear,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -50,7 +56,14 @@ internal sealed class WorldSessionServices(
     public AuraService AuraService { get; } = auras;
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
     // Квест/лут-кластер (M7 S5): мосты легаси-статикам до их конверсии.
-    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;   // мост до S6/S8 (вендор, GO-сбор, dev)
+    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;   // мост до S7/S8 (GO-сбор, dev)
     public QuestProgressService QuestProgress { get; } = questProgress;      // мост до S7 (WorldEntryHandlers)
+    // Инвентарь/тренеры/прогрессия (M7 S6): мосты легаси-статикам до их конверсии.
+    public SkillsService Skills { get; } = skills;                           // мост до S7/S8 (вход в мир, GO-сбор, dev)
+    public SpellLearnService SpellLearn { get; } = spellLearn;               // мост до S8 (.learn)
+    public ProgressionService Progression { get; } = progression;            // мост до S7/S8 (вход в мир, dev)
+    public TalentHandlers Talents { get; } = talents;                        // мост до S7/S8 (вход в мир, dev)
+    public TrainerCatalogService TrainerCatalog { get; } = trainerCatalog;   // мост до S8 (.learnall)
+    public StartingGearService StartingGear { get; } = startingGear;         // мост до S7 (вход в мир)
     public ILogger<WorldSession> Logger { get; } = logger;
 }

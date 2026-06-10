@@ -24,20 +24,6 @@ internal sealed class InventoryGrantService(QuestProgressService questProgress)
         return total;
     }
 
-    /// <summary>Первый свободный слот рюкзака (23..38) основного контейнера; -1 если места нет.
-    /// Чистая функция от сессии — static.</summary>
-    internal static int FreeBackpackSlot(WorldSession session)
-    {
-        var taken = new HashSet<byte>();
-        foreach (var i in session.Inventory)
-            if (i.Bag == InventorySlots.MainBag)
-                taken.Add(i.Slot);
-        for (var s = InventorySlots.BackpackStart; s < InventorySlots.BackpackEnd; s++)
-            if (!taken.Contains((byte)s))
-                return s;
-        return -1;
-    }
-
     /// <summary>
     /// Списывает <paramref name="count"/> предметов entry из сумок (квест-предметы при сдаче M6.10,
     /// реагенты крафта M11.3): целые предметы удаляет (DestroyObject + очистка слота), частичную стопку

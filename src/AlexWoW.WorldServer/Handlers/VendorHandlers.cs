@@ -7,21 +7,23 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Торговля с NPC (M6.2): открытие окна (gossip-hello/list inventory из npc_vendor),
+/// Торговля с NPC (M6.2, DI-модуль M7 S6): открытие окна (gossip-hello/list inventory из npc_vendor),
 /// покупка (CMSG_BUY_ITEM) и продажа (CMSG_SELL_ITEM). Деньги — PLAYER_FIELD_COINAGE.
+/// Класс невелик — листинг/покупка/продажа в одном модуле; госсип (<see cref="GossipService"/>)
+/// инжектит модуль и зовёт <see cref="SendVendorListAsync"/>.
 /// </summary>
-public static class VendorHandlers
+internal sealed class VendorHandlers(InventoryGrantService inventoryGrant) : IOpcodeHandlerModule
 {
     /// <summary>entry шаблона существа из его GUID (0xF130 | entry&lt;&lt;24 | counter).</summary>
     private static uint CreatureEntry(ulong guid) => (uint)((guid >> 24) & 0xFFFFFF);
 
     [WorldOpcodeHandler(WorldOpcode.CmsgListInventory)]
-    public static async Task OnListInventory(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnListInventory(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => await SendVendorListAsync(session, packet.Reader().UInt64(), ct);
 
     /// <summary>Шлёт окно товаров вендора (SMSG_LIST_INVENTORY), если у NPC есть ассортимент. M6.2.
     /// Вынесено для переиспользования из госсипа квестов (M6.5).</summary>
-    internal static async Task SendVendorListAsync(WorldSession session, ulong vendorGuid, CancellationToken ct)
+    internal async Task SendVendorListAsync(WorldSession session, ulong vendorGuid, CancellationToken ct)
     {
         var entry = CreatureEntry(vendorGuid);
         IReadOnlyList<VendorItem> items;
@@ -40,7 +42,7 @@ public static class VendorHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgBuyItem)]
-    public static async Task OnBuyItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnBuyItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var vendorGuid = reader.UInt64();
@@ -68,8 +70,8 @@ public static class VendorHandlers
 
         var ownerGuid = session.InWorldGuid;
         // M7 #20: выдать со стаканием в существующие стопки (как лут/награда). null → нет места.
-        // Деньги списываем только после успешной выдачи. Сервис — через мост сессии (до конверсии в S6).
-        var placed = await session.InventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
+        // Деньги списываем только после успешной выдачи.
+        var placed = await inventoryGrant.TryGiveAsync(session, itemEntry, qty, ct);
         if (placed is null) { await FailAsync(BuyResult.InventoryFull); return; }
 
         session.Money -= cost;
@@ -90,7 +92,7 @@ public static class VendorHandlers
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgSellItem)]
-    public static async Task OnSellItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    public async Task OnSellItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
         var vendorGuid = reader.UInt64();

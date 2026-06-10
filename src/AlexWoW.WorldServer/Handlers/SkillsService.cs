@@ -4,14 +4,15 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Навыки персонажа (M11.1): загрузка при входе, выдача (изучение профессии), прокачка значения и
-/// потолка. Пишет в поля <c>PLAYER_SKILL_INFO</c> (через <see cref="WorldSession.SkillBook"/>) и
-/// персист в <c>character_skill</c>. Языковые навыки сюда не входят — они выдаются по расе в спавне.
+/// Навыки персонажа (M11.1, DI-сервис M7 S6 — бывший статик Skills): загрузка при входе, выдача (изучение
+/// профессии), прокачка значения и потолка. Пишет в поля <c>PLAYER_SKILL_INFO</c> (через
+/// <see cref="WorldSession.SkillBook"/>) и персист в <c>character_skill</c>. Языковые навыки сюда
+/// не входят — они выдаются по расе в спавне.
 /// </summary>
-public static class Skills
+internal sealed class SkillsService
 {
     /// <summary>Загружает персист-навыки персонажа в книгу сессии (число языковых слотов — по расе).</summary>
-    public static async Task LoadAsync(WorldSession session, uint guid, byte race, CancellationToken ct)
+    internal async Task LoadAsync(WorldSession session, uint guid, byte race, CancellationToken ct)
     {
         var languageSlots = LanguageSkills.ForRace(race).Count;
         var persisted = await session.CharState.GetSkillsAsync(guid, ct);
@@ -19,14 +20,14 @@ public static class Skills
     }
 
     /// <summary>Текущее значение/потолок навыка или null, если не изучен.</summary>
-    public static (ushort Value, ushort Max)? Get(WorldSession session, ushort skillId)
+    internal (ushort Value, ushort Max)? Get(WorldSession session, ushort skillId)
     {
         var s = session.SkillBook.Get(skillId);
         return s is null ? null : (s.Value, s.Max);
     }
 
     /// <summary>Выдаёт/обновляет навык (изучение профессии или смена потолка): персист + апдейт клиенту.</summary>
-    public static async Task GrantAsync(WorldSession session, ushort skillId, ushort value, ushort max,
+    internal async Task GrantAsync(WorldSession session, ushort skillId, ushort value, ushort max,
         CancellationToken ct)
     {
         session.SkillBook.AddOrSet(skillId, value, max);
@@ -36,7 +37,7 @@ public static class Skills
 
     /// <summary>Поднимает значение навыка на <paramref name="delta"/> (но не выше потолка). Возвращает
     /// новое значение, либо null, если навыка нет или он уже в потолке.</summary>
-    public static async Task<ushort?> AddValueAsync(WorldSession session, ushort skillId, ushort delta,
+    internal async Task<ushort?> AddValueAsync(WorldSession session, ushort skillId, ushort delta,
         CancellationToken ct)
     {
         var sk = session.SkillBook.Get(skillId);
@@ -52,7 +53,7 @@ public static class Skills
     }
 
     /// <summary>Поднимает потолок навыка (изучение следующего тира у тренера). M11.5.</summary>
-    public static async Task SetMaxAsync(WorldSession session, ushort skillId, ushort max, CancellationToken ct)
+    internal async Task SetMaxAsync(WorldSession session, ushort skillId, ushort max, CancellationToken ct)
     {
         var sk = session.SkillBook.Get(skillId);
         if (sk is null || max <= sk.Max)

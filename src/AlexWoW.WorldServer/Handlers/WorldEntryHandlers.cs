@@ -54,7 +54,7 @@ public static class WorldEntryHandlers
         // M6.1: инвентарь — выдать стартовый набор голым персонажам, загрузить и создать item-объекты
         // у клиента ДО спавна игрока (self-update ссылается на guid'ы предметов в слотах).
         if (!await session.Items.HasItemsAsync(character.Guid, ct))
-            await StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct);
+            await session.StartingGear.GiveAsync(session, character.Guid, character.Race, character.Class, ct); // мост до S7
         session.Inventory.Clear();
         session.Inventory.AddRange(await session.Items.GetItemsAsync(character.Guid, ct));
         session.Money = character.Money; // M6.2: деньги для торговли
@@ -102,7 +102,7 @@ public static class WorldEntryHandlers
         await session.QuestProgress.LoadQuestStateAsync(session, ct); // мост сессии (до конверсии в S7)
 
         // M11.1: навыки персонажа (профессии и пр.) — загрузить ДО спавна, чтобы лечь в слоты PLAYER_SKILL_INFO.
-        await Skills.LoadAsync(session, character.Guid, character.Race, ct);
+        await session.Skills.LoadAsync(session, character.Guid, character.Race, ct); // мост до S7
 
         var spawn = PlayerSpawn.BuildCreateObject(character,
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
@@ -117,7 +117,7 @@ public static class WorldEntryHandlers
         session.LearnedTalents.Clear();
         foreach (var (tid, rank) in await session.CharState.GetTalentsAsync(character.Guid, ct))
             session.LearnedTalents[tid] = rank;
-        TalentHandlers.RecomputePoints(session, character.Class, character.Level);
+        session.Talents.RecomputePoints(session, character.Class, character.Level); // мост до S7
 
         // M9.1: XP-бар — текущий опыт + порог следующего уровня. M9.6: очки талантов в то же поле-апдейт.
         await session.World.Levels.EnsureLoadedAsync(ct);
@@ -130,10 +130,10 @@ public static class WorldEntryHandlers
             }), ct);
 
         // M9.6: состояние талантов (открывает панель; деревья клиент рисует сам из своей DBC).
-        await TalentHandlers.SendTalentsInfoAsync(session, ct);
+        await session.Talents.SendTalentsInfoAsync(session, ct); // мост до S7
 
         // M9.2: боевые поля (урон/скорость) из экипированного оружия — чтобы чарпейн не показывал INF.
-        await Progression.RefreshMeleeAsync(session, ct);
+        await session.Progression.RefreshMeleeAsync(session, ct); // мост до S7
 
         session.Logger.LogInformation("PLAYER_LOGIN '{Name}' (guid={Guid}) → мир: map={Map} ({X};{Y};{Z})",
             character.Name, guid, character.Map, character.X, character.Y, character.Z);
