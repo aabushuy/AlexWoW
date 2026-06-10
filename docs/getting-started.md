@@ -16,6 +16,7 @@ src/
   AlexWoW.DataStores     — загрузка клиентских данных (maps/vmaps/mmaps), DBC
   AlexWoW.AuthServer     — логин-сервер (exe) + CLI (create-account, reset-all-passwords)
   AlexWoW.WorldServer    — world-сервер (exe): сессии, мир, бой, спеллы, квесты
+  AlexWoW.Web            — веб-панель игрока (ASP.NET Core Razor Pages, M8): регистрация/вход/персонажи
 tools/
   MapExtractor           — .NET-экстрактор DBC/maps/vmaps из клиента (MPQ)
   MmapGen                — генератор навмеша (mmaps) на DotRecast
@@ -45,6 +46,19 @@ dotnet run --project src/AlexWoW.AuthServer -- create-account test test
 # Запустить логин-сервер (слушает 3724)
 dotnet run --project src/AlexWoW.AuthServer
 ```
+
+## Веб-панель игрока (локально)
+
+```bash
+# Строка подключения — секция Web:ConnectionString в src/AlexWoW.Web/appsettings.json
+# или переменная окружения Web__ConnectionString
+dotnet run --project src/AlexWoW.Web
+```
+
+Открой выведенный `http://localhost:<порт>`. Регистрация просит **email** (вход на сайт) и
+**имя аккаунта** (вход в игру — латиница/цифры, без «@»). Миграции БД применяет AuthServer
+(панель только читает/пишет). На проде панель отдаётся через Caddy по `https://alexwow.home.srv`
+(см. [deployment.md](deployment.md)).
 
 ## Тесты
 
