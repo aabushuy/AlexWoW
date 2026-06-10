@@ -15,7 +15,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Сейчас единственная команда — <c>menu</c>: сервер отдаёт каталог dev-меню (<see cref="DevMenuCatalog"/>).
 /// Не опкод-модуль (своих опкодов нет) — DI-сервис, инжектится в <see cref="ChatHandlers"/> (M7 #36).
 /// </summary>
-internal sealed class AddonProtocol
+internal sealed class AddonProtocol(DevMenuCatalog devMenu)
 {
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
@@ -41,7 +41,7 @@ internal sealed class AddonProtocol
         await SendLineAsync(session, "BEGIN", ct);
         if (session.IsAdmin)
         {
-            foreach (var line in await DevMenuCatalog.BuildAsync(session, ct))
+            foreach (var line in await devMenu.BuildAsync(session, ct))
                 await SendLineAsync(session, line, ct);
         }
         else

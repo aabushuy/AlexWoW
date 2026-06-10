@@ -7,7 +7,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// приходит из dev-меню аддона (после подтверждения в поп-апе). Та же карта — мгновенно, другая — через
 /// загрузочный экран (<see cref="TeleportService"/>). Devcommands #79.
 /// </summary>
-internal sealed class TpCommand : IDevCommand
+internal sealed class TpCommand(TeleportService teleport) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["tp", "teleport"];
     public string Help => ".tp <id>";
@@ -30,6 +30,6 @@ internal sealed class TpCommand : IDevCommand
         }
 
         await ctx.ReplyAsync($"Телепортация: {loc.Name}…", ct);
-        await ctx.Session.Teleport.TeleportAsync(ctx.Session, loc.Map, loc.X, loc.Y, loc.Z, loc.O, ct); // мост сессии (до S8)
+        await teleport.TeleportAsync(ctx.Session, loc.Map, loc.X, loc.Y, loc.Z, loc.O, ct);
     }
 }

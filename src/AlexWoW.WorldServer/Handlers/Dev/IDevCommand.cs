@@ -1,11 +1,12 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>
-/// Одна dev-команда (Command-паттерн). Команды авто-регистрируются рефлексией в <see cref="DevCommandRegistry"/>
-/// — добавить команду = добавить класс-реализацию, центральный switch не нужен (как реестр опкодов
-/// <c>WorldPacketRouter</c>). Гейт <c>is_admin</c> и парсинг — в диспетчере <see cref="DevCommands"/>.
+/// Одна dev-команда (Command-паттерн). Команды авто-регистрируются DI-сканом сборки
+/// (<see cref="DevCommandRegistration"/>) и собираются в <see cref="DevCommandRegistry"/> — добавить команду =
+/// добавить класс-реализацию, центральный switch не нужен (как реестр опкодов <c>WorldPacketRouter</c>).
+/// Зависимости — через конструктор; гейт <c>is_admin</c> и парсинг — в <see cref="DevCommandDispatcher"/>.
 /// </summary>
-public interface IDevCommand
+internal interface IDevCommand
 {
     /// <summary>Имя команды и алиасы (без точки, нижним регистром). Первое — основное.</summary>
     IReadOnlyList<string> Names { get; }

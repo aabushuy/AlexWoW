@@ -4,7 +4,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 /// <c>.skill &lt;skillId&gt; &lt;value&gt; [max]</c> — выдать/выставить навык персонажу (тест M11.1).
 /// Без max — потолок = value. Пример: <c>.skill 164 1 75</c> (кузнечное 1/75). Персист в character_skill.
 /// </summary>
-internal sealed class SkillCommand : IDevCommand
+internal sealed class SkillCommand(SkillsService skills) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["skill"];
     public string Help => ".skill <skillId> <value> [max]";
@@ -24,7 +24,7 @@ internal sealed class SkillCommand : IDevCommand
         if (max < value)
             max = value;
 
-        await ctx.Session.Skills.GrantAsync(ctx.Session, skillId, value, max, ct); // мост сессии (до S8)
+        await skills.GrantAsync(ctx.Session, skillId, value, max, ct);
         await ctx.ReplyAsync($"Навык {skillId} = {value}/{max}", ct);
     }
 }

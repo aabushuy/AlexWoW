@@ -11,7 +11,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// сбора (рудные жилы / травы): гейт по навыку → выдача ресурса → skill-up → истощение ноды.
 /// Прочие GO (двери/сундуки) — не наш кейс, игнорируем.
 /// </summary>
-internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant, SkillsService skills)
+internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant, SkillsService skills, ChatNotifier chat)
     : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgGameObjUse)]
@@ -26,7 +26,7 @@ internal sealed class GameObjectUseHandlers(InventoryGrantService inventoryGrant
         var sk = session.SkillBook.Get(node.SkillId);
         if (sk is null || sk.Value < node.ReqSkill)
         {
-            await Dev.DevChat.ReplyAsync(session,
+            await chat.SendSystemAsync(session,
                 $"Требуется {Professions.SkillName(node.SkillId)} ({node.ReqSkill})", ct);
             return;
         }

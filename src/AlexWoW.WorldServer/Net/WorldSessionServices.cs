@@ -9,9 +9,9 @@ namespace AlexWoW.WorldServer.Net;
 
 /// <summary>
 /// Parameter object зависимостей <see cref="WorldSession"/> (M7 #35): собирается DI один раз и передаётся
-/// фабрикой в каждую сессию — без service locator. Репозитории здесь временно (мост до S9 #43), игровые
-/// сервисы — мосты dev-командам (до S8): после их конверсии останется только нужное самой сессии
-/// (роутер, handshake, сохранение позиции, персист аур, мир, опции, логгер).
+/// фабрикой в каждую сессию — без service locator. Репозитории здесь временно (мост до S9 #43); из игровых
+/// сервисов осталось только нужное самой сессии (роутер, handshake, персист аур, мир, опции, логгер) —
+/// мосты dev-командам сняты в M7 S8 (команды получают сервисы ctor-инъекцией).
 /// </summary>
 internal sealed class WorldSessionServices(
     IOptions<WorldServerOptions> options,
@@ -26,15 +26,7 @@ internal sealed class WorldSessionServices(
     WorldState world,
     WorldPacketRouter router,
     AuthChallengeSender authChallenge,
-    AuraService auras,
     AuraPersistenceService auraPersistence,
-    InventoryGrantService inventoryGrant,
-    SkillsService skills,
-    SpellLearnService spellLearn,
-    ProgressionService progression,
-    TalentHandlers talents,
-    TrainerCatalogService trainerCatalog,
-    TeleportService teleport,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -51,15 +43,5 @@ internal sealed class WorldSessionServices(
     public AuthChallengeSender AuthChallenge { get; } = authChallenge;
     // Нужно самой сессии: персист временных аур при выходе из мира (M10.5).
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
-    // Мосты до S8 (M7 S7): опкод-хендлеры сконвертированы — через сессию сервисы достают
-    // только dev-команды (статики до S8).
-    public AuraService AuraService { get; } = auras;                          // .buff/.unbuff
-    public InventoryGrantService InventoryGrant { get; } = inventoryGrant;    // .additem
-    public SkillsService Skills { get; } = skills;                            // .skill
-    public SpellLearnService SpellLearn { get; } = spellLearn;                // .learn
-    public ProgressionService Progression { get; } = progression;             // .xp/.level
-    public TalentHandlers Talents { get; } = talents;                         // .resettalents
-    public TrainerCatalogService TrainerCatalog { get; } = trainerCatalog;    // .learnall
-    public TeleportService Teleport { get; } = teleport;                      // .tp
     public ILogger<WorldSession> Logger { get; } = logger;
 }

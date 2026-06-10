@@ -1,7 +1,7 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary><c>.buff SPELL [сек]</c> — наложить бафф (по умолчанию 120 с). M6.11.</summary>
-internal sealed class BuffCommand : IDevCommand
+internal sealed class BuffCommand(AuraService auras) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["buff"];
     public string Help => ".buff SPELL [сек]";
@@ -16,8 +16,7 @@ internal sealed class BuffCommand : IDevCommand
             return;
         }
         var secs = ctx.Args.Count >= 2 && uint.TryParse(ctx.Args[1], out var sv) ? sv : 120u;
-        // мост (M7 S3): dev-команды — статиковый реестр, сервис аур достаём через сессию.
-        await ctx.Session.AuraService.ApplyAsync(ctx.Session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
+        await auras.ApplyAsync(ctx.Session, buffSpell, (int)(secs * 1000), positive: true, form: 0, ct);
         await ctx.ReplyAsync($"Бафф {buffSpell} на {secs}с", ct);
     }
 }

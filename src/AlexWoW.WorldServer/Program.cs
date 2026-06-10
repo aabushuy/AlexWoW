@@ -7,6 +7,7 @@ using AlexWoW.DataStores.Navigation;
 using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Handlers;
+using AlexWoW.WorldServer.Handlers.Dev;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
 using Microsoft.EntityFrameworkCore;
@@ -130,6 +131,12 @@ builder.Services.AddSingleton<VisibilityService>();
 builder.Services.AddSingleton<TimeSyncService>();
 builder.Services.AddSingleton<LoginSequenceService>();
 builder.Services.AddSingleton<TeleportService>();
+// M7 S8: dev-подсистема — DI: команды сканом сборки (AddDevCommands: IDevCommand → реестр → диспетчер,
+// диспетчер инжектится в ChatHandlers), системные ответы в чат — ChatNotifier (бывший статик Dev.DevChat,
+// байты — Protocol/ChatPackets), каталог dev-меню аддона — DevMenuCatalog (потребитель — AddonProtocol).
+builder.Services.AddSingleton<ChatNotifier>();
+builder.Services.AddSingleton<DevMenuCatalog>();
+builder.Services.AddDevCommands();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
 builder.Services.AddSingleton<WorldSessionServices>();
