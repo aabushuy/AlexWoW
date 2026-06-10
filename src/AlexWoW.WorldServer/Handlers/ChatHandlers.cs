@@ -9,12 +9,27 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <summary>Чат (M4): приём CMSG_MESSAGECHAT, эхо отправителю.</summary>
 public static class ChatHandlers
 {
+    private const uint ChatTypeWhisper = 0x07; // CMSG: перед сообщением идёт CString адресата
+
     [WorldOpcodeHandler(WorldOpcode.CmsgMessageChat)]
     public static async Task OnMessageChat(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var reader = packet.Reader();
-        var type = reader.UInt32();        // тип чата клиента (say/yell/emote…)
-        reader.UInt32();                   // язык — игнорируем
+        var type = reader.UInt32();        // тип чата клиента (say/yell/emote/whisper…)
+        var language = reader.UInt32();    // язык; LANG_ADDON (0xFFFFFFFF) → addon-протокол
+        if (type == ChatTypeWhisper)
+            reader.CString();              // адресат (для addon-whisper — сам игрок, не нужен)
+
+        // Devcommands #79: addon-сообщение (язык LANG_ADDON) — кастомный обмен (каталог dev-меню), в чат не идёт.
+        if (language == AddonProtocol.LangAddon)
+        {
+            var addonMsg = reader.CString();          // тело: "PREFIX\tBODY"
+            var tab = addonMsg.IndexOf('\t');
+            if (tab >= 0)
+                await AddonProtocol.HandleAsync(session, addonMsg[..tab], addonMsg[(tab + 1)..], ct);
+            return;
+        }
+
         var rest = reader.Bytes(reader.Remaining);
         var len = rest.Length;
         while (len > 0 && rest[len - 1] == 0)

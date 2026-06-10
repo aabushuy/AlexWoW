@@ -1,0 +1,250 @@
+/* AlexWoW — игровая панель. Визуальный стиль под интерфейс WoW (WotLK):
+   тёмный камень, золото (#FFD100/#C8AA6E), металлические рамки, пергаментные панели. */
+
+:root {
+    --gold: #ffd100;
+    --gold-dim: #c8aa6e;
+    --gold-deep: #a07b27;
+    --ink: #e8dcc0;
+    --ink-dim: #b9ab8c;
+    --panel: #1b1a17;
+    --panel-edge: #2c2823;
+    --stone-1: #14130f;
+    --stone-2: #221f19;
+    --alliance: #3e7dcc;
+    --horde: #c8102e;
+    --danger: #e0524b;
+    --ok: #5bbf63;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(ellipse at top, #2a2620 0%, #100f0c 60%, #080706 100%) fixed,
+        #0b0a08;
+    background-attachment: fixed;
+    line-height: 1.55;
+}
+
+a { color: var(--gold); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 8px rgba(255, 209, 0, 0.5); }
+
+h1, h2, h3 {
+    font-family: "Trajan Pro", "Georgia", "Times New Roman", serif;
+    letter-spacing: 0.04em;
+    color: var(--gold);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    margin: 0 0 0.6em;
+}
+
+.page-frame {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* ── Шапка ── */
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 6px;
+    border-bottom: 2px solid var(--gold-deep);
+    box-shadow: 0 6px 16px -10px rgba(0, 0, 0, 0.9);
+    flex-wrap: wrap;
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: "Trajan Pro", Georgia, serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+}
+.brand:hover { color: var(--ink); text-shadow: none; }
+.brand-mark { color: var(--gold); font-size: 1.4rem; filter: drop-shadow(0 0 6px rgba(255, 209, 0, 0.4)); }
+.brand-accent { color: var(--gold); }
+
+.site-nav {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.site-nav a { font-weight: 600; }
+.nav-user { color: var(--ink-dim); font-size: 0.9rem; }
+.nav-logout { margin: 0; }
+
+.site-main { flex: 1; padding: 28px 0; }
+.site-footer {
+    padding: 18px 0;
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--panel-edge);
+}
+
+/* ── Панели ── */
+.panel {
+    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
+    border: 1px solid var(--panel-edge);
+    border-top: 2px solid var(--gold-deep);
+    border-radius: 6px;
+    padding: 26px 28px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px -16px rgba(0, 0, 0, 0.9);
+}
+.panel + .panel { margin-top: 20px; }
+
+.panel-narrow { max-width: 460px; margin: 0 auto; }
+
+.lead { color: var(--ink-dim); margin-top: -0.2em; }
+
+/* ── Hero (главная) ── */
+.hero { text-align: center; padding: 40px 20px 26px; }
+.hero h1 { font-size: 2.6rem; }
+.hero .lead { font-size: 1.1rem; max-width: 640px; margin: 0 auto 1.6em; }
+.hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+/* ── Формы ── */
+.field { margin-bottom: 16px; }
+.field label { display: block; margin-bottom: 6px; color: var(--gold-dim); font-weight: 600; font-size: 0.92rem; }
+.field input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0e0d0a;
+    border: 1px solid var(--gold-deep);
+    border-radius: 4px;
+    color: var(--ink);
+    font-size: 1rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(255, 209, 0, 0.18);
+}
+
+.form-actions { margin-top: 22px; display: flex; gap: 12px; align-items: center; }
+.form-hint { margin-top: 18px; color: var(--ink-dim); font-size: 0.9rem; }
+
+/* ── Кнопки ── */
+.btn {
+    display: inline-block;
+    padding: 10px 22px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #1a160b;
+    background: linear-gradient(180deg, #ffe27a, #e8b73c 55%, #b07d1e);
+    border: 1px solid #7a571a;
+    border-radius: 4px;
+    cursor: pointer;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 8px -3px rgba(0, 0, 0, 0.8);
+    transition: filter 0.15s, transform 0.05s;
+}
+.btn:hover { filter: brightness(1.1); color: #1a160b; text-shadow: none; }
+.btn:active { transform: translateY(1px); }
+.btn-sm { padding: 6px 14px; font-size: 0.85rem; }
+
+.btn-ghost {
+    background: transparent;
+    color: var(--gold);
+    border: 1px solid var(--gold-deep);
+    box-shadow: none;
+    text-shadow: none;
+}
+.btn-ghost:hover { background: rgba(255, 209, 0, 0.1); color: var(--gold); filter: none; }
+
+/* ── Сообщения ── */
+.alert {
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 18px;
+    border: 1px solid;
+    font-size: 0.95rem;
+}
+.alert-error { background: rgba(224, 82, 75, 0.12); border-color: var(--danger); color: #f3b4b0; }
+.alert-ok { background: rgba(91, 191, 99, 0.12); border-color: var(--ok); color: #bfe6c3; }
+.field-error { color: var(--danger); font-size: 0.85rem; margin-top: 4px; display: block; }
+
+/* ── Список персонажей ── */
+.char-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+.char-card {
+    display: block;
+    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
+    border: 1px solid var(--panel-edge);
+    border-left: 3px solid var(--gold-deep);
+    border-radius: 6px;
+    padding: 16px 18px;
+    transition: border-color 0.15s, transform 0.08s, box-shadow 0.15s;
+}
+.char-card:hover {
+    border-color: var(--gold);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.9);
+    text-shadow: none;
+}
+.char-name { font-size: 1.25rem; font-weight: 700; font-family: Georgia, serif; }
+.char-sub { color: var(--ink-dim); font-size: 0.92rem; margin-top: 2px; }
+.char-meta { margin-top: 10px; display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.85rem; color: var(--ink-dim); }
+.level-badge {
+    display: inline-block;
+    min-width: 30px;
+    text-align: center;
+    padding: 2px 8px;
+    background: #0e0d0a;
+    border: 1px solid var(--gold-deep);
+    border-radius: 12px;
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.faction-tag { font-weight: 700; }
+
+/* ── Детали персонажа ── */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px 24px;
+    margin: 8px 0 6px;
+}
+.detail-grid .k { color: var(--gold-dim); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.detail-grid .v { font-size: 1.05rem; }
+
+.equip-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.equip-table th, .equip-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--panel-edge);
+    font-size: 0.92rem;
+}
+.equip-table th { color: var(--gold-dim); font-weight: 600; }
+.equip-empty { color: var(--ink-dim); font-style: italic; }
+
+.coin { font-weight: 700; }
+.coin .g { color: #ffd100; }
+.coin .s { color: #c7c7cf; }
+.coin .c { color: #c77b46; }
+
+.back-link { display: inline-block; margin-bottom: 16px; color: var(--ink-dim); }
+
+.empty-state { text-align: center; color: var(--ink-dim); padding: 30px 0; }

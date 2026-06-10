@@ -5,6 +5,7 @@
     <Project Path="src/AlexWoW.Cryptography/AlexWoW.Cryptography.csproj" />
     <Project Path="src/AlexWoW.Database/AlexWoW.Database.csproj" />
     <Project Path="src/AlexWoW.DataStores/AlexWoW.DataStores.csproj" />
+    <Project Path="src/AlexWoW.Web/AlexWoW.Web.csproj" />
     <Project Path="src/AlexWoW.WorldServer/AlexWoW.WorldServer.csproj" />
   </Folder>
   <Folder Name="/tests/">

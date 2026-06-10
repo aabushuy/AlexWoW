@@ -23,6 +23,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<CharacterAura> CharacterAuras => Set<CharacterAura>();
     public DbSet<CharacterActionButton> ActionButtons => Set<CharacterActionButton>();
     public DbSet<AccountDataBlob> AccountDataBlobs => Set<AccountDataBlob>();
+    public DbSet<TeleportLocation> TeleportLocations => Set<TeleportLocation>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -31,7 +32,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.ToTable("account");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).HasColumnName("id");
-            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(32).IsRequired();
+            // M8.2: логин = email, поэтому username расширен до 255 (было 32).
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(255).IsRequired();
             e.Property(x => x.Salt).HasColumnName("salt").HasColumnType("binary(32)").IsRequired();
             e.Property(x => x.Verifier).HasColumnName("verifier").HasColumnType("binary(32)").IsRequired();
             e.Property(x => x.SessionKey).HasColumnName("session_key").HasColumnType("binary(40)");
@@ -176,6 +178,22 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.DataType).HasColumnName("data_type");
             e.Property(x => x.UpdateTime).HasColumnName("update_time").HasDefaultValue(0u);
             e.Property(x => x.Data).HasColumnName("data").HasColumnType("longblob");
+        });
+
+        b.Entity<TeleportLocation>(e =>
+        {
+            e.ToTable("dev_teleport");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SortOrder).HasColumnName("sort_order").HasDefaultValue(0);
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(64).IsRequired();
+            e.Property(x => x.Faction).HasColumnName("faction").HasDefaultValue((byte)0);
+            e.Property(x => x.Map).HasColumnName("map").HasDefaultValue(0u);
+            e.Property(x => x.Zone).HasColumnName("zone").HasDefaultValue(0u);
+            e.Property(x => x.X).HasColumnName("x").HasDefaultValue(0f);
+            e.Property(x => x.Y).HasColumnName("y").HasDefaultValue(0f);
+            e.Property(x => x.Z).HasColumnName("z").HasDefaultValue(0f);
+            e.Property(x => x.O).HasColumnName("o").HasDefaultValue(0f);
         });
     }
 }

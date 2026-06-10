@@ -1,0 +1,25 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Главная";
+    var isAuth = User.Identity?.IsAuthenticated == true;
+}
+<section class="hero">
+    <h1>Добро пожаловать в AlexWoW</h1>
+    <p class="lead">
+        Игровая панель сервера World of Warcraft (Wrath of the Lich King 3.3.5a).
+        Создайте аккаунт, чтобы войти в игру, и управляйте им здесь.
+    </p>
+    <div class="hero-actions">
+        @if (isAuth)
+        {
+            <a class="btn" asp-page="/Characters/Index">Мои персонажи</a>
+            <a class="btn btn-ghost" asp-page="/Account/ChangePassword">Сменить пароль</a>
+        }
+        else
+        {
+            <a class="btn" asp-page="/Register">Создать аккаунт</a>
+            <a class="btn btn-ghost" asp-page="/Login">Вход</a>
+        }
+    </div>
+</section>

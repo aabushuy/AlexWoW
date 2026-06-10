@@ -23,7 +23,7 @@ public interface ICharacterRepository
 
     Task<uint> CreateAsync(Character character, CancellationToken ct = default);
 
-    Task SavePositionAsync(uint guid, float x, float y, float z, CancellationToken ct = default);
+    Task SavePositionAsync(uint guid, float x, float y, float z, uint map, CancellationToken ct = default);
 
     /// <summary>Сохраняет 5 склонений имени персонажа (ruRU). Перезаписывает существующие.</summary>
     Task SetDeclinedNamesAsync(uint ownerGuid, string[] names, CancellationToken ct = default);
