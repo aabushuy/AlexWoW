@@ -38,4 +38,8 @@ public sealed record SpellTemplateData
     public int EffectAmplitude1 { get; init; }
     public int EffectAmplitude2 { get; init; }
     public int EffectAmplitude3 { get; init; }
+    /// <summary>Триггерируемый спелл эффекта TRIGGER_SPELL (64) — для цепочки (напр. Shadowstep → телепорт). M7 #33.</summary>
+    public int EffectTriggerSpell1 { get; init; }
+    public int EffectTriggerSpell2 { get; init; }
+    public int EffectTriggerSpell3 { get; init; }
 }

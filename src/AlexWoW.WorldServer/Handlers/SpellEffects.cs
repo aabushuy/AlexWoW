@@ -93,6 +93,60 @@ public static class SpellEffects
     }
 
     /// <summary>
+    /// Телепорт игрока (Blink/Shadowstep, M7 #33): вперёд по направлению (Blink, ~20 ярдов) или за спину цели
+    /// (Shadowstep). Мгновенно — MSG_MOVE_TELEPORT_ACK игроку (клиент применяет позицию + отвечает) +
+    /// MSG_MOVE_TELEPORT наблюдателям. Обновляет авторитетную позицию сессии. Z — рельеф (вперёд) или Z цели.
+    /// </summary>
+    internal static async Task ApplyTeleportAsync(WorldSession session, ulong targetGuid, bool behind, CancellationToken ct)
+    {
+        if (session.Player is not { } player)
+            return;
+
+        float nx, ny, nz, no;
+        if (behind)
+        {
+            // За спину цели (по её ориентации). Цель — существо или игрок.
+            float tx, ty, tz, to;
+            if (session.World.FindCreature(targetGuid) is { } cr)
+            {
+                tx = cr.X; ty = cr.Y; tz = cr.Z; to = cr.O;
+            }
+            else if (session.World.FindPlayer(targetGuid) is { } tp)
+            {
+                tx = tp.X; ty = tp.Y; tz = tp.Z; to = tp.Session.PosO;
+            }
+            else
+            {
+                return;
+            }
+            const float reach = 1.5f;
+            nx = tx - MathF.Cos(to) * reach;
+            ny = ty - MathF.Sin(to) * reach;
+            nz = tz;
+            no = to; // лицом туда же, куда цель (стоим за спиной)
+        }
+        else
+        {
+            // Вперёд по направлению взгляда (Blink ~20 ярдов); Z — по рельефу.
+            const float dist = 20f;
+            nx = session.PosX + MathF.Cos(session.PosO) * dist;
+            ny = session.PosY + MathF.Sin(session.PosO) * dist;
+            no = session.PosO;
+            var map = session.Character?.Map ?? 0;
+            nz = session.Terrain.GetHeight(map, nx, ny) ?? session.PosZ;
+        }
+
+        var guid = (ulong)session.InWorldGuid;
+        await session.SendAsync(WorldOpcode.MsgMoveTeleportAck,
+            MovementPackets.BuildTeleportAck(guid, session.NextTeleportCounter(), nx, ny, nz, no), ct);
+        await session.World.BroadcastToNeighborsAsync(player, WorldOpcode.MsgMoveTeleport,
+            MovementPackets.BuildTeleport(guid, nx, ny, nz, no), ct);
+
+        session.PosX = nx; session.PosY = ny; session.PosZ = nz; session.PosO = no;
+        session.Logger.LogDebug("TELEPORT '{User}' → ({X:F1};{Y:F1};{Z:F1}) behind={B}", session.Account, nx, ny, nz, behind);
+    }
+
+    /// <summary>
     /// Величина урона спелла (M10.4a): мили-абилка (WeaponDamage) — бросок урона оружия + бонус
     /// (BasePoints); процентная (WeaponPercent) — доля от урона оружия; иначе — школьный урон диапазоном.
     /// </summary>

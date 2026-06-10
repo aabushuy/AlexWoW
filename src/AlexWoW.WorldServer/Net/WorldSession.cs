@@ -139,6 +139,10 @@ public sealed class WorldSession
     /// <summary>GUID трупа с открытым окном лута (0 — окно закрыто). M6.6.</summary>
     internal ulong LootGuid { get; set; }
 
+    /// <summary>Счётчик телепортов (movement order counter в MSG_MOVE_TELEPORT_ACK). M7 #33.</summary>
+    private uint _teleportCounter;
+    internal uint NextTeleportCounter() => ++_teleportCounter;
+
     /// <summary>Журнал квестов: слот (0..24) → прогресс (null — пусто). Персист — позже. M6.5.</summary>
     internal World.QuestProgress?[] QuestSlots { get; } = new World.QuestProgress?[Protocol.UpdateField.QuestLogSlots];
     /// <summary>Сданные квесты (для предусловий PrevQuestId и анти-повтора). Персист — позже. M6.5.</summary>

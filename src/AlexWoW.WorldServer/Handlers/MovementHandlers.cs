@@ -6,6 +6,12 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.</summary>
 public static class MovementHandlers
 {
+    /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
+    /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
+    [WorldOpcodeHandler(WorldOpcode.MsgMoveTeleportAck)]
+    public static Task OnTeleportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+        => Task.CompletedTask;
+
     [WorldOpcodeHandler(
         WorldOpcode.MsgMoveStartForward, WorldOpcode.MsgMoveStartBackward, WorldOpcode.MsgMoveStop,
         WorldOpcode.MsgMoveStartStrafeLeft, WorldOpcode.MsgMoveStartStrafeRight, WorldOpcode.MsgMoveStopStrafe,
