@@ -78,6 +78,23 @@ public sealed class TrainerRepository(string connectionString)
             """, new { classId }, cancellationToken: ct));
     }
 
+    public async Task<(ushort SkillId, ushort ReqSkill)?> GetRecipeSkillAsync(uint spellId, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        var row = await db.QuerySingleOrDefaultAsync(new CommandDefinition("""
+            SELECT reqskill, reqskillvalue FROM (
+                SELECT reqskill, reqskillvalue FROM npc_trainer WHERE spell = @spellId AND reqskill > 0
+                UNION
+                SELECT reqskill, reqskillvalue FROM npc_trainer_template WHERE spell = @spellId AND reqskill > 0
+            ) u LIMIT 1;
+            """, new { spellId }, cancellationToken: ct));
+        if (row is null)
+            return null;
+        var d = (IDictionary<string, object>)row;
+        return (Convert.ToUInt16(d["reqskill"], CultureInfo.InvariantCulture),
+                Convert.ToUInt16(d["reqskillvalue"], CultureInfo.InvariantCulture));
+    }
+
     public async Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default)
     {
         await using var db = await OpenAsync(ct);

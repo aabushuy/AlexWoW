@@ -58,6 +58,8 @@ public sealed class WorldRepository(
         => trainers.GetClassTrainerEntryAsync(classId, ct);
     public Task<uint?> GetProfessionTrainerEntryAsync(string subnameKeyword, CancellationToken ct = default)
         => trainers.GetProfessionTrainerEntryAsync(subnameKeyword, ct);
+    public Task<(ushort SkillId, ushort ReqSkill)?> GetRecipeSkillAsync(uint spellId, CancellationToken ct = default)
+        => trainers.GetRecipeSkillAsync(spellId, ct);
 
     // ---- ITalentRepository ----
     public Task<IReadOnlyDictionary<uint, TalentData>> GetAllTalentsAsync(CancellationToken ct = default)
