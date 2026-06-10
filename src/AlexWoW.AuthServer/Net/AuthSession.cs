@@ -171,31 +171,7 @@ public sealed class AuthSession(
         await _stream.ReadExactlyAsync(unused, ct);
 
         var realmList = await realms.GetRealmsAsync(ct);
-
-        var inner = new ByteWriter(128);
-        inner.UInt32(0)                          // unused
-             .UInt16((ushort)realmList.Count);
-        foreach (var realm in realmList)
-        {
-            inner.UInt8(realm.Type)
-                 .UInt8(0x00)                    // lock
-                 .UInt8(realm.Flags)
-                 .CString(realm.Name)
-                 .CString($"{realm.Address}:{realm.Port}")
-                 .Single(realm.Population)
-                 .UInt8(0x00)                    // число персонажей на реалме
-                 .UInt8(realm.Timezone)
-                 .UInt8((byte)realm.Id);
-        }
-        inner.UInt8(0x10).UInt8(0x00);           // трейлер
-
-        var innerBytes = inner.ToArray();
-        var packet = new ByteWriter(innerBytes.Length + 3)
-            .UInt8((byte)AuthCommand.RealmList)
-            .UInt16((ushort)innerBytes.Length)
-            .Bytes(innerBytes);
-
-        await SendAsync(packet.ToArray(), ct);
+        await SendAsync(RealmListBuilder.Build(realmList), ct);
         logger.LogInformation("Отправлен список из {Count} реалмов на {Ip}", realmList.Count, _remoteIp);
     }
 

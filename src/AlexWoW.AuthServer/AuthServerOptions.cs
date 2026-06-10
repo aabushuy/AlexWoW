@@ -1,3 +1,5 @@
+using AlexWoW.Database.Models;
+
 namespace AlexWoW.AuthServer;
 
 /// <summary>Конфигурация логин-сервера (секция "AuthServer" в appsettings.json).</summary>
@@ -28,4 +30,19 @@ public sealed class DefaultRealmOptions
     public byte Flags { get; set; } = 0;
     public byte Timezone { get; set; } = 1;
     public float Population { get; set; } = 0f;
+}
+
+/// <summary>Маппинг конфигурации реалма в модель БД — общий для сервера и CLI (S10, DRY).</summary>
+public static class DefaultRealmOptionsExtensions
+{
+    public static Realm ToRealm(this DefaultRealmOptions o) => new()
+    {
+        Name = o.Name,
+        Address = o.Address,
+        Port = o.Port,
+        Type = o.Type,
+        Flags = o.Flags,
+        Timezone = o.Timezone,
+        Population = o.Population,
+    };
 }
