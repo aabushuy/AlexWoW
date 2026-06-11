@@ -105,9 +105,11 @@ public sealed class SpellModifiersTests
     public void ExtractFrom_ReadsFlatCostModifier()
     {
         // Improved Heroic Strike 12282: Effect1=6, Aura=107, BasePoints=−11 → value −10, MiscValue=14 (COST).
+        // Пассивный талант (Attributes&0x40) — даёт always-on модификатор.
         var tpl = new SpellTemplateData
         {
             Id = 12282,
+            Attributes = 0x40,
             SpellFamilyName = FamilyWarrior,
             Effect1 = 6,
             EffectApplyAuraName1 = 107,
@@ -126,10 +128,11 @@ public sealed class SpellModifiersTests
     [Fact]
     public void ExtractFrom_ReadsPctModifier_AndIgnoresOrdinarySpells()
     {
-        // Improved Rend 12286: Aura=108, BasePoints=9 → +10%, MiscValue=3 (EFFECT1).
+        // Improved Rend 12286: Aura=108, BasePoints=9 → +10%, MiscValue=3 (EFFECT1). Пассивный талант.
         var imp = new SpellTemplateData
         {
             Id = 12286,
+            Attributes = 0x40,
             SpellFamilyName = FamilyWarrior,
             Effect1 = 6,
             EffectApplyAuraName1 = 108,
@@ -143,11 +146,30 @@ public sealed class SpellModifiersTests
         Assert.Equal(10, mod.Value);
 
         // Обычный спелл (Rend 772: аура PERIODIC_DAMAGE) — не модификатор.
-        var rend = new SpellTemplateData { Id = 772, Effect1 = 6, EffectApplyAuraName1 = 3, EffectBasePoints1 = 4 };
+        var rend = new SpellTemplateData { Id = 772, Attributes = 0x40, Effect1 = 6, EffectApplyAuraName1 = 3, EffectBasePoints1 = 4 };
         Assert.Null(SpellModifiers.ExtractFrom(rend));
 
         // Аура 107 с пустой classmask — матчить нечего, пропускается.
-        var empty = new SpellTemplateData { Id = 1, Effect1 = 6, EffectApplyAuraName1 = 107, EffectMiscValue1 = 14 };
+        var empty = new SpellTemplateData { Id = 1, Attributes = 0x40, Effect1 = 6, EffectApplyAuraName1 = 107, EffectMiscValue1 = 14 };
         Assert.Null(SpellModifiers.ExtractFrom(empty));
+    }
+
+    [Fact]
+    public void ExtractFrom_IgnoresActivatedAbility_NotPassive()
+    {
+        // Divine Plea 54428: аура 108 (−50% хил, op DAMAGE) с classmask, НО спелл активируемый (нет SPELL_ATTR_PASSIVE).
+        // Его модификатор не должен попадать в always-on реестр (QA Spell #2: иначе паладин лечит −50% всегда).
+        var divinePlea = new SpellTemplateData
+        {
+            Id = 54428,
+            Attributes = 0x10000, // активируемая, бит PASSIVE (0x40) НЕ выставлен
+            SpellFamilyName = 10,
+            Effect2 = 6,
+            EffectApplyAuraName2 = 108,
+            EffectBasePoints2 = -51,
+            EffectMiscValue2 = 0,
+            EffectSpellClassMask2_1 = 0xC0000000,
+        };
+        Assert.Null(SpellModifiers.ExtractFrom(divinePlea));
     }
 }

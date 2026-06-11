@@ -43,6 +43,8 @@ public static class SpellModifiers
     private const int AuraAddFlatModifier = 107; // SPELL_AURA_ADD_FLAT_MODIFIER
     private const int AuraAddPctModifier = 108;  // SPELL_AURA_ADD_PCT_MODIFIER
     private const int EffectApplyAura = 6;
+    /// <summary>SPELL_ATTR_PASSIVE (Spell.dbc Attributes бит 6): пассивный спелл (талант/пассивная аура).</summary>
+    private const uint SpellAttrPassive = 0x40;
 
     /// <summary>
     /// Извлекает эффекты-модификаторы (ауры 107/108) из строки spell_template; null — спелл не модификатор.
@@ -50,6 +52,13 @@ public static class SpellModifiers
     /// </summary>
     public static List<SpellModifier>? ExtractFrom(SpellTemplateData t)
     {
+        // Только ПАССИВНЫЕ спеллы (таланты/пассивные классовые ауры) дают always-on модификаторы. Активируемые
+        // способности с аурой 107/108 (печати, Divine Plea −50% хил, Envenom) применяют модификатор лишь пока
+        // их баф активен — без хука на наложение ауры считать их постоянными нельзя (QA Spell #2: паладин лечил
+        // −50% всегда). Эталон — CMaNGOS: модификатор от АКТИВНОЙ ауры, а не от наличия спелла в книге.
+        if ((t.Attributes & SpellAttrPassive) == 0)
+            return null;
+
         List<SpellModifier>? mods = null;
         Add(ref mods, t, t.Effect1, t.EffectApplyAuraName1, t.EffectBasePoints1, t.EffectMiscValue1,
             t.EffectSpellClassMask1_1, t.EffectSpellClassMask1_2, t.EffectSpellClassMask1_3);
