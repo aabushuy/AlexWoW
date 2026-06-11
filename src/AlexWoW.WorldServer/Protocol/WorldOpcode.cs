@@ -110,6 +110,10 @@ public enum WorldOpcode : uint
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
     SmsgAuraUpdate = 0x496,                      // одна аура на слоте (баффы/дебаффы/формы) — M6.11
+    // M10.6: модификаторы спеллов у клиента (тултип/гейт стоимости и пр.). Сверено с wow_messages
+    // (smsg_set_flat_spell_modifier: u8 eff + u8 op + u32 value) / CMaNGOS Player::SendAllSpellMods.
+    SmsgSetFlatSpellModifier = 0x266,            // флэт-итог по биту маски (аура 107)
+    SmsgSetPctSpellModifier = 0x267,             // процент-итог по биту маски (аура 108)
 
     // Тренеры классов (M9.3): список абилок у тренера + покупка
     CmsgTrainerList = 0x1B0,                     // Guid npc — открыть список тренера

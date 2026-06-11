@@ -87,6 +87,23 @@ internal sealed class CombatResourcesService
         await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
     }
 
+    /// <summary>Начисляет ресурс (ярость/энергия) от эффекта спелла (ENERGIZE/ярость Рывка) с капом
+    /// и апдейтом полоски. Мана — отдельно (<see cref="SpellCastCompletion"/>). M10.6.</summary>
+    internal async Task GainPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
+    {
+        switch (powerType)
+        {
+            case PowerRage:
+                session.Combat.Rage = Math.Min(MaxRage, session.Combat.Rage + amount);
+                await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
+                break;
+            case PowerEnergy:
+                session.Combat.Energy = Math.Min(MaxEnergy, session.Combat.Energy + amount);
+                await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
+                break;
+        }
+    }
+
     /// <summary>
     /// Списывает ресурс (ярость/энергия) на каст мили-абилки и двигает полоску. Мана списывается отдельно
     /// (<see cref="SpellCastCompletion"/>, правило 5 секунд). M10.4a.

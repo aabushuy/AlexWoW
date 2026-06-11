@@ -46,6 +46,24 @@ Improved Heroic Strike не снижал ярость, Improved Rend не рас
 (84 опкода, БД мира подключена); живым клиентом: воин + Improved Heroic Strike → стоимость 14/13/12
 ярости, Improved Rend → тик растёт.
 
+### Грабли второго захода (по тесту клиентом 2026-06-11)
+
+Клиент подтвердил: Improved Rend работает, но Improved Heroic Strike «не снижает стоимость», а
+Рывок не даёт ярость. Обе причины — не в матчинге:
+
+4. **Клиент считает стоимость сам из своей DBC** — тултип/гейт кнопки не знают о серверных
+   модификаторах, пока им не пришлют **`SMSG_SET_FLAT/PCT_SPELL_MODIFIER` (0x266/0x267)**:
+   u8 eff (бит 0–95 classmask) + u8 op + i32 итог по биту (CMaNGOS `Player::AddSpellMod`).
+   Сервер списывал 14 ярости, но клиент показывал 15 и не давал нажать кнопку при 14.
+   Добавлен `SyncClientAsync` в `SpellModifierService`: дифф итогов по (бит, op, flat/pct)
+   против последней отправки (`SentSpellModTotals`), исчезнувшие биты зануляются (сброс талантов).
+5. **Ярость Рывка закодирована DUMMY-эффектом** (Effect2=3, BasePoints 89/119/149 → 9/12/15 ярости
+   ×10), а не ENERGIZE — ядра скриптуют её (TrinityCore `spell_warr_charge`). Реализован generic
+   `SPELL_EFFECT_ENERGIZE` (30) + спец-случай «воин + эффект CHARGE + DUMMY с bp>0 → ярость»;
+   начисление в `SpellCastCompletion` через `CombatResourcesService.GainPowerAsync` (кап).
+   Величина идёт через `ApplyEffectValue` → талант «Улучшенный рывок» (107, ALL_EFFECTS,
+   +50/+100, маска 1) применяется автоматически: 14/19 ярости.
+
 ### Отложено
 
 SPELLMOD_CRITICAL_CHANCE (нет модели спелл-крита), SPELLMOD_GLOBAL_COOLDOWN (клиент предсказывает

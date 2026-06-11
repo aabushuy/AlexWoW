@@ -69,6 +69,29 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             }
         }
 
+        // M10.6: начисление ресурса кастеру (ENERGIZE/ярость Рывка) — с модификаторами талантов на
+        // величину эффекта (Improved Charge: ALL_EFFECTS +50/+100 к 90 → 14/19 ярости).
+        if (info.EnergizeAmount > 0)
+        {
+            var gain = (uint)Math.Max(0, SpellModifiers.ApplyEffectValue(
+                session.Progression.SpellMods, info, info.EnergizeEffectIndex, (int)info.EnergizeAmount));
+            if (gain > 0)
+            {
+                if (info.EnergizePower == SpellCastService.PowerMana)
+                {
+                    if (session.Cast.MaxMana > 0)
+                    {
+                        session.Cast.Mana = Math.Min(session.Cast.MaxMana, session.Cast.Mana + gain);
+                        await manaRegen.SendManaUpdateAsync(session, ct);
+                    }
+                }
+                else
+                {
+                    await combatResources.GainPowerAsync(session, info.EnergizePower, gain, ct);
+                }
+            }
+        }
+
         // Кулдаун: запускаем у клиента (полоска на кнопке) и запоминаем для отказа при раннем рекасте.
         if (info.CooldownMs > 0)
         {

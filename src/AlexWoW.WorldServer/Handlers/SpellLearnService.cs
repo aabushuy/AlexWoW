@@ -45,9 +45,10 @@ internal sealed class SpellLearnService(
         try { prev = await worldDb.GetPrevRankAsync(spellId, ct); }
         catch { /* БД мира недоступна — просто LEARNED */ }
 
-        // M10.6: пассивный талант-модификатор (ауры 107/108) → в реестр сессии (моды prev-ранга снимаются).
+        // M10.6: пассивный талант-модификатор (ауры 107/108) → в реестр сессии (моды prev-ранга
+        // снимаются) + досылка итогов клиенту (тултипы/гейт стоимости).
         if (tpl is not null)
-            spellMods.OnSpellLearned(session, tpl, prev);
+            await spellMods.OnSpellLearnedAsync(session, tpl, prev, ct);
 
         if (prev != 0 && session.Progression.KnownSpells.Contains(prev))
         {
