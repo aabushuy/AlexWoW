@@ -98,8 +98,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         }
     }
 
-    /// <summary>Маппинг строки spell_template → наша модель эффекта (M10.2).</summary>
-    private static SpellInfo FromTemplate(SpellTemplateData t)
+    /// <summary>Маппинг строки spell_template → наша модель эффекта (M10.2). internal — покрыт автотестом M12.7.</summary>
+    internal static SpellInfo FromTemplate(SpellTemplateData t)
     {
         var effects = new[]
         {

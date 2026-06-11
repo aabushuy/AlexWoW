@@ -19,4 +19,9 @@
     <ProjectReference Include="..\..\src\AlexWoW.WorldServer\AlexWoW.WorldServer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- M12.7: фикстура реальных spell_template (известные классовые спеллы) для data-driven автотеста. -->
+    <Content Include="fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
