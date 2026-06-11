@@ -81,4 +81,21 @@ public sealed class SpellTemplateRepository(string connectionString)
             new { spellIds }, cancellationToken: ct));
         return rows.ToDictionary(r => r.SpellId, r => r.PrevSpell);
     }
+
+    public async Task<IReadOnlySet<uint>> GetLowerRanksInSetAsync(
+        IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
+    {
+        if (spellIds.Count == 0)
+            return new HashSet<uint>();
+        await using var db = await OpenAsync(ct);
+        // Низший ранг = в наборе есть спелл того же имени с реальным рангом и большим SpellLevel.
+        var rows = await db.QueryAsync<uint>(new CommandDefinition("""
+            SELECT DISTINCT s1.Id
+            FROM spell_template s1
+            JOIN spell_template s2
+              ON s2.SpellName = s1.SpellName AND s1.Rank1 <> '' AND s2.Rank1 <> '' AND s2.SpellLevel > s1.SpellLevel
+            WHERE s1.Id IN @spellIds AND s2.Id IN @spellIds;
+            """, new { spellIds }, cancellationToken: ct));
+        return rows.ToHashSet();
+    }
 }
