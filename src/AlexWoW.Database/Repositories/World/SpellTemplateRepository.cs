@@ -18,6 +18,10 @@ public sealed class SpellTemplateRepository(string connectionString)
                EffectAmplitude1, EffectAmplitude2, EffectAmplitude3,
                EffectTriggerSpell1, EffectTriggerSpell2, EffectTriggerSpell3,
                EffectMiscValue1, EffectMiscValue2, EffectMiscValue3,
+               SpellFamilyName, SpellFamilyFlags, SpellFamilyFlags2,
+               EffectSpellClassMask1_1, EffectSpellClassMask1_2, EffectSpellClassMask1_3,
+               EffectSpellClassMask2_1, EffectSpellClassMask2_2, EffectSpellClassMask2_3,
+               EffectSpellClassMask3_1, EffectSpellClassMask3_2, EffectSpellClassMask3_3,
                EffectItemType1, EffectItemType2, EffectItemType3,
                Reagent1, Reagent2, Reagent3, Reagent4, Reagent5, Reagent6, Reagent7, Reagent8,
                ReagentCount1, ReagentCount2, ReagentCount3, ReagentCount4,
@@ -49,5 +53,17 @@ public sealed class SpellTemplateRepository(string connectionString)
         return await db.ExecuteScalarAsync<uint?>(new CommandDefinition(
             "SELECT prev_spell FROM spell_chain WHERE spell_id = @spellId;",
             new { spellId }, cancellationToken: ct)) ?? 0u;
+    }
+
+    public async Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(
+        IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
+    {
+        if (spellIds.Count == 0)
+            return new Dictionary<uint, uint>();
+        await using var db = await OpenAsync(ct);
+        var rows = await db.QueryAsync<(uint SpellId, uint PrevSpell)>(new CommandDefinition(
+            "SELECT spell_id, prev_spell FROM spell_chain WHERE spell_id IN @spellIds AND prev_spell <> 0;",
+            new { spellIds }, cancellationToken: ct));
+        return rows.ToDictionary(r => r.SpellId, r => r.PrevSpell);
     }
 }

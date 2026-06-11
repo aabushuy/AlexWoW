@@ -55,7 +55,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0,
         SpellMovement Movement = SpellMovement.None, uint TriggerSpellId = 0,
         uint CreateItemId = 0, uint CreateItemCount = 0,
-        IReadOnlyList<(uint Item, uint Count)>? Reagents = null);
+        IReadOnlyList<(uint Item, uint Count)>? Reagents = null,
+        // M10.6: семейство/маска принадлежности — матчинг модификаторами талантов (SpellModifiers.IsAffected);
+        // индексы эффектов (1..3, 0 — нет) — адресация SPELLMOD_EFFECT{N} к прямому/периодическому эффекту.
+        uint FamilyName = 0, ulong FamilyFlags = 0, uint FamilyFlags2 = 0,
+        byte DirectEffectIndex = 0, byte PeriodicEffectIndex = 0);
 
     /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн), телепорт вперёд (Blink) или за спину
     /// цели (Shadowstep). None — не двигает.</summary>
@@ -98,13 +102,15 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         };
 
         // Прямой эффект: приоритет хил > школьный урон > урон оружия (мили-абилка); иначе без числа.
+        // Индекс выбранного эффекта (0-базный; −1 — нет) нужен модификаторам SPELLMOD_EFFECT{N} (M10.6).
         static bool IsWeapon(int eff) => eff is EffectWeaponDamage or EffectNormalizedWeaponDmg
             or EffectWeaponDamageNoSchool or EffectWeaponPercentDamage;
-        var heal = Array.Find(effects, e => e.Eff == EffectHeal);
-        var dmg = Array.Find(effects, e => e.Eff == EffectSchoolDamage);
-        var weapon = Array.Find(effects, e => IsWeapon(e.Eff));
-        var isHeal = heal.Eff == EffectHeal;
-        var chosen = isHeal ? heal : dmg.Eff != 0 ? dmg : weapon;
+        var healIdx = Array.FindIndex(effects, e => e.Eff == EffectHeal);
+        var dmgIdx = Array.FindIndex(effects, e => e.Eff == EffectSchoolDamage);
+        var weaponIdx = Array.FindIndex(effects, e => IsWeapon(e.Eff));
+        var isHeal = healIdx >= 0;
+        var chosenIdx = isHeal ? healIdx : dmgIdx >= 0 ? dmgIdx : weaponIdx;
+        var chosen = chosenIdx >= 0 ? effects[chosenIdx] : default;
         var isWeapon = IsWeapon(chosen.Eff);
 
         int min = 0, max = 0;
@@ -129,8 +135,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var manaPct = powerType == 0 ? t.ManaCostPercentage : 0;
 
         // Периодическая аура (DoT/HoT, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL → тик во времени.
-        var periodic = Array.Find(effects, e => e.Eff == EffectApplyAura
+        var periodicIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura
             && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal);
+        var periodic = periodicIdx >= 0 ? effects[periodicIdx] : default;
         var isPeriodic = periodic.Eff == EffectApplyAura;
         var periodicHeal = periodic.Aura == AuraPeriodicHeal;
         var tickAmount = isPeriodic ? periodic.Bp + 1 : 0;          // CMaNGOS: BasePoints+1 за тик
@@ -180,7 +187,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
             isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
-            movement, triggerSpell, createItemId, createItemCount, reagents);
+            movement, triggerSpell, createItemId, createItemCount, reagents,
+            t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
+            (byte)(chosenIdx + 1), (byte)(periodicIdx + 1));
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

@@ -13,6 +13,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class TalentHandlers(
     SpellLearnService spellLearn,
+    SpellModifierService spellMods,
     IWorldRepository worldDb,
     ICharacterRepository characters,
     ICharacterStateRepository charState) : IOpcodeHandlerModule
@@ -96,6 +97,10 @@ internal sealed class TalentHandlers(
         // Выучить ранг-спелл (персист character_spell + LEARNED/SUPERCEDED), записать талант.
         var rankSpell = t.RankSpell(nextRank);
         await spellLearn.GrantAsync(session, rankSpell, ct);
+        // M10.6: ранг-спеллы талантов НЕ записаны в spell_chain → GrantAsync не снял модификаторы
+        // прежнего ранга; снимаем по цепочке из talent (иначе ранги пассивок суммируются).
+        if (nextRank > 0)
+            spellMods.OnSpellRemoved(session, t.RankSpell(nextRank - 1));
         session.Progression.LearnedTalents[talentId] = (byte)nextRank;
         await charState.SetTalentRankAsync(session.InWorldGuid, talentId, (byte)nextRank, ct);
 
@@ -161,6 +166,7 @@ internal sealed class TalentHandlers(
                 var sp = t.RankSpell(rr);
                 if (sp == 0 || !session.Progression.KnownSpells.Remove(sp))
                     continue;
+                spellMods.OnSpellRemoved(session, sp); // M10.6: снять модификаторы пассивного таланта
                 await charState.RemoveLearnedSpellAsync(session.InWorldGuid, sp, ct);
                 await session.SendAsync(WorldOpcode.SmsgRemovedSpell, new ByteWriter(4).UInt32(sp).ToArray(), ct);
             }

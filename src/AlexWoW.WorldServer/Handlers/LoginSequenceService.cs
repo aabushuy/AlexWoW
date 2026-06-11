@@ -30,6 +30,7 @@ internal sealed class LoginSequenceService(
     StartingGearService startingGear,
     SkillsService skills,
     TalentHandlers talents,
+    SpellModifierService spellMods,
     ProgressionService progression)
 {
     /// <summary>Вход персонажа в мир по CMSG_PLAYER_LOGIN (валидация владения + вся последовательность).</summary>
@@ -61,6 +62,7 @@ internal sealed class LoginSequenceService(
             new ByteWriter(2).UInt8(2).UInt8(0).ToArray(), ct);
 
         await SendInitialSpellsAsync(session, character, ct);
+        await spellMods.RebuildAsync(session, ct); // M10.6: модификаторы пассивных талантов из KnownSpells
         await actionBars.SendInitialActionButtonsAsync(session, ct); // M7 #17: ярлыки панелей
 
         var tutorials = new ByteWriter(32);

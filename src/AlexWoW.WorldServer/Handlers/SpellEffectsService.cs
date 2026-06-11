@@ -155,15 +155,23 @@ internal sealed class SpellEffectsService(
     /// <summary>
     /// Величина урона спелла (M10.4a): мили-абилка (WeaponDamage) — бросок урона оружия + бонус
     /// (BasePoints); процентная (WeaponPercent) — доля от урона оружия; иначе — школьный урон диапазоном.
+    /// M10.6: модификаторы талантов — величина ЭФФЕКТА (ALL_EFFECTS/EFFECT{N}, напр. Improved Cleave
+    /// растит бонус, не бросок оружия — как CMaNGOS CalculateSpellEffectValue), затем итог (SPELLMOD_DAMAGE).
     /// </summary>
     private static uint ComputeDamage(WorldSession session, SpellCatalog.SpellInfo info)
     {
+        var mods = session.Progression.SpellMods;
         if (info.WeaponPercent > 0)
-            return (uint)Math.Max(1, WeaponRoll(session) * (int)info.WeaponPercent / 100);
+        {
+            var percent = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, (int)info.WeaponPercent);
+            var total = Math.Max(1, WeaponRoll(session) * percent / 100);
+            return (uint)Math.Max(1, SpellModifiers.Apply(mods, info, SpellModOp.Damage, total));
+        }
         var bonus = info.MaxAmount > 0 ? Random.Shared.Next(info.MinAmount, info.MaxAmount + 1) : 0;
+        bonus = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, bonus);
         if (info.WeaponDamage)
-            return (uint)Math.Max(1, WeaponRoll(session) + bonus);
-        return (uint)Math.Max(0, bonus);
+            return (uint)Math.Max(1, SpellModifiers.Apply(mods, info, SpellModOp.Damage, WeaponRoll(session) + bonus));
+        return (uint)Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Damage, bonus));
     }
 
     /// <summary>Случайный бросок урона оружия главной руки (min..max из RefreshMeleeAsync). M10.4a.</summary>
@@ -190,7 +198,10 @@ internal sealed class SpellEffectsService(
             return;
 
         var ts = target.Session;
-        var amount = (uint)Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
+        // M10.6: модификаторы кастера на величину хила (эффект + итог) — как у урона.
+        var rolled = Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
+        rolled = SpellModifiers.ApplyEffectValue(session.Progression.SpellMods, info, info.DirectEffectIndex, rolled);
+        var amount = (uint)Math.Max(0, SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.Damage, rolled));
         var before = ts.Combat.Health;
         ts.Combat.Health = Math.Min(ts.Combat.MaxHealth, before + amount);
         var effective = ts.Combat.Health - before;

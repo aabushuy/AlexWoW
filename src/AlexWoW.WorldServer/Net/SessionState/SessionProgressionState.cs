@@ -25,6 +25,10 @@ internal sealed class SessionProgressionState
     /// supercede'ит низшие (в книге показывается один). Заполняется при входе/изучении. M11.</summary>
     internal Dictionary<ushort, (uint Spell, ushort Max)> ProfessionRankSpell { get; } = [];
 
+    /// <summary>Активные модификаторы спеллов (пассивные таланты с аурами 107/108): стоимость/урон/КД
+    /// абилок. Перестраивается при входе, дополняется при изучении (SpellModifierService). M10.6.</summary>
+    internal List<World.SpellModifier> SpellMods { get; } = [];
+
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
     internal List<World.ActiveAura> Auras { get; } = [];
     /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
@@ -40,6 +44,7 @@ internal sealed class SessionProgressionState
         LearnedTalents.Clear(); // M9.6: таланты перезагружаем при следующем входе
         SkillBook.Clear();    // M11.1: навыки перезагружаем при следующем входе
         ProfessionRankSpell.Clear();
+        SpellMods.Clear();    // M10.6: модификаторы пересобираются при следующем входе
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;

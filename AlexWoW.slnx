@@ -10,5 +10,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AlexWoW.Cryptography.Tests/AlexWoW.Cryptography.Tests.csproj" />
+    <Project Path="tests/AlexWoW.WorldServer.Tests/AlexWoW.WorldServer.Tests.csproj" />
   </Folder>
 </Solution>
