@@ -25,6 +25,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<CharacterActionButton> ActionButtons => Set<CharacterActionButton>();
     public DbSet<AccountDataBlob> AccountDataBlobs => Set<AccountDataBlob>();
     public DbSet<TeleportLocation> TeleportLocations => Set<TeleportLocation>();
+    public DbSet<SpellTestSession> SpellTestSessions => Set<SpellTestSession>();
+    public DbSet<SpellTestResult> SpellTestResults => Set<SpellTestResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -211,6 +213,53 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.Y).HasColumnName("y").HasDefaultValue(0f);
             e.Property(x => x.Z).HasColumnName("z").HasDefaultValue(0f);
             e.Property(x => x.O).HasColumnName("o").HasDefaultValue(0f);
+        });
+
+        // M12 Spell QA: захват проверки заклинаний (заголовок сессии + строки результатов).
+        modelBuilder.Entity<SpellTestSession>(e =>
+        {
+            e.ToTable("spell_test_session");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.OwnerGuid).HasColumnName("owner_guid");
+            e.Property(x => x.AccountId).HasColumnName("account_id");
+            e.Property(x => x.Class).HasColumnName("class");
+            e.Property(x => x.Level).HasColumnName("level");
+            e.Property(x => x.Mode).HasColumnName("mode").HasDefaultValue((byte)0);
+            e.Property(x => x.TalentsSlotted).HasColumnName("talents_slotted").HasDefaultValue((byte)0);
+            e.Property(x => x.StartedAt).HasColumnName("started_at").HasColumnType("datetime(3)");
+            e.Property(x => x.EndedAt).HasColumnName("ended_at").HasColumnType("datetime(3)");
+            e.Property(x => x.Note).HasColumnName("note").HasMaxLength(128);
+            e.Property(x => x.Analyzed).HasColumnName("analyzed").HasDefaultValue((byte)0);
+            e.Property(x => x.TicketId).HasColumnName("ticket_id");
+            e.HasIndex(x => x.OwnerGuid).HasDatabaseName("ix_sts_owner");
+        });
+
+        modelBuilder.Entity<SpellTestResult>(e =>
+        {
+            e.ToTable("spell_test_result");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.SessionId).HasColumnName("session_id");
+            e.Property(x => x.SpellId).HasColumnName("spell_id");
+            e.Property(x => x.Class).HasColumnName("class");
+            e.Property(x => x.Level).HasColumnName("level");
+            e.Property(x => x.ResultType).HasColumnName("result_type");
+            e.Property(x => x.School).HasColumnName("school");
+            e.Property(x => x.Amount).HasColumnName("amount");
+            e.Property(x => x.Effective).HasColumnName("effective");
+            e.Property(x => x.OverkillOrOverheal).HasColumnName("overkill_or_overheal");
+            e.Property(x => x.ExpectedMin).HasColumnName("expected_min");
+            e.Property(x => x.ExpectedMax).HasColumnName("expected_max");
+            e.Property(x => x.ExpectedCost).HasColumnName("expected_cost");
+            e.Property(x => x.PowerType).HasColumnName("power_type");
+            e.Property(x => x.IsHeal).HasColumnName("is_heal");
+            e.Property(x => x.WeaponBased).HasColumnName("weapon_based");
+            e.Property(x => x.FamilyName).HasColumnName("family_name");
+            e.Property(x => x.CastIndex).HasColumnName("cast_index");
+            e.Property(x => x.RecordedAt).HasColumnName("recorded_at").HasColumnType("datetime(3)");
+            e.HasIndex(x => x.SessionId).HasDatabaseName("ix_str_session");
+            e.HasIndex(x => x.SpellId).HasDatabaseName("ix_str_spell");
         });
     }
 }

@@ -15,6 +15,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class SpellEffectsService(
     CreatureCombatAI creatureAi,
     KillRewardService killReward,
+    SpellTestCaptureService spellTestCapture,
     TerrainMaps terrain)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
@@ -32,6 +33,9 @@ internal sealed class SpellEffectsService(
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
             SpellPackets.BuildDamageLog(creature.Guid, (ulong)session.InWorldGuid, spellId, damage, overkill, info.School), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
+
+        // M12 Spell QA: захват прямого урона (если активна сессия захвата — иначе no-op).
+        await spellTestCapture.RecordDamageAsync(session, spellId, info, damage, overkill, ct);
 
         if (died)
         {
@@ -191,6 +195,25 @@ internal sealed class SpellEffectsService(
         ulong targetGuid, CancellationToken ct)
     {
         var caster = (ulong)session.InWorldGuid;
+
+        // M12 Spell QA: лечебный манекен (дружественное существо). Хилы в проекте — игрок-only, но для проверки
+        // лечащих спеллов нужна стационарная цель: лечим HP существа с клампом ½ макс. (всегда ранен → effective>0).
+        if (targetGuid != 0 && session.World.FindCreature(targetGuid) is { } healDummy
+            && Protocol.Npcs.IsHealDummy(healDummy.Template.Entry) && healDummy.IsAlive)
+        {
+            var amt = ComputeHealAmount(session, info);
+            var ceiling = healDummy.MaxHealth - healDummy.MaxHealth / 2; // не выше ½ макс. — остаётся раненым
+            var beforeHp = healDummy.Health;
+            healDummy.Health = Math.Min(ceiling, beforeHp + amt);
+            var effHp = healDummy.Health - beforeHp;
+            var overHp = amt - effHp;
+            await session.World.BroadcastToObserversAsync(healDummy, WorldOpcode.SmsgSpellHealLog,
+                SpellPackets.BuildHealLog(healDummy.Guid, caster, spellId, effHp, overHp), ct);
+            await session.World.BroadcastCreatureHealthAsync(healDummy, ct);
+            await spellTestCapture.RecordHealAsync(session, spellId, info, amt, effHp, overHp, ct);
+            return;
+        }
+
         var target = targetGuid == 0 || targetGuid == caster
             ? session.Player
             : session.World.FindPlayer(targetGuid) ?? session.Player;
@@ -198,10 +221,7 @@ internal sealed class SpellEffectsService(
             return;
 
         var ts = target.Session;
-        // M10.6: модификаторы кастера на величину хила (эффект + итог) — как у урона.
-        var rolled = Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
-        rolled = SpellModifiers.ApplyEffectValue(session.Progression.SpellMods, info, info.DirectEffectIndex, rolled);
-        var amount = (uint)Math.Max(0, SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.Damage, rolled));
+        var amount = ComputeHealAmount(session, info);
         var before = ts.Combat.Health;
         ts.Combat.Health = Math.Min(ts.Combat.MaxHealth, before + amount);
         var effective = ts.Combat.Health - before;
@@ -210,5 +230,17 @@ internal sealed class SpellEffectsService(
         await session.World.BroadcastToPlayerObserversAsync(target, WorldOpcode.SmsgSpellHealLog,
             SpellPackets.BuildHealLog(target.Guid, caster, spellId, effective, overheal), ct);
         await session.World.BroadcastPlayerHealthAsync(target, ct);
+
+        // M12 Spell QA: захват прямого хила (если активна сессия захвата — иначе no-op).
+        await spellTestCapture.RecordHealAsync(session, spellId, info, amount, effective, overheal, ct);
+    }
+
+    /// <summary>Величина хила (M6.4): бросок MinAmount..MaxAmount + модификаторы кастера (эффект + итог, M10.6).</summary>
+    private static uint ComputeHealAmount(WorldSession session, SpellCatalog.SpellInfo info)
+    {
+        var mods = session.Progression.SpellMods;
+        var rolled = Random.Shared.Next(info.MinAmount, info.MaxAmount + 1);
+        rolled = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, rolled);
+        return (uint)Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Damage, rolled));
     }
 }

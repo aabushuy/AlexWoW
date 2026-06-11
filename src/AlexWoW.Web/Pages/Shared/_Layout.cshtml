@@ -1,6 +1,7 @@
 @{
     var isAuth = User.Identity?.IsAuthenticated == true;
     var gameAccount = User.GameAccount();
+    var isAdmin = User.IsAdmin();
 }
 <!DOCTYPE html>
 <html lang="ru">
@@ -21,6 +22,10 @@
                 @if (isAuth)
                 {
                     <a asp-page="/Characters/Index">Персонажи</a>
+                    @if (isAdmin)
+                    {
+                        <a asp-page="/Admin/Index">Админ</a>
+                    }
                     <details class="nav-dropdown">
                         <summary>@gameAccount</summary>
                         <div class="nav-dropdown-menu">

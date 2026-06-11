@@ -238,6 +238,10 @@ public sealed class WorldState
     public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
         => Director.SummonTrainingDummyAsync(session, ct);
 
+    /// <inheritdoc cref="CreatureDirector.SummonHealDummyAsync"/>
+    public Task SummonHealDummyAsync(WorldSession session, CancellationToken ct)
+        => Director.SummonHealDummyAsync(session, ct);
+
     /// <inheritdoc cref="CreatureDirector.SummonDevNpcAsync"/>
     public Task<bool> SummonDevNpcAsync(WorldSession session, uint entry, string slot, CancellationToken ct)
         => Director.SummonDevNpcAsync(session, entry, slot, ct);

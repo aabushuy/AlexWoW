@@ -307,3 +307,39 @@ h1, h2, h3 {
 .back-link { display: inline-block; margin-bottom: 16px; color: var(--ink-dim); }
 
 .empty-state { text-align: center; color: var(--ink-dim); padding: 30px 0; }
+
+/* ── Админ Spell QA (M12) ── */
+.muted { color: var(--ink-dim); }
+.alert-warn { background: rgba(255, 209, 0, 0.10); border-color: var(--gold-deep); color: #f0dca0; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.data-table th, .data-table td {
+    text-align: left;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--panel-edge);
+}
+.data-table th { color: var(--gold-dim); font-weight: 600; border-bottom: 1px solid var(--gold-deep); }
+.data-table tbody tr:hover { background: rgba(255, 209, 0, 0.05); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; }
+.kv dt { color: var(--gold-dim); font-weight: 600; }
+.kv dd { margin: 0; color: var(--ink); }
+.badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    border: 1px solid;
+}
+.badge-ok { background: rgba(91, 191, 99, 0.12); border-color: var(--ok); color: #bfe6c3; }
+.badge-warn { background: rgba(255, 209, 0, 0.12); border-color: var(--gold-deep); color: #f0dca0; }
+.ticket-body {
+    width: 100%;
+    margin-top: 6px;
+    background: var(--stone-1);
+    border: 1px solid var(--gold-deep);
+    border-radius: 4px;
+    color: var(--ink);
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+    resize: vertical;
+}

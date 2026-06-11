@@ -15,7 +15,10 @@ internal static class AuthSessionExtensions
     /// <summary>Имя игрового логина в claims (для подсказки «что вводить в клиенте»).</summary>
     public const string GameAccountClaim = "alexwow:game_account";
 
-    /// <summary>account_id → NameIdentifier, email → Name, игровой логин → GameAccountClaim.</summary>
+    /// <summary>Признак администратора в claims (M12: доступ к админ-разделу панели).</summary>
+    public const string AdminClaim = "alexwow:is_admin";
+
+    /// <summary>account_id → NameIdentifier, email → Name, игровой логин → GameAccountClaim, is_admin → AdminClaim.</summary>
     public static async Task SignInAccountAsync(this HttpContext http, Account account, bool persistent = true)
     {
         var claims = new List<Claim>
@@ -24,6 +27,8 @@ internal static class AuthSessionExtensions
             new(ClaimTypes.Name, account.Email ?? account.Username),
             new(GameAccountClaim, account.Username),
         };
+        if (account.IsAdmin)
+            claims.Add(new Claim(AdminClaim, "1"));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await http.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,
@@ -44,4 +49,7 @@ internal static class AuthSessionExtensions
 
     /// <summary>Игровой логин (то, что игрок вводит в клиенте WoW).</summary>
     public static string GameAccount(this ClaimsPrincipal user) => user.FindFirstValue(GameAccountClaim) ?? "";
+
+    /// <summary>Текущий пользователь — администратор (M12: доступ к админ-разделу).</summary>
+    public static bool IsAdmin(this ClaimsPrincipal user) => user.FindFirstValue(AdminClaim) == "1";
 }

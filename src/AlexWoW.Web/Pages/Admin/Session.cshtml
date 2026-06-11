@@ -1,0 +1,115 @@
+@page "{id:long}"
+@model AlexWoW.Web.Pages.Admin.SessionModel
+@using AlexWoW.Database.Models
+@{
+    ViewData["Title"] = $"Сессия #{Model.Id}";
+    var s = Model.Session!;
+    var a = Model.Analysis!;
+}
+<p><a asp-page="/Admin/Index">← К списку сессий</a></p>
+<h1>Сессия захвата #@s.Id</h1>
+
+@if (!string.IsNullOrEmpty(Model.StatusMessage))
+{
+    <div class="alert alert-ok" role="alert">@Model.StatusMessage</div>
+}
+
+<div class="panel">
+    <dl class="kv">
+        <dt>Класс</dt><dd style="color:@GameData.ClassColor(s.Class)">@GameData.ClassName(s.Class)</dd>
+        <dt>Уровень</dt><dd>@s.Level</dd>
+        <dt>Режим</dt><dd>@(s.Mode == SpellTestMode.Harness ? "авто-харнесс" : "ручной")</dd>
+        <dt>Старт</dt><dd>@s.StartedAt.ToString("yyyy-MM-dd HH:mm:ss")</dd>
+        <dt>Конец</dt><dd>@(s.EndedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "— (идёт)")</dd>
+        @if (!string.IsNullOrEmpty(s.Note))
+        {
+            <dt>Метка</dt><dd>@s.Note</dd>
+        }
+        <dt>Записей</dt><dd>@a.TotalResults (@a.DistinctSpells спеллов)</dd>
+    </dl>
+    @if (s.TalentsSlotted)
+    {
+        <div class="alert alert-warn" role="alert">⚠ На старте были активны таланты-модификаторы — это не базовая конфигурация.</div>
+    }
+</div>
+
+<h2>Аномалии (@a.Anomalies.Count)</h2>
+@if (!a.HasAnomalies)
+{
+    <div class="alert alert-ok" role="alert">Аномалий не найдено — все вычисленные величины в эталонных диапазонах.</div>
+}
+else
+{
+    <div class="panel">
+        <table class="data-table">
+            <thead><tr><th>Спелл</th><th>Тип</th><th>Аномалия</th><th>Детали</th></tr></thead>
+            <tbody>
+                @foreach (var an in a.Anomalies)
+                {
+                    <tr>
+                        <td>@an.SpellId</td>
+                        <td>@AlexWoW.Web.Pages.Admin.SessionModel.TypeName(an.ResultType)</td>
+                        <td><span class="badge badge-warn">@AlexWoW.Web.Pages.Admin.SessionModel.AnomalyName(an.Kind)</span></td>
+                        <td>@an.Detail</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (a.HasAnomalies)
+{
+    <h2>Тикет</h2>
+    <div class="panel">
+        @if (s.TicketId is { } tid)
+        {
+            <p>Тикет по этой сессии заведён: <span class="badge badge-ok">#@tid</span></p>
+        }
+        else
+        {
+            @if (Model.VikunjaConfigured)
+            {
+                <form method="post" asp-page-handler="CreateTicket" style="margin-bottom:14px">
+                    <button type="submit" class="btn">Завести тикет в Vikunja</button>
+                </form>
+            }
+            else
+            {
+                <p class="muted">Интеграция Vikunja не настроена (<code>Web:Vikunja</code>). Скопируйте тело тикета и заведите вручную:</p>
+            }
+            <label class="muted" for="ticketBody">Тело тикета (markdown):</label>
+            <textarea id="ticketBody" class="ticket-body" readonly rows="10">@Model.TicketTitle
+
+@Model.TicketBody</textarea>
+        }
+    </div>
+}
+
+<h2>Сводка по спеллам</h2>
+<div class="panel">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Спелл</th><th>Тип</th><th>Школа</th><th>Кастов</th>
+                <th>Мин</th><th>Сред</th><th>Макс</th><th>Эталон</th><th>Стоим.</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var sp in Model.Spells)
+            {
+                <tr>
+                    <td>@sp.SpellId</td>
+                    <td>@AlexWoW.Web.Pages.Admin.SessionModel.TypeName(sp.Type)</td>
+                    <td>@sp.School</td>
+                    <td>@sp.Casts</td>
+                    <td>@sp.Min</td>
+                    <td>@sp.Avg</td>
+                    <td>@sp.Max</td>
+                    <td>@(sp.WeaponBased ? "оружие" : $"{sp.ExpMin}–{sp.ExpMax}")</td>
+                    <td>@sp.ExpectedCost</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

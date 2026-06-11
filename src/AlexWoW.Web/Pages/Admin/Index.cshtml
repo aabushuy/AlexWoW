@@ -1,0 +1,64 @@
+@page
+@model AlexWoW.Web.Pages.Admin.IndexModel
+@using AlexWoW.Database.Models
+@{
+    ViewData["Title"] = "Spell QA — сессии";
+}
+<h1>Spell QA — сессии захвата</h1>
+<p class="muted">Проверка заклинаний по классам. Захват ведётся в игре дев-командами
+    <code>.spelltest start/stop</code> или авто-прогоном <code>.spelltest run</code>.</p>
+
+@if (Model.Sessions.Count == 0)
+{
+    <div class="panel">
+        <div class="empty-state">
+            <p>Сессий захвата пока нет.</p>
+            <p>В игре (админ-персонажем): <code>.dummy</code>, <code>.dummy heal</code>, затем <code>.spelltest run</code>.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="panel">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Класс</th>
+                    <th>Ур.</th>
+                    <th>Режим</th>
+                    <th>Старт</th>
+                    <th>Статус</th>
+                    <th>Тикет</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Sessions)
+                {
+                    <tr>
+                        <td><a asp-page="/Admin/Session" asp-route-id="@s.Id">@s.Id</a></td>
+                        <td style="color:@GameData.ClassColor(s.Class)">@GameData.ClassName(s.Class)</td>
+                        <td>@s.Level</td>
+                        <td>@(s.Mode == SpellTestMode.Harness ? "авто" : "ручной")</td>
+                        <td>@s.StartedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@(s.EndedAt is null ? "идёт" : "завершена")</td>
+                        <td>
+                            @if (s.TicketId is { } tid)
+                            {
+                                <span class="badge badge-ok">#@tid</span>
+                            }
+                            else if (s.Analyzed)
+                            {
+                                <span class="muted">проанализирована</span>
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
