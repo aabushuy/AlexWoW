@@ -49,10 +49,25 @@ public sealed class SpellTemplateRepository(string connectionString)
     public async Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default)
     {
         await using var db = await OpenAsync(ct);
-        // spell_chain.prev_spell — предыдущий ранг (0, если ранг 1 или спелл не в цепочке). M10.3.
-        return await db.ExecuteScalarAsync<uint?>(new CommandDefinition(
+        // spell_chain.prev_spell — предыдущий ранг (0, если ранг 1). M10.3.
+        var prev = await db.ExecuteScalarAsync<uint?>(new CommandDefinition(
             "SELECT prev_spell FROM spell_chain WHERE spell_id = @spellId;",
             new { spellId }, cancellationToken: ct)) ?? 0u;
+        if (prev != 0)
+            return prev;
+
+        // Фолбэк: в дампе spell_chain неполна (нет, напр., рангов аур/печатей паладина — 64 из 175). Тогда
+        // предыдущий ранг ищем в spell_template: тот же SpellName, реальный ранг (Rank1<>'') и ближайший
+        // меньший SpellLevel. Нужно для SUPERCEDED при изучении (иначе на панели/в книге копятся все ранги). M7 #47.
+        return await db.ExecuteScalarAsync<uint?>(new CommandDefinition("""
+            SELECT s2.Id
+            FROM spell_template s1
+            JOIN spell_template s2
+              ON s2.SpellName = s1.SpellName AND s2.Rank1 <> '' AND s2.SpellLevel < s1.SpellLevel
+            WHERE s1.Id = @spellId AND s1.Rank1 <> ''
+            ORDER BY s2.SpellLevel DESC
+            LIMIT 1;
+            """, new { spellId }, cancellationToken: ct)) ?? 0u;
     }
 
     public async Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(
