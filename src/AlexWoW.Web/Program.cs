@@ -30,6 +30,8 @@ builder.Services.AddPooledDbContextFactory<AuthDbContext>((sp, o) =>
 builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
 builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
 builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
+builder.Services.AddSingleton<ISpellTestRepository, EfSpellTestRepository>(); // M12 Spell QA: чтение/анализ захвата
+builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -44,7 +46,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.Cookie.HttpOnly = true;
         o.Cookie.SameSite = SameSiteMode.Lax;
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o =>
+    // M12: админ-раздел панели — только аккаунтам is_admin=1 (claim выставляется при входе).
+    o.AddPolicy("Admin", p => p.RequireClaim(AuthSessionExtensions.AdminClaim, "1")));
 
 // За Caddy (терминирует TLS) — доверяем заголовкам X-Forwarded-* для корректных https-ссылок.
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -58,6 +62,7 @@ builder.Services.AddRazorPages(o =>
 {
     // Все страницы требуют входа, кроме явно открытых (главная, вход, регистрация).
     o.Conventions.AuthorizeFolder("/");
+    o.Conventions.AuthorizeFolder("/Admin", "Admin"); // M12: раздел только для администраторов
     o.Conventions.AllowAnonymousToPage("/Index");
     o.Conventions.AllowAnonymousToPage("/Login");
     o.Conventions.AllowAnonymousToPage("/Register");

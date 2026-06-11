@@ -18,6 +18,7 @@ internal sealed class WorldSessionServices(
     WorldPacketRouter router,
     AuthChallengeSender authChallenge,
     AuraPersistenceService auraPersistence,
+    SpellTestCaptureService spellTestCapture,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -28,5 +29,7 @@ internal sealed class WorldSessionServices(
     public AuthChallengeSender AuthChallenge { get; } = authChallenge;
     // Нужно самой сессии: персист временных аур при выходе из мира (M10.5).
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
+    // Нужно самой сессии: закрыть осиротевшую сессию захвата проверки заклинаний при логауте (M12 Spell QA).
+    public SpellTestCaptureService SpellTestCapture { get; } = spellTestCapture;
     public ILogger<WorldSession> Logger { get; } = logger;
 }

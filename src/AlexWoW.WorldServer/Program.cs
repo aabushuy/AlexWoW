@@ -43,6 +43,7 @@ builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
 builder.Services.AddSingleton<IQuestRepository, EfQuestRepository>();
 builder.Services.AddSingleton<ICharacterStateRepository, EfCharacterStateRepository>();
 builder.Services.AddSingleton<ITeleportRepository, EfTeleportRepository>(); // Devcommands #79: точки телепорта
+builder.Services.AddSingleton<ISpellTestRepository, EfSpellTestRepository>(); // M12 Spell QA: захват проверки заклинаний
 // Рефактор #25 (SOLID): WorldDatabase (god-класс) разбит на focused SRP-репозитории (Dapper,
 // read-only дамп mangos). *Store зависят от УЗКИХ интерфейсов; WorldSession — от композитного
 // фасада IWorldRepository (делегирует этим репозиториям).
@@ -93,6 +94,8 @@ builder.Services.AddSingleton<SpellCastCompletion>();
 builder.Services.AddSingleton<SpellTogglesService>();
 builder.Services.AddSingleton<SpellEffectsService>();
 builder.Services.AddSingleton<SpellModifierService>(); // M10.6: модификаторы пассивных талантов (ауры 107/108)
+builder.Services.AddSingleton<SpellTestCaptureService>();  // M12 Spell QA: рекордер захвата
+builder.Services.AddSingleton<SpellTestHarnessService>();  // M12 Spell QA: авто-харнесс прогона абилок
 builder.Services.AddSingleton<AuraService>();
 builder.Services.AddSingleton<PeriodicsService>();
 builder.Services.AddSingleton<AuraPersistenceService>();

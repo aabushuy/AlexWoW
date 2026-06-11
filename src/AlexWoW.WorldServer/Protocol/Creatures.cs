@@ -59,17 +59,45 @@ public static class Npcs
     /// <summary>GUID существа манекена — тот же, что у БД-спавна; дев-команда .dummy двигает его. #29.</summary>
     public static readonly ulong TrainingDummyGuid = UnitGuid(TrainingDummyEntry, TrainingDummySpawnId);
 
-    /// <summary>Существо — тренировочный манекен (пассивная высоко-HP цель). #28.</summary>
+    /// <summary>Существо — тренировочный (урон) манекен (пассивная высоко-HP цель). #28.</summary>
     public static bool IsTrainingDummy(uint entry) => entry == TrainingDummyEntry;
 
     /// <summary>Шаблон манекена — фоллбэк для дев-команды .dummy, если он ещё не закэширован из БД. #29.</summary>
     public static readonly CreatureTemplate TrainingDummy = new(
         Entry: TrainingDummyEntry,
         Name: "Тренировочный манекен",
-        SubName: "Уровень 80 — проверка навыков",
+        SubName: "Уровень 80 — проверка урона",
         DisplayId: 3019,
         Level: 80,
         Faction: 7,    // нейтральный (жёлтый) — атакуемый, не авто-враждебный
+        UnitType: 7);  // Humanoid
+
+    /// <summary>Entry лечебного манекена (M12 Spell QA): дружественная цель для проверки хилов/HoT.</summary>
+    public const uint HealDummyEntry = 990021;
+
+    /// <summary>Макс. HP лечебного манекена (как у урон-манекена — большой, чтобы держался любой тест). M12.</summary>
+    public const uint HealDummyHealth = 50_000_000;
+
+    /// <summary>Counter (creature.guid) спавна лечебного манекена. M12.</summary>
+    public const uint HealDummySpawnId = 9000021;
+
+    /// <summary>GUID лечебного манекена; дев-команда .dummy heal двигает/призывает его. M12.</summary>
+    public static readonly ulong HealDummyGuid = UnitGuid(HealDummyEntry, HealDummySpawnId);
+
+    /// <summary>Существо — лечебный манекен (дружественная цель хила, всегда ранен). M12.</summary>
+    public static bool IsHealDummy(uint entry) => entry == HealDummyEntry;
+
+    /// <summary>Любой тестовый манекен (урон или хил) — пассивный, высоко-HP. M12.</summary>
+    public static bool IsTestDummy(uint entry) => IsTrainingDummy(entry) || IsHealDummy(entry);
+
+    /// <summary>Шаблон лечебного манекена. Faction 35 (дружелюбен ко всем) — не атакуем, валидная цель хила. M12.</summary>
+    public static readonly CreatureTemplate HealDummy = new(
+        Entry: HealDummyEntry,
+        Name: "Лечебный манекен",
+        SubName: "Уровень 80 — проверка лечения",
+        DisplayId: 3019,
+        Level: 80,
+        Faction: 35,   // дружелюбен ко всем — не атакуем; принимает лечащие спеллы
         UnitType: 7);  // Humanoid
 
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()

@@ -62,8 +62,8 @@ internal sealed class VisibilityService(IWorldRepository worldDb)
                 var template = new CreatureTemplate(
                     row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId,
                     row.MinLevel, row.Faction, row.CreatureType, row.Scale, row.NpcFlags, row.UnitClass);
-                // Манекен (#28) — большой фиксированный HP, чтобы переживал тесты; остальные — по уровню.
-                var maxHealth = Npcs.IsTrainingDummy(row.Entry)
+                // Манекены (#28/M12) — большой фиксированный HP, чтобы переживали тесты; остальные — по уровню.
+                var maxHealth = Npcs.IsTestDummy(row.Entry)
                     ? Npcs.TrainingDummyHealth
                     : WorldCreature.MaxHealthFor(row.MinLevel);
                 return new WorldCreature

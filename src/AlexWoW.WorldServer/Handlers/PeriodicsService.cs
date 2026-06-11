@@ -32,6 +32,7 @@ internal sealed class PeriodicsService(
     AuraService auras,
     SpellCatalog spellCatalog,
     CreatureCombatAI creatureAi,
+    SpellTestCaptureService spellTestCapture,
     KillRewardService killReward)
 {
     /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
@@ -232,6 +233,8 @@ internal sealed class PeriodicsService(
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgPeriodicAuraLog,
             AuraPackets.BuildPeriodicLog(creature.Guid, caster, p.SpellId, isHeal: false, amount, p.SchoolMask), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
+        // M12 Spell QA: захват тика DoT (ручной режим; харнесс пишет синтетический тик).
+        await spellTestCapture.RecordTickAsync(session, p.SpellId, p.SchoolMask, isHeal: false, amount, (uint)Math.Max(0, p.Amount), ct);
         if (died)
         {
             await killReward.OnCreatureKilledAsync(session, creature, ct);
@@ -253,6 +256,8 @@ internal sealed class PeriodicsService(
         await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgPeriodicAuraLog,
             AuraPackets.BuildPeriodicLog(player.Guid, caster, p.SpellId, isHeal: true, effective, 0), ct);
         await session.World.BroadcastPlayerHealthAsync(player, ct);
+        // M12 Spell QA: захват тика HoT (ручной режим; харнесс пишет синтетический тик).
+        await spellTestCapture.RecordTickAsync(session, p.SpellId, p.SchoolMask, isHeal: true, effective, (uint)Math.Max(0, p.Amount), ct);
     }
 
     /// <summary>Снимает свой периодический эффект/бафф по spellId (правый клик по иконке, M10.4c) — откат +макс.HP.</summary>

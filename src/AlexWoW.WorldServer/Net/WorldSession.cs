@@ -131,6 +131,8 @@ public sealed class WorldSession
             return;
         // M10.5: сохранить временны́е баффы/HoT с остатком длительности ДО очистки (InWorldGuid ещё валиден).
         await _services.AuraPersistence.SaveTimedAurasAsync(this, InWorldGuid, ct);
+        // M12 Spell QA: закрыть незавершённую сессию захвата (тестировщик вышел, не нажав .spelltest stop).
+        await _services.SpellTestCapture.StopAsync(this, ct);
         Player = null;
         InWorldGuid = 0;
         // M7 S9 #43: пер-полевые сбросы перенесены в Reset() компонентов (семантика сохранена 1:1).

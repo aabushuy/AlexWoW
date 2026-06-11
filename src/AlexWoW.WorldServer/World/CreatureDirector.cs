@@ -84,33 +84,49 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
     /// боевое состояние сбрасываются. В пределах видимости БД-точки (вся Долина Североземья) остаётся;
     /// дальше может пропасть при обновлении видимости — тогда позвать заново.
     /// </summary>
-    public async Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
+    public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
+        => SummonDummyAsync(session, Npcs.TrainingDummyGuid, Npcs.TrainingDummy, Npcs.TrainingDummyHealth,
+            sideOffset: 0f, wounded: false, ct);
+
+    /// <summary>
+    /// Лечебный манекен (M12 Spell QA): дружественная цель для проверки хилов/HoT. Призывается ранен (HP = ½
+    /// макс.) — лечащий спелл всегда даёт effective&gt;0. Ставится со смещением вбок, чтобы не накладываться на
+    /// урон-манекен. Хил по нему обрабатывает <see cref="Handlers.SpellEffectsService.ApplyHealAsync"/>.
+    /// </summary>
+    public Task SummonHealDummyAsync(WorldSession session, CancellationToken ct)
+        => SummonDummyAsync(session, Npcs.HealDummyGuid, Npcs.HealDummy, Npcs.HealDummyHealth,
+            sideOffset: 2.5f, wounded: true, ct);
+
+    /// <summary>
+    /// Общая логика призыва манекена (#29, расширено M12): телепортирует существо с фикс. GUID на ~3 ярда перед
+    /// игроком (с боковым сдвигом <paramref name="sideOffset"/>), лицом к нему; DESTROY+CREATE наблюдателям; сброс
+    /// боевого состояния. <paramref name="wounded"/> — выставить HP в ½ макс. (лечебный манекен), иначе полный.
+    /// </summary>
+    private async Task SummonDummyAsync(WorldSession session, ulong guid, CreatureTemplate template,
+        uint maxHealth, float sideOffset, bool wounded, CancellationToken ct)
     {
         var map = session.Character?.Map ?? 0;
-        float x = session.PosX + 3f * MathF.Cos(session.PosO);
-        float y = session.PosY + 3f * MathF.Sin(session.PosO);
+        // 3 ярда вперёд + боковой сдвиг (перпендикуляр к направлению взгляда) — чтобы два манекена не слипались.
+        float x = session.PosX + 3f * MathF.Cos(session.PosO) + sideOffset * MathF.Cos(session.PosO + MathF.PI / 2);
+        float y = session.PosY + 3f * MathF.Sin(session.PosO) + sideOffset * MathF.Sin(session.PosO + MathF.PI / 2);
         float z = session.PosZ;
         float o = session.PosO + MathF.PI;            // лицом к игроку
 
-        var dummy = world.GetOrAddCreature(Npcs.TrainingDummyGuid, () =>
+        var dummy = world.GetOrAddCreature(guid, () => new WorldCreature
         {
-            var hp = Npcs.TrainingDummyHealth;
-            return new WorldCreature
-            {
-                Guid = Npcs.TrainingDummyGuid,
-                Map = map,
-                Template = Npcs.TrainingDummy,
-                X = x,
-                Y = y,
-                Z = z,
-                O = o,
-                HomeX = x,
-                HomeY = y,
-                HomeZ = z,
-                HomeO = o,
-                MaxHealth = hp,
-                Health = hp,
-            };
+            Guid = guid,
+            Map = map,
+            Template = template,
+            X = x,
+            Y = y,
+            Z = z,
+            O = o,
+            HomeX = x,
+            HomeY = y,
+            HomeZ = z,
+            HomeO = o,
+            MaxHealth = maxHealth,
+            Health = maxHealth,
         });
 
         // Убрать со старого места у всех, кто его видит (включая вызвавшего — ниже пере-создадим).
@@ -122,9 +138,10 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         }
 
         // Переставить (X/Y/Z мутабельны; Home — init, и не нужен: манекен пассивен, не евейдит/респавнит)
-        // + полный сброс боевого состояния (как свежий манекен).
+        // + полный сброс боевого состояния (как свежий манекен). Лечебный — глубоко ранен (1% макс., заведомо ниже
+        // потолка лечения ½ макс. в ApplyHealAsync), чтобы любой хил давал effective>0 в течение всей сессии.
         dummy.X = x; dummy.Y = y; dummy.Z = z; dummy.O = o;
-        dummy.Health = dummy.MaxHealth;
+        dummy.Health = wounded ? Math.Max(1, dummy.MaxHealth / 100) : dummy.MaxHealth;
         dummy.CombatTargetGuid = 0;
         dummy.Evading = false;
         dummy.RespawnAtMs = null;
