@@ -9,7 +9,7 @@ public sealed class SpellTemplateRepository(string connectionString)
     : MangosRepositoryBase(connectionString), ISpellTemplateRepository
 {
     private const string SpellColumns = """
-        SELECT Id, SchoolMask, CastingTimeIndex, PowerType, ManaCost, ManaCostPercentage,
+        SELECT Id, Attributes, SchoolMask, CastingTimeIndex, PowerType, ManaCost, ManaCostPercentage,
                RecoveryTime, CategoryRecoveryTime, StartRecoveryTime, DurationIndex,
                Effect1, Effect2, Effect3,
                EffectBasePoints1, EffectBasePoints2, EffectBasePoints3,

@@ -10,6 +10,10 @@ namespace AlexWoW.Database.Models;
 public sealed record SpellTemplateData
 {
     public uint Id { get; init; }
+    /// <summary>Флаги спелла (Spell.dbc Attributes): бит <c>SPELL_ATTR_PASSIVE=0x40</c> — пассивный (талант/
+    /// пассивная классовая аура). Нужен, чтобы модификаторы (107/108) брать только от пассивных, а не от
+    /// активируемых способностей (печати, Divine Plea, Envenom). M7 #48-bis / QA Spell.</summary>
+    public uint Attributes { get; init; }
     public uint SchoolMask { get; init; }
     public uint CastingTimeIndex { get; init; }
     public int PowerType { get; init; }
