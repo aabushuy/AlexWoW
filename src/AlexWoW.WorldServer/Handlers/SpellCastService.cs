@@ -65,6 +65,18 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
+        // M10.6: модификаторы талантов на каст-тайм/кулдаун — копией SpellInfo (кэш не трогаем); всё
+        // ниже (SPELL_START, отложенное завершение, КД в CompleteCast) видит уже изменённые значения.
+        // Стоимость модифицируется внутри EffectivePowerCost.
+        var mods = session.Progression.SpellMods;
+        if (mods.Count > 0)
+        {
+            var castMs = Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.CastingTime, info.CastMs));
+            var cooldownMs = Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Cooldown, info.CooldownMs));
+            if (castMs != info.CastMs || cooldownMs != info.CooldownMs)
+                info = info with { CastMs = castMs, CooldownMs = cooldownMs };
+        }
+
         var now = Environment.TickCount64;
         var cost = EffectivePowerCost(session, info);
 
@@ -136,9 +148,19 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     /// <summary>
     /// Стоимость ресурса спелла (M10.2 → M10.4a): для маны — флэт из spell_template или % MaxMana (приближение
     /// базовой маны); для ярости/энергии — флэт в единицах ресурса (ярость в DBC уже ×10, как у нас).
+    /// M10.6: поверх базы — модификаторы SPELLMOD_COST талантов (напр. Improved Heroic Strike: −10 ярости ×10).
     /// Чистый хелпер (static): зовётся и гейтом каста, и завершением (<see cref="SpellCastCompletion"/>).
     /// </summary>
     internal static uint EffectivePowerCost(WorldSession session, SpellCatalog.SpellInfo info)
+    {
+        var cost = BasePowerCost(session, info);
+        if (cost == 0 || session.Progression.SpellMods.Count == 0)
+            return cost;
+        return (uint)Math.Max(0,
+            SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.Cost, (int)cost));
+    }
+
+    private static uint BasePowerCost(WorldSession session, SpellCatalog.SpellInfo info)
     {
         if (info.PowerType != PowerMana)
             return info.ManaCost; // ярость/энергия — флэт

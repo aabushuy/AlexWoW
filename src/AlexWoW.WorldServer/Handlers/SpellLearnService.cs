@@ -16,6 +16,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class SpellLearnService(
     SkillsService skills,
+    SpellModifierService spellMods,
     IWorldRepository worldDb,
     ICharacterStateRepository charState)
 {
@@ -43,6 +44,10 @@ internal sealed class SpellLearnService(
         uint prev = 0;
         try { prev = await worldDb.GetPrevRankAsync(spellId, ct); }
         catch { /* БД мира недоступна — просто LEARNED */ }
+
+        // M10.6: пассивный талант-модификатор (ауры 107/108) → в реестр сессии (моды prev-ранга снимаются).
+        if (tpl is not null)
+            spellMods.OnSpellLearned(session, tpl, prev);
 
         if (prev != 0 && session.Progression.KnownSpells.Contains(prev))
         {

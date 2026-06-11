@@ -42,10 +42,28 @@ public sealed record SpellTemplateData
     public int EffectTriggerSpell1 { get; init; }
     public int EffectTriggerSpell2 { get; init; }
     public int EffectTriggerSpell3 { get; init; }
-    /// <summary>Misc-значение эффекта: для SKILL(118)/SKILL_STEP(44) — id навыка профессии. M11.2.</summary>
+    /// <summary>Misc-значение эффекта: для SKILL(118)/SKILL_STEP(44) — id навыка профессии (M11.2);
+    /// для аур ADD_FLAT/PCT_MODIFIER(107/108) — тип SPELLMOD_* (стоимость/урон/КД и т.д.). M10.6.</summary>
     public int EffectMiscValue1 { get; init; }
     public int EffectMiscValue2 { get; init; }
     public int EffectMiscValue3 { get; init; }
+    /// <summary>Семейство спеллов класса (SPELLFAMILY_*: 4=воин, 3=маг…) — пространство масок ниже. M10.6.</summary>
+    public uint SpellFamilyName { get; init; }
+    /// <summary>Биты 0–63 96-битной маски принадлежности спелла к семейству (Spell.dbc SpellFamilyFlags). M10.6.</summary>
+    public ulong SpellFamilyFlags { get; init; }
+    /// <summary>Биты 64–95 той же маски (Spell.dbc SpellFamilyFlags2). M10.6.</summary>
+    public uint SpellFamilyFlags2 { get; init; }
+    /// <summary>Маска затрагиваемых спеллов эффекта-модификатора (аура 107/108): какие спеллы СЕМЕЙСТВА
+    /// модифицирует талант (сверка с SpellFamilyFlags/Flags2 цели). N_1/N_2/N_3 = биты 0–31/32–63/64–95. M10.6.</summary>
+    public uint EffectSpellClassMask1_1 { get; init; }
+    public uint EffectSpellClassMask1_2 { get; init; }
+    public uint EffectSpellClassMask1_3 { get; init; }
+    public uint EffectSpellClassMask2_1 { get; init; }
+    public uint EffectSpellClassMask2_2 { get; init; }
+    public uint EffectSpellClassMask2_3 { get; init; }
+    public uint EffectSpellClassMask3_1 { get; init; }
+    public uint EffectSpellClassMask3_2 { get; init; }
+    public uint EffectSpellClassMask3_3 { get; init; }
     /// <summary>Создаваемый предмет эффекта CREATE_ITEM(24) — entry результата крафта. M11.3.</summary>
     public uint EffectItemType1 { get; init; }
     public uint EffectItemType2 { get; init; }

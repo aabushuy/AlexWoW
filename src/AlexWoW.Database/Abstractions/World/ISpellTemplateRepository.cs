@@ -13,4 +13,8 @@ public interface ISpellTemplateRepository
 
     /// <summary>Предыдущий ранг спелла из spell_chain (0 — ранг 1 / вне цепочки). Для SUPERCEDED. M10.3.</summary>
     Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default);
+
+    /// <summary>Пакетно: spell_id → prev_spell из spell_chain (только спеллы с предыдущим рангом).
+    /// Ранг-дедуп модификаторов талантов при входе. M10.6.</summary>
+    Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
 }

@@ -42,7 +42,14 @@ internal sealed class PeriodicsService(
         if (!info.Periodic || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
             return;
 
-        var dur = durationOverrideMs > 0 ? durationOverrideMs : info.AuraDurationMs;
+        // M10.6: модификаторы талантов — величина тика (ALL_EFFECTS/EFFECT{N} + SPELLMOD_DOT, напр.
+        // Improved Rend) и длительность (SPELLMOD_DURATION). Остаток при восстановлении не трогаем.
+        var mods = session.Progression.SpellMods;
+        var tickAmount = SpellModifiers.Apply(mods, info, SpellModOp.Dot,
+            SpellModifiers.ApplyEffectValue(mods, info, info.PeriodicEffectIndex, info.TickAmount));
+        var dur = durationOverrideMs > 0
+            ? durationOverrideMs
+            : Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Duration, info.AuraDurationMs));
         var interval = info.TickIntervalMs > 0 ? info.TickIntervalMs : 3000;
         var now = Environment.TickCount64;
         var expires = now + dur;
@@ -59,7 +66,7 @@ internal sealed class PeriodicsService(
                 SpellId = spellId,
                 TargetGuid = 0,
                 SchoolMask = info.School,
-                Amount = info.TickAmount,
+                Amount = tickAmount,
                 IntervalMs = interval,
                 NextTickMs = now + interval,
                 ExpiresAtMs = expires,
@@ -90,7 +97,7 @@ internal sealed class PeriodicsService(
             SpellId = spellId,
             TargetGuid = targetCreatureGuid,
             SchoolMask = info.School,
-            Amount = info.TickAmount,
+            Amount = tickAmount,
             IntervalMs = interval,
             NextTickMs = now + interval,
             ExpiresAtMs = expires,
@@ -110,7 +117,10 @@ internal sealed class PeriodicsService(
     {
         if (!info.AuraBuff || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
             return;
-        var dur = durationOverrideMs > 0 ? durationOverrideMs : info.AuraDurationMs;
+        // M10.6: SPELLMOD_DURATION талантов (напр. Booming Voice удлиняет Боевой клич).
+        var dur = durationOverrideMs > 0
+            ? durationOverrideMs
+            : Math.Max(0, SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.Duration, info.AuraDurationMs));
         var now = Environment.TickCount64;
         var expires = now + dur;
         var caster = (ulong)session.InWorldGuid;

@@ -92,6 +92,7 @@ builder.Services.AddSingleton<SpellCastService>();
 builder.Services.AddSingleton<SpellCastCompletion>();
 builder.Services.AddSingleton<SpellTogglesService>();
 builder.Services.AddSingleton<SpellEffectsService>();
+builder.Services.AddSingleton<SpellModifierService>(); // M10.6: модификаторы пассивных талантов (ауры 107/108)
 builder.Services.AddSingleton<AuraService>();
 builder.Services.AddSingleton<PeriodicsService>();
 builder.Services.AddSingleton<AuraPersistenceService>();
