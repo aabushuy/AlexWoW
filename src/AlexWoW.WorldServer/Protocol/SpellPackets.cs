@@ -95,6 +95,15 @@ public static class SpellPackets
             .UInt32(cooldownMs)
             .ToArray();
 
+    /// <summary>
+    /// SMSG_SET_FLAT/PCT_SPELL_MODIFIER (3.3.5): u8 eff (бит 0–95 classmask) + u8 op (SPELLMOD_*) +
+    /// i32 итог по биту. Клиент применяет к тултипам/стоимости/гейту кнопок (без этого пакета тултип
+    /// Удара героя показывает базовые 15 ярости и кнопка не жмётся при 14). Сверено с wow_messages
+    /// (smsg_set_flat_spell_modifier) и CMaNGOS <c>Player::AddSpellMod</c>. M10.6.
+    /// </summary>
+    public static byte[] BuildSpellModifier(byte eff, byte op, int value)
+        => new ByteWriter(6).UInt8(eff).UInt8(op).Int32(value).ToArray();
+
     /// <summary>SMSG_SPELLNONMELEEDAMAGELOG (3.3.5): «числа урона» от спелла.</summary>
     public static byte[] BuildDamageLog(ulong target, ulong attacker, uint spellId, uint damage, uint overkill, byte school)
     {

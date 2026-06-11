@@ -29,6 +29,10 @@ internal sealed class SessionProgressionState
     /// абилок. Перестраивается при входе, дополняется при изучении (SpellModifierService). M10.6.</summary>
     internal List<World.SpellModifier> SpellMods { get; } = [];
 
+    /// <summary>Последние отправленные клиенту итоги модификаторов (SMSG_SET_FLAT/PCT_SPELL_MODIFIER):
+    /// (бит маски, op, процентный?) → значение. Для диффа при изучении/сбросе (исчезнувшие зануляются). M10.6.</summary>
+    internal Dictionary<(byte Eff, byte Op, bool Pct), int> SentSpellModTotals { get; } = [];
+
     /// <summary>Активные ауры (баффы/дебаффы/формы). Слот = позиция в баф-баре. M6.11.</summary>
     internal List<World.ActiveAura> Auras { get; } = [];
     /// <summary>Активные периодические эффекты этого кастера (DoT на существах / HoT на себе). M10.4b.</summary>
@@ -45,6 +49,7 @@ internal sealed class SessionProgressionState
         SkillBook.Clear();    // M11.1: навыки перезагружаем при следующем входе
         ProfessionRankSpell.Clear();
         SpellMods.Clear();    // M10.6: модификаторы пересобираются при следующем входе
+        SentSpellModTotals.Clear();
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;

@@ -17,6 +17,9 @@ namespace AlexWoW.WorldServer.World;
 /// </summary>
 public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog> logger)
 {
+    /// <summary>Семейство спеллов воина (SpellFamilyName, CMaNGOS SPELLFAMILY_WARRIOR). M10.6.</summary>
+    private const uint SpellFamilyWarrior = 4;
+
     /// <summary>МАСКИ школ магии (SpellSchoolMask, u8): Fire=0x4, Frost=0x10, Holy=0x2 (см. SMSG_*DAMAGELOG).</summary>
     public const byte SchoolFire = 0x04;
     public const byte SchoolFrost = 0x10;
@@ -35,6 +38,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
+    private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
+    private const int EffectDummy = 3;                   // dummy — скриптовый эффект (ярость Рывка) — M10.6
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
@@ -59,7 +64,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // M10.6: семейство/маска принадлежности — матчинг модификаторами талантов (SpellModifiers.IsAffected);
         // индексы эффектов (1..3, 0 — нет) — адресация SPELLMOD_EFFECT{N} к прямому/периодическому эффекту.
         uint FamilyName = 0, ulong FamilyFlags = 0, uint FamilyFlags2 = 0,
-        byte DirectEffectIndex = 0, byte PeriodicEffectIndex = 0);
+        byte DirectEffectIndex = 0, byte PeriodicEffectIndex = 0,
+        // M10.6: начисление ресурса кастеру (ENERGIZE / ярость Рывка): величина, power type, индекс эффекта.
+        uint EnergizeAmount = 0, byte EnergizePower = 0, byte EnergizeEffectIndex = 0);
 
     /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн), телепорт вперёд (Blink) или за спину
     /// цели (Shadowstep). None — не двигает.</summary>
@@ -168,6 +175,31 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             t.Effect2 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell2 :
             t.Effect3 == EffectTriggerSpell ? (uint)t.EffectTriggerSpell3 : 0u;
 
+        // M10.6: начисление ресурса кастеру. Общий случай — SPELL_EFFECT_ENERGIZE (30): MiscValue = power
+        // type, величина = BasePoints+1. Спец-случай — ярость Рывка воина: она закодирована DUMMY-эффектом
+        // (BasePoints 89/119/149 → 9/12/15 ярости ×10), который ядра скриптуют (TrinityCore spell_warr_charge,
+        // CMaNGOS Spell::EffectDummy) — распознаём по семейству воина + эффекту CHARGE.
+        uint energizeAmount = 0;
+        byte energizePower = 0, energizeIdx = 0;
+        var energizeEff = Array.FindIndex(effects, e => e.Eff == EffectEnergize);
+        if (energizeEff >= 0)
+        {
+            var misc = energizeEff switch { 0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, _ => t.EffectMiscValue3 };
+            energizeAmount = (uint)Math.Max(0, effects[energizeEff].Bp + 1);
+            energizePower = (byte)Math.Max(0, misc);
+            energizeIdx = (byte)(energizeEff + 1);
+        }
+        else if (t.SpellFamilyName == SpellFamilyWarrior && Array.Exists(effects, e => e.Eff == EffectCharge))
+        {
+            var dummy = Array.FindIndex(effects, e => e.Eff == EffectDummy && e.Bp > 0);
+            if (dummy >= 0)
+            {
+                energizeAmount = (uint)(effects[dummy].Bp + 1);
+                energizePower = 1; // ярость (уже ×10 в DBC, как у нас)
+                energizeIdx = (byte)(dummy + 1);
+            }
+        }
+
         // M11.3: создание предмета (крафт). count = BasePoints+1 (Smelt Bronze: BasePoints=1 → 2 слитка).
         uint createItemId = 0, createItemCount = 0;
         if (t.Effect1 == EffectCreateItem) { createItemId = t.EffectItemType1; createItemCount = (uint)Math.Max(1, t.EffectBasePoints1 + 1); }
@@ -189,7 +221,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
             movement, triggerSpell, createItemId, createItemCount, reagents,
             t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
-            (byte)(chosenIdx + 1), (byte)(periodicIdx + 1));
+            (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
+            energizeAmount, energizePower, energizeIdx);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
