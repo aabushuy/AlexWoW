@@ -8,12 +8,10 @@ namespace AlexWoW.WorldServer.World;
 /// <summary>
 /// Каталог спеллов (M6.4 → M10.2, DI-синглтон M7 S3): данные эффекта/каста для оркестрации
 /// (<see cref="Handlers.SpellCastService"/>).
-/// <para>M10.2: основной источник — дамп <c>spell_template</c> (mangos): школа, время каста
+/// <para>M10.2: единственный источник — дамп <c>spell_template</c> (mangos): школа, время каста
 /// (<see cref="SpellCastTimes"/>), эффект (урон/хил), мана (флэт или % базовой), кулдаун — читаются из БД
-/// и кэшируются (данные спелла иммутабельны). Хардкод снят. Легаси-словарь <see cref="LegacySpells"/>
-/// оставлен только фолбэком, если БД мира недоступна.</para>
-/// Переключатели (<see cref="Toggles"/>) и стартовый набор (<see cref="GrantedCombatSpells"/>) — наша
-/// игровая конфигурация, не из БД (чистые данные — статические члены).
+/// и кэшируются (данные спелла иммутабельны). Хардкод снят (легаси-стартер M6.4 убран).</para>
+/// Переключатели (<see cref="Toggles"/>) — наша игровая конфигурация, не из БД (чистые данные — статические члены).
 /// </summary>
 public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog> logger)
 {
@@ -76,8 +74,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private readonly ConcurrentDictionary<uint, SpellInfo?> _cache = new();
 
     /// <summary>
-    /// Эффект спелла: из <c>spell_template</c> (с кэшем); при недоступности БД мира — легаси-фолбэк.
-    /// Возвращает null, если спелл не известен ни в БД, ни в фолбэке (клиент сам валидирует — каст без эффекта).
+    /// Эффект спелла из <c>spell_template</c> (с кэшем). Возвращает null, если спелл не найден в БД мира
+    /// или БД недоступна (клиент сам валидирует — каст без эффекта).
     /// </summary>
     public async Task<SpellInfo?> GetAsync(uint spellId, CancellationToken ct)
     {
@@ -86,15 +84,15 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         try
         {
             var tpl = await worldDb.GetSpellAsync(spellId, ct);
-            var info = tpl is not null ? FromTemplate(tpl) : LegacySpells.GetValueOrDefault(spellId);
+            var info = tpl is not null ? FromTemplate(tpl) : null;
             _cache[spellId] = info; // кэшируем определённый результат (в т.ч. null = нет такого спелла)
             return info;
         }
         catch (Exception ex)
         {
-            // БД мира недоступна / ошибка маппинга — фолбэк на легаси, без кэша. ЛОГИРУЕМ (раньше глоталось).
-            logger.LogError(ex, "SpellCatalog: spell={Spell} — ошибка чтения spell_template, фолбэк на легаси", spellId);
-            return LegacySpells.GetValueOrDefault(spellId);
+            // БД мира недоступна / ошибка маппинга — спелл без эффекта (без кэша). ЛОГИРУЕМ.
+            logger.LogError(ex, "SpellCatalog: spell={Spell} — ошибка чтения spell_template", spellId);
+            return null;
         }
     }
 
@@ -230,21 +228,6 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         if (item > 0 && count > 0)
             (reagents ??= []).Add(((uint)item, count));
     }
-
-    /// <summary>
-    /// Легаси-словарь эффектов (ранг 1) — фолбэк, если БД мира недоступна (M6.4). Совпадает с данными
-    /// spell_template для этих id; в норме сервер берёт значения из БД.
-    /// </summary>
-    private static readonly Dictionary<uint, SpellInfo> LegacySpells = new()
-    {
-        [133] = new(SchoolFire, 14, 22, 1500, ManaCost: 30, CooldownMs: 0),     // Fireball rank 1
-        [116] = new(SchoolFrost, 14, 20, 1500, ManaCost: 25, CooldownMs: 0),    // Frostbolt rank 1
-        [2136] = new(SchoolFire, 24, 32, 0, ManaCost: 40, CooldownMs: 8000),    // Fire Blast rank 1 (мгновенный)
-        [2050] = new(SchoolHoly, 45, 56, 1500, ManaCost: 30, CooldownMs: 0, IsHeal: true), // Lesser Heal rank 1
-    };
-
-    /// <summary>Спеллы, выдаваемые игроку в SMSG_INITIAL_SPELLS (для каста). M6.4.</summary>
-    public static readonly int[] GrantedCombatSpells = { 133, 116, 2136, 2050 };
 
     // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида

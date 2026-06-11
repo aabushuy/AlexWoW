@@ -203,13 +203,9 @@ internal sealed class LoginSequenceService(
 
     /// <summary>
     /// SMSG_INITIAL_SPELLS (M9.3): книга заклинаний при входе. Набор = языковые спеллы расы ∪ стартовые
-    /// абилки класса (playercreateinfo_spell) ∪ изученное у тренера (character_spell). Хардкод маг-спеллов
-    /// из M6.4 (Fireball/Frostbolt/…) выдаём ТОЛЬКО магу (класс 8) — у остальных классов их в книге быть
-    /// не должно. Заполняет session.Progression.KnownSpells (для HasSpell-проверок тренера). БД мира недоступна → фолбэк
-    /// на языковые + (магу) боевые.
+    /// абилки класса (playercreateinfo_spell) ∪ изученное у тренера (character_spell). Заполняет
+    /// session.Progression.KnownSpells (для HasSpell-проверок тренера). БД мира недоступна → фолбэк на языковые.
     /// </summary>
-    private const byte ClassMage = 8;
-
     private async Task SendInitialSpellsAsync(WorldSession session, Character character, CancellationToken ct)
     {
         var known = session.Progression.KnownSpells;
@@ -226,13 +222,6 @@ internal sealed class LoginSequenceService(
         {
             session.Logger.LogDebug(ex, "INITIAL_SPELLS '{User}': стартовые спеллы из БД недоступны ({Msg})",
                 session.Account, ex.Message);
-        }
-
-        // M6.4: боевые спеллы-заглушки умеет кастовать только маг (их эффекты хардкожены под мага).
-        if (character.Class == ClassMage)
-        {
-            foreach (var s in World.SpellCatalog.GrantedCombatSpells)
-                known.Add((uint)s);
         }
 
         // Изученное у тренера (персист).
