@@ -74,7 +74,16 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
 
         var misc = b.Category("Прочее");
         b.Cmd(misc, "Тренировочный манекен", ".dummy");
+        b.Cmd(misc, "Лечебный манекен", ".dummy heal");
         b.Cmd(misc, "Снести dev-сущности", ".devclean");
+
+        // M12 Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.
+        var spellTest = b.Category("Spell QA");
+        b.Cmd(spellTest, "Старт захвата", ".spelltest start");
+        b.Cmd(spellTest, "Стоп захвата", ".spelltest stop");
+        b.Cmd(spellTest, "Статус", ".spelltest status");
+        b.Cmd(spellTest, "Авто-прогон ×5", ".spelltest run");
+        b.Prompt(spellTest, "Авто-прогон ×N…", ".spelltest run ", "Повторов на спелл:");
 
         // Динамическая ветка «Телепорт» из БД (alexwow_auth.dev_teleport), сгруппирована по фракции.
         var teleport = b.Category("Телепорт");
