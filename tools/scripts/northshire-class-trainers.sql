@@ -136,6 +136,15 @@ FROM npc_trainer_template WHERE entry=111;
 
 DROP TEMPORARY TABLE IF EXISTS _t;
 
+-- Стойки воина (2457 Боевая / 71 Защитная / 2458 Берсерка) — клонированный шаблон тренера их НЕ содержит
+-- (Боевая — стартовая в playercreateinfo_spell, но как тренируемая отсутствовала; Защитная/Берсерка вообще
+-- нетренируемы). Добавляем в тренер воина 990001, чтобы .learnall/обучение их выдавали. M12 (QA).
+DELETE FROM npc_trainer WHERE entry=990001 AND spell IN (2457,71,2458);
+INSERT INTO npc_trainer (entry,spell,spellcost,reqskill,reqskillvalue,reqlevel,ReqAbility1,ReqAbility2,ReqAbility3) VALUES
+  (990001,2457,0,0,0,1,0,0,0),   -- Боевая стойка (ур.1)
+  (990001,71,  0,0,0,10,0,0,0),  -- Защитная стойка (ур.10)
+  (990001,2458,0,0,0,30,0,0,0);  -- Стойка берсерка (ур.30)
+
 -- НЕ спавним тренеров на карте: команда `.trainer <class>` (веха Devcommands) ставит их у игрока
 -- по требованию. Прежние статичные спавны (creature guid 9000001..9000011) удалены — см. ОТКАТ.
 -- Манекен (guid 9000020, northshire-training-dummy.sql) — отдельная сущность, не трогаем.

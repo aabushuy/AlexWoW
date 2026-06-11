@@ -254,33 +254,61 @@ internal sealed class TrainerCatalogService(
         if (c is null || session.InWorldGuid == 0)
             return -1;
 
-        // Среди видимых тренеров найти первого, подходящего игроку по классу/расе.
+        // ПРИОРИТЕТ — тренер, поставленный командой .trainer (кастомный, полный набор умений класса). Без этого
+        // .learnall брал бы ПЕРВОГО подходящего из видимых, а в Северолесье рядом стоят реальные нортширские
+        // тренеры (воин/жрец/маг) с парой низкоуровневых спеллов → жрец/воин учили лишь ~5. M12 (QA).
         TrainerData? trainer = null;
-        foreach (var creature in session.Visibility.VisibleNpcs.Values)
+        if (session.Visibility.DevNpcs.TryGetValue(World.DevSlot.Trainer, out var devGuid))
         {
-            if ((creature.Template.NpcFlags & NpcFlagTrainer) == 0)
-                continue;
-            TrainerData? t;
-            try { t = await worldDb.GetTrainerAsync(CreatureEntry(creature.Guid), ct); }
-            catch { continue; }
-            if (t is not null && FitsPlayer(session, t))
+            try
             {
-                trainer = t;
-                break;
+                var dt = await worldDb.GetTrainerAsync(CreatureEntry(devGuid), ct);
+                if (dt is not null && FitsPlayer(session, dt))
+                    trainer = dt;
+            }
+            catch { /* БД мира недоступна — ниже фолбэк на ближайшего видимого тренера */ }
+        }
+
+        // Фолбэк: первый видимый тренер, подходящий игроку по классу/расе (если .trainer не ставили).
+        if (trainer is null)
+        {
+            foreach (var creature in session.Visibility.VisibleNpcs.Values)
+            {
+                if ((creature.Template.NpcFlags & NpcFlagTrainer) == 0)
+                    continue;
+                TrainerData? t;
+                try { t = await worldDb.GetTrainerAsync(CreatureEntry(creature.Guid), ct); }
+                catch { continue; }
+                if (t is not null && FitsPlayer(session, t))
+                {
+                    trainer = t;
+                    break;
+                }
             }
         }
         if (trainer is null)
             return -1;
 
         // По возрастанию уровня изучения — чтобы низший ранг учился раньше высшего и SUPERCEDED шёл цепочкой. M10.3.
+        // Учим ДО ФИКСПОИНТА: за один проход спелл с ReqAbility, чей пререквизит ещё не выучен (сортируется
+        // позже / тот же SpellLevel), остался бы RED навсегда. Повторяем, пока проход что-то учит — пререквизиты
+        // доезжают, цепочки требований дозабираются (иначе у жреца learnall брал ~5 из 240, стойки воина и т.п.).
         var learned = 0;
-        foreach (var s in trainer.Spells.OrderBy(x => x.SpellLevel))
+        bool progress;
+        do
         {
-            if (StateFor(session, c.Level, s) != StateGreen)
-                continue;
-            if (await spellLearn.GrantAsync(session, s.Spell, ct))
-                learned++;
-        }
+            progress = false;
+            foreach (var s in trainer.Spells.OrderBy(x => x.SpellLevel))
+            {
+                if (StateFor(session, c.Level, s) != StateGreen)
+                    continue;
+                if (await spellLearn.GrantAsync(session, s.Spell, ct))
+                {
+                    learned++;
+                    progress = true;
+                }
+            }
+        } while (progress);
         session.Logger.LogInformation("LEARNALL '{User}': выучено {Count} абилок (класс {Class}, ур.{Level})",
             session.Account, learned, c.Class, c.Level);
         return learned;
