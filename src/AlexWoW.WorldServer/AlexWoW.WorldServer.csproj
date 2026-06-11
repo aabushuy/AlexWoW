@@ -19,6 +19,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- M12.7: автотест маппинга spell_template → SpellInfo (internal FromTemplate). -->
+    <InternalsVisibleTo Include="AlexWoW.WorldServer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
