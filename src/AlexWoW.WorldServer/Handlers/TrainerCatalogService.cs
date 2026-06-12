@@ -289,13 +289,12 @@ internal sealed class TrainerCatalogService(
         if (trainer is null)
             return -1;
 
-        // Из цепочки рангов учим только ВЫСШИЙ доступный (низшие не плодим): дамп spell_chain неполн, бывают
-        // дубли «Rank 1» — клиент держал бы низшие ранги отдельными кнопками/в книге. Считаем по GREEN-набору. M7 #47.
-        var greenIds = trainer.Spells.Where(s => StateFor(session, c.Level, s) == StateGreen).Select(s => s.Spell).ToList();
-        var lowerRanks = await worldDb.GetLowerRanksInSetAsync(greenIds, ct);
-
-        // Учим ДО ФИКСПОИНТА: за один проход спелл с ReqAbility, чей пререквизит ещё не выучен (сортируется
-        // позже), остался бы RED навсегда. Повторяем, пока проход что-то учит (иначе у жреца learnall брал ~5).
+        // Учим ВСЕ доступные ранги (по запросу, Фаза 2/QA): клиентский чекбокс «Отображать все уровни
+        // заклинаний» раскрывает только ИЗВЕСТНЫЕ ранги — при «только высший» ему нечего показывать, и поведение
+        // выходит непоследовательным между классами (зависит от прогрессии уровня и полноты spell_chain). Порядок
+        // по SpellLevel: высший ранг при изучении шлёт SUPERCEDED низшему (кнопка апгрейдится), низший остаётся
+        // в книге/кастуемым. Учим ДО ФИКСПОИНТА: спелл с ReqAbility, чей пререквизит учится позже, за один проход
+        // остался бы RED — повторяем, пока проход что-то учит (иначе у жреца learnall брал ~5). M7 #47.
         var learned = 0;
         bool progress;
         do
@@ -303,7 +302,7 @@ internal sealed class TrainerCatalogService(
             progress = false;
             foreach (var s in trainer.Spells.OrderBy(x => x.SpellLevel))
             {
-                if (lowerRanks.Contains(s.Spell) || StateFor(session, c.Level, s) != StateGreen)
+                if (StateFor(session, c.Level, s) != StateGreen)
                     continue;
                 if (await spellLearn.GrantAsync(session, s.Spell, ct))
                 {
