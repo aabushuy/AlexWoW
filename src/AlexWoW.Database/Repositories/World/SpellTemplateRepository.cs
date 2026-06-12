@@ -84,6 +84,23 @@ public sealed class SpellTemplateRepository(string connectionString)
         return rows.ToDictionary(r => r.SpellId, r => r.PrevSpell);
     }
 
+    public async Task<IReadOnlyList<(uint RankId, uint SeedId)>> GetSameNameRankIdsAsync(
+        IReadOnlyCollection<uint> seedIds, CancellationToken ct = default)
+    {
+        if (seedIds.Count == 0)
+            return [];
+        await using var db = await OpenAsync(ct);
+        // Все одноимённые спеллы для каждого seed (тот же SpellName, иной Id). Имена toggle/аур/печатей
+        // уникальны, так что это ранги той же абилки (+ возможные NPC-версии — для игрока безвредны).
+        var rows = await db.QueryAsync<(uint RankId, uint SeedId)>(new CommandDefinition("""
+            SELECT r.Id AS RankId, seed.Id AS SeedId
+            FROM spell_template seed
+            JOIN spell_template r ON r.SpellName = seed.SpellName AND r.Id <> seed.Id
+            WHERE seed.Id IN @seedIds;
+            """, new { seedIds }, cancellationToken: ct));
+        return rows.AsList();
+    }
+
     public async Task<IReadOnlyList<(uint Lower, uint Higher)>> GetRankSupersedePairsAsync(
         IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
     {

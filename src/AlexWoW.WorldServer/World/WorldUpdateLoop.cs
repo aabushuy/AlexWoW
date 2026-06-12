@@ -8,12 +8,14 @@ namespace AlexWoW.WorldServer.World;
 /// респавн существ (<see cref="WorldTick.UpdateAsync"/>; тик — DI-синглтон, M7 S3). Фундамент под
 /// реген/ИИ/нормализацию времени движения (позже). Один на сервер (hosted service).
 /// </summary>
-internal sealed class WorldUpdateLoop(WorldTick tick, ILogger<WorldUpdateLoop> logger) : BackgroundService
+internal sealed class WorldUpdateLoop(WorldTick tick, SpellCatalog spellCatalog, ILogger<WorldUpdateLoop> logger) : BackgroundService
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(250);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Расширение рангов toggle/эксклюзивных аур из БД ДО первых кастов (многоранговые ауры/аспекты/брони).
+        await spellCatalog.ExpandRankTogglesAsync(stoppingToken);
         logger.LogInformation("Тик мира запущен (интервал {Ms} мс)", TickInterval.TotalMilliseconds);
         using var timer = new PeriodicTimer(TickInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
