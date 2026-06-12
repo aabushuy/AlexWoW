@@ -27,10 +27,11 @@
 
 | Абилка | Спелл | Школа/Аура | Тип | Статус |
 |---|---|---|---|---|
-| Свет небес (Holy Light) | 635 | Holy | Direct heal | 🟡 |
-| Озарение (Flash of Light) | 19750 | Holy | Direct heal | 🟡 |
+| Свет небес (Holy Light) | 635 | Holy | Direct heal | ✅ хил сверен #2 |
+| Озарение (Flash of Light) | 19750 | Holy | Direct heal | ✅ хил сверен #2 |
+| Изгнание нечисти (Exorcism) | 879 | Holy | Direct | ✅ урон сверен #2 |
 | Святой удар (Holy Shock) | 20473 | Holy | Direct (урон/хил) | ⬜ |
-| Гнев небес (Holy Wrath) | 2812 | Holy | Direct (AoE) | ⬜ |
+| Гнев небес (Holy Wrath) | 2812 | Holy | Direct (AoE) | ✅ урон сверен #2 |
 | Воскрешение (Redemption) | 7328 | Holy / рес | Utility | ➖ |
 | Божественная благосклонность (Divine Favor) | 20216 | Buff (крит хила) | Buff | ⬜ |
 
@@ -40,7 +41,8 @@
 |---|---|---|---|---|
 | Праведная ярость (Righteous Fury) | 25780 | MOD_THREAT | Toggle | ➖ |
 | Освящение (Consecration) | 26573 | Holy | DoT (земля, AoE) | ⬜ |
-| Щит праведника (Avenger's Shield) | 31935 | Holy | Direct (бросок щита) | ⬜ |
+| Щит праведника (Avenger's Shield) | 31935 | Holy | Direct (бросок щита) | ✅ урон сверен #2 |
+| Щит праведности (Shield of Righteousness) | 61411 | Holy | Direct (требует щит) | ✅ урон сверен #2 |
 | Длань спасения (Hand of Reckoning) | 62124 | таунт+урон | Utility | ➖ |
 | Священный щит (Holy Shield) | 20925 | MOD_BLOCK_PERCENT | Buff | ⬜ (как Shield Block) |
 
@@ -51,7 +53,7 @@
 | Удар крестоносца (Crusader Strike) | 35395 | Physical (Holy) | Melee | ⬜ |
 | Божественная буря (Divine Storm) | 53385 | Physical | Melee (AoE)+heal | ⬜ |
 | Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | ⬜ |
-| Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ⬜ |
+| Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ✅ урон сверен #2 |
 | Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | ⬜ |
 
 > **Чинить:** печати/ауры — toggle-механика (есть для аур, печати требуют on-hit); MOD_BLOCK_PERCENT (Holy Shield) и
