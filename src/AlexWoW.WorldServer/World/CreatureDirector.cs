@@ -97,6 +97,12 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         => SummonDummyAsync(session, Npcs.HealDummyGuid, Npcs.HealDummy, Npcs.HealDummyHealth,
             sideOffset: 2.5f, wounded: true, ct);
 
+    /// <summary>Атакующий манекен (проверка защиты): уровень 80, отвечает при атаке — бьёт игрока, чтобы
+    /// проверять уклонение/парирование/блок/броню/«Глухую оборону». Ставится сбоку, чтобы не слипаться.</summary>
+    public Task SummonAttackDummyAsync(WorldSession session, CancellationToken ct)
+        => SummonDummyAsync(session, Npcs.AttackDummyGuid, Npcs.AttackDummy, Npcs.AttackDummyHealth,
+            sideOffset: -2.5f, wounded: false, ct);
+
     /// <summary>
     /// Общая логика призыва манекена (#29, расширено M12): телепортирует существо с фикс. GUID на ~3 ярда перед
     /// игроком (с боковым сдвигом <paramref name="sideOffset"/>), лицом к нему; DESTROY+CREATE наблюдателям; сброс

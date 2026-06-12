@@ -133,13 +133,20 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
                 return;
             creature.NextSwingMs = now + PlayerMeleeService.SwingIntervalMs;
 
-            var damage = ComputeCreatureMeleeDamage(creature.Template.Level);
+            // Защита: уклонение/парирование (обход) + митигейшн (броня/блок/«Глухая оборона») по кэшу статов.
+            var raw = ComputeCreatureMeleeDamage(creature.Template.Level);
+            var cs = player.Session.Combat;
+            var dmgTaken = player.Session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct);
+            var (damage, outcome) = CombatStats.ResolveIncomingMelee(
+                raw, cs.DodgePct, cs.ParryPct, cs.BlockPct, cs.ArmorValue, creature.Template.Level,
+                dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена
-            await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
+            if (damage > 0)
+                await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0), ct);
+                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome), ct);
             await world.BroadcastPlayerHealthAsync(player, ct);
 
             if (died)

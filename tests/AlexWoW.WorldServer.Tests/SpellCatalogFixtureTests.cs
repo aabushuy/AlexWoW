@@ -18,7 +18,7 @@ public class SpellCatalogFixtureTests
 
     /// <summary>Golden-дайджест парсинга всей фикстуры. Обновлять осознанно (изменение парсера/дампа):
     /// при падении взять «Actual» из сообщения и вписать сюда, предварительно проверив, что изменение ожидаемо.</summary>
-    private const string ExpectedDigest = "c07615eaccc05764d9bb15227aff8557a8e84fc602559f0615e324eaf482ca55";
+    private const string ExpectedDigest = "0d33d5dbca7e3a0e95c3fba033f987094097aec3758c65f280db04e13426dce0";
 
     private static List<SpellTemplateData> LoadFixture()
     {

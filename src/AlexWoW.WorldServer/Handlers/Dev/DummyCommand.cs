@@ -1,10 +1,10 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
-/// <summary><c>.dummy [heal|damage]</c> — переместить тренировочный манекен к игроку. #29; M12: лечебный манекен.</summary>
+/// <summary><c>.dummy [heal|attack|damage]</c> — переместить манекен к игроку. #29; M12: лечебный; защита: атакующий.</summary>
 internal sealed class DummyCommand : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["dummy"];
-    public string Help => ".dummy [heal|damage]";
+    public string Help => ".dummy [heal|attack|damage]";
     public int Order => 80;
     public bool RequiresWorld => true;
 
@@ -14,6 +14,12 @@ internal sealed class DummyCommand : IDevCommand
         {
             await ctx.Session.World.SummonHealDummyAsync(ctx.Session, ct);
             await ctx.ReplyAsync("Лечебный манекен перемещён к вам (ранен — лечите его)", ct);
+            return;
+        }
+        if (ctx.ArgLower(0) == "attack")
+        {
+            await ctx.Session.World.SummonAttackDummyAsync(ctx.Session, ct);
+            await ctx.ReplyAsync("Атакующий манекен перемещён к вам (атакуйте — он ответит; проверка защиты)", ct);
             return;
         }
         await ctx.Session.World.SummonTrainingDummyAsync(ctx.Session, ct);

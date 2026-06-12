@@ -42,6 +42,11 @@ internal sealed class SessionCombatState
     internal float WeaponMaxDamage { get; set; } = 2f;
     /// <summary>Надет ли щит (офф-хенд) — кэш из RefreshMeleeAsync для пересчёта блока при аурах («Блок щитом»).</summary>
     internal bool HasShield { get; set; }
+    /// <summary>Защитные проценты и броня (кэш из RefreshMeleeAsync) — для обработки входящего удара (уклон/парри/блок/броня).</summary>
+    internal float DodgePct { get; set; }
+    internal float ParryPct { get; set; }
+    internal float BlockPct { get; set; }
+    internal uint ArmorValue { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
 

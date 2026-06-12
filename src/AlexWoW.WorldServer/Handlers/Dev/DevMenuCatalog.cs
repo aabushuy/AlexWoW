@@ -75,6 +75,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         var misc = b.Category("Прочее");
         b.Cmd(misc, "Тренировочный манекен", ".dummy");
         b.Cmd(misc, "Лечебный манекен", ".dummy heal");
+        b.Cmd(misc, "Атакующий манекен", ".dummy attack");
         b.Cmd(misc, "Снести dev-сущности", ".devclean");
 
         // M12 Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.

@@ -90,6 +90,26 @@ public static class Npcs
     /// <summary>Любой тестовый манекен (урон или хил) — пассивный, высоко-HP. M12.</summary>
     public static bool IsTestDummy(uint entry) => IsTrainingDummy(entry) || IsHealDummy(entry);
 
+    /// <summary>Entry атакующего манекена (проверка защиты): уровень 80, ОТВЕЧАЕТ в бою (не пассивен) —
+    /// бьёт игрока при атаке, чтобы видеть уклонение/парирование/блок/броню/«Глухую оборону».</summary>
+    public const uint AttackDummyEntry = 990022;
+    public const uint AttackDummyHealth = 50_000_000;
+    public const uint AttackDummySpawnId = 9000022;
+    public static readonly ulong AttackDummyGuid = UnitGuid(AttackDummyEntry, AttackDummySpawnId);
+
+    /// <summary>Существо — атакующий манекен (отвечает в бою; НЕ входит в IsTestDummy → не пассивен).</summary>
+    public static bool IsAttackDummy(uint entry) => entry == AttackDummyEntry;
+
+    /// <summary>Шаблон атакующего манекена. Faction 7 (нейтрал, атакуемый); т.к. не IsTestDummy — отвечает при атаке.</summary>
+    public static readonly CreatureTemplate AttackDummy = new(
+        Entry: AttackDummyEntry,
+        Name: "Атакующий манекен",
+        SubName: "Уровень 80 — проверка защиты",
+        DisplayId: 3019,
+        Level: 80,
+        Faction: 7,    // нейтральный (жёлтый) — атакуемый; ответка при атаке
+        UnitType: 7);  // Humanoid
+
     /// <summary>Шаблон лечебного манекена. Faction 35 (дружелюбен ко всем) — не атакуем, валидная цель хила. M12.</summary>
     public static readonly CreatureTemplate HealDummy = new(
         Entry: HealDummyEntry,
