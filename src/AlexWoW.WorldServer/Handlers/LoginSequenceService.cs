@@ -269,6 +269,22 @@ internal sealed class LoginSequenceService(
         }
 
         var book = known.Where(s => !hiddenSpells.Contains(s)).ToList();
+
+        // Низшие ранги цепочки В КНИГУ НЕ ШЛЁМ (как CMaNGOS Player::SendInitialSpells — только активные ранги;
+        // низшие — disabled). Клиент сам сворачивает по своему DBC и раскрывает лестницу рангов галкой
+        // «Отображать все уровни». Если слать низшие как активные — клиент рисует их отдельными кнопками,
+        // не сворачивает и не показывает галку. Низшие остаются в KnownSpells (каст/харнес/«уже изучено» у тренера).
+        try
+        {
+            var lowerRanks = (await worldDb.GetRankSupersedePairsAsync(book, ct)).Select(p => p.Lower).ToHashSet();
+            if (lowerRanks.Count > 0)
+                book = book.Where(s => !lowerRanks.Contains(s)).ToList();
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "INITIAL_SPELLS '{User}': дедуп низших рангов пропущен ({Msg})", session.Account, ex.Message);
+        }
+
         var w = new ByteWriter(8 + (book.Count * 6))
             .UInt8(0)
             .UInt16((ushort)book.Count);
@@ -276,23 +292,8 @@ internal sealed class LoginSequenceService(
             w.UInt32(spell).UInt16(0); // 3.3.5: spellId — u32 + u16
         w.UInt16(0); // нет кулдаунов
         await session.SendAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
-        session.Logger.LogDebug("INITIAL_SPELLS '{User}': {Count} спеллов (класс {Class})",
-            session.Account, known.Count, character.Class);
-
-        // Ресенд SUPERCEDED для известных цепочек рангов: INITIAL_SPELLS — плоский список, а сворачивание
-        // низших рангов в книге (и чекбокс «Отображать все уровни») клиент строит из SMSG_SUPERCEDED_SPELL,
-        // который иначе приходит только в момент изучения и не переживает релог. Пары (низший→следующий) —
-        // по SpellName/SpellLevel (работает и для физ-абилок воина, у которых spell_chain пуст).
-        try
-        {
-            foreach (var (lower, higher) in await worldDb.GetRankSupersedePairsAsync(book, ct))
-                await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
-                    new ByteWriter(8).UInt32(lower).UInt32(higher).ToArray(), ct);
-        }
-        catch (Exception ex)
-        {
-            session.Logger.LogDebug(ex, "SUPERCEDED-ресенд '{User}' пропущен ({Msg})", session.Account, ex.Message);
-        }
+        session.Logger.LogDebug("INITIAL_SPELLS '{User}': {Count} спеллов в книге из {Known} известных (класс {Class})",
+            session.Account, book.Count, known.Count, character.Class);
     }
 
     /// <summary>

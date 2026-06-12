@@ -19,7 +19,8 @@ public interface ISpellTemplateRepository
     Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
 
     /// <summary>В пределах набора — пары (низший ранг → СЛЕДУЮЩИЙ известный ранг той же абилки), по
-    /// SpellName + соседним SpellLevel (НЕ требует spell_chain — у физ-абилок он пуст). Для ресенда
-    /// SUPERCEDED на логине, чтобы клиент свернул низшие ранги в книге (иначе INITIAL_SPELLS — плоский список).</summary>
+    /// SpellName + соседним SpellLevel (НЕ требует spell_chain — у физ-абилок он пуст). Множество <c>Lower</c> —
+    /// это все «перекрытые» низшие ранги: их исключаем из INITIAL_SPELLS (в книгу шлём только активный высший
+    /// ранг, как CMaNGOS), чтобы клиент свернул лестницу рангов и показал галку «Отображать все уровни».</summary>
     Task<IReadOnlyList<(uint Lower, uint Higher)>> GetRankSupersedePairsAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
 }
