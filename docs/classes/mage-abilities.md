@@ -7,7 +7,7 @@
 
 | Абилка | Спелл | Школа/Аура | Тип | Статус |
 |---|---|---|---|---|
-| Превращение (Polymorph) | 118 | Arcane / CC | CC | ⬜ |
+| Превращение (Polymorph) | 118 | Arcane / CC | CC | ✅ дезориентация одиночной цели + визуал (CC-фреймворк); break-on-damage ⬜ |
 | Контрзаклинание (Counterspell) | 2139 | Arcane / interrupt+lockout | Interrupt | ⬜ |
 | Кража заклинания (Spellsteal) | 30449 | Arcane / dispel-steal | Utility | ⬜ |
 | Снятие проклятия (Remove Curse) | 475 | Arcane / dispel | Utility | ⬜ |

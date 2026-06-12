@@ -30,7 +30,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ауры паладина (Devotion/Retri/Concentration) | Паладин | ✅ |
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
 | Брони мага (Frost/Mage/Molten Armor) | Маг | ✅ (эксклюзив проверен вживую; стат не моделируется) |
-| Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | 🟡 (эксклюзив + on-hit прок: holy/хил/мана; величины упрощённые, Justice-stun нет) |
+| Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | ✅ (эксклюзив + on-hit: holy/хил/мана/стан проверены; величины упрощённые) |
 | Облик Тьмы (Shadowform) | Жрец | 🟡 (toggle-форма 28) |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
 | Присутствия (Blood/Frost/Unholy) | DK | 🟡 (эксклюзивная группа, форма 0) |
@@ -62,11 +62,11 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 рут/немота визуальны (существа не ходят/редко кастуют). Стат-эффекты/breaks-on-damage/иммунитеты — позже.
 | Тип | Абилки (класс) | Статус |
 |---|---|---|
-| Stun | Hammer of Justice (Пал), Concussion Blow (Воин), Cheap/Kidney Shot (Разб), Deep Freeze (Маг), Bash (Друид), Shadowfury (ЧК) | 🟡 (стан существа + визуал; data-driven) |
-| Root | Frost Nova (Маг), Entangling Roots (Друид), Freezing Trap (Охот), Chains of Ice (DK) | 🟡 (визуал; поведения на существах нет) |
-| Fear | Psychic Scream (Жрец), Fear/Howl of Terror (ЧК), Intimidating Shout (Воин), Scare Beast (Охот) | 🟡 (стопает существо + визуал; fleeing-движение нет) |
+| Stun | Hammer of Justice (Пал ✅), Concussion Blow (Воин), Cheap/Kidney Shot (Разб), Deep Freeze (Маг), Bash (Друид), Shadowfury (ЧК) | ✅ одиночная цель (HoJ + Seal of Justice проверены); AoE-стан ⬜ |
+| Root | Frost Nova (Маг — AoE!), Entangling Roots (Друид), Freezing Trap (Охот), Chains of Ice (DK) | 🟡 одиночная цель — визуал; AoE (Frost Nova) ⬜ |
+| Fear | Psychic Scream (Жрец — AoE), Fear/Howl of Terror (ЧК), Intimidating Shout (Воин), Scare Beast (Охот) | 🟡 одиночная цель (стопает + визуал); AoE/fleeing ⬜ |
 | Silence | Strangulate (DK), Silencing Shot (Охот), Arcane Torrent (Эльф крови); Counterspell-lockout (Маг) | 🟡 (визуал) / ⬜ (lockout) |
-| Disorient/Poly | Polymorph (Маг), Blind (Разб), Dragon's Breath (Маг), Scatter Shot (Охот), Hibernate | 🟡 (стопает существо + визуал; break-on-damage нет) |
+| Disorient/Poly | Polymorph (Маг ✅), Blind (Разб), Dragon's Breath (Маг — AoE), Scatter Shot (Охот), Hibernate | ✅ одиночная цель (Polymorph проверен; стопает + визуал); break-on-damage ⬜ |
 
 ### 5. Interrupt
 Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Freeze (DK), Wind Shear (Шам), Skull Bash (Друид), Spell Lock (пет ЧК). Статус: ⬜.

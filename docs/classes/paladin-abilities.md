@@ -13,10 +13,10 @@
 | Благословение Мудрости (Blessing of Wisdom) | 19742 | MOD_POWER_REGEN | Buff | ⬜ |
 | Благословение Могущества (Blessing of Might) | 19740 | MOD_ATTACK_POWER | Buff | 🟡 |
 | Благословение Королей (Blessing of Kings) | 20217 | MOD_TOTAL_STAT% | Buff | ⬜ |
-| Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | 🟡 эксклюзив + on-hit holy-урон по свингу (упрощённо ~уровень; SP/AP не моделируется) |
-| Печать света (Seal of Light) | 20165 | toggle / on-hit heal | Toggle | 🟡 эксклюзив + on-hit хил по свингу (упрощённо) |
-| Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | 🟡 эксклюзив + on-hit мана по свингу (3% макс.) |
-| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | 🟡 эксклюзив + on-hit стан цели (через CC-фреймворк, прок 20170) |
+| Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | ✅ эксклюзив + on-hit holy-урон по свингу (упрощённо ~уровень; SP/AP не моделируется) |
+| Печать света (Seal of Light) | 20165 | toggle / on-hit heal | Toggle | ✅ эксклюзив + on-hit хил по свингу (упрощённо) |
+| Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | ✅ эксклюзив + on-hit мана по свингу (3% макс.) |
+| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | ✅ эксклюзив + on-hit стан цели (через CC-фреймворк, прок 20170) |
 | Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
 | Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ⬜ |
 | Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |
@@ -54,7 +54,7 @@
 |---|---|---|---|---|
 | Удар крестоносца (Crusader Strike) | 35395 | Physical (Holy) | Melee | ⬜ |
 | Божественная буря (Divine Storm) | 53385 | Physical | Melee (AoE)+heal | ⬜ |
-| Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | 🟡 стан существа + визуал (CrowdControlService) |
+| Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | ✅ стан существа + визуал (CrowdControlService) проверено |
 | Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ✅ урон сверен #2 |
 | Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | ⬜ |
 
