@@ -1,0 +1,58 @@
+# Паладин — абилки (WoW 3.3.5a)
+
+Ресурс — **мана**. Ауры паладина — эксклюзивные toggle (`GroupPaladinAura`); печати/благословения. Школа — Holy.
+Легенда/колонки — [README](README.md).
+
+## Общее
+
+| Абилка | Спелл | Школа/Аура | Тип | Статус |
+|---|---|---|---|---|
+| Аура преданности (Devotion Aura) | 465 | toggle / MOD_RESISTANCE | Toggle | ✅ (группа аур) |
+| Аура возмездия (Retribution Aura) | 7294 | toggle / dmg-shield | Toggle | ✅ |
+| Аура сосредоточения (Concentration Aura) | 19746 | toggle | Toggle | ✅ |
+| Благословение Мудрости (Blessing of Wisdom) | 19742 | MOD_POWER_REGEN | Buff | ⬜ |
+| Благословение Могущества (Blessing of Might) | 19740 | MOD_ATTACK_POWER | Buff | 🟡 |
+| Благословение Королей (Blessing of Kings) | 20217 | MOD_TOTAL_STAT% | Buff | ⬜ |
+| Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | ⬜ |
+| Печать веры (Seal of Light) | 20165 | toggle | Toggle | ⬜ |
+| Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
+| Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ⬜ |
+| Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |
+| Очищение (Cleanse) | 4987 | dispel | Utility | ⬜ |
+| Возложение рук (Lay on Hands) | 633 | Holy | Direct heal | ⬜ |
+| Божественная защита (Divine Protection) | 498 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ (как Shield Wall) |
+| Божественный щит (Divine Shield) | 642 | SCHOOL_IMMUNITY | Buff | ⬜ |
+
+## Свет (Holy)
+
+| Абилка | Спелл | Школа/Аура | Тип | Статус |
+|---|---|---|---|---|
+| Свет небес (Holy Light) | 635 | Holy | Direct heal | 🟡 |
+| Озарение (Flash of Light) | 19750 | Holy | Direct heal | 🟡 |
+| Святой удар (Holy Shock) | 20473 | Holy | Direct (урон/хил) | ⬜ |
+| Гнев небес (Holy Wrath) | 2812 | Holy | Direct (AoE) | ⬜ |
+| Воскрешение (Redemption) | 7328 | Holy / рес | Utility | ➖ |
+| Божественная благосклонность (Divine Favor) | 20216 | Buff (крит хила) | Buff | ⬜ |
+
+## Защита (Protection)
+
+| Абилка | Спелл | Школа/Аура | Тип | Статус |
+|---|---|---|---|---|
+| Праведная ярость (Righteous Fury) | 25780 | MOD_THREAT | Toggle | ➖ |
+| Освящение (Consecration) | 26573 | Holy | DoT (земля, AoE) | ⬜ |
+| Щит праведника (Avenger's Shield) | 31935 | Holy | Direct (бросок щита) | ⬜ |
+| Длань спасения (Hand of Reckoning) | 62124 | таунт+урон | Utility | ➖ |
+| Священный щит (Holy Shield) | 20925 | MOD_BLOCK_PERCENT | Buff | ⬜ (как Shield Block) |
+
+## Воздаяние (Retribution)
+
+| Абилка | Спелл | Школа/Аура | Тип | Статус |
+|---|---|---|---|---|
+| Удар крестоносца (Crusader Strike) | 35395 | Physical (Holy) | Melee | ⬜ |
+| Божественная буря (Divine Storm) | 53385 | Physical | Melee (AoE)+heal | ⬜ |
+| Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | ⬜ |
+| Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ⬜ |
+| Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | ⬜ |
+
+> **Чинить:** печати/ауры — toggle-механика (есть для аур, печати требуют on-hit); MOD_BLOCK_PERCENT (Holy Shield) и
+> MOD_DAMAGE_PERCENT_TAKEN (Divine Protection) — уже умеем (Shield Block/Wall). Иммунитеты/dispel — новые типы.
