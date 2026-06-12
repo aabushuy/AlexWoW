@@ -197,4 +197,23 @@ public class SpellCatalogFromTemplateTests
         Assert.Equal(3u, info.FamilyName);
         Assert.Equal(0x1UL, info.FamilyFlags);
     }
+
+    [Theory]
+    // Брони мага (Frost/Ice/Mage/Molten) — одна эксклюзивная группа.
+    [InlineData(168u, SpellCatalog.GroupMageArmor)]    // Frost Armor R1
+    [InlineData(43008u, SpellCatalog.GroupMageArmor)]  // Ice Armor R6 (макс)
+    [InlineData(43024u, SpellCatalog.GroupMageArmor)]  // Mage Armor R6 (макс)
+    [InlineData(43046u, SpellCatalog.GroupMageArmor)]  // Molten Armor R3 (макс)
+    // Брони чернокнижника (Demon Skin/Demon Armor/Fel Armor) — другая эксклюзивная группа.
+    [InlineData(687u, SpellCatalog.GroupWarlockArmor)] // Demon Skin R1
+    [InlineData(47889u, SpellCatalog.GroupWarlockArmor)] // Demon Armor R8 (макс)
+    [InlineData(47893u, SpellCatalog.GroupWarlockArmor)] // Fel Armor R4 (макс)
+    public void ExclusiveArmor_MappedToGroup(uint spellId, byte expectedGroup)
+        => Assert.Equal(expectedGroup, SpellCatalog.ExclusiveAuraGroup(spellId));
+
+    [Theory]
+    [InlineData(133u)]   // Fireball — обычный спелл, не эксклюзивная броня
+    [InlineData(2457u)]  // стойка воина — это Toggle, а не ExclusiveAura
+    public void NonArmor_NoExclusiveGroup(uint spellId)
+        => Assert.Equal(0, SpellCatalog.ExclusiveAuraGroup(spellId));
 }
