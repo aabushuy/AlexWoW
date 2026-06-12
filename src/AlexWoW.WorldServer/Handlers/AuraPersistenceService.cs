@@ -38,7 +38,18 @@ internal sealed class AuraPersistenceService(
                 continue;
             }
 
-            // Перманентный переключатель (M7 #21).
+            // Перманентный переключатель (M7 #21). Восстанавливаем через AuraService с ГРУППОЙ
+            // эксклюзивности из каталога тоглов — иначе при Group=0 смена стойки/ауры/аспекта не снимает
+            // восстановленную, и они копятся («все активны одновременно»). Заодно это само-лечит дубли в
+            // character_aura: восстановление второй стойки той же группы снимает первую (и её строку БД).
+            if (SpellCatalog.TryGetToggle(spell, out var toggle))
+            {
+                await auras.ApplyAsync(session, spell, durationMs: 0, positive: true, toggle.Form, ct,
+                    group: toggle.Group, persist: true);
+                continue;
+            }
+
+            // Фолбэк: перманентная аура вне каталога тоглов (нештатно) — восстановить как есть, без группы.
             byte flags = (byte)(AuraFlags.Effect1 | AuraFlags.SelfCast | AuraFlags.Positive);
             var aura = new ActiveAura
             {
