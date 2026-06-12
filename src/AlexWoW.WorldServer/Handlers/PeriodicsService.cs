@@ -303,6 +303,7 @@ internal sealed class PeriodicsService(
             return Task.CompletedTask;
         var bonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus);
         var block = CombatStats.BlockPercent(c.Class, session.Combat.HasShield, bonus);
+        session.Combat.BlockPct = block; // синхронизируем кэш — иначе серверный резолвер блока не видит «Блок щитом»
         return session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
                 m => m.SetFloat(UpdateField.PlayerBlockPercentage, block)), ct);
