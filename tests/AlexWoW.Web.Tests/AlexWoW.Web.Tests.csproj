@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\AlexWoW.Web\AlexWoW.Web.csproj" />
   </ItemGroup>
 
