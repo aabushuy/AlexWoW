@@ -18,6 +18,10 @@ public interface ISpellTemplateRepository
     /// Ранг-дедуп модификаторов талантов при входе. M10.6.</summary>
     Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
 
+    /// <summary>Для seed-спеллов — все ОДНОИМЁННЫЕ спеллы (тот же SpellName, иной Id): пары (RankId, SeedId).
+    /// Расширение рангов toggle/эксклюзивных аур на старте (seed-таблица держит один ранг, игрок кастует высший).</summary>
+    Task<IReadOnlyList<(uint RankId, uint SeedId)>> GetSameNameRankIdsAsync(IReadOnlyCollection<uint> seedIds, CancellationToken ct = default);
+
     /// <summary>В пределах набора — пары (низший ранг → СЛЕДУЮЩИЙ известный ранг той же абилки), по
     /// SpellName + соседним SpellLevel (НЕ требует spell_chain — у физ-абилок он пуст). Множество <c>Lower</c> —
     /// это все «перекрытые» низшие ранги: их исключаем из INITIAL_SPELLS (в книгу шлём только активный высший

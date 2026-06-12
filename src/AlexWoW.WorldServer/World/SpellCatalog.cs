@@ -298,8 +298,43 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         [48265] = new(0, GroupDkPresence),   // Unholy Presence
     };
 
-    /// <summary>Переключатель (стойка/аура/аспект) по id (true — это переключатель).</summary>
-    public static bool TryGetToggle(uint spellId, out Toggle toggle) => Toggles.TryGetValue(spellId, out toggle);
+    /// <summary>
+    /// Расширение рангов (заполняется на старте из БД, <see cref="ExpandRankTogglesAsync"/>): seed-таблицы
+    /// <see cref="Toggles"/>/<see cref="ExclusiveAuras"/> держат по одному рангу на абилку, а игрок (после
+    /// all-ranks .learnall) кастует ВЫСШИЙ ранг. Сюда подтягиваются все одноимённые ранги с тем же form/group.
+    /// </summary>
+    private static readonly ConcurrentDictionary<uint, Toggle> ToggleRankExpansion = new();
+    private static readonly ConcurrentDictionary<uint, byte> ExclusiveRankExpansion = new();
+
+    /// <summary>Переключатель (стойка/аура/аспект/форма) по id — seed-таблица ИЛИ расширение рангов.</summary>
+    public static bool TryGetToggle(uint spellId, out Toggle toggle)
+        => Toggles.TryGetValue(spellId, out toggle) || ToggleRankExpansion.TryGetValue(spellId, out toggle);
+
+    /// <summary>
+    /// Подтягивает из БД все одноимённые ранги seed-переключателей и эксклюзивных аур (с тем же form/group).
+    /// Игрок кастует высший ранг, которого нет в seed-таблице → без этого toggle/эксклюзив у многоранговых
+    /// аур/аспектов/броней не срабатывает. Зовётся один раз на старте world-цикла (БД уже доступна).
+    /// </summary>
+    public async Task ExpandRankTogglesAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var seeds = Toggles.Keys.Concat(ExclusiveAuras.Keys).ToList();
+            foreach (var (rankId, seedId) in await worldDb.GetSameNameRankIdsAsync(seeds, ct))
+            {
+                if (Toggles.TryGetValue(seedId, out var tog))
+                    ToggleRankExpansion[rankId] = tog;
+                if (ExclusiveAuras.TryGetValue(seedId, out var grp))
+                    ExclusiveRankExpansion[rankId] = grp;
+            }
+            logger.LogInformation("Расширение рангов toggle: +{T} переключателей, +{E} эксклюзивных аур",
+                ToggleRankExpansion.Count, ExclusiveRankExpansion.Count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Расширение рангов toggle пропущено: {Msg}", ex.Message);
+        }
+    }
 
     /// <summary>
     /// Эксклюзивные группы для ПЛАТНЫХ временны́х само-баффов (Фаза 2 — формы/toggle): брони мага и
@@ -337,6 +372,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         return map;
     }
 
-    /// <summary>Эксклюзивная группа платного временно́го само-баффа (броня мага/чернокнижника) по id; 0 — нет.</summary>
-    public static byte ExclusiveAuraGroup(uint spellId) => ExclusiveAuras.GetValueOrDefault(spellId);
+    /// <summary>Эксклюзивная группа платного само-баффа (броня/печать) по id — seed ИЛИ расширение рангов; 0 — нет.</summary>
+    public static byte ExclusiveAuraGroup(uint spellId)
+        => ExclusiveAuras.TryGetValue(spellId, out var g) ? g : ExclusiveRankExpansion.GetValueOrDefault(spellId);
 }
