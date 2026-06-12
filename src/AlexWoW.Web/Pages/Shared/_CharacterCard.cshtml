@@ -1,0 +1,54 @@
+@model AlexWoW.Web.Services.CharacterCardModel
+@{
+    var c = Model.Character;
+    var (gold, silver, copper) = GameData.SplitMoney(c.Money);
+}
+<div class="panel">
+    <h1 style="color:@GameData.ClassColor(c.Class)">@c.Name</h1>
+    <p class="lead">
+        @GameData.RaceName(c.Race), @GameData.ClassName(c.Class)
+        · <span style="color:@GameData.FactionColor(c.Race)">@GameData.Faction(c.Race)</span>
+    </p>
+
+    <div class="detail-grid">
+        <div><div class="k">Уровень</div><div class="v">@c.Level</div></div>
+        <div><div class="k">Опыт</div><div class="v">@c.Xp</div></div>
+        <div><div class="k">Пол</div><div class="v">@GameData.GenderName(c.Gender)</div></div>
+        <div><div class="k">Раса</div><div class="v">@GameData.RaceName(c.Race)</div></div>
+        <div><div class="k">Класс</div><div class="v">@GameData.ClassName(c.Class)</div></div>
+        <div><div class="k">Зона</div><div class="v">@GameData.ZoneName(c.Zone)</div></div>
+        <div><div class="k">Карта</div><div class="v">@GameData.MapName(c.Map)</div></div>
+        <div>
+            <div class="k">Деньги</div>
+            <div class="v coin">
+                <span class="g">@gold</span><span class="s"> @silver</span><span class="c"> @copper</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Экипировка</h2>
+    @if (Model.Equipment.Count == 0)
+    {
+        <p class="equip-empty">Нет надетых предметов.</p>
+    }
+    else
+    {
+        <table class="equip-table">
+            <thead>
+                <tr><th>Слот</th><th>Предмет (entry)</th><th>Кол-во</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var e in Model.Equipment)
+                {
+                    <tr>
+                        <td>@e.SlotName</td>
+                        <td>#@e.Entry</td>
+                        <td>@e.Stack</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

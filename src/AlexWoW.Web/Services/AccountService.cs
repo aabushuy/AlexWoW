@@ -12,6 +12,9 @@ namespace AlexWoW.Web.Services;
 /// </summary>
 public sealed class AccountService(IAccountRepository accounts) : IAccountService
 {
+    /// <summary>Стандартный пароль, на который сбрасывает админ-кнопка (M8.9).</summary>
+    public const string DefaultResetPassword = "123456";
+
     public async Task<RegisterResult> RegisterAsync(string email, string accountName, string password,
         CancellationToken ct = default)
     {
@@ -43,6 +46,18 @@ public sealed class AccountService(IAccountRepository accounts) : IAccountServic
             return false;
 
         var (salt, verifier) = MakeCredentials(account.Username, newPassword);
+        await accounts.UpdatePasswordAsync(account.Username, salt, verifier, ct);
+        return true;
+    }
+
+    public async Task<bool> AdminResetPasswordAsync(string username, CancellationToken ct = default)
+    {
+        // Берём каноничное имя из БД (верхний регистр) — SRP считается ровно по нему, как при входе.
+        var account = await accounts.GetAccountByUsernameAsync(username, ct);
+        if (account is null)
+            return false;
+
+        var (salt, verifier) = MakeCredentials(account.Username, DefaultResetPassword);
         await accounts.UpdatePasswordAsync(account.Username, salt, verifier, ct);
         return true;
     }

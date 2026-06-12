@@ -129,6 +129,14 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, money), ct);
     }
 
+    public async Task SetRaceGenderAsync(uint guid, byte race, byte gender, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.Characters.Where(c => c.Guid == guid).ExecuteUpdateAsync(s => s
+            .SetProperty(c => c.Race, race)
+            .SetProperty(c => c.Gender, gender), ct);
+    }
+
     public async Task SetTalentResetCostAsync(uint guid, uint cost, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

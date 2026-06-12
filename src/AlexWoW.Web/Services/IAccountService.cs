@@ -34,4 +34,11 @@ public interface IAccountService
     /// </summary>
     Task<bool> ChangePasswordAsync(string email, string currentPassword, string newPassword,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Админ-сброс пароля на стандартный <see cref="AccountService.DefaultResetPassword"/> по ИГРОВОМУ имени
+    /// (без проверки текущего). Пишет новые SRP6 соль+верификатор, сбрасывает session_key (форс ре-логина).
+    /// Возвращает false, если аккаунт не найден. Только для админ-раздела (M8.9).
+    /// </summary>
+    Task<bool> AdminResetPasswordAsync(string username, CancellationToken ct = default);
 }
