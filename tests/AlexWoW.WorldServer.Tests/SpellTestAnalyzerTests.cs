@@ -53,11 +53,20 @@ public class SpellTestAnalyzerTests
     }
 
     [Fact]
-    public void WeaponBased_OutOfRange_NotFlagged()
+    public void WeaponBased_AboveMax_NotFlagged()
     {
-        // weapon-абилка: величина включает бросок оружия — за [min;max] выходить нормально.
+        // weapon-абилка: бросок оружия закономерно превышает [min;max] — «выше максимума» не флагуем.
         var analysis = SpellTestAnalyzer.Analyze([Result(amount: 999, expectedMin: 40, expectedMax: 60, weaponBased: true)]);
         Assert.DoesNotContain(analysis.Anomalies, a => a.Kind is SpellAnomalyKind.AboveExpected or SpellAnomalyKind.BelowExpected);
+    }
+
+    [Fact]
+    public void WeaponBased_BelowMin_Flagged()
+    {
+        // weapon-абилка: оружие лишь ДОБАВЛЯЕТ поверх flat-бонуса, поэтому величина ниже min =
+        // непрокинутый/заниженный flat-компонент (реальный баг) — флагуем даже для weapon.
+        var analysis = SpellTestAnalyzer.Analyze([Result(amount: 10, expectedMin: 40, expectedMax: 60, weaponBased: true)]);
+        Assert.Contains(analysis.Anomalies, a => a.Kind == SpellAnomalyKind.BelowExpected);
     }
 
     [Fact]
