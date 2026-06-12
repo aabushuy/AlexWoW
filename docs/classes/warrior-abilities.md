@@ -11,14 +11,16 @@
 | Защитная стойка (Defensive Stance) | 71 | форма 18 | Toggle | ✅ | −урон/+угроза |
 | Стойка берсерка (Berserker Stance) | 2458 | форма 19 | Toggle | ✅ | +крит/−защита |
 | Рывок (Charge) | 100 | Physical | Utility+Melee | ✅ | сплайн + генерация ярости (M10.6) |
-| Героический удар (Heroic Strike) | 78 | Physical | Melee | 🟡 | next-melee |
-| Раздробить (Rend) | 772 | Physical | DoT | 🟡 | периодика |
+| Героический удар (Heroic Strike) | 78 | Physical | Melee | 🟡 | next-melee; flat-бонус сверен харнесом #3 (правило BelowExpected) |
+| Раздробить (Rend) | 772 | Physical | DoT | ✅ | тик сверен харнесом #3 (5/8/76 = эталон) |
+| Героический бросок (Heroic Throw) | 57755 | Physical | Ranged | ✅ | урон 12 сверен харнесом #3 |
+| Сокрушающий бросок (Shattering Throw) | 64382 | Physical | Ranged+Dispel | ✅ | урон 12 сверен #3; снятие иммунитета — отдельно |
 | Подрезать (Hamstring) | 1715 | Physical | Melee+Debuff | ⬜ | замедление (MOD_DECREASE_SPEED) |
 | Разить (Cleave) | 845 | Physical | Melee (AoE) | ⬜ | |
-| Удар грома (Thunder Clap) | 6343 | Physical | Melee (AoE)+Debuff | ⬜ | MOD_MELEE_HASTE− |
+| Удар грома (Thunder Clap) | 6343 | Physical | Melee (AoE)+Debuff | ✅ | урон 15/300 сверен харнесом #3; дебафф MOD_MELEE_HASTE− — отдельно |
 | Деморализующий крик (Demoralizing Shout) | 1160 | MOD_ATTACK_POWER− | Debuff | ⬜ | |
 | Добивание (Execute) | 5308 | Physical | Melee | ⬜ | только <20% HP |
-| Удар возмездия (Victory Rush) | 34428 | Physical | Melee | ⬜ | после убийства |
+| Удар возмездия (Victory Rush) | 34428 | Physical | Melee | ✅ | урон 45 сверен харнесом #3 |
 | Ярость берсерка (Berserker Rage) | 18499 | MECHANIC_IMMUNITY (буфф) | Buff | ⬜ | |
 | Провокация (Taunt) | 355 | MOD_THREAT | Utility | ➖ | угроза (PvE-агро) |
 | Оглушающий удар (Pummel) | 6552 | Physical | Interrupt | ⬜ | прерывание (стойка берсерка) |

@@ -5,10 +5,10 @@ namespace AlexWoW.Database.Analysis;
 /// <summary>Вид аномалии заклинания, найденной анализом захвата (M12 Spell QA).</summary>
 public enum SpellAnomalyKind : byte
 {
-    /// <summary>Урон/хил ниже эталонного минимума (не weapon-абилка).</summary>
+    /// <summary>Урон/хил ниже эталонного минимума (в т.ч. weapon-абилки: оружие лишь добавляет поверх flat-бонуса).</summary>
     BelowExpected,
 
-    /// <summary>Урон/хил выше эталонного максимума (не weapon-абилка).</summary>
+    /// <summary>Урон/хил выше эталонного максимума (только не-weapon-абилки).</summary>
     AboveExpected,
 
     /// <summary>Прямой урон с нулевой вычисленной величиной (спелл «впустую»).</summary>
@@ -37,8 +37,10 @@ public sealed record SpellTestAnalysis(int TotalResults, int DistinctSpells, IRe
 /// </summary>
 public static class SpellTestAnalyzer
 {
-    /// <summary>Аномалия урона/хила вне эталонного диапазона учитывается только для не-weapon-абилок:
-    /// у weapon-абилок величина включает бросок урона оружия и закономерно выходит за [min;max].</summary>
+    /// <summary>Сверка с эталонным диапазоном [min;max] (эталон — flat-компонент из spell_template):
+    /// «ниже минимума» проверяется и для weapon-абилок (оружие лишь ДОБАВЛЯЕТ поверх flat-бонуса, поэтому
+    /// величина ниже min = непрокинутый/заниженный flat-компонент — реальный баг); «выше максимума» —
+    /// только для не-weapon-абилок (у weapon-абилок бросок урона оружия закономерно превышает [min;max]).</summary>
     public static SpellTestAnalysis Analyze(IReadOnlyList<SpellTestResult> results)
     {
         var anomalies = new List<SpellAnomaly>();
@@ -46,13 +48,13 @@ public static class SpellTestAnalyzer
         {
             var isTick = r.ResultType is SpellTestResultType.DotTick or SpellTestResultType.HotTick;
 
-            // Вне эталонного диапазона (не weapon, есть верхняя граница).
-            if (!r.WeaponBased && r.ExpectedMax > 0)
+            // Вне эталонного диапазона (есть верхняя граница). См. сводку выше по weapon/non-weapon.
+            if (r.ExpectedMax > 0)
             {
                 if (r.Amount < r.ExpectedMin)
                     anomalies.Add(new(r.SpellId, r.ResultType, SpellAnomalyKind.BelowExpected,
                         $"величина {r.Amount} < ожидаемого минимума {r.ExpectedMin}"));
-                else if (r.Amount > r.ExpectedMax)
+                else if (!r.WeaponBased && r.Amount > r.ExpectedMax)
                     anomalies.Add(new(r.SpellId, r.ResultType, SpellAnomalyKind.AboveExpected,
                         $"величина {r.Amount} > ожидаемого максимума {r.ExpectedMax}"));
             }
