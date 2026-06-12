@@ -244,6 +244,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида
     public const byte GroupPaladinAura = 2;  // ауры паладина
     public const byte GroupHunterAspect = 3; // аспекты охотника
+    public const byte GroupMageArmor = 4;    // брони мага (Frost/Ice/Mage/Molten — взаимоисключающие)
+    public const byte GroupWarlockArmor = 5; // брони чернокнижника (Demon Skin/Demon Armor/Fel Armor)
 
     /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.</summary>
     public readonly record struct Toggle(byte Form, byte Group);
@@ -280,4 +282,39 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
 
     /// <summary>Переключатель (стойка/аура/аспект) по id (true — это переключатель).</summary>
     public static bool TryGetToggle(uint spellId, out Toggle toggle) => Toggles.TryGetValue(spellId, out toggle);
+
+    /// <summary>
+    /// Эксклюзивные группы для ПЛАТНЫХ временны́х само-баффов (Фаза 2 — формы/toggle): брони мага и
+    /// чернокнижника. В отличие от <see cref="Toggles"/> (бесплатные мгновенные переключатели), эти спеллы
+    /// идут обычным кастом (мана + длительность 30 мин) через <see cref="Handlers.PeriodicsService.ApplyAuraEffectAsync"/>,
+    /// но эксклюзивны: новая броня снимает прежнюю той же группы. Все ранги — на 80-м кастуется максимальный,
+    /// но по ходу прокачки игрок применяет разные ранги.
+    /// </summary>
+    private static readonly Dictionary<uint, byte> ExclusiveAuras = BuildExclusiveAuras();
+
+    private static Dictionary<uint, byte> BuildExclusiveAuras()
+    {
+        var map = new Dictionary<uint, byte>();
+        // Брони мага (Frost/Ice/Mage/Molten — взаимоисключающие): все ранги одной группой.
+        foreach (var id in new uint[]
+        {
+            168, 7300, 7301,                          // Frost Armor
+            7302, 7320, 10219, 10220, 27124, 43008,   // Ice Armor
+            6117, 22782, 22783, 27125, 43023, 43024,  // Mage Armor
+            30482, 34913, 43043, 43044, 43045, 43046, // Molten Armor
+        })
+            map[id] = GroupMageArmor;
+        // Брони чернокнижника (Demon Skin/Demon Armor/Fel Armor — взаимоисключающие): все ранги одной группой.
+        foreach (var id in new uint[]
+        {
+            687, 696,                                          // Demon Skin
+            706, 1086, 11733, 11734, 11735, 27260, 47793, 47889, // Demon Armor
+            28176, 28189, 44520, 44977, 47892, 47893,         // Fel Armor
+        })
+            map[id] = GroupWarlockArmor;
+        return map;
+    }
+
+    /// <summary>Эксклюзивная группа платного временно́го само-баффа (броня мага/чернокнижника) по id; 0 — нет.</summary>
+    public static byte ExclusiveAuraGroup(uint spellId) => ExclusiveAuras.GetValueOrDefault(spellId);
 }

@@ -29,12 +29,13 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Стойки (Battle/Def/Berserker) | Воин | ✅ |
 | Ауры паладина (Devotion/Retri/Concentration) | Паладин | ✅ |
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
-| Брони мага (Frost/Mage/Molten Armor) | Маг | ⬜ |
+| Брони мага (Frost/Mage/Molten Armor) | Маг | 🟡 (эксклюзивная группа; стат не моделируется) |
 | Печати (Seal of Righteousness/Light) — on-hit | Паладин | ⬜ |
 | Облик Тьмы (Shadowform) | Жрец | ⬜ |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
 | Присутствия (Blood/Frost/Unholy) | DK | ⬜ |
-| Метаморфоза / Fel-Demon Armor | Чернокнижник | ⬜ |
+| Брони (Demon Skin/Demon Armor/Fel Armor) | Чернокнижник | 🟡 (эксклюзивная группа; стат не моделируется) |
+| Метаморфоза | Чернокнижник | ⬜ |
 | Призрачный волк (Ghost Wolf) | Шаман | ⬜ |
 | Скрытность (Stealth) | Разбойник | ⬜ |
 
