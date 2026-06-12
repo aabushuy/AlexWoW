@@ -14,7 +14,12 @@
 Сверены Rend (DoT), Thunder Clap, Victory Rush, Heroic/Shattering Throw → ✅. Заодно закрыт пробел
 анализатора: для weapon-абилок теперь проверяется «ниже минимума» (непрокинутый flat-бонус) — раньше глушилось.
 Паладин — сессия #2 (чистые таланты): 0 аномалий. Сверены Holy Light/Flash of Light (хил), Exorcism,
-Holy Wrath, Avenger's Shield, Shield of Righteousness, Hammer of Wrath (урон) → ✅. Маг — ждёт прогона.
+Holy Wrath, Avenger's Shield, Shield of Righteousness, Hammer of Wrath (урон) → ✅.
+Маг — сессия #4 (чистые таланты): 0 аномалий, 21 связка. Школы (Fire/Frost/Arcane/Frostfire) парсятся верно.
+Сверены Fireball/Pyroblast/Frostfire Bolt/Living Bomb (+DoT), Fire Blast, Scorch, Flamestrike, Blast Wave,
+Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosion/Barrage → ✅.
+Не покрыто харнесом: Arcane Blast, Arcane Missiles (канал), Blizzard (канал) — остаются 🟡.
+**Фаза 1 итог по Воин/Маг/Паладин: чисел-аномалий нет — движок SpellCatalog.FromTemplate считает урон/хил/DoT корректно.**
 
 ## Фаза 2 — механики по убыванию отдачи
 
