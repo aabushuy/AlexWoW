@@ -135,12 +135,17 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
                 return;
             creature.NextSwingMs = now + PlayerMeleeService.SwingIntervalMs;
 
-            // Защита: уклонение/парирование (обход) + митигейшн (броня/блок/«Глухая оборона») по кэшу статов.
+            // Защита: уклонение/парирование (обход) + митигейшн (броня/блок/«Глухая оборона»). Блок считаем
+            // вживую (класс + щит + ауры «Блок щитом») — надёжнее кэша; уклон/парри/броня — из кэша RefreshMelee.
             var raw = ComputeCreatureMeleeDamage(creature.Template.Level);
             var cs = player.Session.Combat;
-            var dmgTaken = player.Session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct);
-            var (damage, outcome) = CombatStats.ResolveIncomingMelee(
-                raw, cs.DodgePct, cs.ParryPct, cs.BlockPct, cs.ArmorValue, creature.Template.Level,
+            var pclass = player.Session.Character?.Class ?? 0;
+            var periodics = player.Session.Progression.Periodics;
+            var blockPct = CombatStats.BlockPercent(pclass, cs.HasShield,
+                periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus));
+            var dmgTaken = periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct);
+            var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
+                raw, cs.DodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена
@@ -148,7 +153,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
                 await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome), ct);
+                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked), ct);
             await world.BroadcastPlayerHealthAsync(player, ct);
 
             if (died)
@@ -156,14 +161,15 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
             return;
         }
 
-        // Атакующий манекен (проверка защиты) стоит на месте — НЕ преследует. Отошёл на ~40 ярдов → выход из боя.
+        // Атакующий манекен (проверка защиты) стоит на месте — НЕ преследует. Отошёл на ~40 ярдов →
+        // ДЕСПАВН (чисто исчезает, бой завершается; для нового теста — .dummy attack снова).
         if (Npcs.IsAttackDummy(creature.Template.Entry))
         {
             var px = player.X - creature.X;
             var py = player.Y - creature.Y;
             var pz = player.Z - creature.Z;
             if (px * px + py * py + pz * pz > AttackDummyLeashSq)
-                await BeginEvadeAsync(world, creature, ct);
+                await world.DespawnCreatureAsync(creature, ct);
             return;
         }
 

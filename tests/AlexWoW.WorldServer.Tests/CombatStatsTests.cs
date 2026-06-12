@@ -93,23 +93,27 @@ public sealed class CombatStatsTests
     public void Incoming_dodge_and_parry_avoid_fully()
     {
         // dodge 5% / parry 5%: avoidRoll 0.01 → уклонение; 0.07 → парирование.
-        Assert.Equal(CombatStats.MeleeOutcome.Dodge, CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.01, 0.99).Outcome);
-        var (dmgDodge, _) = CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.01, 0.99);
-        Assert.Equal(0u, dmgDodge);
+        var dodge = CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.01, 0.99);
+        Assert.Equal(CombatStats.MeleeOutcome.Dodge, dodge.Outcome);
+        Assert.Equal(0u, dodge.Damage);
         Assert.Equal(CombatStats.MeleeOutcome.Parry, CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.07, 0.99).Outcome);
     }
 
     [Fact]
     public void Incoming_plain_hit_passes_through()
     {
-        var (dmg, outcome) = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 0, 80, 0, 0.5, 0.99);
-        Assert.Equal(1000u, dmg);
-        Assert.Equal(CombatStats.MeleeOutcome.Hit, outcome);
+        var hit = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 0, 80, 0, 0.5, 0.99);
+        Assert.Equal(1000u, hit.Damage);
+        Assert.Equal(CombatStats.MeleeOutcome.Hit, hit.Outcome);
     }
 
     [Fact]
-    public void Incoming_block_reduces_30pct()
-        => Assert.Equal(700u, CombatStats.ResolveIncomingMelee(1000, 0, 0, 100, 0, 80, 0, 0.5, 0.10).Damage);
+    public void Incoming_block_reduces_30pct_and_reports_blocked()
+    {
+        var r = CombatStats.ResolveIncomingMelee(1000, 0, 0, 100, 0, 80, 0, 0.5, 0.10);
+        Assert.Equal(700u, r.Damage);
+        Assert.Equal(300u, r.Blocked); // сумма блока для клиента («Блокировка (N)»)
+    }
 
     [Fact]
     public void Incoming_shield_wall_reduces_by_pct()
@@ -119,7 +123,7 @@ public sealed class CombatStatsTests
     public void Incoming_armor_mitigates()
     {
         // armor=15232 при атакующем 80 ур. → ~50% снижения.
-        var (dmg, _) = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 15232, 80, 0, 0.5, 0.99);
+        var dmg = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 15232, 80, 0, 0.5, 0.99).Damage;
         Assert.InRange(dmg, 499u, 501u);
     }
 }
