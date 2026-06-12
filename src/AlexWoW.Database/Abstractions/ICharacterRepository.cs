@@ -38,6 +38,9 @@ public interface ICharacterRepository
     /// <summary>Деньги персонажа (медь).</summary>
     Task SetMoneyAsync(uint guid, uint money, CancellationToken ct = default);
 
+    /// <summary>Меняет расу и пол персонажа (админ-правка / M8.6). Внешность не трогает.</summary>
+    Task SetRaceGenderAsync(uint guid, byte race, byte gender, CancellationToken ct = default);
+
     /// <summary>Последняя стоимость сброса талантов (медь) — для растущей цены. M9.8.</summary>
     Task SetTalentResetCostAsync(uint guid, uint cost, CancellationToken ct = default);
 

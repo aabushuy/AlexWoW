@@ -1,0 +1,23 @@
+@{
+    Layout = "_Layout";
+    // Активный пункт меню — по имени текущей Razor-страницы.
+    var page = (ViewContext.RouteData.Values["page"] as string) ?? "";
+    bool Active(params string[] prefixes) =>
+        prefixes.Any(p => page.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+}
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-title">Администрирование</div>
+        <nav class="admin-menu">
+            <a class="@(Active("/Admin/Accounts", "/Admin/Characters") ? "active" : null)"
+               asp-page="/Admin/Accounts/Index">Аккаунты</a>
+            <a class="@(Active("/Admin/Server") ? "active" : null)"
+               asp-page="/Admin/Server">Сервер</a>
+            <a class="@(Active("/Admin/Index", "/Admin/Session") ? "active" : null)"
+               asp-page="/Admin/Index">Spell QA</a>
+        </nav>
+    </aside>
+    <section class="admin-content">
+        @RenderBody()
+    </section>
+</div>

@@ -26,6 +26,12 @@ public interface IAccountRepository
     /// <summary>Все имена аккаунтов (для массовых операций, напр. сброса пароля).</summary>
     Task<IReadOnlyList<string>> GetAllUsernamesAsync(CancellationToken ct = default);
 
+    /// <summary>Сводка всех аккаунтов + число персонажей (админ-список, M8.9). Сортировка по имени.</summary>
+    Task<IReadOnlyList<AccountSummary>> GetAccountsWithCharCountsAsync(CancellationToken ct = default);
+
+    /// <summary>Аккаунт по id или null (админ-карточка, M8.9).</summary>
+    Task<Account?> GetAccountByIdAsync(uint id, CancellationToken ct = default);
+
     /// <summary>Меняет пароль аккаунта (новые соль+верификатор SRP6); сбрасывает session_key.</summary>
     Task UpdatePasswordAsync(string username, byte[] salt, byte[] verifier, CancellationToken ct = default);
 

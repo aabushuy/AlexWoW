@@ -1,0 +1,66 @@
+@page "{id:int}"
+@model AlexWoW.Web.Pages.Admin.Accounts.EditModel
+@{
+    var a = Model.Account;
+    ViewData["Title"] = $"Аккаунт {a.Username}";
+}
+<a class="back-link" asp-page="/Admin/Accounts/Index">← К списку аккаунтов</a>
+
+@if (!string.IsNullOrEmpty(Model.Flash))
+{
+    <div class="alert alert-ok" role="alert">@Model.Flash</div>
+}
+
+<div class="panel">
+    <h1>@a.Username</h1>
+    <div class="detail-grid">
+        <div><div class="k">Игровой логин</div><div class="v">@a.Username</div></div>
+        <div><div class="k">Email</div><div class="v">@(string.IsNullOrEmpty(a.Email) ? "—" : a.Email)</div></div>
+        <div><div class="k">Дата регистрации</div><div class="v">@a.CreatedAt.ToString("dd.MM.yyyy HH:mm")</div></div>
+        <div><div class="k">Админ</div><div class="v">@(a.IsAdmin ? "да" : "нет")</div></div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Сброс пароля</h2>
+    <p class="muted">Сбрасывает пароль на стандартный <code>123456</code> (работает и на сайте, и в игре).
+        Текущая сессия в игре будет сброшена.</p>
+    <form method="post" asp-page-handler="ResetPassword" asp-route-id="@a.Id"
+          onsubmit="return confirm('Сбросить пароль аккаунта @a.Username на 123456?');">
+        <button type="submit" class="btn btn-ghost">Сбросить пароль</button>
+    </form>
+</div>
+
+<div class="panel">
+    <h2>Персонажи <span class="muted">(@Model.Characters.Count)</span></h2>
+    @if (Model.Characters.Count == 0)
+    {
+        <p class="empty-state">На аккаунте нет персонажей.</p>
+    }
+    else
+    {
+        <div class="char-grid">
+            @foreach (var c in Model.Characters)
+            {
+                <div class="char-card char-card-static">
+                    <div class="char-name" style="color:@GameData.ClassColor(c.Class)">@c.Name</div>
+                    <div class="char-sub">
+                        @GameData.RaceName(c.Race), @GameData.ClassName(c.Class) · @GameData.GenderName(c.Gender)
+                    </div>
+                    <div class="char-meta">
+                        <span class="level-badge">@c.Level</span>
+                        <span class="faction-tag" style="color:@GameData.FactionColor(c.Race)">@GameData.Faction(c.Race)</span>
+                        <span>@GameData.ZoneName(c.Zone)</span>
+                    </div>
+                    <div class="char-actions">
+                        <a class="btn btn-ghost btn-sm" asp-page="/Admin/Characters/Edit" asp-route-guid="@c.Guid">Редактировать</a>
+                        <form method="post" asp-page-handler="DeleteCharacter" asp-route-id="@a.Id" asp-route-guid="@c.Guid"
+                              onsubmit="return confirm('Удалить персонажа @c.Name безвозвратно?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

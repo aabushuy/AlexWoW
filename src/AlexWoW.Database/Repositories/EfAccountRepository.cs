@@ -62,6 +62,31 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         return await db.Accounts.AsNoTracking().Select(x => x.Username).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<AlexWoW.Database.Models.AccountSummary>> GetAccountsWithCharCountsAsync(
+        CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        // Коррелированный подзапрос на число персонажей — без навигации Account→Characters в модели.
+        return await db.Accounts.AsNoTracking()
+            .OrderBy(a => a.Username)
+            .Select(a => new AlexWoW.Database.Models.AccountSummary
+            {
+                Id = a.Id,
+                Username = a.Username,
+                Email = a.Email,
+                CreatedAt = a.CreatedAt,
+                CharacterCount = db.Characters.Count(c => c.AccountId == a.Id),
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task<ModelAccount?> GetAccountByIdAsync(uint id, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var a = await db.Accounts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        return a is null ? null : ToModel(a);
+    }
+
     public async Task UpdatePasswordAsync(string username, byte[] salt, byte[] verifier, CancellationToken ct = default)
     {
         var u = username.ToUpperInvariant();

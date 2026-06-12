@@ -1,0 +1,50 @@
+@page
+@model AlexWoW.Web.Pages.Admin.Accounts.IndexModel
+@{
+    ViewData["Title"] = "Аккаунты";
+}
+<h1>Аккаунты</h1>
+<p class="muted">Всего аккаунтов: @Model.Accounts.Count. Клик по строке — карточка аккаунта.</p>
+
+@if (Model.Accounts.Count == 0)
+{
+    <div class="panel">
+        <div class="empty-state"><p>Аккаунтов пока нет.</p></div>
+    </div>
+}
+else
+{
+    <div class="panel">
+        <table class="data-table row-link">
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Email</th>
+                    <th>Дата регистрации</th>
+                    <th>Персонажей</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Accounts)
+                {
+                    <tr data-href="@Url.Page("Edit", new { id = a.Id })">
+                        <td><a asp-page="Edit" asp-route-id="@a.Id">@a.Username</a></td>
+                        <td>@(string.IsNullOrEmpty(a.Email) ? "—" : a.Email)</td>
+                        <td>@a.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@a.CharacterCount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Клик по строке таблицы открывает карточку аккаунта (ссылка в первой ячейке — для доступности).
+        document.querySelectorAll('table.row-link tr[data-href]').forEach(function (tr) {
+            tr.addEventListener('click', function (e) {
+                if (e.target.closest('a')) return;
+                window.location = tr.dataset.href;
+            });
+        });
+    </script>
+}

@@ -1,0 +1,60 @@
+@page "{guid:int}"
+@model AlexWoW.Web.Pages.Admin.Characters.EditModel
+@{
+    var c = Model.Character;
+    ViewData["Title"] = $"Правка {c.Name}";
+}
+<a class="back-link" asp-page="/Admin/Accounts/Edit" asp-route-id="@c.AccountId">← К аккаунту</a>
+
+<partial name="_CharacterCard" model="Model.Card" />
+
+<div class="panel">
+    <h2>Редактирование</h2>
+    <p class="muted">Класс — @GameData.ClassName(c.Class) (не меняется). Раса доступна любая (админ-инструмент).</p>
+
+    <form method="post" asp-route-guid="@c.Guid">
+        <div asp-validation-summary="All" class="alert alert-error" role="alert"
+             style="@(ViewData.ModelState.IsValid ? "display:none" : null)"></div>
+
+        <div class="form-row">
+            <div class="field">
+                <label asp-for="Input.Race">Раса</label>
+                <select asp-for="Input.Race" class="select">
+                    @foreach (var r in GameData.AllRaces)
+                    {
+                        <option value="@r.Key">@r.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label asp-for="Input.Gender">Пол</label>
+                <select asp-for="Input.Gender" class="select">
+                    @foreach (var g in GameData.AllGenders)
+                    {
+                        <option value="@g.Key">@g.Value</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field field-coin">
+                <label asp-for="Input.Gold">Золото</label>
+                <input asp-for="Input.Gold" type="number" min="0" max="429496" />
+            </div>
+            <div class="field field-coin">
+                <label asp-for="Input.Silver">Серебро</label>
+                <input asp-for="Input.Silver" type="number" min="0" max="99" />
+            </div>
+            <div class="field field-coin">
+                <label asp-for="Input.Copper">Медь</label>
+                <input asp-for="Input.Copper" type="number" min="0" max="99" />
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Сохранить</button>
+            <a class="btn btn-ghost" asp-page="/Admin/Accounts/Edit" asp-route-id="@c.AccountId">Отмена</a>
+        </div>
+    </form>
+</div>
