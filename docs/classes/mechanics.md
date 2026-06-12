@@ -30,7 +30,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ауры паладина (Devotion/Retri/Concentration) | Паладин | ✅ |
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
 | Брони мага (Frost/Mage/Molten Armor) | Маг | ✅ (эксклюзив проверен вживую; стат не моделируется) |
-| Печати (Seal of Righteousness/Light) — on-hit | Паладин | ⬜ |
+| Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | 🟡 (эксклюзив готов; on-hit прок — отдельно) |
 | Облик Тьмы (Shadowform) | Жрец | 🟡 (toggle-форма 28) |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
 | Присутствия (Blood/Frost/Unholy) | DK | 🟡 (эксклюзивная группа, форма 0) |
