@@ -23,6 +23,8 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
     private const long MoveIntervalMs = 500;
     /// <summary>Leash: если существо удалилось от дома дальше — выходит из боя и возвращается.</summary>
     private const float LeashRadius = 50f;
+    /// <summary>Дистанция (ярды²) разрыва боя для атакующего манекена: стоит на месте, отошёл на 40 ярдов — evade.</summary>
+    private const float AttackDummyLeashSq = 40f * 40f;
     /// <summary>Прибыл домой (ярды²) — порог завершения возврата (evade).</summary>
     private const float HomeArriveSq = 1.0f;
 
@@ -151,6 +153,17 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
 
             if (died)
                 await HandlePlayerDeathAsync(world, player, creature, ct);
+            return;
+        }
+
+        // Атакующий манекен (проверка защиты) стоит на месте — НЕ преследует. Отошёл на ~40 ярдов → выход из боя.
+        if (Npcs.IsAttackDummy(creature.Template.Entry))
+        {
+            var px = player.X - creature.X;
+            var py = player.Y - creature.Y;
+            var pz = player.Z - creature.Z;
+            if (px * px + py * py + pz * pz > AttackDummyLeashSq)
+                await BeginEvadeAsync(world, creature, ct);
             return;
         }
 
