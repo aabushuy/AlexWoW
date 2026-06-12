@@ -29,6 +29,8 @@ public sealed class WorldRepository(
         => creatures.GetCreaturesNearAsync(map, x, y, range, limit, ct);
     public Task<CreatureTemplateData?> GetCreatureTemplateAsync(uint entry, CancellationToken ct = default)
         => creatures.GetCreatureTemplateAsync(entry, ct);
+    public Task<IReadOnlyList<CreatureTemplateData>> GetCreatureTemplatesByTypeAsync(byte creatureType, int limit, CancellationToken ct = default)
+        => creatures.GetCreatureTemplatesByTypeAsync(creatureType, limit, ct);
 
     // ---- IGameObjectRepository ----
     public Task<IReadOnlyList<GameObjectSpawnData>> GetGameObjectsNearAsync(

@@ -225,6 +225,57 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         return true;
     }
 
+    /// <summary>
+    /// Дев-команда <c>.spawnenemy</c>: спавнит <paramref name="count"/> ВРАЖДЕБНЫХ существ типа
+    /// <paramref name="creatureType"/> уровня <paramref name="level"/> кольцом вокруг игрока. Фракция 14
+    /// («Monster» — враждебна всем игрокам) → авто-агро и ответный бой работают штатно (CreatureCombatAI).
+    /// Каждый регистрируется в DevNpcs уникальным слотом (липкость в видимости + снятие через <c>.devclean</c>).
+    /// Возвращает число заспавненных (0 — типа нет в БД или БД недоступна).
+    /// </summary>
+    public async Task<int> SpawnEnemiesAsync(WorldSession session, byte creatureType, byte level, int count, CancellationToken ct)
+    {
+        count = Math.Clamp(count, 1, 20);
+        IReadOnlyList<CreatureTemplateData> templates;
+        try { templates = await worldDb.GetCreatureTemplatesByTypeAsync(creatureType, count, ct); }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "SPAWNENEMY type={Type}: БД мира недоступна ({Msg})", creatureType, ex.Message);
+            return 0;
+        }
+        if (templates.Count == 0)
+            return 0;
+
+        const ushort HostileFaction = 14; // «Monster» — враждебна всем игрокам (красное имя, авто-агро)
+        var map = session.Character?.Map ?? 0;
+        var hp = WorldCreature.MaxHealthFor(level);
+        for (var i = 0; i < count; i++)
+        {
+            var row = templates[i % templates.Count]; // меньше типов, чем нужно → циклим
+            var angle = session.PosO + i * (2f * MathF.PI / count); // равномерно кольцом вокруг игрока
+            float x = session.PosX + 5f * MathF.Cos(angle);
+            float y = session.PosY + 5f * MathF.Sin(angle);
+            float z = session.PosZ;
+            float o = angle + MathF.PI; // лицом к центру (игроку)
+
+            var template = new CreatureTemplate(row.Entry, row.Name, row.SubName ?? string.Empty, row.DisplayId1,
+                level, HostileFaction, row.CreatureType, row.Scale <= 0 ? 1f : row.Scale, 0, row.UnitClass);
+            var guid = Npcs.UnitGuid(row.Entry, world.NextDevSpawnCounter());
+            var creature = world.GetOrAddCreature(guid, () => new WorldCreature
+            {
+                Guid = guid, Map = map, Template = template,
+                X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
+                MaxHealth = hp, Health = hp,
+            });
+            session.Visibility.VisibleNpcs[guid] = creature;
+            session.Visibility.DevNpcs[$"enemy:{guid}"] = guid; // уникальный слот → снимается .devclean
+            await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+                CreatureUpdate.BuildCreateObject(creature, (uint)Environment.TickCount), ct);
+        }
+        logger.LogDebug("SPAWNENEMY '{User}': type={Type} level={Level} count={Count}",
+            session.Account, creatureType, level, count);
+        return count;
+    }
+
     /// <summary>Снимает dev-сущность из слота <paramref name="slot"/> (DESTROY вызвавшему + чистка реестров).
     /// Возвращает true, если что-то было снято. D1.</summary>
     public async Task<bool> DespawnDevNpcAsync(WorldSession session, string slot, CancellationToken ct)

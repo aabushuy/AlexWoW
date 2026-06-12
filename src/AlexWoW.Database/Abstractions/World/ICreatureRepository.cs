@@ -14,4 +14,9 @@ public interface ICreatureRepository
 
     /// <summary>Шаблон существа по entry (для CMSG_CREATURE_QUERY).</summary>
     Task<CreatureTemplateData?> GetCreatureTemplateAsync(uint entry, CancellationToken ct = default);
+
+    /// <summary>До <paramref name="limit"/> случайных шаблонов существ заданного типа (CreatureType) с валидной
+    /// моделью — для дев-спавна «врагов» (<c>.spawnenemy</c>). Пусто, если тип не встречается.</summary>
+    Task<IReadOnlyList<CreatureTemplateData>> GetCreatureTemplatesByTypeAsync(
+        byte creatureType, int limit, CancellationToken ct = default);
 }

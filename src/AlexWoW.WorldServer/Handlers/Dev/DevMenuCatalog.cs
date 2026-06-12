@@ -72,6 +72,17 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Prompt(buffs, "Наложить бафф…", ".buff ", "ID спелла [секунды]:");
         b.Prompt(buffs, "Снять бафф…", ".unbuff ", "ID спелла:");
 
+        // Враги (.spawnenemy): по типу существа → prompt «уровень [кол-во]» (как «Выдать предмет»).
+        var enemies = b.Category("Враги");
+        b.Prompt(enemies, "Гуманоид…", ".spawnenemy humanoid ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Животное…", ".spawnenemy beast ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Демон…", ".spawnenemy demon ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Нежить…", ".spawnenemy undead ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Дракон…", ".spawnenemy dragonkin ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Элементаль…", ".spawnenemy elemental ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Великан…", ".spawnenemy giant ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Механизм…", ".spawnenemy mechanical ", "Уровень [кол-во]:");
+
         var misc = b.Category("Прочее");
         b.Cmd(misc, "Тренировочный манекен", ".dummy");
         b.Cmd(misc, "Лечебный манекен", ".dummy heal");
