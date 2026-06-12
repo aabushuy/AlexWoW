@@ -40,6 +40,8 @@ internal sealed class SessionCombatState
     /// <summary>Урон оружия главной руки (min/max) — для мили-абилок (WEAPON_DAMAGE). RefreshMeleeAsync. M10.4a.</summary>
     internal float WeaponMinDamage { get; set; } = 1f;
     internal float WeaponMaxDamage { get; set; } = 2f;
+    /// <summary>Надет ли щит (офф-хенд) — кэш из RefreshMeleeAsync для пересчёта блока при аурах («Блок щитом»).</summary>
+    internal bool HasShield { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
 

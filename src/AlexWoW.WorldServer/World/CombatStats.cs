@@ -20,9 +20,10 @@ public static class CombatStats
     public static float ParryPercent(byte cls, bool hasMeleeWeapon) =>
         ClassCanParry(cls) && hasMeleeWeapon ? 5f : 0f;
 
-    /// <summary>Блок (%): базовые 5% при способном классе и надетом щите, иначе 0.</summary>
-    public static float BlockPercent(byte cls, bool hasShield) =>
-        ClassCanBlock(cls) && hasShield ? 5f : 0f;
+    /// <summary>Блок (%): базовые 5% при способном классе и надетом щите + бонус от аур («Блок щитом»),
+    /// клампится в [0;100]. Без щита/способного класса — 0.</summary>
+    public static float BlockPercent(byte cls, bool hasShield, float auraBonus = 0f) =>
+        ClassCanBlock(cls) && hasShield ? Math.Clamp(5f + auraBonus, 0f, 100f) : 0f;
 
     /// <summary>Базовый навык защиты (skill 95): 5×уровень (400 на 80).</summary>
     public static ushort DefenseSkill(byte level) => (ushort)(level * 5);

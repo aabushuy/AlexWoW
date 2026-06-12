@@ -42,6 +42,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
+    private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -55,7 +56,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0,
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
         int AuraDurationMs = 0,
-        bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0,
+        bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0, int BlockBonus = 0,
         SpellMovement Movement = SpellMovement.None, uint TriggerSpellId = 0,
         uint CreateItemId = 0, uint CreateItemCount = 0,
         IReadOnlyList<(uint Item, uint Count)>? Reagents = null,
@@ -157,6 +158,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var auraPositive = auraBuff && auraBuffEff.Bp >= 0;
         var hpAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseHealth);
         var healthBonus = hpAura.Eff == EffectApplyAura ? hpAura.Bp + 1 : 0;
+        // +% блока (MOD_BLOCK_PERCENT, напр. «Блок щитом»): величина = BasePoints+1.
+        var blockAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModBlockPercent);
+        var blockBonus = blockAura.Eff == EffectApplyAura ? blockAura.Bp + 1 : 0;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
@@ -217,7 +221,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
             isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
-            movement, triggerSpell, createItemId, createItemCount, reagents,
+            blockBonus, movement, triggerSpell, createItemId, createItemCount, reagents,
             t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
             (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
             energizeAmount, energizePower, energizeIdx);
