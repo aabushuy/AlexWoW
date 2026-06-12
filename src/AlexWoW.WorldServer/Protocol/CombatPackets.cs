@@ -33,8 +33,10 @@ public static class CombatPackets
     public static byte[] BuildAiReaction(ulong guid, uint reaction)
         => new ByteWriter(12).UInt64(guid).UInt32(reaction).ToArray();
 
-    /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона, без absorb/resist/block.</summary>
-    public static byte[] BuildAttackerStateUpdate(ulong attacker, ulong target, uint damage, uint overkill)
+    /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона, без absorb/resist/block.
+    /// <paramref name="victimState"/>: 1=удар, 2=уклонение, 3=парирование (клиент рисует плавающий текст).</summary>
+    public static byte[] BuildAttackerStateUpdate(ulong attacker, ulong target, uint damage, uint overkill,
+        byte victimState = VictimStateHit)
     {
         var w = new ByteWriter(48);
         w.UInt32(HitInfoAffectsVictim);
@@ -47,7 +49,7 @@ public static class CombatPackets
         w.UInt32(SchoolMaskPhysical)
          .Single(damage)      // damage_float
          .UInt32(damage);     // damage_uint
-        w.UInt8(VictimStateHit);
+        w.UInt8(victimState);
         w.UInt32(0);          // unknown1
         w.UInt32(0);          // unknown2
         return w.ToArray();

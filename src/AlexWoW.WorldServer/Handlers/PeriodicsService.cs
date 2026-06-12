@@ -20,6 +20,7 @@ public sealed class PeriodicEffect
     public bool DoesTick = true; // false — непериодический бафф/дебафф (только визуал + истечение). M10.4c
     public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
     public int BlockBonus;     // +% блока от баффа (MOD_BLOCK_PERCENT, напр. «Блок щитом») — снять при истечении.
+    public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
 }
 
 /// <summary>
@@ -161,6 +162,19 @@ internal sealed class PeriodicsService(
                     BlockBonus = info.BlockBonus,
                 });
                 await SendBlockAsync(session, ct);
+            }
+            if (info.DamageTakenPct != 0)
+            {
+                // Снижение получаемого урона («Глухая оборона») — учитывается в обработке входящего удара.
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0 && p.DamageTakenPct != 0);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    DamageTakenPct = info.DamageTakenPct,
+                });
             }
             return;
         }

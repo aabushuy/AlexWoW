@@ -79,4 +79,47 @@ public sealed class CombatStatsTests
         Assert.Equal(0f, r.MeleeCritPercent(cls: 0, level: 80, agi: 100));
         Assert.Equal(0f, r.DodgePercent(cls: 99, level: 80, agi: 100));
     }
+
+    // --- Входящий удар: уклон/парри/блок/броня/«Глухая оборона» ---
+
+    [Fact]
+    public void Armor_reduction_zero_and_clamped()
+    {
+        Assert.Equal(0.0, CombatStats.ArmorReduction(0, 80));
+        Assert.Equal(0.75, CombatStats.ArmorReduction(10_000_000, 80)); // кламп 75%
+    }
+
+    [Fact]
+    public void Incoming_dodge_and_parry_avoid_fully()
+    {
+        // dodge 5% / parry 5%: avoidRoll 0.01 → уклонение; 0.07 → парирование.
+        Assert.Equal(CombatStats.MeleeOutcome.Dodge, CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.01, 0.99).Outcome);
+        var (dmgDodge, _) = CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.01, 0.99);
+        Assert.Equal(0u, dmgDodge);
+        Assert.Equal(CombatStats.MeleeOutcome.Parry, CombatStats.ResolveIncomingMelee(1000, 5, 5, 0, 0, 80, 0, 0.07, 0.99).Outcome);
+    }
+
+    [Fact]
+    public void Incoming_plain_hit_passes_through()
+    {
+        var (dmg, outcome) = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 0, 80, 0, 0.5, 0.99);
+        Assert.Equal(1000u, dmg);
+        Assert.Equal(CombatStats.MeleeOutcome.Hit, outcome);
+    }
+
+    [Fact]
+    public void Incoming_block_reduces_30pct()
+        => Assert.Equal(700u, CombatStats.ResolveIncomingMelee(1000, 0, 0, 100, 0, 80, 0, 0.5, 0.10).Damage);
+
+    [Fact]
+    public void Incoming_shield_wall_reduces_by_pct()
+        => Assert.Equal(400u, CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 0, 80, -60, 0.5, 0.99).Damage); // −60%
+
+    [Fact]
+    public void Incoming_armor_mitigates()
+    {
+        // armor=15232 при атакующем 80 ур. → ~50% снижения.
+        var (dmg, _) = CombatStats.ResolveIncomingMelee(1000, 0, 0, 0, 15232, 80, 0, 0.5, 0.99);
+        Assert.InRange(dmg, 499u, 501u);
+    }
 }

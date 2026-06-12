@@ -153,6 +153,12 @@ internal sealed class ProgressionService(
         var parry = CombatStats.ParryPercent(c.Class, hasMeleeWeapon);
         var block = CombatStats.BlockPercent(c.Class, hasShield, blockAura);
 
+        // Кэш для серверной обработки входящего удара (уклон/парри/блок/броня).
+        session.Combat.DodgePct = dodge;
+        session.Combat.ParryPct = parry;
+        session.Combat.BlockPct = block;
+        session.Combat.ArmorValue = armor;
+
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
