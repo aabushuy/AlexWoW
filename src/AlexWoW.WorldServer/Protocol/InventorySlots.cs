@@ -12,6 +12,7 @@ public static class InventorySlots
     public const int EquipmentStart = 0;
     public const int EquipmentEnd = 19;    // EQUIPMENT_SLOT_END (слоты 0..18)
     public const byte MainHandSlot = 15;   // EQUIPMENT_SLOT_MAINHAND (M9.2 — урон оружия)
+    public const byte OffHandSlot = 16;    // EQUIPMENT_SLOT_OFFHAND (щит/доп. рука — блок)
     public const int BagSlotStart = 19;    // INVENTORY_SLOT_BAG_START (надеваемые сумки)
     public const int BagSlotEnd = 23;      // INVENTORY_SLOT_BAG_END (слоты 19..22)
     public const int BackpackStart = 23;   // INVENTORY_SLOT_ITEM_START

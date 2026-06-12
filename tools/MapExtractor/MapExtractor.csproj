@@ -4,6 +4,9 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>AlexWoW.MapExtractor</AssemblyName>
     <RootNamespace>AlexWoW.MapExtractor</RootNamespace>
+    <!-- Дев-тул с вендоренным Foole.Mpq (сторонний, не nullable-чистый): не валим сборку
+         репозиторным TreatWarningsAsErrors. Тул не входит в решение/CI. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

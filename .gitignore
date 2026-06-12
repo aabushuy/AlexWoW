@@ -28,6 +28,9 @@ mmaps/
 # data/ — хранимые данные (out-maps и т.п.); tests/extractor-output/ — пробные/тестовые выгрузки
 data/
 tests/extractor-output/
+# Но бандл-данные DataStores (маленькие, встраиваются в сборку) — в репозитории.
+!src/AlexWoW.DataStores/data/
+!src/AlexWoW.DataStores/data/**
 
 # Сгенерированные SQL-дампы экстрактора (tools/scripts/quest-test-reset.sql — рукописный, остаётся в репо)
 tools/scripts/factiontemplate.sql

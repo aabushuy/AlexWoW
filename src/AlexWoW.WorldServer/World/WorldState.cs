@@ -23,12 +23,13 @@ public sealed class WorldState
     private readonly PlayerVisibility _visibility;
 
     public WorldState(ILogger<WorldState> logger, Navmesh navmesh, IWorldRepository worldDb, FactionStore factions,
-        QuestStore quests, LevelStore levels, StatStore stats)
+        QuestStore quests, LevelStore levels, StatStore stats, AlexWoW.DataStores.CombatRatings ratings)
     {
         _factions = factions;
         Quests = quests;
         Levels = levels;
         Stats = stats;
+        Ratings = ratings;
         Director = new CreatureDirector(this, navmesh, worldDb, logger);
         _visibility = new PlayerVisibility(this, logger);
     }
@@ -40,6 +41,9 @@ public sealed class WorldState
 
     /// <summary>Характеристики по расе/классу/уровню (HP/мана/статы). M9.2.</summary>
     public StatStore Stats { get; }
+
+    /// <summary>Боевые рейтинги (крит/уклонение от ловкости) из client GameTable-DBC. Защитные статы.</summary>
+    public AlexWoW.DataStores.CombatRatings Ratings { get; }
 
     /// <summary>Реестр квест-связей (иконки !/?). M6.5.</summary>
     public QuestStore Quests { get; }

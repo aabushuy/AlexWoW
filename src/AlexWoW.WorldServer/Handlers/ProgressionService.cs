@@ -16,8 +16,12 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class ProgressionService(
     TalentHandlers talents,
     ICharacterRepository characters,
-    IWorldRepository worldDb)
+    IWorldRepository worldDb,
+    SkillsService skills)
 {
+    /// <summary>Навык «Защита» (SKILL_DEFENSE) — для базового уклонения/парирования/блока в чарпейне.</summary>
+    private const ushort DefenseSkillId = 95;
+
     /// <summary>
     /// Начисляет <paramref name="amount"/> опыта игроку: копит, повышает уровень (с переносом остатка),
     /// шлёт level-up визуал/поля, обновляет PLAYER_XP, персистит уровень+опыт. На капе опыт не копится.
@@ -121,6 +125,32 @@ internal sealed class ProgressionService(
         var meleeAp = MeleeAttackPower(c.Class, c.Level, str, agi);
         var rangedAp = RangedAttackPower(c.Class, c.Level, agi);
 
+        // Защитные статы (срез M-защита): броня предметов + флаги оружия/щита.
+        uint itemArmor = 0;
+        var hasShield = false;
+        foreach (var it in session.Inv.Inventory
+            .Where(i => i.Bag == InventorySlots.MainBag && InventorySlots.IsEquipmentSlot(i.Slot)))
+        {
+            try
+            {
+                var tpl = await worldDb.GetItemTemplateAsync(it.ItemEntry, ct);
+                if (tpl is null)
+                    continue;
+                if (tpl.Armor > 0)
+                    itemArmor += (uint)tpl.Armor;
+                if (it.Slot == InventorySlots.OffHandSlot && tpl.InventoryType == 14) // INVTYPE_SHIELD
+                    hasShield = true;
+            }
+            catch { /* БД мира недоступна — без брони предметов */ }
+        }
+        var hasMeleeWeapon = mh is not null;
+
+        var armor = CombatStats.Armor(agi, itemArmor);
+        var dodge = session.World.Ratings.DodgePercent(c.Class, c.Level, agi);
+        var crit = session.World.Ratings.MeleeCritPercent(c.Class, c.Level, agi);
+        var parry = CombatStats.ParryPercent(c.Class, hasMeleeWeapon);
+        var block = CombatStats.BlockPercent(c.Class, hasShield);
+
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
@@ -134,7 +164,20 @@ internal sealed class ProgressionService(
                 m.SetUInt32(UpdateField.UnitRangedAttackPower, rangedAp);
                 m.SetUInt32(UpdateField.UnitRangedAttackPowerMods, 0);
                 m.SetFloat(UpdateField.UnitRangedAttackPowerMultiplier, 0f);
+                // Защитные: броня + проценты уклонения/парирования/блока/крита.
+                m.SetUInt32(UpdateField.UnitResistances, armor);
+                m.SetFloat(UpdateField.PlayerDodgePercentage, dodge);
+                m.SetFloat(UpdateField.PlayerParryPercentage, parry);
+                m.SetFloat(UpdateField.PlayerBlockPercentage, block);
+                m.SetFloat(UpdateField.PlayerCritPercentage, crit);
+                m.SetFloat(UpdateField.PlayerOffhandCritPercentage, crit);
+                m.SetFloat(UpdateField.PlayerRangedCritPercentage, crit);
             }), ct);
+
+        // Навык «Защита» (5×level) — для чарпейна и UI-корректировок; обновляем только при изменении.
+        var def = CombatStats.DefenseSkill(c.Level);
+        if (skills.Get(session, DefenseSkillId) is not { } cur || cur.Value != def)
+            await skills.GrantAsync(session, DefenseSkillId, def, def, ct);
     }
 
     /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS. M7 #16. (Чистая математика — static.)</summary>
@@ -218,5 +261,8 @@ internal sealed class ProgressionService(
 
         if (ding) // M9.6: обновить панель талантов (новые свободные очки)
             await talents.SendTalentsInfoAsync(session, ct);
+
+        // Защитные статы зависят от уровня/ловкости — пересчитать и переслать (броня/уклон/крит + навык защиты).
+        await RefreshMeleeAsync(session, ct);
     }
 }
