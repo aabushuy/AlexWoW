@@ -21,6 +21,7 @@ internal sealed class SealService(KillRewardService killReward, ManaRegenService
     // Seal of Justice 20164 — stun-proc, CC не моделируется (прок без эффекта).
 
     private const byte SchoolHoly = 2;
+    private const uint PowerMana = 0; // POWER_MANA для лога энерджайза
 
     /// <summary>Прок активной печати по прошедшему свингу. Возвращает true, если цель умерла от прок-урона.</summary>
     internal async Task<bool> OnMeleeHitAsync(WorldSession session, WorldCreature creature, long now, CancellationToken ct)
@@ -78,13 +79,18 @@ internal sealed class SealService(KillRewardService killReward, ManaRegenService
         await session.World.BroadcastPlayerHealthAsync(player, ct);
     }
 
-    /// <summary>Seal of Wisdom: восстановление маны по удару — 3% макс. (как Bp прока 20168 = 3% базовой маны).</summary>
+    /// <summary>Seal of Wisdom: восстановление маны по удару — 3% макс. (как Bp прока 20168 = 3% базовой маны).
+    /// Лог энерджайза шлём всегда (плавающее «+мана» видно даже при полной мане, как в WoW); полоску — если был прирост.</summary>
     private async Task ProcManaAsync(WorldSession session, CancellationToken ct)
     {
-        if (session.Cast.MaxMana == 0 || session.Cast.Mana >= session.Cast.MaxMana)
+        if (session.Cast.MaxMana == 0 || session.Player is not { } player)
             return;
         var amount = Math.Max(1u, session.Cast.MaxMana * 3 / 100);
-        session.Cast.Mana = Math.Min(session.Cast.MaxMana, session.Cast.Mana + amount);
-        await manaRegen.SendManaUpdateAsync(session, ct);
+        var before = session.Cast.Mana;
+        session.Cast.Mana = Math.Min(session.Cast.MaxMana, before + amount);
+        await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgSpellEnergizeLog,
+            SpellPackets.BuildEnergizeLog(player.Guid, (ulong)session.InWorldGuid, SealOfWisdom, PowerMana, amount), ct);
+        if (session.Cast.Mana != before)
+            await manaRegen.SendManaUpdateAsync(session, ct);
     }
 }

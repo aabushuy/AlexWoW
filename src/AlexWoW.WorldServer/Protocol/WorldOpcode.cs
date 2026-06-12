@@ -106,6 +106,7 @@ public enum WorldOpcode : uint
     SmsgSpellFailure = 0x133,
     SmsgSpellCooldown = 0x134,
     SmsgSpellHealLog = 0x150,
+    SmsgSpellEnergizeLog = 0x151,                // восполнение ресурса спеллом (плавающее «+мана») — Seal of Wisdom
     SmsgPeriodicAuraLog = 0x24E,                 // тик DoT/HoT (плавающее число) — M10.4b
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,

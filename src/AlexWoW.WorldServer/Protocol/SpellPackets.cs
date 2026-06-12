@@ -140,6 +140,19 @@ public static class SpellPackets
         return w.ToArray();
     }
 
+    /// <summary>SMSG_SPELLENERGIZELOG (3.3.5): packed victim + packed caster + spell + powerType + amount.
+    /// Плавающее «+ресурс» (мана=0). Сверено с CMaNGOS <c>Unit::SendEnergizeSpellLog</c>.</summary>
+    public static byte[] BuildEnergizeLog(ulong victim, ulong caster, uint spellId, uint powerType, uint amount)
+    {
+        var w = new ByteWriter(28);
+        PackedGuid.Write(w, victim);
+        PackedGuid.Write(w, caster);
+        w.UInt32(spellId)
+         .UInt32(powerType)
+         .UInt32(amount);
+        return w.ToArray();
+    }
+
     /// <summary>SpellCastTargets: только SELF (нет цели) или UNIT (packed guid цели).</summary>
     private static void WriteTargets(ByteWriter w, ulong targetGuid)
     {
