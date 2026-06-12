@@ -241,7 +241,7 @@ local function Toggle()
   if mainFrame:IsShown() then
     mainFrame:Hide()
   else
-    if #catalog.roots == 0 then RequestMenu() end -- ещё не загружен — дёрнуть сервер
+    RequestMenu() -- всегда обновляем меню от сервера при открытии (подхватываем новые команды без релога)
     mainFrame:Show(); Rebuild(); Refresh()
   end
 end
