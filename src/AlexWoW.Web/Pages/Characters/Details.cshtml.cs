@@ -46,7 +46,8 @@ public sealed class DetailsModel(
 
     public sealed class GoldInput
     {
-        [Range(1, MaxGoldPerPurchase, ErrorMessage = "Введите от 1 до 100000 золота.")]
+        // Без DataAnnotation: на странице две формы с общей моделью, авто-валидация одной мешала бы
+        // другой. Проверяем диапазон вручную в OnPostBuyGoldAsync.
         public uint Amount { get; set; }
     }
 
@@ -63,9 +64,9 @@ public sealed class DetailsModel(
         if (!await LoadOwnAsync(guid, ct))
             return NotFound();
 
-        // На странице две формы с общей моделью: при сабмите «Внешности» поле Gold.Amount приходит
-        // пустым (=0) и валит его [Range]. Убираем чужой ключ, чтобы он не блокировал смену расы/пола.
-        ModelState.Remove($"{nameof(Gold)}.{nameof(GoldInput.Amount)}");
+        // Две формы с общей моделью: чистим ModelState от авто-валидации чужой формы (поле покупки
+        // золота) и валидируем только свои поля вручную.
+        ModelState.Clear();
 
         // Раса — только из доступного набора (та же фракция + валидна для класса); пол — 0/1.
         if (!AvailableRaces.Any(r => r.Key == Appearance.Race))
@@ -104,11 +105,13 @@ public sealed class DetailsModel(
         if (!await LoadOwnAsync(guid, ct))
             return NotFound();
 
-        // Симметрично: поля «Внешности» в этой форме не участвуют — снимаем их из ModelState.
-        ModelState.Remove($"{nameof(Appearance)}.{nameof(AppearanceInput.Race)}");
-        ModelState.Remove($"{nameof(Appearance)}.{nameof(AppearanceInput.Gender)}");
-        if (!ModelState.IsValid)
+        // Чистим ModelState от авто-валидации полей «Внешности» этой же модели; диапазон проверяем сами.
+        ModelState.Clear();
+        if (Gold.Amount < 1 || Gold.Amount > MaxGoldPerPurchase)
+        {
+            ModelState.AddModelError("Gold.Amount", "Введите от 1 до 100000 золота.");
             return Page();
+        }
 
         var added = (ulong)Gold.Amount * 10000;
         var newMoney = Math.Min((ulong)Character.Money + added, uint.MaxValue);
