@@ -216,4 +216,21 @@ public class SpellCatalogFromTemplateTests
     [InlineData(2457u)]  // стойка воина — это Toggle, а не ExclusiveAura
     public void NonArmor_NoExclusiveGroup(uint spellId)
         => Assert.Equal(0, SpellCatalog.ExclusiveAuraGroup(spellId));
+
+    [Theory]
+    // Формы-шейпшифты — общая группа GroupShapeshift, форма из EffectMiscValue ауры 36.
+    [InlineData(1784u, 30, SpellCatalog.GroupShapeshift)]  // Stealth R1
+    [InlineData(1787u, 30, SpellCatalog.GroupShapeshift)]  // Stealth R4 (макс)
+    [InlineData(15473u, 28, SpellCatalog.GroupShapeshift)] // Shadowform
+    [InlineData(2645u, 16, SpellCatalog.GroupShapeshift)]  // Ghost Wolf
+    // Присутствия DK — не шейпшифт (форма 0), своя эксклюзивная группа.
+    [InlineData(48266u, 0, SpellCatalog.GroupDkPresence)]  // Blood Presence
+    [InlineData(48263u, 0, SpellCatalog.GroupDkPresence)]  // Frost Presence
+    [InlineData(48265u, 0, SpellCatalog.GroupDkPresence)]  // Unholy Presence
+    public void FormToggle_MappedToFormAndGroup(uint spellId, byte expectedForm, byte expectedGroup)
+    {
+        Assert.True(SpellCatalog.TryGetToggle(spellId, out var toggle));
+        Assert.Equal(expectedForm, toggle.Form);
+        Assert.Equal(expectedGroup, toggle.Group);
+    }
 }

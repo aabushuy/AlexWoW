@@ -31,13 +31,13 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
 | Брони мага (Frost/Mage/Molten Armor) | Маг | ✅ (эксклюзив проверен вживую; стат не моделируется) |
 | Печати (Seal of Righteousness/Light) — on-hit | Паладин | ⬜ |
-| Облик Тьмы (Shadowform) | Жрец | ⬜ |
+| Облик Тьмы (Shadowform) | Жрец | 🟡 (toggle-форма 28) |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
-| Присутствия (Blood/Frost/Unholy) | DK | ⬜ |
+| Присутствия (Blood/Frost/Unholy) | DK | 🟡 (эксклюзивная группа, форма 0) |
 | Брони (Demon Skin/Demon Armor/Fel Armor) | Чернокнижник | ✅ (тот же механизм, проверен на маге; стат не моделируется) |
 | Метаморфоза | Чернокнижник | ⬜ |
-| Призрачный волк (Ghost Wolf) | Шаман | ⬜ |
-| Скрытность (Stealth) | Разбойник | ⬜ |
+| Призрачный волк (Ghost Wolf) | Шаман | 🟡 (toggle-форма 16) |
+| Скрытность (Stealth) | Разбойник | 🟡 (toggle-форма 30, все ранги) |
 
 ### 2. Ресурсы — рага/энергия/мана ✅; остальные НЕТ
 | Ресурс | Класс | Статус | Зажигает |
