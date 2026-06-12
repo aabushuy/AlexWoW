@@ -14,9 +14,9 @@
 | Мерцание (Blink) | 1953 | Arcane / телепорт вперёд | Utility | 🟡 (движение есть) |
 | Невидимость (Invisibility) | 66 | MOD_INVISIBILITY | Buff | ⬜ |
 | Чародейский интеллект (Arcane Intellect) | 1459 | MOD_STAT (инт) | Buff | 🟡 |
-| Ледяная броня (Frost Armor) | 168 | MOD_RESISTANCE/щит | Toggle | 🟡 эксклюзивная группа (Фаза 2); стат не моделируется |
-| Магическая броня (Mage Armor) | 6117 | MOD_POWER_REGEN | Toggle | 🟡 эксклюзивная группа (Фаза 2); стат не моделируется |
-| Расплавленная броня (Molten Armor) | 30482 | MOD_CRIT/щит | Toggle | 🟡 эксклюзивная группа (Фаза 2); стат не моделируется |
+| Ледяная броня (Frost Armor) | 168 | MOD_RESISTANCE/щит | Toggle | ✅ эксклюзив проверен вживую; стат не моделируется |
+| Магическая броня (Mage Armor) | 6117 | MOD_POWER_REGEN | Toggle | ✅ эксклюзив проверен вживую; стат не моделируется |
+| Расплавленная броня (Molten Armor) | 30482 | MOD_CRIT/щит | Toggle | ✅ эксклюзив + наложение (фикс прок-брони) проверены; стат не моделируется |
 | Чародейский щит (Mana Shield) | 1463 | MANA_SHIELD | Buff | ⬜ |
 | Магический дар (Conjure Water/Food/Gem) | 5504/587/759 | CreateItem | Utility | 🟡 (CreateItem есть) |
 | Телепорт/Портал | 3561… | Utility / телепорт | Utility | ⬜ |

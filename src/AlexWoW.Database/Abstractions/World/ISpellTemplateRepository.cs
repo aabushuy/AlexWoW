@@ -17,4 +17,9 @@ public interface ISpellTemplateRepository
     /// <summary>Пакетно: spell_id → prev_spell из spell_chain (только спеллы с предыдущим рангом).
     /// Ранг-дедуп модификаторов талантов при входе. M10.6.</summary>
     Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
+
+    /// <summary>В пределах набора — пары (низший ранг → СЛЕДУЮЩИЙ известный ранг той же абилки), по
+    /// SpellName + соседним SpellLevel (НЕ требует spell_chain — у физ-абилок он пуст). Для ресенда
+    /// SUPERCEDED на логине, чтобы клиент свернул низшие ранги в книге (иначе INITIAL_SPELLS — плоский список).</summary>
+    Task<IReadOnlyList<(uint Lower, uint Higher)>> GetRankSupersedePairsAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default);
 }
