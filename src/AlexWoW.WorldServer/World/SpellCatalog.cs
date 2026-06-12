@@ -252,6 +252,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     public const byte GroupMageArmor = 4;    // брони мага (Frost/Ice/Mage/Molten — взаимоисключающие)
     public const byte GroupWarlockArmor = 5; // брони чернокнижника (Demon Skin/Demon Armor/Fel Armor)
     public const byte GroupDkPresence = 6;   // присутствия DK (Blood/Frost/Unholy — не шейпшифт, эксклюзивны)
+    public const byte GroupPaladinSeal = 7;  // печати паладина (Righteousness/Light/Wisdom/Justice — взаимоисключающие)
 
     /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.</summary>
     public readonly record struct Toggle(byte Form, byte Group);
@@ -329,6 +330,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             28176, 28189, 44520, 44977, 47892, 47893,         // Fel Armor
         })
             map[id] = GroupWarlockArmor;
+        // Печати паладина (база тренера; взаимоисключающие): Righteousness/Light/Wisdom/Justice. Платный
+        // timed-бафф 30 мин — путь ExclusiveAuras. On-hit прок (тип 42 → trigger) — отдельным шагом.
+        foreach (var id in new uint[] { 21084, 20165, 20166, 20164 })
+            map[id] = GroupPaladinSeal;
         return map;
     }
 

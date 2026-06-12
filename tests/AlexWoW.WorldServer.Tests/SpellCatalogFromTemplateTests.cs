@@ -208,6 +208,11 @@ public class SpellCatalogFromTemplateTests
     [InlineData(687u, SpellCatalog.GroupWarlockArmor)] // Demon Skin R1
     [InlineData(47889u, SpellCatalog.GroupWarlockArmor)] // Demon Armor R8 (макс)
     [InlineData(47893u, SpellCatalog.GroupWarlockArmor)] // Fel Armor R4 (макс)
+    // Печати паладина — своя эксклюзивная группа.
+    [InlineData(21084u, SpellCatalog.GroupPaladinSeal)]  // Seal of Righteousness
+    [InlineData(20165u, SpellCatalog.GroupPaladinSeal)]  // Seal of Light
+    [InlineData(20166u, SpellCatalog.GroupPaladinSeal)]  // Seal of Wisdom
+    [InlineData(20164u, SpellCatalog.GroupPaladinSeal)]  // Seal of Justice
     public void ExclusiveArmor_MappedToGroup(uint spellId, byte expectedGroup)
         => Assert.Equal(expectedGroup, SpellCatalog.ExclusiveAuraGroup(spellId));
 
