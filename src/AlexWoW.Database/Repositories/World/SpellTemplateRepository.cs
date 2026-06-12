@@ -57,13 +57,15 @@ public sealed class SpellTemplateRepository(string connectionString)
             return prev;
 
         // Фолбэк: в дампе spell_chain неполна (нет, напр., рангов аур/печатей паладина — 64 из 175). Тогда
-        // предыдущий ранг ищем в spell_template: тот же SpellName, реальный ранг (Rank1<>'') и ближайший
-        // меньший SpellLevel. Нужно для SUPERCEDED при изучении (иначе на панели/в книге копятся все ранги). M7 #47.
+        // предыдущий ранг ищем в spell_template: тот же SpellName и ближайший меньший SpellLevel. На предыдущем
+        // ранге условия Rank1<>'' НЕТ — у некоторых абилок ранг 1 идёт с ПУСТЫМ Rank1 (Stealth 1784, Prowl):
+        // иначе SUPERCEDED(1784→1785) не отправится и на панели/в книге задвоится «Незаметность». Нужно для
+        // SUPERCEDED при изучении (иначе копятся все ранги). M7 #47.
         return await db.ExecuteScalarAsync<uint?>(new CommandDefinition("""
             SELECT s2.Id
             FROM spell_template s1
             JOIN spell_template s2
-              ON s2.SpellName = s1.SpellName AND s2.Rank1 <> '' AND s2.SpellLevel < s1.SpellLevel
+              ON s2.SpellName = s1.SpellName AND s2.SpellLevel < s1.SpellLevel
             WHERE s1.Id = @spellId AND s1.Rank1 <> ''
             ORDER BY s2.SpellLevel DESC
             LIMIT 1;
@@ -89,13 +91,15 @@ public sealed class SpellTemplateRepository(string connectionString)
             return [];
         await using var db = await OpenAsync(ct);
         // Пара = низший ранг lo и ближайший БОЛЬШИЙ ранг hi той же абилки (оба в наборе): тот же SpellName,
-        // оба реальные ранги (Rank1<>''), hi.SpellLevel > lo.SpellLevel и между ними нет другого известного
-        // ранга. Не требует spell_chain (у воина он пуст). Дублей по равному SpellLevel избегаем (mid строго между).
+        // hi — реальный ранг (Rank1<>''), hi.SpellLevel > lo.SpellLevel, между ними нет другого известного ранга.
+        // ВАЖНО: на lo.Rank1 условия НЕТ — у некоторых абилок ранг 1 идёт с ПУСТЫМ Rank1 (напр. Stealth 1784,
+        // Prowl): иначе он не считался бы низшим и дублировал высший ранг в книге/на панели. Не требует
+        // spell_chain (у физ-абилок пуст). Дублей по равному SpellLevel избегаем (mid строго между).
         var rows = await db.QueryAsync<(uint Lower, uint Higher)>(new CommandDefinition("""
             SELECT lo.Id AS Lower, hi.Id AS Higher
             FROM spell_template lo
             JOIN spell_template hi
-              ON hi.SpellName = lo.SpellName AND lo.Rank1 <> '' AND hi.Rank1 <> ''
+              ON hi.SpellName = lo.SpellName AND hi.Rank1 <> ''
              AND hi.SpellLevel > lo.SpellLevel
             WHERE lo.Id IN @spellIds AND hi.Id IN @spellIds
               AND NOT EXISTS (
