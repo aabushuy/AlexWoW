@@ -19,6 +19,7 @@ public sealed class PeriodicEffect
     public bool OwnsVisual;    // true — мы шлём AURA_UPDATE на цель; визуал на себе — в системе аур игрока
     public bool DoesTick = true; // false — непериодический бафф/дебафф (только визуал + истечение). M10.4c
     public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
+    public int BlockBonus;     // +% блока от баффа (MOD_BLOCK_PERCENT, напр. «Блок щитом») — снять при истечении.
 }
 
 /// <summary>
@@ -129,7 +130,7 @@ internal sealed class PeriodicsService(
 
         if (info.AuraPositive)
         {
-            // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP) — здесь, со снятием по истечении.
+            // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP / +% блока) — здесь, со снятием по истечении.
             await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct);
             if (info.HealthBonus > 0)
             {
@@ -146,6 +147,20 @@ internal sealed class PeriodicsService(
                     DoesTick = false,
                     HealthBonus = info.HealthBonus,
                 });
+            }
+            if (info.BlockBonus != 0)
+            {
+                // +% блока («Блок щитом»): записываем эффект и пересчитываем PLAYER_BLOCK_PERCENTAGE.
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0 && p.BlockBonus != 0);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    BlockBonus = info.BlockBonus,
+                });
+                await SendBlockAsync(session, ct);
             }
             return;
         }
@@ -267,6 +282,18 @@ internal sealed class PeriodicsService(
             await RemoveAsync(session, p, ct);
     }
 
+    /// <summary>Пересчитывает и шлёт PLAYER_BLOCK_PERCENTAGE: база (класс+щит) + сумма активных аур-бонусов блока.</summary>
+    private Task SendBlockAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0 || session.Character is not { } c)
+            return Task.CompletedTask;
+        var bonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus);
+        var block = CombatStats.BlockPercent(c.Class, session.Combat.HasShield, bonus);
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
+                m => m.SetFloat(UpdateField.PlayerBlockPercentage, block)), ct);
+    }
+
     private async Task RemoveAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
     {
         session.Progression.Periodics.Remove(p);
@@ -279,6 +306,10 @@ internal sealed class PeriodicsService(
             if (session.Player is { } pl)
                 await session.World.BroadcastPlayerHealthAsync(pl, ct);
         }
+
+        // Снять +% блока («Блок щитом») — пересчитать блок без истёкшего эффекта.
+        if (p.BlockBonus != 0)
+            await SendBlockAsync(session, ct);
 
         if (!p.OwnsVisual)
             return; // визуал на себе (бафф/HoT-иконка) истечёт сам в AuraService.TickAsync (та же длительность)

@@ -145,11 +145,13 @@ internal sealed class ProgressionService(
         }
         var hasMeleeWeapon = mh is not null;
 
+        session.Combat.HasShield = hasShield; // кэш для пересчёта блока при аурах («Блок щитом»)
+        var blockAura = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus);
         var armor = CombatStats.Armor(agi, itemArmor);
         var dodge = session.World.Ratings.DodgePercent(c.Class, c.Level, agi);
         var crit = session.World.Ratings.MeleeCritPercent(c.Class, c.Level, agi);
         var parry = CombatStats.ParryPercent(c.Class, hasMeleeWeapon);
-        var block = CombatStats.BlockPercent(c.Class, hasShield);
+        var block = CombatStats.BlockPercent(c.Class, hasShield, blockAura);
 
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>

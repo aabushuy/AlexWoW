@@ -28,6 +28,13 @@ public sealed class CombatStatsTests
     public void Block_needs_shield_and_capable_class(byte cls, bool shield, float expected)
         => Assert.Equal(expected, CombatStats.BlockPercent(cls, shield));
 
+    [Theory]
+    [InlineData(1, true, 20f, 25f)]    // воин+щит: 5 база + 20 («Блок щитом»)
+    [InlineData(1, true, 100f, 100f)]  // кламп до 100% (Блок щитом +100)
+    [InlineData(1, false, 100f, 0f)]   // без щита аура не даёт блока
+    public void Block_adds_aura_bonus_and_clamps(byte cls, bool shield, float bonus, float expected)
+        => Assert.Equal(expected, CombatStats.BlockPercent(cls, shield, bonus));
+
     [Fact]
     public void DefenseSkill_is_five_per_level()
     {
