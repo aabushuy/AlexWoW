@@ -13,7 +13,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSender spellGo,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
-    SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting)
+    SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
+    CrowdControlService crowdControl)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -110,8 +111,14 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.Periodic)
             await periodics.ApplyAsync(session, spellId, info, targetGuid, ct);
         // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
-        if (info.AuraBuff)
+        // CC-спеллы (стан/рут/…) сюда НЕ идут — их визуал/состояние ставит CrowdControlService (иначе дубль ауры).
+        if (info.AuraBuff && info.CrowdControl == SpellCatalog.CrowdControlKind.None)
             await periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
+
+        // Фаза 2 CC: контроль цели-существа (стан/рут/страх/немота/дезориентация).
+        if (info.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
+            && session.World.FindCreature(targetGuid) is { } ccTarget)
+            await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct);
 
         // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
         if (info.CreateItemId != 0)

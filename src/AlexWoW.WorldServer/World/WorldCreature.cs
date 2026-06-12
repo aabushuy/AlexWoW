@@ -51,6 +51,15 @@ public sealed class WorldCreature
     /// <summary>Троттлинг доворота к цели в мили (фейсинг). <see cref="Environment.TickCount64"/>, мс. M6.7.</summary>
     public long NextFaceMs { get; set; }
 
+    // --- Контроль (CC, Фаза 2): стан/рут/страх/немота/дезориентация от спелла игрока. ---
+    /// <summary>Активный вид контроля (None — нет). Стан/страх/дезориентация мешают свингу (см. CreatureCombatAI).</summary>
+    public SpellCatalog.CrowdControlKind CrowdControl { get; set; }
+    /// <summary>Момент окончания контроля (<see cref="Environment.TickCount64"/>, мс).</summary>
+    public long CrowdControlUntilMs { get; set; }
+    /// <summary>Spell-id наложившего CC (для снятия визуальной ауры-дебаффа) + её слот.</summary>
+    public uint CrowdControlSpellId { get; set; }
+    public byte CrowdControlSlot { get; set; }
+
     // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
     /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
     public bool Lootable { get; set; }

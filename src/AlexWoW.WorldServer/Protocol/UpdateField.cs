@@ -140,6 +140,13 @@ public static class UnitFlags
     /// <summary>UNIT_FLAG_PLAYER_CONTROLLED — юнит под управлением игрока. Клиент по нему выбирает
     /// ветку реакции/атаки PvC vs CvC; без него игрок считается существом и не может бить нейтралов.</summary>
     public const uint PlayerControlled = 0x00000008;
+
+    // Флаги контроля (CC) — клиент рисует соответствующую анимацию/состояние. Значения 3.3.5a.
+    public const uint Silenced = 0x00002000;   // UNIT_FLAG_SILENCED — нем (не может кастовать)
+    public const uint Pacified = 0x00020000;   // UNIT_FLAG_PACIFIED
+    public const uint Stunned = 0x00040000;    // UNIT_FLAG_STUNNED — оглушён (звёзды/нокдаун)
+    public const uint Confused = 0x00400000;   // UNIT_FLAG_CONFUSED — дезориентирован (поли/блайнд)
+    public const uint Fleeing = 0x00800000;    // UNIT_FLAG_FLEEING — в страхе
 }
 
 /// <summary>Типы объектов (OBJECT_FIELD_TYPE — битовая маска).</summary>

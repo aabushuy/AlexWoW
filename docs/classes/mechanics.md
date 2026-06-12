@@ -55,14 +55,18 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | SCHOOL_ABSORB | PW:Shield (Жрец), Ice Barrier (Маг), Mana Shield (Маг), Anti-Magic Shell (DK), Sacred Shield (Пал) | ⬜ |
 | SCHOOL_IMMUNITY | Ice Block (Маг), Divine Shield (Пал) | ⬜ |
 
-### 4. CC (контроль) — фреймворк НЕТ
+### 4. CC (контроль) — фреймворк ЕСТЬ (`CrowdControlService`, data-driven по CC-ауре)
+Детект CC в `SpellCatalog.FromTemplate` (ауры 12/26/7/27/5 → Stun/Root/Fear/Silence/Disorient + длительность).
+На существе-цели: визуал (аура-дебафф + UNIT_FLAG) + состояние; стан/страх/дезориентация **блокируют свинг**
+существа (`CreatureCombatAI`); истечение — в `WorldTick` (у любого существа, в т.ч. манекена). PvE-фокус:
+рут/немота визуальны (существа не ходят/редко кастуют). Стат-эффекты/breaks-on-damage/иммунитеты — позже.
 | Тип | Абилки (класс) | Статус |
 |---|---|---|
-| Stun | Hammer of Justice (Пал), War Stomp (Таурен), Concussion Blow (Воин), Cheap/Kidney Shot (Разб), Deep Freeze (Маг), Shadowfury (ЧК) | ⬜ |
-| Root | Frost Nova (Маг), Entangling Roots (Друид), Freezing Trap (Охот), Chains of Ice-snare (DK) | ⬜ |
-| Fear | Psychic Scream (Жрец), Fear/Howl of Terror (ЧК), Intimidating Shout (Воин), Scare Beast (Охот) | ⬜ |
-| Silence | Counterspell-lockout (Маг), Silencing Shot (Охот), Arcane Torrent (Эльф крови), Strangulate (DK) | ⬜ |
-| Disorient/Poly | Blind (Разб), Scatter Shot (Охот), Dragon's Breath (Маг), Polymorph (Маг), Banish/Hibernate | ⬜ |
+| Stun | Hammer of Justice (Пал), Concussion Blow (Воин), Cheap/Kidney Shot (Разб), Deep Freeze (Маг), Bash (Друид), Shadowfury (ЧК) | 🟡 (стан существа + визуал; data-driven) |
+| Root | Frost Nova (Маг), Entangling Roots (Друид), Freezing Trap (Охот), Chains of Ice (DK) | 🟡 (визуал; поведения на существах нет) |
+| Fear | Psychic Scream (Жрец), Fear/Howl of Terror (ЧК), Intimidating Shout (Воин), Scare Beast (Охот) | 🟡 (стопает существо + визуал; fleeing-движение нет) |
+| Silence | Strangulate (DK), Silencing Shot (Охот), Arcane Torrent (Эльф крови); Counterspell-lockout (Маг) | 🟡 (визуал) / ⬜ (lockout) |
+| Disorient/Poly | Polymorph (Маг), Blind (Разб), Dragon's Breath (Маг), Scatter Shot (Охот), Hibernate | 🟡 (стопает существо + визуал; break-on-damage нет) |
 
 ### 5. Interrupt
 Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Freeze (DK), Wind Shear (Шам), Skull Bash (Друид), Spell Lock (пет ЧК). Статус: ⬜.

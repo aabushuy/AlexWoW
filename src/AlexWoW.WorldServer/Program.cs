@@ -107,6 +107,7 @@ builder.Services.AddSingleton<CraftingService>();
 // опкод-входы — модуль CombatOpcodeHandlers (регистрируется assembly-сканом выше).
 builder.Services.AddSingleton<PlayerMeleeService>();
 builder.Services.AddSingleton<SealService>(); // Фаза 2: on-hit прок печатей паладина
+builder.Services.AddSingleton<CrowdControlService>(); // Фаза 2: контроль (стан/рут/страх/немота)
 builder.Services.AddSingleton<CreatureCombatAI>();
 builder.Services.AddSingleton<RegenService>();
 // M7 S5: квест/лут-кластер — god-класс QuestHandlers разнесён по SRP-сервисам (прогресс/персист, иконки

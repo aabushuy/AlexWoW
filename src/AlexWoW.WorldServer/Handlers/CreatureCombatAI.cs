@@ -118,6 +118,11 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
             return;
         }
 
+        // Фаза 2 CC: активный стан/страх/дезориентация — существо не действует (не бьёт и не преследует),
+        // оставаясь «в бою». Истечение снимается в WorldTick. Рут/немота свинг не блокируют (визуал на клиенте).
+        if (CrowdControlService.PreventsAction(creature, now))
+            return;
+
         // В мили-радиусе — бьём; иначе преследуем по навмешу (троттлинг шагов).
         if (InMeleeRangeOfCreature(creature, player))
         {

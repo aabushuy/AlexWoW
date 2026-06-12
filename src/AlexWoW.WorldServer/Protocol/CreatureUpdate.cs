@@ -43,6 +43,10 @@ public static class CreatureUpdate
     public static byte[] BuildDynamicFlagsUpdate(ulong guid, uint flags)
         => BuildValuesUpdate(guid, m => m.SetUInt32(UpdateField.UnitDynamicFlags, flags));
 
+    /// <summary>VALUES-апдейт флагов существа (UNIT_FIELD_FLAGS) — CC-визуал (оглушён/в страхе/нем). Фаза 2.</summary>
+    public static byte[] BuildUnitFlagsUpdate(ulong guid, uint flags)
+        => BuildValuesUpdate(guid, m => m.SetUInt32(UpdateField.UnitFlags, flags));
+
     /// <summary>Каркас SMSG_UPDATE_OBJECT с одним VALUES-блоком для существа (произвольный набор полей).</summary>
     private static byte[] BuildValuesUpdate(ulong guid, Action<UpdateMask> fill)
     {

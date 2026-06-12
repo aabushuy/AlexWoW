@@ -44,6 +44,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
+    // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
+    private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
+    private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)
+    private const int AuraModStun = 12;                  // оглушение (Hammer of Justice/Concussion Blow)
+    private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
+    private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -67,7 +73,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         uint FamilyName = 0, ulong FamilyFlags = 0, uint FamilyFlags2 = 0,
         byte DirectEffectIndex = 0, byte PeriodicEffectIndex = 0,
         // M10.6: начисление ресурса кастеру (ENERGIZE / ярость Рывка): величина, power type, индекс эффекта.
-        uint EnergizeAmount = 0, byte EnergizePower = 0, byte EnergizeEffectIndex = 0);
+        uint EnergizeAmount = 0, byte EnergizePower = 0, byte EnergizeEffectIndex = 0,
+        // Фаза 2 CC: тип контроля (стан/рут/страх/немота/дезориентация) + длительность (мс). None — не CC.
+        CrowdControlKind CrowdControl = CrowdControlKind.None, int CrowdControlMs = 0);
+
+    /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
+    public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
 
     /// <summary>Движущий эффект спелла (M7 #33): рывок к цели (сплайн), телепорт вперёд (Blink) или за спину
     /// цели (Shadowstep). None — не двигает.</summary>
@@ -176,6 +187,20 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
+        // Фаза 2 CC: тип контроля по первой найденной CC-ауре (стан/рут/страх/немота/дезориентация).
+        // Длительность — из DurationIndex (даже если спелл не помечен auraBuff/periodic — CC всегда временный).
+        var ccEff = Array.Find(effects, e => e.Eff == EffectApplyAura
+            && e.Aura is AuraModStun or AuraModRoot or AuraModFear or AuraModSilence or AuraModConfuse);
+        var crowdControl = ccEff.Eff != EffectApplyAura ? CrowdControlKind.None : ccEff.Aura switch
+        {
+            AuraModStun => CrowdControlKind.Stun,
+            AuraModRoot => CrowdControlKind.Root,
+            AuraModFear => CrowdControlKind.Fear,
+            AuraModSilence => CrowdControlKind.Silence,
+            _ => CrowdControlKind.Disorient, // AuraModConfuse
+        };
+        var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
+
         // M7 #33: движущий эффект. Charge(96)=рывок (сплайн); Leap(29)=прыжок вперёд (Blink);
         // TeleportUnits(5)=телепорт за спину цели (триггер Shadowstep 36563). TRIGGER_SPELL(64) — цепочка
         // (Shadowstep 36554 → 36563): несём id триггера, тип движения резолвится у триггера в SpellCastCompletion.
@@ -236,7 +261,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             blockBonus, damageTakenPct, movement, triggerSpell, createItemId, createItemCount, reagents,
             t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
             (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
-            energizeAmount, energizePower, energizeIdx);
+            energizeAmount, energizePower, energizeIdx,
+            crowdControl, crowdControlMs);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
