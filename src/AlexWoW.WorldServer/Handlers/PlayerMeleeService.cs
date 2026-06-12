@@ -14,7 +14,8 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class PlayerMeleeService(
     CreatureCombatAI creatureAi,
     CombatResourcesService combatResources,
-    KillRewardService killReward)
+    KillRewardService killReward,
+    SealService seals)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
     internal const long SwingIntervalMs = 2000;
@@ -107,6 +108,13 @@ internal sealed class PlayerMeleeService(
             await killReward.OnCreatureKilledAsync(session, creature, ct); // M6.6: ролл лута + lootable-флаг
             session.Logger.LogInformation("KILL '{User}' убил '{Name}' (guid={Guid}), респавн через {Sec}с",
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);
+            return;
+        }
+
+        // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
+        if (await seals.OnMeleeHitAsync(session, creature, now, ct))
+        {
+            await StopAttackAsync(session, creature.Guid, ct);
             return;
         }
 
