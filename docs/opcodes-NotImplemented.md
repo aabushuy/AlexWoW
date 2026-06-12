@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 706 / 860 опкодов НЕ реализовано — 82.1%** (реализовано: 154 — 17.9%, см. [Implemented.md](Implemented.md)).
+> **Прогресс: 696 / 860 опкодов НЕ реализовано — 80.9%** (реализовано: 164 — 19.1%, см. [opcodes-Implemented.md](opcodes-Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -10,8 +10,6 @@
 | `0x0002` | CMSG_DBLOOKUP | Debug |
 | `0x0008` | CMSG_WORLD_TELEPORT | Movement |
 | `0x0009` | CMSG_TELEPORT_TO_UNIT | Movement |
-| `0x003E` | SMSG_NEW_WORLD | Movement |
-| `0x003F` | SMSG_TRANSFER_PENDING | Movement |
 | `0x0040` | SMSG_TRANSFER_ABORTED | Movement |
 | `0x0041` | SMSG_CHARACTER_LOGIN_FAILED | Character |
 | `0x004A` | CMSG_PLAYER_LOGOUT | Login |
@@ -93,10 +91,8 @@
 | `0x00AE` | SMSG_READ_ITEM_OK | Item |
 | `0x00AF` | SMSG_READ_ITEM_FAILED | Item |
 | `0x00B0` | SMSG_ITEM_COOLDOWN | Item |
-| `0x00B1` | CMSG_GAMEOBJ_USE | GameObject |
 | `0x00B3` | SMSG_GAMEOBJECT_CUSTOM_ANIM | GameObject |
 | `0x00B4` | CMSG_AREATRIGGER | GameObject |
-| `0x00DC` | MSG_MOVE_WORLDPORT_ACK | Movement |
 | `0x00DE` | SMSG_MOVE_WATER_WALK | Movement |
 | `0x00DF` | SMSG_MOVE_LAND_WALK | Movement |
 | `0x00E1` | CMSG_MOVE_SET_RAW_POSITION | Movement |
@@ -252,14 +248,12 @@
 | `0x01FF` | SMSG_LFG_PLAYER_REWARD | LFG |
 | `0x0200` | SMSG_LFG_TELEPORT_DENIED | LFG |
 | `0x0202` | CMSG_UNLEARN_SKILL | Spell |
-| `0x0203` | SMSG_REMOVED_SPELL | Spell |
 | `0x0205` | CMSG_GMTICKET_CREATE | GM |
 | `0x0206` | SMSG_GMTICKET_CREATE | GM |
 | `0x0207` | CMSG_GMTICKET_UPDATETEXT | GM |
 | `0x0208` | SMSG_GMTICKET_UPDATETEXT | GM |
 | `0x0211` | CMSG_GMTICKET_GETTICKET | GM |
 | `0x0212` | SMSG_GMTICKET_GETTICKET | GM |
-| `0x0213` | CMSG_UNLEARN_TALENTS | Spell |
 | `0x0214` | SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT | Raid |
 | `0x0215` | SMSG_GAMEOBJECT_DESPAWN_ANIM | GameObject |
 | `0x0217` | CMSG_GMTICKET_DELETETICKET | GM |
@@ -294,7 +288,6 @@
 | `0x024B` | SMSG_SPELLLOGMISS | Spell |
 | `0x024C` | SMSG_SPELLLOGEXECUTE | Spell |
 | `0x024F` | SMSG_SPELLDAMAGESHIELD | Spell |
-| `0x0251` | CMSG_LEARN_TALENT | Spell |
 | `0x0252` | SMSG_RESURRECT_FAILED | Resurrect |
 | `0x0253` | CMSG_TOGGLE_PVP | Pvp |
 | `0x0254` | SMSG_ZONE_UNDER_ATTACK | Combat |
@@ -313,8 +306,6 @@
 | `0x0263` | SMSG_SPELLORDAMAGE_IMMUNE | Spell |
 | `0x0264` | CMSG_AUCTION_LIST_BIDDER_ITEMS | Auction |
 | `0x0265` | SMSG_AUCTION_BIDDER_LIST_RESULT | Auction |
-| `0x0266` | SMSG_SET_FLAT_SPELL_MODIFIER | Spell |
-| `0x0267` | SMSG_SET_PCT_SPELL_MODIFIER | Spell |
 | `0x0268` | CMSG_SET_AMMO | Item |
 | `0x0269` | SMSG_CORPSE_RECLAIM_DELAY | Resurrect |
 | `0x026A` | CMSG_SET_ACTIVE_MOVER | Client |
@@ -668,7 +659,6 @@
 | `0x04BD` | CMSG_EQUIPMENT_SET_SAVE | Item |
 | `0x04BE` | CMSG_UPDATE_PROJECTILE_POSITION | Spell |
 | `0x04BF` | SMSG_SET_PROJECTILE_POSITION | Spell |
-| `0x04C0` | SMSG_TALENTS_INFO | Spell |
 | `0x04C1` | CMSG_LEARN_PREVIEW_TALENTS | Spell |
 | `0x04C2` | CMSG_LEARN_PREVIEW_TALENTS_PET | Spell |
 | `0x04C7` | SMSG_ARENA_UNIT_DESTROYED | Arena |

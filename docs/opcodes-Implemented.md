@@ -1,8 +1,8 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 154 / 860 опкодов реализовано — 17.9%** (не реализовано: 706 — 82.1%, см. [NotImplemented.md](NotImplemented.md)).
+> **Прогресс: 164 / 860 опкодов реализовано — 19.1%** (не реализовано: 696 — 80.9%, см. [opcodes-NotImplemented.md](opcodes-NotImplemented.md)).
 >
-> Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Генерируется из кода + reference; обновлять при добавлении опкодов.
+> Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Актуализируется из кода + reference; обновлять при добавлении опкодов.
 
 | Код | Опкод | Категория |
 |---|---|---|
@@ -13,6 +13,8 @@
 | `0x003B` | SMSG_CHAR_ENUM | Character |
 | `0x003C` | SMSG_CHAR_DELETE | Character |
 | `0x003D` | CMSG_PLAYER_LOGIN | Character |
+| `0x003E` | SMSG_NEW_WORLD | Movement |
+| `0x003F` | SMSG_TRANSFER_PENDING | Movement |
 | `0x0042` | SMSG_LOGIN_SETTIMESPEED | Login |
 | `0x004B` | CMSG_LOGOUT_REQUEST | Login |
 | `0x004C` | SMSG_LOGOUT_RESPONSE | Login |
@@ -33,6 +35,7 @@
 | `0x0096` | SMSG_MESSAGECHAT | Chat |
 | `0x00A9` | SMSG_UPDATE_OBJECT | Gossip |
 | `0x00AA` | SMSG_DESTROY_OBJECT | GameObject |
+| `0x00B1` | CMSG_GAMEOBJ_USE | GameObject |
 | `0x00B5` | MSG_MOVE_START_FORWARD | Movement |
 | `0x00B6` | MSG_MOVE_START_BACKWARD | Movement |
 | `0x00B7` | MSG_MOVE_STOP | Movement |
@@ -53,6 +56,7 @@
 | `0x00CB` | MSG_MOVE_STOP_SWIM | Movement |
 | `0x00DA` | MSG_MOVE_SET_FACING | Movement |
 | `0x00DB` | MSG_MOVE_SET_PITCH | Movement |
+| `0x00DC` | MSG_MOVE_WORLDPORT_ACK | Movement |
 | `0x00DD` | SMSG_MONSTER_MOVE | Movement |
 | `0x00EE` | MSG_MOVE_HEARTBEAT | Movement |
 | `0x00FD` | SMSG_TUTORIAL_FLAGS | Chat |
@@ -135,13 +139,18 @@
 | `0x01EC` | SMSG_AUTH_CHALLENGE | Character |
 | `0x01ED` | CMSG_AUTH_SESSION | Character |
 | `0x01EE` | SMSG_AUTH_RESPONSE | Character |
+| `0x0203` | SMSG_REMOVED_SPELL | Spell |
 | `0x0209` | SMSG_ACCOUNT_DATA_TIMES | Login |
 | `0x020A` | CMSG_REQUEST_ACCOUNT_DATA | Login |
 | `0x020B` | CMSG_UPDATE_ACCOUNT_DATA | Login |
 | `0x020C` | SMSG_UPDATE_ACCOUNT_DATA | Login |
+| `0x0213` | CMSG_UNLEARN_TALENTS | Spell |
 | `0x0236` | SMSG_LOGIN_VERIFY_WORLD | Character |
 | `0x024E` | SMSG_PERIODICAURALOG | Spell |
 | `0x0250` | SMSG_SPELLNONMELEEDAMAGELOG | Spell |
+| `0x0251` | CMSG_LEARN_TALENT | Spell |
+| `0x0266` | SMSG_SET_FLAT_SPELL_MODIFIER | Spell |
+| `0x0267` | SMSG_SET_PCT_SPELL_MODIFIER | Spell |
 | `0x02BF` | CMSG_SET_ACTIONBAR_TOGGLES | Client |
 | `0x02EF` | SMSG_ADDON_INFO | Login |
 | `0x037A` | SMSG_FORCED_DEATH_UPDATE | Resurrect |
@@ -159,4 +168,5 @@
 | `0x0463` | SMSG_UPDATE_ACCOUNT_DATA_COMPLETE | Login |
 | `0x0480` | SMSG_POWER_UPDATE | Spell |
 | `0x0496` | SMSG_AURA_UPDATE | Spell |
+| `0x04C0` | SMSG_TALENTS_INFO | Spell |
 | `0x04FF` | CMSG_READY_FOR_ACCOUNT_DATA_TIMES | Character |
