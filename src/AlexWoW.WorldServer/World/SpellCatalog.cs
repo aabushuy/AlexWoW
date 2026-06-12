@@ -168,6 +168,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Бафф/дебафф: по знаку BasePoints, НО защитный само-бафф со снижением урона (−% получаемого)
         // — положительный (на себя), несмотря на отрицательный Bp («Глухая оборона»).
         var auraPositive = auraBuff && (auraBuffEff.Bp >= 0 || damageTakenPct < 0);
+        // Брони (эксклюзивные само-баффы) — положительны по определению, даже если первый аура-эффект —
+        // прок-триггер с отрицательным BasePoints (Molten Armor: PROC_TRIGGER_SPELL Bp=−1 → иначе движок
+        // принял бы за дебафф и не наложил бы без цели). Frost/Mage/Demon/Fel уже положительны (MOD_RESISTANCE+).
+        if (auraBuff && !auraPositive && ExclusiveAuras.ContainsKey((uint)t.Id))
+            auraPositive = true;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
