@@ -85,3 +85,6 @@ app.UseAuthorization();
 app.MapRazorPages();
 
 app.Run();
+
+/// <summary>Точка входа как public partial — чтобы WebApplicationFactory&lt;Program&gt; видел сборку в тестах.</summary>
+public partial class Program;
