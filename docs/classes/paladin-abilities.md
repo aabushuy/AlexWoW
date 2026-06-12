@@ -16,7 +16,7 @@
 | Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | 🟡 эксклюзив + on-hit holy-урон по свингу (упрощённо ~уровень; SP/AP не моделируется) |
 | Печать света (Seal of Light) | 20165 | toggle / on-hit heal | Toggle | 🟡 эксклюзив + on-hit хил по свингу (упрощённо) |
 | Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | 🟡 эксклюзив + on-hit мана по свингу (3% макс.) |
-| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | 🟡 эксклюзив; stun-proc не моделируется (CC) |
+| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | 🟡 эксклюзив + on-hit стан цели (через CC-фреймворк, прок 20170) |
 | Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
 | Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ⬜ |
 | Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |
