@@ -251,14 +251,15 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     public const byte GroupHunterAspect = 3; // аспекты охотника
     public const byte GroupMageArmor = 4;    // брони мага (Frost/Ice/Mage/Molten — взаимоисключающие)
     public const byte GroupWarlockArmor = 5; // брони чернокнижника (Demon Skin/Demon Armor/Fel Armor)
+    public const byte GroupDkPresence = 6;   // присутствия DK (Blood/Frost/Unholy — не шейпшифт, эксклюзивны)
 
     /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.</summary>
     public readonly record struct Toggle(byte Form, byte Group);
 
     /// <summary>
     /// Спеллы-переключатели (M6.12/M7 #21): мгновенный каст без маны/цели → перманентная аура (персист).
-    /// Форма (стойки воина → панель стоек). Эксклюзивны в группе. ⚠️ Только РАНГ 1 — высшие ранги имеют
-    /// другие spell-id (высшие ранги/формы друида — расширение системы аур).
+    /// Форма (стойки/Stealth/Shadowform/Ghost Wolf → панель формы). Эксклюзивны в группе. Для многоранговых
+    /// (Stealth) перечисляем ВСЕ ранги — на 80-м кастуется высший, но игрок может применить любой.
     /// </summary>
     private static readonly Dictionary<uint, Toggle> Toggles = new()
     {
@@ -283,6 +284,17 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         [13161] = new(0, GroupHunterAspect), // Aspect of the Beast
         [34074] = new(0, GroupHunterAspect), // Aspect of the Viper
         [61846] = new(0, GroupHunterAspect), // Aspect of the Dragonhawk
+        // Формы-шейпшифты (одна на класс → общая группа GroupShapeshift; форма из EffectMiscValue ауры 36).
+        [1784] = new(30, GroupShapeshift),   // Stealth (рога) — ранг 1
+        [1785] = new(30, GroupShapeshift),   // Stealth ранг 2
+        [1786] = new(30, GroupShapeshift),   // Stealth ранг 3
+        [1787] = new(30, GroupShapeshift),   // Stealth ранг 4
+        [15473] = new(28, GroupShapeshift),  // Shadowform (жрец)
+        [2645] = new(16, GroupShapeshift),   // Ghost Wolf (шаман)
+        // Присутствия DK (не шейпшифт, форма 0; эксклюзивны как ауры паладина).
+        [48266] = new(0, GroupDkPresence),   // Blood Presence
+        [48263] = new(0, GroupDkPresence),   // Frost Presence
+        [48265] = new(0, GroupDkPresence),   // Unholy Presence
     };
 
     /// <summary>Переключатель (стойка/аура/аспект) по id (true — это переключатель).</summary>
