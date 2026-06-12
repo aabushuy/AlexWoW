@@ -11,7 +11,10 @@ namespace AlexWoW.Web.Pages.Characters;
 /// Карточка персонажа (только свои): атрибуты + экипировка (общий компонент _CharacterCard),
 /// смена расы/пола (M8.6) и покупка игрового золота (M8.7).
 /// </summary>
-public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepository inventory) : PageModel
+public sealed class DetailsModel(
+    ICharacterRepository characters,
+    IInventoryRepository inventory,
+    ServerSettingsService settings) : PageModel
 {
     /// <summary>Максимум золота за одну покупку (M8.7, демо-режим без реальной оплаты).</summary>
     public const uint MaxGoldPerPurchase = 100_000;
@@ -21,6 +24,10 @@ public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepo
 
     /// <summary>Доступные расы для смены (той же фракции, валидные для класса) — M8.6.</summary>
     public IReadOnlyList<KeyValuePair<byte, string>> AvailableRaces { get; private set; } = [];
+
+    /// <summary>Стоимость смены расы/пола (золото) из настроек сервера — M8.6.</summary>
+    public uint RaceChangeCostGold { get; private set; }
+    public uint GenderChangeCostGold { get; private set; }
 
     [TempData]
     public string? Flash { get; set; }
@@ -64,8 +71,27 @@ public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepo
         if (!ModelState.IsValid)
             return Page();
 
+        var raceChanged = Appearance.Race != Character.Race;
+        var genderChanged = Appearance.Gender != Character.Gender;
+        if (!raceChanged && !genderChanged)
+        {
+            Flash = "Раса и пол не изменены — списывать нечего.";
+            return RedirectToPage(new { guid });
+        }
+
+        // Стоимость — сумма цен изменённых атрибутов (в золоте → медь).
+        var costGold = (raceChanged ? RaceChangeCostGold : 0) + (genderChanged ? GenderChangeCostGold : 0);
+        var costCopper = (ulong)costGold * 10000;
+        if (Character.Money < costCopper)
+        {
+            ModelState.AddModelError(string.Empty,
+                $"Недостаточно золота: нужно {costGold}, у вас {GameData.SplitMoney(Character.Money).Gold}.");
+            return Page();
+        }
+
         await characters.SetRaceGenderAsync(guid, Appearance.Race, Appearance.Gender, ct);
-        Flash = "Раса/пол изменены. Изменения вступят в силу при следующем входе в игру.";
+        await characters.SetMoneyAsync(guid, (uint)(Character.Money - costCopper), ct);
+        Flash = $"Готово. Списано {costGold} золота. Изменения вступят в силу при следующем входе в игру.";
         return RedirectToPage(new { guid });
     }
 
@@ -93,6 +119,8 @@ public sealed class DetailsModel(ICharacterRepository characters, IInventoryRepo
         var items = await inventory.GetItemsAsync(guid, ct);
         Card = new CharacterCardModel { Character = character, Equipment = CharacterCardModel.BuildEquipment(items) };
         AvailableRaces = GameData.RacesForClassSameFaction(character.Class, character.Race);
+        RaceChangeCostGold = await settings.RaceChangeCostGoldAsync(ct);
+        GenderChangeCostGold = await settings.GenderChangeCostGoldAsync(ct);
         return true;
     }
 }

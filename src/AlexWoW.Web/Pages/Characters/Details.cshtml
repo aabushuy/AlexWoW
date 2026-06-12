@@ -18,8 +18,13 @@
     <h2>Внешность</h2>
     <p class="muted">Смена расы и пола. Раса — в пределах вашей фракции и класса.
         Не меняйте, находясь в игре: правка применится при следующем входе.</p>
+    <p class="muted">Стоимость: смена расы — <strong class="coin"><span class="g">@Model.RaceChangeCostGold</span></strong> золота,
+        смена пола — <strong class="coin"><span class="g">@Model.GenderChangeCostGold</span></strong> золота.
+        Списывается только за изменённые поля. У вас: <strong class="coin"><span class="g">@GameData.SplitMoney(c.Money).Gold</span></strong> золота.</p>
 
     <form method="post" asp-page-handler="Appearance" asp-route-guid="@c.Guid">
+        <div asp-validation-summary="ModelOnly" class="alert alert-error" role="alert"
+             style="@(ViewData.ModelState.IsValid ? "display:none" : null)"></div>
         <div class="form-row">
             <div class="field">
                 <label asp-for="Appearance.Race">Раса</label>

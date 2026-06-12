@@ -27,6 +27,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<TeleportLocation> TeleportLocations => Set<TeleportLocation>();
     public DbSet<SpellTestSession> SpellTestSessions => Set<SpellTestSession>();
     public DbSet<SpellTestResult> SpellTestResults => Set<SpellTestResult>();
+    public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -260,6 +261,15 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.RecordedAt).HasColumnName("recorded_at").HasColumnType("datetime(3)");
             e.HasIndex(x => x.SessionId).HasDatabaseName("ix_str_session");
             e.HasIndex(x => x.SpellId).HasDatabaseName("ix_str_spell");
+        });
+
+        // Key-value настройки сервера (M8.6: стоимость смены расы/пола и т.п.).
+        modelBuilder.Entity<ServerSetting>(e =>
+        {
+            e.ToTable("server_setting");
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasColumnName("setting_key").HasMaxLength(64).ValueGeneratedNever();
+            e.Property(x => x.Value).HasColumnName("setting_value").HasMaxLength(255).IsRequired();
         });
     }
 }
