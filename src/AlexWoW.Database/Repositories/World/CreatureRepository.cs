@@ -76,4 +76,19 @@ public sealed class CreatureRepository(string connectionString)
             FROM creature_template WHERE Entry = @entry;
             """, new { entry }, cancellationToken: ct));
     }
+
+    public async Task<IReadOnlyList<CreatureTemplateData>> GetCreatureTemplatesByTypeAsync(
+        byte creatureType, int limit, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        // Случайные шаблоны типа с валидной моделью и обычным именем (без дев/плейсхолдеров) — для дев-врагов.
+        var rows = await db.QueryAsync<CreatureTemplateData>(new CommandDefinition("""
+            SELECT Entry, Name, SubName, DisplayId1, Faction, MinLevel, CreatureType, NpcFlags, UnitClass, Scale
+            FROM creature_template
+            WHERE CreatureType = @creatureType AND DisplayId1 > 0
+              AND Name <> '' AND Name NOT LIKE '%[%' AND NpcFlags = 0
+            ORDER BY RAND() LIMIT @limit;
+            """, new { creatureType, limit }, cancellationToken: ct));
+        return rows.AsList();
+    }
 }
