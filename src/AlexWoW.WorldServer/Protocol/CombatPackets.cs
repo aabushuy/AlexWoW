@@ -11,6 +11,8 @@ public static class CombatPackets
 {
     /// <summary>HitInfo для обычного удара: AFFECTS_VICTIM (0x2) — без absorb/resist/block, простой пакет.</summary>
     private const uint HitInfoAffectsVictim = 0x2;
+    /// <summary>HITINFO_BLOCK (0x2000): удар частично заблокирован → в конце пакета пишется blocked_amount.</summary>
+    private const uint HitInfoBlock = 0x2000;
 
     private const byte VictimStateHit = 1;
     private const uint SchoolMaskPhysical = 1;
@@ -33,13 +35,18 @@ public static class CombatPackets
     public static byte[] BuildAiReaction(ulong guid, uint reaction)
         => new ByteWriter(12).UInt64(guid).UInt32(reaction).ToArray();
 
-    /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона, без absorb/resist/block.
-    /// <paramref name="victimState"/>: 1=удар, 2=уклонение, 3=парирование (клиент рисует плавающий текст).</summary>
+    /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона. <paramref name="victimState"/>:
+    /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
+    /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>
     public static byte[] BuildAttackerStateUpdate(ulong attacker, ulong target, uint damage, uint overkill,
-        byte victimState = VictimStateHit)
+        byte victimState = VictimStateHit, uint blockedAmount = 0)
     {
-        var w = new ByteWriter(48);
-        w.UInt32(HitInfoAffectsVictim);
+        var hitInfo = HitInfoAffectsVictim;
+        if (blockedAmount > 0)
+            hitInfo |= HitInfoBlock;
+
+        var w = new ByteWriter(52);
+        w.UInt32(hitInfo);
         PackedGuid.Write(w, attacker);
         PackedGuid.Write(w, target);
         w.UInt32(damage);     // total_damage
@@ -51,7 +58,9 @@ public static class CombatPackets
          .UInt32(damage);     // damage_uint
         w.UInt8(victimState);
         w.UInt32(0);          // unknown1
-        w.UInt32(0);          // unknown2
+        w.UInt32(0);          // spell id
+        if (blockedAmount > 0)
+            w.UInt32(blockedAmount);   // blocked_amount (только при HITINFO_BLOCK)
         return w.ToArray();
     }
 }

@@ -99,6 +99,20 @@ public sealed class WorldState
     /// <summary>Удаляет существо из реестра (снятие dev-сущности: <c>.trainer off</c>/<c>.devclean</c>). D1.</summary>
     public bool RemoveCreature(ulong guid) => _creatures.TryRemove(guid, out _);
 
+    /// <summary>Деспавн существа: DESTROY всем наблюдателям + чистка их видимости + сброс боя + удаление из
+    /// реестра. Для атакующего манекена на отходе (чисто исчезает, без «невидимый, но бьёт»).</summary>
+    public async Task DespawnCreatureAsync(WorldCreature creature, CancellationToken ct)
+    {
+        creature.CombatTargetGuid = 0;
+        var destroy = new ByteWriter(9).UInt64(creature.Guid).UInt8(0).ToArray();
+        foreach (var obs in ObserversOf(creature).ToList())
+        {
+            await obs.Session.SendAsync(WorldOpcode.SmsgDestroyObject, destroy, ct);
+            obs.Session.Visibility.VisibleNpcs.TryRemove(creature.Guid, out _);
+        }
+        RemoveCreature(creature.Guid);
+    }
+
     /// <summary>Монотонный счётчик спавнов dev-сущностей. База в верхней части 24-битного counter'а
     /// (выше реальных creature.guid из дампа) — чтобы GUID dev-спавна не сталкивался с реальным. D1.</summary>
     private int _devSpawnCounter;

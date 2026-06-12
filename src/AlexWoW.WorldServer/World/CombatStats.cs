@@ -45,21 +45,26 @@ public static class CombatStats
     /// броня, блок (упрощённо −30% за блок-валью) и снижение от аур («Глухая оборона», dmgTakenPct&lt;0).
     /// <paramref name="avoidRoll"/>/<paramref name="blockRoll"/> ∈ [0;1). Чистая функция (тестируемо).
     /// </summary>
-    public static (uint Damage, MeleeOutcome Outcome) ResolveIncomingMelee(
+    public static (uint Damage, MeleeOutcome Outcome, uint Blocked) ResolveIncomingMelee(
         uint raw, float dodgePct, float parryPct, float blockPct, uint armor, byte attackerLevel,
         int dmgTakenPct, double avoidRoll, double blockRoll)
     {
         var r = avoidRoll * 100.0;
         if (r < dodgePct)
-            return (0, MeleeOutcome.Dodge);
+            return (0, MeleeOutcome.Dodge, 0);
         if (r < dodgePct + parryPct)
-            return (0, MeleeOutcome.Parry);
+            return (0, MeleeOutcome.Parry, 0);
 
         double dmg = raw;
         dmg *= 1.0 - ArmorReduction(armor, attackerLevel);
+        uint blocked = 0;
         if (blockRoll * 100.0 < blockPct)
+        {
+            var beforeBlock = dmg;
             dmg *= 0.70; // упрощённый блок-валью: −30% за заблокированный удар
+            blocked = (uint)Math.Max(0, Math.Round(beforeBlock - dmg));
+        }
         dmg *= Math.Max(0.0, 1.0 + dmgTakenPct / 100.0); // «Глухая оборона»: dmgTakenPct<0 → снижение
-        return ((uint)Math.Max(0, Math.Round(dmg)), MeleeOutcome.Hit);
+        return ((uint)Math.Max(0, Math.Round(dmg)), MeleeOutcome.Hit, blocked);
     }
 }
