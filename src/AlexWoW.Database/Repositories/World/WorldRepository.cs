@@ -74,6 +74,8 @@ public sealed class WorldRepository(
         => spells.GetPrevRankAsync(spellId, ct);
     public Task<IReadOnlyDictionary<uint, uint>> GetPrevRanksAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
         => spells.GetPrevRanksAsync(spellIds, ct);
+    public Task<IReadOnlyList<(uint Lower, uint Higher)>> GetRankSupersedePairsAsync(IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
+        => spells.GetRankSupersedePairsAsync(spellIds, ct);
 
     // ---- ILootRepository ----
     public Task<CreatureLootData?> GetCreatureLootAsync(uint creatureEntry, CancellationToken ct = default)

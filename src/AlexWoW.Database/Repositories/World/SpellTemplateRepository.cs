@@ -82,4 +82,27 @@ public sealed class SpellTemplateRepository(string connectionString)
         return rows.ToDictionary(r => r.SpellId, r => r.PrevSpell);
     }
 
+    public async Task<IReadOnlyList<(uint Lower, uint Higher)>> GetRankSupersedePairsAsync(
+        IReadOnlyCollection<uint> spellIds, CancellationToken ct = default)
+    {
+        if (spellIds.Count == 0)
+            return [];
+        await using var db = await OpenAsync(ct);
+        // Пара = низший ранг lo и ближайший БОЛЬШИЙ ранг hi той же абилки (оба в наборе): тот же SpellName,
+        // оба реальные ранги (Rank1<>''), hi.SpellLevel > lo.SpellLevel и между ними нет другого известного
+        // ранга. Не требует spell_chain (у воина он пуст). Дублей по равному SpellLevel избегаем (mid строго между).
+        var rows = await db.QueryAsync<(uint Lower, uint Higher)>(new CommandDefinition("""
+            SELECT lo.Id AS Lower, hi.Id AS Higher
+            FROM spell_template lo
+            JOIN spell_template hi
+              ON hi.SpellName = lo.SpellName AND lo.Rank1 <> '' AND hi.Rank1 <> ''
+             AND hi.SpellLevel > lo.SpellLevel
+            WHERE lo.Id IN @spellIds AND hi.Id IN @spellIds
+              AND NOT EXISTS (
+                  SELECT 1 FROM spell_template mid
+                  WHERE mid.SpellName = lo.SpellName AND mid.Rank1 <> '' AND mid.Id IN @spellIds
+                    AND mid.SpellLevel > lo.SpellLevel AND mid.SpellLevel < hi.SpellLevel);
+            """, new { spellIds }, cancellationToken: ct));
+        return rows.AsList();
+    }
 }

@@ -278,6 +278,21 @@ internal sealed class LoginSequenceService(
         await session.SendAsync(WorldOpcode.SmsgInitialSpells, w.ToArray(), ct);
         session.Logger.LogDebug("INITIAL_SPELLS '{User}': {Count} спеллов (класс {Class})",
             session.Account, known.Count, character.Class);
+
+        // Ресенд SUPERCEDED для известных цепочек рангов: INITIAL_SPELLS — плоский список, а сворачивание
+        // низших рангов в книге (и чекбокс «Отображать все уровни») клиент строит из SMSG_SUPERCEDED_SPELL,
+        // который иначе приходит только в момент изучения и не переживает релог. Пары (низший→следующий) —
+        // по SpellName/SpellLevel (работает и для физ-абилок воина, у которых spell_chain пуст).
+        try
+        {
+            foreach (var (lower, higher) in await worldDb.GetRankSupersedePairsAsync(book, ct))
+                await session.SendAsync(WorldOpcode.SmsgSupercededSpell,
+                    new ByteWriter(8).UInt32(lower).UInt32(higher).ToArray(), ct);
+        }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "SUPERCEDED-ресенд '{User}' пропущен ({Msg})", session.Account, ex.Message);
+        }
     }
 
     /// <summary>
