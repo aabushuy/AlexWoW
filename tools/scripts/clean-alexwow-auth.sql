@@ -2,6 +2,7 @@
 -- Полная очистка БД alexwow_auth (TRUNCATE всех таблиц), КРОМЕ:
 --   * realmlist             — список реалмов (конфиг сервера)
 --   * dev_teleport          — точки телепорта для дев-команд
+--   * server_setting        — key-value настройки сервера (стоимости смены расы/пола и т.п.)
 --   * __EFMigrationsHistory — журнал EF-миграций (его НЕЛЬЗЯ чистить, иначе мигратор
 --                             решит, что схемы нет, и попытается пересоздать таблицы)
 --
@@ -36,7 +37,7 @@ BEGIN
           FROM information_schema.tables
          WHERE table_schema = 'alexwow_auth'
            AND table_type   = 'BASE TABLE'
-           AND table_name NOT IN ('realmlist', 'dev_teleport', '__EFMigrationsHistory');
+           AND table_name NOT IN ('realmlist', 'dev_teleport', 'server_setting', '__EFMigrationsHistory');
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
 
     -- FK-каскадов в схеме нет, но на всякий случай снимаем проверки на время очистки.

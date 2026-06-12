@@ -30,5 +30,18 @@ public sealed class AuthSchemaInitializer(IDbContextFactory<AuthDbContext> facto
             });
             await db.SaveChangesAsync(ct);
         }
+
+        // Идемпотентный сид настроек по умолчанию: добавляем только отсутствующие ключи
+        // (существующие значения не трогаем — их можно править в рантайме). M8.6.
+        var existing = await db.ServerSettings.Select(x => x.Key).ToListAsync(ct);
+        var missing = ServerSettingKeys.Defaults
+            .Where(kv => !existing.Contains(kv.Key))
+            .Select(kv => new ServerSetting { Key = kv.Key, Value = kv.Value })
+            .ToList();
+        if (missing.Count > 0)
+        {
+            db.ServerSettings.AddRange(missing);
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

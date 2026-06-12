@@ -31,7 +31,9 @@ builder.Services.AddSingleton<IAccountRepository, EfAccountRepository>();
 builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
 builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
 builder.Services.AddSingleton<ISpellTestRepository, EfSpellTestRepository>(); // M12 Spell QA: чтение/анализ захвата
+builder.Services.AddSingleton<ISettingRepository, EfSettingRepository>(); // M8.6: настройки сервера (стоимости)
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
+builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
 builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
