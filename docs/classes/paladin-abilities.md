@@ -13,10 +13,10 @@
 | Благословение Мудрости (Blessing of Wisdom) | 19742 | MOD_POWER_REGEN | Buff | ⬜ |
 | Благословение Могущества (Blessing of Might) | 19740 | MOD_ATTACK_POWER | Buff | 🟡 |
 | Благословение Королей (Blessing of Kings) | 20217 | MOD_TOTAL_STAT% | Buff | ⬜ |
-| Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | 🟡 эксклюзив (группа GroupPaladinSeal); on-hit holy-урон — отдельно |
-| Печать света (Seal of Light) | 20165 | toggle / on-hit heal | Toggle | 🟡 эксклюзив; on-hit хил (proc→20167) — отдельно |
-| Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | 🟡 эксклюзив; on-hit мана (proc→20168) — отдельно |
-| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | 🟡 эксклюзив; on-hit proc (→20170) — отдельно |
+| Печать праведности (Seal of Righteousness) | 21084 | toggle / on-hit Holy | Toggle | 🟡 эксклюзив + on-hit holy-урон по свингу (упрощённо ~уровень; SP/AP не моделируется) |
+| Печать света (Seal of Light) | 20165 | toggle / on-hit heal | Toggle | 🟡 эксклюзив + on-hit хил по свингу (упрощённо) |
+| Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | 🟡 эксклюзив + on-hit мана по свингу (3% макс.) |
+| Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | 🟡 эксклюзив; stun-proc не моделируется (CC) |
 | Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
 | Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ⬜ |
 | Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |

@@ -30,7 +30,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ауры паладина (Devotion/Retri/Concentration) | Паладин | ✅ |
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
 | Брони мага (Frost/Mage/Molten Armor) | Маг | ✅ (эксклюзив проверен вживую; стат не моделируется) |
-| Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | 🟡 (эксклюзив готов; on-hit прок — отдельно) |
+| Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | 🟡 (эксклюзив + on-hit прок: holy/хил/мана; величины упрощённые, Justice-stun нет) |
 | Облик Тьмы (Shadowform) | Жрец | 🟡 (toggle-форма 28) |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
 | Присутствия (Blood/Frost/Unholy) | DK | 🟡 (эксклюзивная группа, форма 0) |
@@ -75,6 +75,7 @@ Hot Streak/Brain Freeze (Маг), Eclipse (Друид), Sudden Death (Воин),
 
 ### 8. On-next-hit / оружейные чары / on-hit
 Heroic Strike/Cleave/Maul (next-melee), яды разбойника, оружейные имбу шамана, печати паладина (on-hit). Статус: ⬜/🟡.
+Печати паладина (on-hit прок holy/хил/мана) — 🟡 (`SealService`, хук в `PlayerMeleeService.TickMeleeAsync`); остальное ⬜.
 
 ### 9. Движение/телепорт — частично ЕСТЬ (`SpellMovement`)
 Charge (Воин) ✅, Shadowstep (Разб) 🟡, Blink (Маг) 🟡; ⬜: Intercept, Heroic Leap, Death Grip (pull цели), Feral Charge.
