@@ -12,13 +12,15 @@ namespace AlexWoW.WorldServer.Handlers;
 /// упрощённые (по уровню / % маны): движок без spell power/AP, а базовые точки проков коэффициентные (≈0).
 /// Зовётся из <see cref="PlayerMeleeService"/> после нанесённого свинга.
 /// </summary>
-internal sealed class SealService(KillRewardService killReward, ManaRegenService manaRegen)
+internal sealed class SealService(KillRewardService killReward, ManaRegenService manaRegen,
+    World.SpellCatalog spellCatalog, CrowdControlService crowdControl)
 {
     // Печати тренера (дублируются в SpellCatalog.ExclusiveAuras с группой GroupPaladinSeal).
     private const uint SealOfRighteousness = 21084;
     private const uint SealOfLight = 20165;
     private const uint SealOfWisdom = 20166;
-    // Seal of Justice 20164 — stun-proc, CC не моделируется (прок без эффекта).
+    private const uint SealOfJustice = 20164;
+    private const uint SealOfJusticeStun = 20170; // прок-стан Печати справедливости
 
     private const byte SchoolHoly = 2;
     private const uint PowerMana = 0; // POWER_MANA для лога энерджайза
@@ -42,9 +44,20 @@ internal sealed class SealService(KillRewardService killReward, ManaRegenService
             case SealOfWisdom:
                 await ProcManaAsync(session, ct);
                 return false;
+            case SealOfJustice:
+                await ProcStunAsync(session, creature, now, ct);
+                return false;
             default:
-                return false; // Justice и прочие — без моделируемого эффекта
+                return false;
         }
+    }
+
+    /// <summary>Seal of Justice: по удару — стан цели (через CC-фреймворк, прок-спелл 20170).</summary>
+    private async Task ProcStunAsync(WorldSession session, WorldCreature creature, long now, CancellationToken ct)
+    {
+        var stun = await spellCatalog.GetAsync(SealOfJusticeStun, ct);
+        if (stun is { CrowdControl: SpellCatalog.CrowdControlKind.Stun })
+            await crowdControl.ApplyAsync(session, creature, SealOfJusticeStun, stun, now, ct);
     }
 
     /// <summary>Seal of Righteousness: доп. holy-урон по цели (упрощённо ~уровень..2×уровень). Лог как спелл-урон.</summary>
