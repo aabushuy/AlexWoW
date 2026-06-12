@@ -28,6 +28,8 @@ public static class UpdateField
     public const int UnitStat4 = 0x0058;          // дух
     public const int UnitBaseMana = 0x0078;       // OBJECT_END + 0x72
     public const int UnitBaseHealth = 0x0079;     // OBJECT_END + 0x73
+    /// <summary>UNIT_FIELD_RESISTANCES (OBJECT_END 0x06 + 0x5D), 7 полей: [0] броня, [1..6] резисты школ. M-защита.</summary>
+    public const int UnitResistances = 0x0063;
     /// <summary>UNIT_FIELD_BYTES_2: sheath|pvpFlags|petFlags|shapeshiftForm. Байт 3 (старший) — форма
     /// (стойки воина/формы друида). M6.11.</summary>
     public const int UnitBytes2 = 0x007A;
@@ -116,6 +118,14 @@ public static class UpdateField
     /// <summary>PLAYER_CHARACTER_POINTS1 — свободные очки талантов (private; сверено с CMaNGOS
     /// UpdateFields.cpp, калибровка по COINAGE=0x492). M9.6.</summary>
     public const int PlayerCharacterPoints1 = 0x03FC;
+
+    // Вторичные защитные/боевые проценты (float). UNIT_END=0x94; сверено с эталоном UpdateFields.h.
+    public const int PlayerBlockPercentage = 0x0400;    // UNIT_END + 0x36C
+    public const int PlayerDodgePercentage = 0x0401;    // UNIT_END + 0x36D
+    public const int PlayerParryPercentage = 0x0402;    // UNIT_END + 0x36E
+    public const int PlayerCritPercentage = 0x0405;     // UNIT_END + 0x371 (мили)
+    public const int PlayerRangedCritPercentage = 0x0406; // UNIT_END + 0x372
+    public const int PlayerOffhandCritPercentage = 0x0407; // UNIT_END + 0x373
 
     /// <summary>Поле OBJECT_FIELD_ENTRYID видимого предмета для слота экипировки 0..18.</summary>
     public static int VisibleItemEntry(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2;

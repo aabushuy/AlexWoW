@@ -53,6 +53,14 @@ if (args.Length >= 3 && args[0].Equals("talent", StringComparison.OrdinalIgnoreC
     return;
 }
 
+// Боевые рейтинги: combatratings <dataDir> <out.json> — gtChanceToMeleeCrit(+Base).dbc → JSON (защитные статы).
+if (args.Length >= 3 && args[0].Equals("combatratings", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqCr = new MpqChain(args[1]);
+    CombatRatingDump.ExtractToJson(mpqCr, args[2]);
+    return;
+}
+
 // Диагностика Faction.dbc: faction <dataDir> <id> [id2 ...] — печать reputationListID и base standing.
 if (args.Length >= 3 && args[0].Equals("faction", StringComparison.OrdinalIgnoreCase))
 {

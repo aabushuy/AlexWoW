@@ -90,8 +90,9 @@ internal sealed class InventoryMoveService(
         await sync.SendContainedAsync(session, src, ct);
         if (dst is not null) await sync.SendContainedAsync(session, dst, ct);
 
-        // M7 #16: смена оружия гл. руки → пересчёт урона/скорости/attack-power.
-        if ((srcMain && srcSlot == InventorySlots.MainHandSlot) || (dstMain && dstSlot == InventorySlots.MainHandSlot))
+        // Смена экипировки → пересчёт боевых/защитных полей: гл. рука (урон/AP/парри), офф-хенд (щит→блок),
+        // прочие слоты (броня предметов). Любой equip-слот мог измениться — обновляем по нему.
+        if (InventorySlots.IsEquipmentSlot(srcSlot) && srcMain || InventorySlots.IsEquipmentSlot(dstSlot) && dstMain)
             await progression.RefreshMeleeAsync(session, ct);
     }
 
