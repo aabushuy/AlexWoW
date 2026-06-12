@@ -223,6 +223,32 @@ public class SpellCatalogFromTemplateTests
         => Assert.Equal(0, SpellCatalog.ExclusiveAuraGroup(spellId));
 
     [Theory]
+    // CC по типу аура-эффекта (SpellAuraDefines): 12=стан,26=рут,7=страх,27=немота,5=дезориентация.
+    [InlineData(12, SpellCatalog.CrowdControlKind.Stun)]
+    [InlineData(26, SpellCatalog.CrowdControlKind.Root)]
+    [InlineData(7, SpellCatalog.CrowdControlKind.Fear)]
+    [InlineData(27, SpellCatalog.CrowdControlKind.Silence)]
+    [InlineData(5, SpellCatalog.CrowdControlKind.Disorient)]
+    public void CrowdControl_DetectedByAuraType(int auraType, SpellCatalog.CrowdControlKind expected)
+    {
+        // APPLY_AURA(6) с CC-аурой + DurationIndex 27 (10 сек) → распознаётся как CC с длительностью.
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData
+        {
+            Id = 100, DurationIndex = 27, Effect1 = 6, EffectApplyAuraName1 = auraType,
+        });
+        Assert.Equal(expected, info.CrowdControl);
+        Assert.True(info.CrowdControlMs > 0);
+    }
+
+    [Fact]
+    public void CrowdControl_NoneForNonCcSpell()
+    {
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData { Id = 1, Effect1 = 2, EffectBasePoints1 = 10 });
+        Assert.Equal(SpellCatalog.CrowdControlKind.None, info.CrowdControl);
+        Assert.Equal(0, info.CrowdControlMs);
+    }
+
+    [Theory]
     // Формы-шейпшифты — общая группа GroupShapeshift, форма из EffectMiscValue ауры 36.
     [InlineData(1784u, 30, SpellCatalog.GroupShapeshift)]  // Stealth R1
     [InlineData(1787u, 30, SpellCatalog.GroupShapeshift)]  // Stealth R4 (макс)

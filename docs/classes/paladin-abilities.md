@@ -54,7 +54,7 @@
 |---|---|---|---|---|
 | Удар крестоносца (Crusader Strike) | 35395 | Physical (Holy) | Melee | ⬜ |
 | Божественная буря (Divine Storm) | 53385 | Physical | Melee (AoE)+heal | ⬜ |
-| Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | ⬜ |
+| Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | 🟡 стан существа + визуал (CrowdControlService) |
 | Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ✅ урон сверен #2 |
 | Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | ⬜ |
 

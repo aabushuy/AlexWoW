@@ -14,7 +14,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     AuraService auras, PeriodicsService periodics,
     PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
-    TimeSyncService timeSync, ILogger<WorldTick> logger)
+    Handlers.CrowdControlService crowdControl, TimeSyncService timeSync, ILogger<WorldTick> logger)
 {
     /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
     private const long TimeSyncIntervalMs = 10_000;
@@ -55,6 +55,8 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                 // M6.7: живое существо — ИИ (возврат/преследование+бой/реген); мёртвое — ждёт респавна.
                 if (creature.IsAlive)
                 {
+                    // Фаза 2 CC: снять истёкший контроль у ЛЮБОГО существа (в т.ч. вне боя — манекен).
+                    await crowdControl.ExpireIfDueAsync(world, creature, now, ct);
                     if (creature.Evading)
                         await creatureAi.TickEvadeAsync(world, creature, now, ct);
                     else if (creature.CombatTargetGuid != 0)
