@@ -63,6 +63,10 @@ public sealed class DetailsModel(
         if (!await LoadOwnAsync(guid, ct))
             return NotFound();
 
+        // На странице две формы с общей моделью: при сабмите «Внешности» поле Gold.Amount приходит
+        // пустым (=0) и валит его [Range]. Убираем чужой ключ, чтобы он не блокировал смену расы/пола.
+        ModelState.Remove($"{nameof(Gold)}.{nameof(GoldInput.Amount)}");
+
         // Раса — только из доступного набора (та же фракция + валидна для класса); пол — 0/1.
         if (!AvailableRaces.Any(r => r.Key == Appearance.Race))
             ModelState.AddModelError("Appearance.Race", "Эта раса недоступна для вашего класса/фракции.");
@@ -99,6 +103,10 @@ public sealed class DetailsModel(
     {
         if (!await LoadOwnAsync(guid, ct))
             return NotFound();
+
+        // Симметрично: поля «Внешности» в этой форме не участвуют — снимаем их из ModelState.
+        ModelState.Remove($"{nameof(Appearance)}.{nameof(AppearanceInput.Race)}");
+        ModelState.Remove($"{nameof(Appearance)}.{nameof(AppearanceInput.Gender)}");
         if (!ModelState.IsValid)
             return Page();
 
