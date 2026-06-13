@@ -60,7 +60,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | MOD_BLOCK_PERCENT (51) | Блок щитом (Воин) ✅, Holy Shield (Пал) ⬜ | частично |
 | MOD_DAMAGE_PERCENT_TAKEN (87) | Глухая оборона (Воин) ✅; Divine Protection (Пал), Pain Suppression/Dispersion (Жрец), Barkskin (Друид), Icebound Fortitude (DK), Shamanistic Rage (Шам) | каркас ✅, остальные ⬜ |
 | MOD_DODGE_PERCENT (49) | Evasion (Разб), Quickness-расовый | ⬜ |
-| SCHOOL_ABSORB | PW:Shield (Жрец), Ice Barrier (Маг), Mana Shield (Маг), Anti-Magic Shell (DK), Sacred Shield (Пал) | ⬜ |
+| SCHOOL_ABSORB / MANA_SHIELD | PW:Shield (Жрец) ✅, Ice Barrier/Fire/Frost Ward (Маг) ✅, Mana Shield (Маг) ✅; Anti-Magic Shell (DK), Sacred Shield (Пал) ⬜ | ✅ ABS.1–ABS.2 (поглощение мили существ по школе + absorb в damage-логе; Mana Shield тратит ману. Todo: персист через релог, поглощение спелл-урона существ) |
 | SCHOOL_IMMUNITY | Ice Block (Маг), Divine Shield (Пал) | ⬜ |
 
 ### 4. CC (контроль) — фреймворк ЕСТЬ (`CrowdControlService`, data-driven по CC-ауре)
