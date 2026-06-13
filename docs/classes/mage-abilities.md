@@ -17,7 +17,7 @@
 | Ледяная броня (Frost Armor) | 168 | MOD_RESISTANCE/щит | Toggle | ✅ эксклюзив проверен вживую; стат не моделируется |
 | Магическая броня (Mage Armor) | 6117 | MOD_POWER_REGEN | Toggle | ✅ эксклюзив проверен вживую; стат не моделируется |
 | Расплавленная броня (Molten Armor) | 30482 | MOD_CRIT/щит | Toggle | ✅ эксклюзив + наложение (фикс прок-брони) проверены; стат не моделируется |
-| Чародейский щит (Mana Shield) | 1463 | MANA_SHIELD | Buff | ⬜ |
+| Чародейский щит (Mana Shield) | 1463 | MANA_SHIELD | Buff | ✅ поглощает урон за счёт маны (ABS.2: 1.5 маны/ед.), спадает при исчерпании пула |
 | Магический дар (Conjure Water/Food/Gem) | 5504/587/759 | CreateItem | Utility | 🟡 (CreateItem есть) |
 | Телепорт/Портал | 3561… | Utility / телепорт | Utility | ⬜ |
 
@@ -57,7 +57,7 @@
 | Ледяные оковы (Frost Nova) | 122 | Frost / root (AoE) | Direct+CC | ✅ урон сверен #4 (root отдельно) |
 | Метель (Blizzard) | 10 | Frost | DoT-канал (AoE) | 🟡 |
 | Конус холода (Cone of Cold) | 120 | Frost | Direct (конус)+замедл. | ✅ урон сверен #4 (замедл. отдельно) |
-| Ледяная преграда (Ice Barrier) | 11426 | SCHOOL_ABSORB | Buff (щит) | ⬜ |
+| Ледяная преграда (Ice Barrier) | 11426 | SCHOOL_ABSORB | Buff (щит) | ✅ поглощает входящий урон (ABS.1), щит спадает при исчерпании пула |
 | Глубокая заморозка (Deep Freeze) | 44572 | Frost / stun | Direct+CC | ⬜ |
 | Ледяная глыба (Ice Block) | 45438 | SCHOOL_IMMUNITY | Buff | ⬜ |
 | Ледяные вены (Icy Veins) | 12472 | MOD_CASTING_SPEED | Buff | ⬜ |

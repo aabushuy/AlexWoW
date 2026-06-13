@@ -20,7 +20,7 @@
 
 | Абилка | Спелл | Школа/Аура | Тип | Статус |
 |---|---|---|---|---|
-| Слово Силы: Щит (Power Word: Shield) | 17 | SCHOOL_ABSORB | Buff (щит) | ⬜ |
+| Слово Силы: Щит (Power Word: Shield) | 17 | SCHOOL_ABSORB | Buff (щит) | ✅ поглощает входящий урон (ABS.1), щит спадает при исчерпании пула; Weakened Soul не моделируется |
 | Усиление (Power Infusion) | 10060 | MOD_CASTING_SPEED | Buff | ⬜ |
 | Болевое подавление (Pain Suppression) | 33206 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ (как Shield Wall) |
 | Покаяние (Penance) | 47540 | Holy | Channel (урон/хил) | ⬜ |
