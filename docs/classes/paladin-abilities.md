@@ -56,7 +56,7 @@
 | Божественная буря (Divine Storm) | 53385 | Physical | Melee (AoE)+heal | ⬜ |
 | Молот правосудия (Hammer of Justice) | 853 | Holy / stun | CC | ✅ стан существа + визуал (CrowdControlService) проверено |
 | Молот гнева (Hammer of Wrath) | 24275 | Holy | Direct (<20% HP) | ✅ урон сверен #2 |
-| Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | 🟡 +20% урона спеллами (механика damage-done; ждёт проверки; авто-атака/печати — отдельный путь) |
+| Возмездие (Avenging Wrath) | 31884 | MOD_DAMAGE_PERCENT_DONE | Buff | ✅ +20% урона спеллами (проверено); авто-атака/печати — отдельный путь ⬜ |
 
 > **Чинить:** печати/ауры — toggle-механика (есть для аур, печати требуют on-hit); MOD_BLOCK_PERCENT (Holy Shield) и
 > MOD_DAMAGE_PERCENT_TAKEN (Divine Protection) — уже умеем (Shield Block/Wall). Иммунитеты/dispel — новые типы.
