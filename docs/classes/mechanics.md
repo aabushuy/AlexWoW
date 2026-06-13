@@ -97,6 +97,12 @@ Hot Streak/Brain Freeze (Маг), Eclipse (Друид), Sudden Death (Воин),
 (DEAL_HARMFUL_SPELL). Покрывает chance-on-melee/on-cast (Sudden Death ✅). **Todo:** крит-проки (Hot Streak/
 Killing Machine — нужен спелл-крит), ICD прока, `spell_proc_event`/procEx, заряды, эффект триггер-баффов на след. каст.
 
+### 7a. Спелл-крит — ✅ (CRIT.1)
+Крит урона/хила заклинаний ×1.5 (множитель CMaNGOS) + флаг крита в логах (`SPELL_HIT_TYPE_CRIT 0x02` в
+`SMSG_SPELLNONMELEEDAMAGELOG`; байт `critical` в `SMSG_SPELLHEALLOG`) → клиент рисует крит. Шанс — флэт
+`SessionCastState.SpellCritChance` (база 0; дев-команда `.setcrit [0-100]`). **Todo:** крит из статов
+(интеллект/крит-рейтинг — стат-модель упрощена), крит-проки (procEx поверх PROC.1), крит DoT-тиков, мили-крит ×2.
+
 ### 8. On-next-hit / оружейные чары / on-hit
 Heroic Strike/Cleave/Maul (next-melee), яды разбойника, оружейные имбу шамана, печати паладина (on-hit). Статус: ⬜/🟡.
 Печати паладина (on-hit прок holy/хил/мана) — 🟡 (`SealService`, хук в `PlayerMeleeService.TickMeleeAsync`); остальное ⬜.
