@@ -26,7 +26,7 @@
 | Подлый приём (Cheap Shot) | 1833 | stun (из стелса) | CC+CP | ⬜ |
 | Гарота (Garrote) | 703 | Physical | DoT+CP | 🟡 |
 | Мутиляция (Mutilate) | 1329 | Physical | Melee+CP | ⬜ |
-| Вскрытие (Rupture) | 1943 | Physical | DoT (расход CP) | ✅ финишер: гейт+расход CP, тик DoT скалируется очками (CP.3); длит. от CP — CP.3b |
+| Вскрытие (Rupture) | 1943 | Physical | DoT (расход CP) | ✅ финишер: гейт+расход CP, тик DoT и длительность скалируются очками (CP.3/CP.3b: 6→16с) |
 | Удар в спину (Backstab) | 53 | Physical (со спины) | Melee+CP | ⬜ |
 
 ## Бой (Combat)
@@ -36,7 +36,7 @@
 | Скрытный удар (Sinister Strike) | 1752 | Physical | Melee+CP | ✅ генератор: +1 очко серии на цели (CP.2) |
 | Серия ударов (Eviscerate) | 2098 | Physical | Melee (расход CP) | ✅ финишер: гейт+расход CP, урон скалируется очками ×370/ранг (CP.3) |
 | Веер ножей (Fan of Knives) | 51723 | Physical (AoE) | Melee | ⬜ |
-| Удар по почкам (Kidney Shot) | 408 | stun (расход CP) | CC | 🟡 финишер: гейт+расход CP (CP.3); стан-длительность от CP — CP.3b |
+| Удар по почкам (Kidney Shot) | 408 | stun (расход CP) | CC | ✅ финишер: гейт+расход CP, длительность стана от очков (CP.3b: 1→6с) |
 | Жажда крови (Adrenaline Rush) | 13750 | ENERGIZE/haste | Buff | ⬜ |
 | Лезвийный вихрь (Blade Flurry) | 13877 | MOD_MELEE_HASTE | Buff | ⬜ |
 
@@ -49,9 +49,9 @@
 | Приготовление (Preparation) | 14185 | сброс КД | Utility | ⬜ |
 | Скверный трюк (Hemorrhage) | 16511 | Physical | Melee+CP | ⬜ |
 
-> **Очки серии (combo points) — ✅ есть** (Фаза 2, CP.1–CP.3): ресурс на цели (`SMSG_UPDATE_COMBO_POINTS`),
+> **Очки серии (combo points) — ✅ есть** (Фаза 2, CP.1–CP.3b): ресурс на цели (`SMSG_UPDATE_COMBO_POINTS`),
 > генераторы (эффект 80) копят, финишеры (биты FINISHING_MOVE_* в AttributesEx) гейтятся «нет очков»
-> (fail 78) и расходуют все очки; урон/тик скалируются `EffectPointsPerComboPoint`. Очки теряются со
-> смертью цели / сменой комбо-цели. **CP.3b (todo):** скалирование ДЛИТЕЛЬНОСТИ финишеров (Slice and Dice,
-> Kidney Shot) — нужен Max из SpellDuration.dbc. Прочее: стелс/яды — новые механики; Evasion/Blade Flurry —
-> dodge/haste-ауры (умеем процент-ауры).
+> (fail 78) и расходуют все очки; урон/тик скалируются `EffectPointsPerComboPoint`, а ДЛИТЕЛЬНОСТЬ —
+> `base + (max−base) × очки / 5` из SpellDuration.dbc (Slice and Dice 6→21с, Kidney Shot 1→6с, Rupture
+> 6→16с). Очки теряются со смертью цели / сменой комбо-цели. Прочее: стелс/яды — новые механики;
+> Evasion/Blade Flurry — dodge/haste-ауры (умеем процент-ауры).
