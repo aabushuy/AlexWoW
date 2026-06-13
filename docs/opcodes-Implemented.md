@@ -1,6 +1,6 @@
 # Реализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 164 / 860 опкодов реализовано — 19.1%** (не реализовано: 696 — 80.9%, см. [opcodes-NotImplemented.md](opcodes-NotImplemented.md)).
+> **Прогресс: 171 / 863 опкодов реализовано — 19.8%** (не реализовано: 692 — 80.2%, см. [opcodes-NotImplemented.md](opcodes-NotImplemented.md)).
 >
 > Источник опкодов 3.3.5a — `reference/wow_messages` (wotlk-теги). «Реализовано» = опкод заведён в `WorldOpcode.cs` (обрабатывается или отправляется сервером). Актуализируется из кода + reference; обновлять при добавлении опкодов.
 
@@ -51,6 +51,8 @@
 | `0x00C1` | MSG_MOVE_STOP_PITCH | Movement |
 | `0x00C2` | MSG_MOVE_SET_RUN_MODE | Movement |
 | `0x00C3` | MSG_MOVE_SET_WALK_MODE | Movement |
+| `0x00C5` | MSG_MOVE_TELEPORT | Movement |
+| `0x00C7` | MSG_MOVE_TELEPORT_ACK | Movement |
 | `0x00C9` | MSG_MOVE_FALL_LAND | Movement |
 | `0x00CA` | MSG_MOVE_START_SWIM | Movement |
 | `0x00CB` | MSG_MOVE_STOP_SWIM | Movement |
@@ -82,6 +84,7 @@
 | `0x0132` | SMSG_SPELL_GO | Spell |
 | `0x0133` | SMSG_SPELL_FAILURE | Spell |
 | `0x0134` | SMSG_SPELL_COOLDOWN | Spell |
+| `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
 | `0x0136` | CMSG_CANCEL_AURA | Spell |
 | `0x013C` | SMSG_AI_REACTION | Combat |
 | `0x013D` | CMSG_SET_SELECTION | Client |
@@ -92,6 +95,7 @@
 | `0x0145` | SMSG_ATTACKSWING_NOTINRANGE | Combat |
 | `0x014A` | SMSG_ATTACKERSTATEUPDATE | Combat |
 | `0x0150` | SMSG_SPELLHEALLOG | Spell |
+| `0x0151` | SMSG_SPELLENERGIZELOG | Spell |
 | `0x015A` | CMSG_REPOP_REQUEST | Client |
 | `0x015D` | CMSG_LOOT | Loot |
 | `0x015E` | CMSG_LOOT_MONEY | Loot |
@@ -151,6 +155,8 @@
 | `0x0251` | CMSG_LEARN_TALENT | Spell |
 | `0x0266` | SMSG_SET_FLAT_SPELL_MODIFIER | Spell |
 | `0x0267` | SMSG_SET_PCT_SPELL_MODIFIER | Spell |
+| `0x02A6` | SMSG_SPELL_FAILED_OTHER | Spell |
+| `0x02AA` | MSG_TALENT_WIPE_CONFIRM | Spell |
 | `0x02BF` | CMSG_SET_ACTIONBAR_TOGGLES | Client |
 | `0x02EF` | SMSG_ADDON_INFO | Login |
 | `0x037A` | SMSG_FORCED_DEATH_UPDATE | Resurrect |
@@ -158,6 +164,7 @@
 | `0x038C` | CMSG_REALM_SPLIT | Character |
 | `0x0390` | SMSG_TIME_SYNC_REQ | Login |
 | `0x0391` | CMSG_TIME_SYNC_RESP | Login |
+| `0x039D` | SMSG_UPDATE_COMBO_POINTS | Spell |
 | `0x03C9` | SMSG_FEATURE_SYSTEM_STATUS | Social |
 | `0x0417` | CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY | Quest |
 | `0x0418` | SMSG_QUESTGIVER_STATUS_MULTIPLE | Quest |
