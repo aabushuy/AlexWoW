@@ -16,6 +16,8 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
     private const byte SchoolMaskPhysical = 1; // SCHOOL_MASK_NORMAL — школа мили-урона существ (ABS.1)
+    private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
+    private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
 
     // --- Преследование/возврат (M6.7 инкр.2) ---
     /// <summary>Скорость бега существа (ярды/с) — совпадает с RunSpeed в create-блоке существа.</summary>
@@ -123,6 +125,13 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         // оставаясь «в бою». Истечение снимается в WorldTick. Рут/немота свинг не блокируют (визуал на клиенте).
         if (CrowdControlService.PreventsAction(creature, now))
             return;
+
+        // Фаза 2 INT.1: кастующий манекен — крутит каст-бар по игроку (стенд для проверки прерывания), не бьёт.
+        if (Npcs.IsCasterDummy(creature.Template.Entry))
+        {
+            await TickCasterDummyAsync(world, creature, player, now, ct);
+            return;
+        }
 
         // В мили-радиусе — бьём; иначе преследуем по навмешу (троттлинг шагов).
         if (InMeleeRangeOfCreature(creature, player))
@@ -293,6 +302,38 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         var dy = creature.Y - player.Y;
         var dz = creature.Z - player.Z;
         return dx * dx + dy * dy + dz * dz <= PlayerMeleeService.MeleeRangeYards * PlayerMeleeService.MeleeRangeYards;
+    }
+
+    /// <summary>
+    /// Фаза 2 INT.1: кастующий манекен — зацикленный каст-бар по игроку (SMSG_SPELL_START → SMSG_SPELL_GO).
+    /// Урон не наносит (каст «вхолостую»); цель — стенд для проверки прерывания (Kick/Counterspell/Pummel).
+    /// Прерывание (<see cref="Handlers.SpellCastCompletion"/>) сбрасывает каст и лочит школу — здесь ждём разлок.
+    /// </summary>
+    private async Task TickCasterDummyAsync(WorldState world, WorldCreature creature, WorldPlayer player, long now, CancellationToken ct)
+    {
+        // Идёт каст — завершаем по таймеру (вхолостую) и уходим на паузу.
+        if (creature.CastingSpellId != 0)
+        {
+            if (now < creature.CastEndMs)
+                return;
+            await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellGo,
+                SpellPackets.BuildSpellGo(creature.Guid, creature.CastingSpellId, player.Guid, 0), ct);
+            creature.CastingSpellId = 0;
+            creature.NextCastMs = now + CasterDummyCastGapMs;
+            return;
+        }
+
+        // Школа залочена прерыванием или ещё пауза — ждём.
+        if (now < creature.SchoolLockUntilMs || now < creature.NextCastMs)
+            return;
+
+        // Начинаем новый каст по игроку: доворот + SMSG_SPELL_START (каст-бар у наблюдателей).
+        creature.O = MathF.Atan2(player.Y - creature.Y, player.X - creature.X);
+        creature.CastingSpellId = Npcs.CasterDummyCastSpellId;
+        creature.CastSchoolMask = Npcs.CasterDummyCastSchoolMask;
+        creature.CastEndMs = now + CasterDummyCastMs;
+        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellStart,
+            SpellPackets.BuildSpellStart(creature.Guid, Npcs.CasterDummyCastSpellId, 0, CasterDummyCastMs, player.Guid), ct);
     }
 
     /// <summary>Мили-урон существа (упрощённо по уровню; точные статы — позже). Чуть мягче игрока.</summary>

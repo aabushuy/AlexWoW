@@ -120,6 +120,31 @@ public static class Npcs
         Faction: 35,   // дружелюбен ко всем — не атакуем; принимает лечащие спеллы
         UnitType: 7);  // Humanoid
 
+    /// <summary>Entry кастующего манекена (Фаза 2 INT.1): крутит каст-бар по игроку — стенд для проверки
+    /// прерывания (Kick/Counterspell/Pummel). Урон по игроку не наносит (каст «вхолостую»).</summary>
+    public const uint CasterDummyEntry = 990023;
+    public const uint CasterDummyHealth = 50_000_000;
+    public const uint CasterDummySpawnId = 9000023;
+    public static readonly ulong CasterDummyGuid = UnitGuid(CasterDummyEntry, CasterDummySpawnId);
+
+    /// <summary>Существо — кастующий манекен (зацикленный каст для проверки interrupt). INT.1.</summary>
+    public static bool IsCasterDummy(uint entry) => entry == CasterDummyEntry;
+
+    /// <summary>Спелл, который крутит кастующий манекен: Ледяная стрела (Frost, школа 16). Каст-тайм и пауза —
+    /// фиксированные (см. CreatureCombatAI), чтобы прерывание было удобно ловить. INT.1.</summary>
+    public const uint CasterDummyCastSpellId = 116;
+    public const byte CasterDummyCastSchoolMask = 16; // SCHOOL_MASK_FROST
+
+    /// <summary>Шаблон кастующего манекена. Faction 7 (нейтрал, атакуемый); кастует по игроку. INT.1.</summary>
+    public static readonly CreatureTemplate CasterDummy = new(
+        Entry: CasterDummyEntry,
+        Name: "Кастующий манекен",
+        SubName: "Уровень 80 — проверка прерывания",
+        DisplayId: 3019,
+        Level: 80,
+        Faction: 7,    // нейтральный (жёлтый) — атакуемый
+        UnitType: 7);  // Humanoid
+
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()
     {
         [TestDummy.Entry] = TestDummy,
