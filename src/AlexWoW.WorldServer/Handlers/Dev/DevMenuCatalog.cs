@@ -83,10 +83,13 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Prompt(enemies, "Великан…", ".spawnenemy giant ", "Уровень [кол-во]:");
         b.Prompt(enemies, "Механизм…", ".spawnenemy mechanical ", "Уровень [кол-во]:");
 
+        var dummies = b.Category("Манекены");
+        b.Cmd(dummies, "Тренировочный (урон)", ".dummy");
+        b.Cmd(dummies, "Лечебный", ".dummy heal");
+        b.Cmd(dummies, "Атакующий (защита)", ".dummy attack");
+        b.Cmd(dummies, "Кастующий (прерывание)", ".dummy caster");
+
         var misc = b.Category("Прочее");
-        b.Cmd(misc, "Тренировочный манекен", ".dummy");
-        b.Cmd(misc, "Лечебный манекен", ".dummy heal");
-        b.Cmd(misc, "Атакующий манекен", ".dummy attack");
         b.Cmd(misc, "Снести dev-сущности", ".devclean");
 
         // M12 Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.

@@ -105,6 +105,7 @@ public enum WorldOpcode : uint
     SmsgSpellStart = 0x131,
     SmsgSpellGo = 0x132,
     SmsgSpellFailure = 0x133,
+    SmsgSpellFailedOther = 0x2A6,                // прерывание каста ДРУГОГО юнита (existing у наблюдателя гасит каст-бар цели) — INT.1
     SmsgSpellCooldown = 0x134,
     SmsgCooldownEvent = 0x135,                   // u32 spell + guid — старт кулдауна по событию (снятие COOLDOWN_ON_EVENT-ауры: Shadowform/Stealth)
     SmsgSpellHealLog = 0x150,

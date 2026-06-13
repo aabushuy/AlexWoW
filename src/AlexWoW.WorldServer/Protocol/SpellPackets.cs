@@ -72,6 +72,22 @@ public static class SpellPackets
             .ToArray();
 
     /// <summary>
+    /// SMSG_SPELL_FAILED_OTHER (3.3.5): прерывание каста ДРУГОГО юнита — у наблюдателей гасит каст-бар цели
+    /// (клиентское событие UNIT_SPELLCAST_INTERRUPTED). В отличие от SMSG_SPELL_FAILURE (свой каст игрока),
+    /// именно этот пакет останавливает каст-бар существа. Layout — CMaNGOS Spell::SendInterrupted:
+    /// PackedGuid caster + u8 cast_count + u32 spell + u8 result. INT.1.
+    /// </summary>
+    public static byte[] BuildSpellFailedOther(ulong caster, uint spellId, byte result)
+    {
+        var w = new ByteWriter(16);
+        PackedGuid.Write(w, caster);
+        w.UInt8(0);            // cast_count
+        w.UInt32(spellId);
+        w.UInt8(result);
+        return w.ToArray();
+    }
+
+    /// <summary>
     /// SMSG_CAST_FAILED (3.3.5): отказ каста. u8 cast_count + u32 spell + u8 result + u8 multiple_casts.
     /// Для NOT_READY/NO_POWER conditional-полей нет.
     /// </summary>
