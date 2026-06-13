@@ -42,6 +42,11 @@ public sealed record SpellTemplateData
     public float EffectPointsPerComboPoint1 { get; init; }
     public float EffectPointsPerComboPoint2 { get; init; }
     public float EffectPointsPerComboPoint3 { get; init; }
+    /// <summary>Множитель эффекта (Spell.dbc EffectMultipleValue): для Mana Shield — мана за 1 ед. поглощённого
+    /// урона (1.5). ABS.2.</summary>
+    public float EffectMultipleValue1 { get; init; }
+    public float EffectMultipleValue2 { get; init; }
+    public float EffectMultipleValue3 { get; init; }
     /// <summary>Тип ауры эффекта (SPELL_AURA_*): 3=PERIODIC_DAMAGE, 8=PERIODIC_HEAL. M10.4b.</summary>
     public int EffectApplyAuraName1 { get; init; }
     public int EffectApplyAuraName2 { get; init; }

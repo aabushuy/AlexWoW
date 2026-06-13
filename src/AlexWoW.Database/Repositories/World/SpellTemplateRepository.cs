@@ -15,6 +15,7 @@ public sealed class SpellTemplateRepository(string connectionString)
                EffectBasePoints1, EffectBasePoints2, EffectBasePoints3,
                EffectDieSides1, EffectDieSides2, EffectDieSides3,
                EffectPointsPerComboPoint1, EffectPointsPerComboPoint2, EffectPointsPerComboPoint3,
+               EffectMultipleValue1, EffectMultipleValue2, EffectMultipleValue3,
                EffectApplyAuraName1, EffectApplyAuraName2, EffectApplyAuraName3,
                EffectAmplitude1, EffectAmplitude2, EffectAmplitude3,
                EffectTriggerSpell1, EffectTriggerSpell2, EffectTriggerSpell3,

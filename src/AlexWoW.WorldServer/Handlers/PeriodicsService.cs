@@ -23,6 +23,7 @@ public sealed class PeriodicEffect
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
+    public float ManaShieldMultiplier; // ABS.2: Mana Shield — мана за 1 ед. поглощённого урона (1.5); 0 — обычный щит.
 }
 
 /// <summary>
@@ -195,6 +196,7 @@ internal sealed class PeriodicsService(
                     DoesTick = false,
                     AbsorbRemaining = info.AbsorbAmount,
                     AbsorbSchoolMask = info.AbsorbSchoolMask,
+                    ManaShieldMultiplier = info.ManaShieldMultiplier,
                 });
             }
             return;
