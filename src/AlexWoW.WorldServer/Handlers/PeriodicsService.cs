@@ -24,6 +24,7 @@ public sealed class PeriodicEffect
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
     public float ManaShieldMultiplier; // ABS.2: Mana Shield — мана за 1 ед. поглощённого урона (1.5); 0 — обычный щит.
+    public byte ImmuneSchoolMask; // IMMUNITY.1: «пузырь» — маска школ, урон которых гасится в ноль (Divine Shield/Ice Block 127); 0 — не иммунитет.
 }
 
 /// <summary>
@@ -197,6 +198,20 @@ internal sealed class PeriodicsService(
                     AbsorbRemaining = info.AbsorbAmount,
                     AbsorbSchoolMask = info.AbsorbSchoolMask,
                     ManaShieldMultiplier = info.ManaShieldMultiplier,
+                });
+            }
+            if (info.ImmuneSchoolMask != 0)
+            {
+                // IMMUNITY.1: «пузырь» неуязвимости (Divine Shield/Ice Block/Hand of Protection) — флаг на эффекте;
+                // пока активен, входящий урон совпадающей школы гасится в ноль (см. CreatureCombatAI).
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0 && p.ImmuneSchoolMask != 0);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    ImmuneSchoolMask = info.ImmuneSchoolMask,
                 });
             }
             return;

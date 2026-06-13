@@ -59,7 +59,7 @@
 | Конус холода (Cone of Cold) | 120 | Frost | Direct (конус)+замедл. | ✅ урон сверен #4 (замедл. отдельно) |
 | Ледяная преграда (Ice Barrier) | 11426 | SCHOOL_ABSORB | Buff (щит) | ✅ поглощает входящий урон (ABS.1), щит спадает при исчерпании пула |
 | Глубокая заморозка (Deep Freeze) | 44572 | Frost / stun | Direct+CC | ⬜ |
-| Ледяная глыба (Ice Block) | 45438 | SCHOOL_IMMUNITY | Buff | ⬜ |
+| Ледяная глыба (Ice Block) | 45438 | SCHOOL_IMMUNITY | Buff | 🟡 IMMUNITY.1 (иммунитет ко всем школам; мили-урон → «Иммунитет») |
 | Ледяные вены (Icy Veins) | 12472 | MOD_CASTING_SPEED | Buff | ⬜ |
 | Призыв элементаля воды | 31687 | призыв пета | Summon | ➖ |
 
