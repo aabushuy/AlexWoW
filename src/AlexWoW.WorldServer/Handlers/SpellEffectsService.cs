@@ -16,6 +16,7 @@ internal sealed class SpellEffectsService(
     CreatureCombatAI creatureAi,
     KillRewardService killReward,
     SpellTestCaptureService spellTestCapture,
+    ProcService procs,
     TerrainMaps terrain)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
@@ -40,6 +41,9 @@ internal sealed class SpellEffectsService(
 
         // M12 Spell QA: захват прямого урона (если активна сессия захвата — иначе no-op).
         await spellTestCapture.RecordDamageAsync(session, spellId, info, damage, overkill, ct);
+
+        // PROC.1/PROC.2: прок на вредный спелл — здесь известны крит и школа (для крит-проков типа Elemental Focus).
+        await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct, wasCrit: crit, spellSchoolMask: info.School);
 
         if (died)
         {

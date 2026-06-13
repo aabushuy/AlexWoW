@@ -128,6 +128,26 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     /// <summary>Кэш разобранных спеллов (включая «нет в БД» = null), данные иммутабельны. M10.2.</summary>
     private readonly ConcurrentDictionary<uint, SpellInfo?> _cache = new();
 
+    /// <summary>Кэш строк spell_proc_event (включая «нет строки» = null) для крит-проков. PROC.2.</summary>
+    private readonly ConcurrentDictionary<uint, Database.Models.SpellProcEventData?> _procEventCache = new();
+
+    /// <summary>Строка <c>spell_proc_event</c> по spellId (с кэшем); null — строки нет / БД недоступна. PROC.2.</summary>
+    public async Task<Database.Models.SpellProcEventData?> GetProcEventAsync(uint spellId, CancellationToken ct)
+    {
+        if (_procEventCache.TryGetValue(spellId, out var cached))
+            return cached;
+        try
+        {
+            var ev = await worldDb.GetProcEventAsync(spellId, ct);
+            _procEventCache[spellId] = ev;
+            return ev;
+        }
+        catch
+        {
+            return null; // БД недоступна — без уточнения прока (не кэшируем)
+        }
+    }
+
     /// <summary>
     /// Эффект спелла из <c>spell_template</c> (с кэшем). Возвращает null, если спелл не найден в БД мира
     /// или БД недоступна (клиент сам валидирует — каст без эффекта).

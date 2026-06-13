@@ -112,8 +112,9 @@ internal sealed class PlayerMeleeService(
             return;
         }
 
-        // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.) — накладывают триггер-бафф на себя.
-        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct);
+        // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.). Школа удара — физическая (1),
+        // чтобы прок с SchoolMask (напр. Omen of Clarity, маска 127) проходил фильтр школы (PROC.2). Мили-крита нет → wasCrit:false.
+        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct, wasCrit: false, spellSchoolMask: 1);
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))

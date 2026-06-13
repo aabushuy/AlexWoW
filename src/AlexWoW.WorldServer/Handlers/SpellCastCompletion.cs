@@ -152,9 +152,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.IsFinisher)
             await comboPoints.ConsumeAsync(session, ct);
 
-        // PROC.1: проки на каст вредного спелла (прямой урон/периодика по цели) — накладывают триггер-бафф.
-        if (info.MaxAmount > 0 || (info.Periodic && !info.PeriodicHeal))
-            await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct);
+        // PROC.1/PROC.2: прок на вредный спелл фактически шлётся из SpellEffectsService.ApplyDamageAsync
+        // (там известны крит и школа для крит-проков). Чистый DoT без прямого урона: шлём событие здесь (без крита).
+        if (info.MaxAmount == 0 && info.Periodic && !info.PeriodicHeal)
+            await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct, wasCrit: false, spellSchoolMask: info.School);
 
         // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
         if (info.CreateItemId != 0)
