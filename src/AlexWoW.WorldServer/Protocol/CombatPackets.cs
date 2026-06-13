@@ -13,6 +13,9 @@ public static class CombatPackets
     private const uint HitInfoAffectsVictim = 0x2;
     /// <summary>HITINFO_BLOCK (0x2000): удар частично заблокирован → в конце пакета пишется blocked_amount.</summary>
     private const uint HitInfoBlock = 0x2000;
+    /// <summary>HITINFO_FULL_ABSORB (0x20): весь урон поглощён щитом; HITINFO_PARTIAL_ABSORB (0x40): часть. ABS.1.</summary>
+    private const uint HitInfoFullAbsorb = 0x20;
+    private const uint HitInfoPartialAbsorb = 0x40;
 
     private const byte VictimStateHit = 1;
     private const uint SchoolMaskPhysical = 1;
@@ -52,13 +55,17 @@ public static class CombatPackets
     /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
     /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>
     public static byte[] BuildAttackerStateUpdate(ulong attacker, ulong target, uint damage, uint overkill,
-        byte victimState = VictimStateHit, uint blockedAmount = 0)
+        byte victimState = VictimStateHit, uint blockedAmount = 0, uint absorbedAmount = 0)
     {
         var hitInfo = HitInfoAffectsVictim;
         if (blockedAmount > 0)
             hitInfo |= HitInfoBlock;
+        // ABS.1: весь урон поглощён (damage==0) → FULL_ABSORB; часть → PARTIAL_ABSORB. Поле absorb пишется
+        // после массива DamageInfo (3.3.5 layout: absorb/resist между damage_infos и victim_state).
+        if (absorbedAmount > 0)
+            hitInfo |= damage == 0 ? HitInfoFullAbsorb : HitInfoPartialAbsorb;
 
-        var w = new ByteWriter(52);
+        var w = new ByteWriter(56);
         w.UInt32(hitInfo);
         PackedGuid.Write(w, attacker);
         PackedGuid.Write(w, target);
@@ -69,6 +76,8 @@ public static class CombatPackets
         w.UInt32(SchoolMaskPhysical)
          .Single(damage)      // damage_float
          .UInt32(damage);     // damage_uint
+        if (absorbedAmount > 0)
+            w.UInt32(absorbedAmount);  // absorb (только при ALL_ABSORB; до victim_state)
         w.UInt8(victimState);
         w.UInt32(0);          // unknown1
         w.UInt32(0);          // spell id

@@ -21,6 +21,8 @@ public sealed class PeriodicEffect
     public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
     public int BlockBonus;     // +% блока от баффа (MOD_BLOCK_PERCENT, напр. «Блок щитом») — снять при истечении.
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
+    public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
+    public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
 }
 
 /// <summary>
@@ -179,6 +181,20 @@ internal sealed class PeriodicsService(
                     ExpiresAtMs = expires,
                     DoesTick = false,
                     DamageTakenPct = info.DamageTakenPct,
+                });
+            }
+            if (info.AbsorbAmount > 0)
+            {
+                // ABS.1: absorb-щит — пул поглощения на эффекте; гасит входящий урон по своей школе до исчерпания.
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0 && p.AbsorbRemaining != 0);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    AbsorbRemaining = info.AbsorbAmount,
+                    AbsorbSchoolMask = info.AbsorbSchoolMask,
                 });
             }
             return;
