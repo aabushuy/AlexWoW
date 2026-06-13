@@ -14,7 +14,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSender spellGo,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
-    CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel)
+    CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -151,6 +151,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // CP.3: финишер израсходовал все очки серии (эффект уже отмасштабирован зафиксированным `combo`).
         if (info.IsFinisher)
             await comboPoints.ConsumeAsync(session, ct);
+
+        // PROC.1: проки на каст вредного спелла (прямой урон/периодика по цели) — накладывают триггер-бафф.
+        if (info.MaxAmount > 0 || (info.Periodic && !info.PeriodicHeal))
+            await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct);
 
         // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
         if (info.CreateItemId != 0)

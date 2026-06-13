@@ -39,6 +39,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectDispel = 38;                 // диспел: снять ауры типа EffectMiscValue (Cleanse/Remove Curse/Dispel Magic/Purge) — DSP.1
     private const int EffectStealBeneficialBuff = 126;   // Spellsteal: снять Magic-бафф врага и наложить на себя — DSP.2
     private const int DispelMagic = 1;                   // DispelType: Magic (Spellsteal снимает только его) — DSP
+    private const int AuraProcTriggerSpell = 42;         // прок: на событии (procFlags) кастует EffectTriggerSpell — PROC.1
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
@@ -113,7 +114,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Маска снимаемых типов диспел-спелла (биты по DispelType из эффектов 38). 0 — не диспел.
         byte DispelMask = 0,
         // Spellsteal (эффект 126) — снять Magic-бафф врага и наложить на себя. DSP.2.
-        bool IsSpellsteal = false);
+        bool IsSpellsteal = false,
+        // PROC.1: прок-аура (аура 42) — на событии ProcFlags с шансом ProcChance кастует ProcTriggerSpellId.
+        uint ProcTriggerSpellId = 0, uint ProcFlags = 0, uint ProcChance = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -253,6 +256,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var isSpellsteal = effects.Any(e => e.Eff == EffectStealBeneficialBuff);
         if (isSpellsteal)
             dispelMask |= 1 << DispelMagic; // Spellsteal снимает только Magic
+
+        // PROC.1: прок-аура (аура 42) — триггер-спелл из EffectTriggerSpell того же эффекта + procFlags/procChance.
+        var procIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraProcTriggerSpell);
+        var trigger = new[] { t.EffectTriggerSpell1, t.EffectTriggerSpell2, t.EffectTriggerSpell3 };
+        var procTriggerSpellId = procIdx >= 0 ? (uint)Math.Max(0, trigger[procIdx]) : 0u;
+        var procFlags = procTriggerSpellId != 0 ? t.ProcFlags : 0u;
+        var procChance = procTriggerSpellId != 0 ? t.ProcChance : 0u;
         // Бафф/дебафф: по знаку BasePoints, НО защитный само-бафф со снижением урона (−% получаемого)
         // — положительный (на себя), несмотря на отрицательный Bp («Глухая оборона»).
         var auraPositive = auraBuff && (auraBuffEff.Bp >= 0 || damageTakenPct < 0);
@@ -358,7 +368,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isFinisher, comboDamagePerPoint, comboTickPerPoint, maxDurationMs,
             absorbAmount, absorbSchoolMask, manaShieldMultiplier,
             isInterrupt, interruptLockMs,
-            dispelType, dispelMask, isSpellsteal);
+            dispelType, dispelMask, isSpellsteal,
+            procTriggerSpellId, procFlags, procChance);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

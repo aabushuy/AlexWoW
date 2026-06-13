@@ -20,6 +20,11 @@ public sealed record SpellTemplateData
     /// <summary>Тип диспела ауры (Spell.dbc Dispel): 1=Magic, 2=Curse, 3=Disease, 4=Poison. 0 — не снимается
     /// диспелом. Для диспел-спеллов снимаемые типы берутся из EffectMiscValue эффекта 38. DSP.1.</summary>
     public uint Dispel { get; init; }
+    /// <summary>Флаги события прока (Spell.dbc procFlags, PROC_FLAG_*): на каком событии срабатывает прок-аура
+    /// (0x4 — мили-свинг, 0x10000 — вредный спелл и т.п.). PROC.1.</summary>
+    public uint ProcFlags { get; init; }
+    /// <summary>Шанс прока в % (Spell.dbc procChance). PROC.1.</summary>
+    public uint ProcChance { get; init; }
     public uint SchoolMask { get; init; }
     public uint CastingTimeIndex { get; init; }
     public int PowerType { get; init; }
