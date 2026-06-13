@@ -188,19 +188,9 @@ internal sealed class SpellEffectsService(
                 floor = 0;
             }
         }
-        // Фаза 2: % наносимого урона по школе от активных аур (Shadowform +15% Shadow / Arcane Power / Avenging Wrath).
-        value = ApplyDamageDonePct(session, info.School, value);
+        // Фаза 2: % наносимого урона по школе от активных аур (Shadowform +15% Shadow / Avenging Wrath +20% all).
+        value = DamageDoneModifier.Apply(session, info.School, value);
         return (uint)Math.Max(floor, value);
-    }
-
-    /// <summary>Множитель «% наносимого урона» от активных аур кастера, совпадающих по маске школ (0 — все). Фаза 2.</summary>
-    private static int ApplyDamageDonePct(WorldSession session, byte school, int amount)
-    {
-        var pct = 0;
-        foreach (var a in session.Progression.Auras)
-            if (a.DamageDonePct != 0 && (a.DamageDoneSchool == 0 || (a.DamageDoneSchool & school) != 0))
-                pct += a.DamageDonePct;
-        return pct != 0 ? amount * (100 + pct) / 100 : amount;
     }
 
     /// <summary>Случайный бросок урона оружия главной руки (min..max из RefreshMeleeAsync). M10.4a.</summary>

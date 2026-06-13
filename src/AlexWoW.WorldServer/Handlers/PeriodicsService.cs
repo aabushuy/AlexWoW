@@ -260,7 +260,8 @@ internal sealed class PeriodicsService(
             return;
         }
         session.Combat.LastCombatMs = now;
-        var amount = (uint)Math.Max(1, p.Amount);
+        // Фаза 2: % наносимого урона по школе (Shadowform +15% Shadow к DoT — SW:Pain/Mind Flay и т.п.).
+        var amount = (uint)Math.Max(1, DamageDoneModifier.Apply(session, p.SchoolMask, p.Amount));
         var (_, _, died) = session.World.ApplyCreatureDamage(creature, amount);
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgPeriodicAuraLog,
             AuraPackets.BuildPeriodicLog(creature.Guid, caster, p.SpellId, isHeal: false, amount, p.SchoolMask), ct);
