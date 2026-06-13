@@ -52,6 +52,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
     private const int AuraManaShield = 97;               // поглощение урона за счёт маны (Mana Shield мага) — ABS.2
+    private const int AuraSchoolImmunity = 39;           // иммунитет к школам (Divine Shield/Ice Block/Hand of Protection): маска школ = EffectMiscValue — IMMUNITY.1
+    private const int AuraDamageImmunity = 40;           // иммунитет ко всему урону (все школы) — IMMUNITY.1
     private const int AuraModDamagePercentDone = 79;     // % наносимого урона по школе (Shadowform/Arcane Power/Avenging Wrath)
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
@@ -116,7 +118,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Spellsteal (эффект 126) — снять Magic-бафф врага и наложить на себя. DSP.2.
         bool IsSpellsteal = false,
         // PROC.1: прок-аура (аура 42) — на событии ProcFlags с шансом ProcChance кастует ProcTriggerSpellId.
-        uint ProcTriggerSpellId = 0, uint ProcFlags = 0, uint ProcChance = 0);
+        uint ProcTriggerSpellId = 0, uint ProcFlags = 0, uint ProcChance = 0,
+        // IMMUNITY.1: маска школ, к урону которых даёт иммунитет (Divine Shield/Ice Block — 127 все школы;
+        // Hand of Protection — 1 физ.). 0 — не «пузырь». Пока аура активна, урон этих школ гасится в ноль.
+        byte ImmuneSchoolMask = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -261,6 +266,22 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
                 0 => t.EffectMultipleValue1, 1 => t.EffectMultipleValue2, 2 => t.EffectMultipleValue3, _ => 0f,
             }
             : 0f;
+        // IMMUNITY.1: «пузырь» неуязвимости — SCHOOL_IMMUNITY (39, маска школ = EffectMiscValue) либо
+        // DAMAGE_IMMUNITY (40, весь урон). Собираем маску по ВСЕМ таким эффектам: Divine Shield (642) и
+        // Ice Block (45438) несут две ауры 39 (127+126 / 1+126 → все школы), Hand of Protection (1022) — только
+        // физ. (маска 1). Пока аура активна, входящий урон совпадающей школы гасится в ноль (CreatureCombatAI).
+        byte immuneSchoolMask = 0;
+        var immuneMisc = new[] { t.EffectMiscValue1, t.EffectMiscValue2, t.EffectMiscValue3 };
+        for (var i = 0; i < 3; i++)
+        {
+            if (effects[i].Eff != EffectApplyAura)
+                continue;
+            if (effects[i].Aura == AuraSchoolImmunity)
+                immuneSchoolMask |= (byte)immuneMisc[i];
+            else if (effects[i].Aura == AuraDamageImmunity)
+                immuneSchoolMask |= 0x7F; // все школы
+        }
+
         // INT.1: interrupt — эффект 68; длительность лока школы = DurationIndex (Kick 5с/Counterspell 8с/Pummel 4с).
         var isInterrupt = effects.Any(e => e.Eff == EffectInterruptCast);
         var interruptLockMs = isInterrupt ? SpellDurations.Get(t.DurationIndex) : 0;
@@ -290,6 +311,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // прок-триггер с отрицательным BasePoints (Molten Armor: PROC_TRIGGER_SPELL Bp=−1 → иначе движок
         // принял бы за дебафф и не наложил бы без цели). Frost/Mage/Demon/Fel уже положительны (MOD_RESISTANCE+).
         if (auraBuff && !auraPositive && ExclusiveAuras.ContainsKey((uint)t.Id))
+            auraPositive = true;
+        // IMMUNITY.1: «пузырь» неуязвимости — защитный само-бафф (положителен), хотя первый аура-эффект может
+        // быть отрицателен (Divine Shield: −50% урона; Ice Block: стан-себя) — иначе движок счёл бы дебаффом.
+        if (auraBuff && !auraPositive && immuneSchoolMask != 0)
             auraPositive = true;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
@@ -389,7 +414,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             absorbAmount, absorbSchoolMask, manaShieldMultiplier,
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
-            procTriggerSpellId, procFlags, procChance);
+            procTriggerSpellId, procFlags, procChance,
+            immuneSchoolMask);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

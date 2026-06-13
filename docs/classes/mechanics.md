@@ -77,7 +77,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | MOD_DAMAGE_PERCENT_TAKEN (87) | Глухая оборона (Воин) ✅; Divine Protection (Пал), Pain Suppression/Dispersion (Жрец), Barkskin (Друид), Icebound Fortitude (DK), Shamanistic Rage (Шам) | каркас ✅, остальные ⬜ |
 | MOD_DODGE_PERCENT (49) | Evasion (Разб), Quickness-расовый | ⬜ |
 | SCHOOL_ABSORB / MANA_SHIELD | PW:Shield (Жрец) ✅, Ice Barrier/Fire/Frost Ward (Маг) ✅, Mana Shield (Маг) ✅; Anti-Magic Shell (DK), Sacred Shield (Пал) ⬜ | ✅ ABS.1–ABS.2 (поглощение мили существ по школе + absorb в damage-логе; Mana Shield тратит ману. Todo: персист через релог, поглощение спелл-урона существ) |
-| SCHOOL_IMMUNITY | Ice Block (Маг), Divine Shield (Пал) | ⬜ |
+| SCHOOL_IMMUNITY / DAMAGE_IMMUNITY (39/40) | Divine Shield (Пал) ✅, Ice Block (Маг) ✅, Hand of Protection (Пал) ✅ | 🟡 IMMUNITY.1 (data-driven по аурам 39/40: маска школ из всех таких эффектов; пока активна аура — входящий мили-урон совпадающей школы гасится в ноль, клиент рисует «Иммунитет» VictimState=7. Стенд: каст «пузыря» → `.dummy attack`. Todo: иммунитет к спелл-урону существ (каст-манекен бьёт вхолостую), снятие свинга существа, untargetable/Divine Intervention, персист) |
 
 ### 4. CC (контроль) — фреймворк ЕСТЬ (`CrowdControlService`, data-driven по CC-ауре)
 Детект CC в `SpellCatalog.FromTemplate` (ауры 12/26/7/27/5 → Stun/Root/Fear/Silence/Disorient + длительность).

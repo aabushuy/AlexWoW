@@ -16,6 +16,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
     private const byte SchoolMaskPhysical = 1; // SCHOOL_MASK_NORMAL — школа мили-урона существ (ABS.1)
+    private const byte VictimStateImmune = 7;  // VICTIMSTATE_IS_IMMUNE — клиент рисует «Иммунитет» (IMMUNITY.1)
     private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
     private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
 
@@ -149,6 +150,17 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             if (now < creature.NextSwingMs)
                 return;
             creature.NextSwingMs = now + PlayerMeleeService.SwingIntervalMs;
+
+            // IMMUNITY.1: «пузырь» неуязвимости (Divine Shield/Ice Block/Hand of Protection) — активная аура
+            // с маской, покрывающей школу удара (мили — физ.). Урон гасится в ноль, клиент рисует «Иммунитет»
+            // (VictimState=7); HP/ярость/смерть не трогаем. Эталон — CMaNGOS Unit::IsImmuneToDamage.
+            if (player.Session.Progression.Periodics.Any(p => p.TargetGuid == 0
+                    && (p.ImmuneSchoolMask & SchoolMaskPhysical) != 0 && now < p.ExpiresAtMs))
+            {
+                await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
+                    CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, 0, 0, VictimStateImmune), ct);
+                return;
+            }
 
             // Защита: уклонение/парирование (обход) + митигейшн (броня/блок/«Глухая оборона»). Блок считаем
             // вживую (класс + щит + ауры «Блок щитом») — надёжнее кэша; уклон/парри/броня — из кэша RefreshMelee.
