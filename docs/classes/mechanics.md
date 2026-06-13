@@ -47,7 +47,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 > (`resetForm`) со спелла с этим атрибутом (`SpellInfo.CooldownOnAuraRemove`). Эталон — CMaNGOS
 > `Player::AddCooldown` на fade COOLDOWN_ON_EVENT-ауры. Ghost Wolf атрибута не имеет — не затронут.
 
-### 2. Ресурсы — рага/энергия/мана ✅; остальные НЕТ
+### 2. Ресурсы — ярость/энергия/мана + combo points ✅; руны/осколки НЕТ
 | Ресурс | Класс | Статус | Зажигает |
 |---|---|---|---|
 | Combo points | Разбойник, друид-кошка | ✅ (CP.1–CP.3b) | генераторы (Sinister Strike/Backstab/Rake) копят; финишеры гейтятся/расходуют, урон+тик и длительность скалируются очками (Eviscerate/Rupture/Slice and Dice/Kidney Shot) |

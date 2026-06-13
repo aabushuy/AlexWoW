@@ -1,6 +1,6 @@
 # Нереализованные опкоды (WoW 3.3.5a)
 
-> **Прогресс: 696 / 860 опкодов НЕ реализовано — 80.9%** (реализовано: 164 — 19.1%, см. [opcodes-Implemented.md](opcodes-Implemented.md)).
+> **Прогресс: 692 / 863 опкодов НЕ реализовано — 80.2%** (реализовано: 171 — 19.8%, см. [opcodes-Implemented.md](opcodes-Implemented.md)).
 >
 > Полный список опкодов 3.3.5a из `reference/wow_messages` (wotlk-теги) за вычетом заведённых в `WorldOpcode.cs`. Категория — домен (по структуре reference).
 
@@ -140,7 +140,6 @@
 | `0x0124` | SMSG_SET_FACTION_STANDING | Faction |
 | `0x0125` | CMSG_SET_FACTION_ATWAR | Faction |
 | `0x0127` | SMSG_SET_PROFICIENCY | Item |
-| `0x0135` | SMSG_COOLDOWN_EVENT | Spell |
 | `0x0138` | SMSG_PET_CAST_FAILED | Pet |
 | `0x013B` | CMSG_CANCEL_CHANNELLING | Chat |
 | `0x013E` | CMSG_DELETEEQUIPMENT_SET | Client |
@@ -150,7 +149,6 @@
 | `0x0148` | SMSG_ATTACKSWING_DEADTARGET | Combat |
 | `0x0149` | SMSG_ATTACKSWING_CANT_ATTACK | Combat |
 | `0x014E` | SMSG_CANCEL_COMBAT | Combat |
-| `0x0151` | SMSG_SPELLENERGIZELOG | Spell |
 | `0x0152` | SMSG_BREAK_TARGET | Spell |
 | `0x0155` | SMSG_BINDPOINTUPDATE | Movement |
 | `0x0159` | SMSG_CLIENT_CONTROL_UPDATE | Movement |
@@ -351,7 +349,6 @@
 | `0x02A3` | CMSG_LOOT_MASTER_GIVE | Loot |
 | `0x02A4` | SMSG_LOOT_MASTER_LIST | Loot |
 | `0x02A5` | SMSG_SET_FORCED_REACTIONS | Faction |
-| `0x02A6` | SMSG_SPELL_FAILED_OTHER | Spell |
 | `0x02A8` | CMSG_REPAIR_ITEM | Item |
 | `0x02A9` | SMSG_CHAT_PLAYER_NOT_FOUND | Chat |
 | `0x02AC` | CMSG_SUMMON_RESPONSE | Spell |
@@ -514,7 +511,6 @@
 | `0x038D` | CMSG_MOVE_CHNG_TRANSPORT | Movement |
 | `0x0396` | SMSG_RESET_FAILED_NOTIFY | Raid |
 | `0x0398` | SMSG_LFG_DISABLED | LFG |
-| `0x039D` | SMSG_UPDATE_COMBO_POINTS | Spell |
 | `0x03A7` | MSG_MOVE_START_DESCEND | Movement |
 | `0x03AC` | SMSG_DISMOUNT | Movement |
 | `0x03AF` | CMSG_VOICE_SESSION_ENABLE | Chat |
