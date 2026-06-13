@@ -23,9 +23,6 @@ internal sealed class RuneService
     /// Ускорение от Unholy Presence / рейтинга скорости — позже (RUNE.2 TODO).</summary>
     internal const int RuneCooldownMs = 10000;
 
-    /// <summary>Индекс ресурса рун среди UNIT power (POWER_RUNE = 5). Число готовых рун — в этом поле.</summary>
-    private const byte PowerRune = 5;
-
     /// <summary>Раскладка слотов по типам (эталон mangos <c>runeSlotTypes</c>): 2 крови, 2 нечестия, 2 мороза.</summary>
     private static readonly RuneType[] SlotLayout =
         [RuneType.Blood, RuneType.Blood, RuneType.Unholy, RuneType.Unholy, RuneType.Frost, RuneType.Frost];
@@ -262,12 +259,11 @@ internal sealed class RuneService
         for (var i = 0; i < runes.Length; i++)
             snapshot[i] = ((byte)runes[i].CurrentType, runes[i].CooldownMs);
 
+        // ВАЖНО: только SMSG_RESYNC_RUNES — как TC/CMaNGOS. НЕ слать следом UNIT_FIELD_POWER(POWER_RUNE):
+        // апдейт поля рун (в нём только число готовых, без кулдаунов) заставляет клиентский рунный фрейм
+        // пересобраться из поля и сбросить анимацию кулдауна — руны переставали «гаснуть». Кулдаун/готовность
+        // полностью несёт сам RESYNC (байт пройденного КД 0..255), длительность — из PLAYER_RUNE_REGEN.
         await session.SendAsync(WorldOpcode.SmsgResyncRunes,
             CombatPackets.BuildResyncRunes(snapshot, RuneCooldownMs), ct);
-
-        // Поле POWER_RUNE = число готовых рун (макрос UnitPower(unit,"RUNES") у клиента).
-        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
-                m => m.SetUInt32(UpdateField.UnitPower1 + PowerRune, (uint)ReadyCount(session))), ct);
     }
 }
