@@ -130,6 +130,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             && session.World.FindCreature(targetGuid) is { } ccTarget)
             await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct, durationOverrideMs: finisherDur);
 
+        // Фаза 2 INT.1: прерывание каста цели-существа (Kick/Counterspell/Pummel) + лок школы.
+        if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)
+            await InterruptCreatureCastAsync(session, caster, info, now, ct);
+
         // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
         if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)
             await comboPoints.AddAsync(session, targetGuid, info.ComboPointsGenerated, ct);
@@ -151,6 +155,26 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             if (trig is not null)
                 await ApplyMovementAsync(session, trig.Movement, targetGuid, ct);
         }
+    }
+
+    /// <summary>SpellCastResult INTERRUPTED (0x28) — гасит каст-бар существа у клиента. INT.1.</summary>
+    private const byte SpellFailedInterrupted = 0x28;
+
+    /// <summary>
+    /// Фаза 2 INT.1: прерывает текущий каст существа и лочит его школу на <see cref="SpellCatalog.SpellInfo.InterruptLockMs"/>.
+    /// Шлёт SMSG_SPELL_FAILURE (caster=существо) — клиент гасит каст-бар; AI существа ждёт разлок (CreatureCombatAI).
+    /// </summary>
+    private async Task InterruptCreatureCastAsync(WorldSession session, WorldCreature caster,
+        SpellCatalog.SpellInfo info, long now, CancellationToken ct)
+    {
+        await session.World.BroadcastToObserversAsync(caster, WorldOpcode.SmsgSpellFailure,
+            SpellPackets.BuildSpellFailure(caster.Guid, caster.CastingSpellId, SpellFailedInterrupted), ct);
+        caster.SchoolLockMask = caster.CastSchoolMask;
+        caster.SchoolLockUntilMs = now + info.InterruptLockMs;
+        caster.CastingSpellId = 0;
+        caster.NextCastMs = now + info.InterruptLockMs; // не возобновлять каст до разлока
+        session.Logger.LogDebug("INTERRUPT '{User}': прервал каст '{Name}', школа {School} залочена на {Ms}мс",
+            session.Account, caster.Template.Name, caster.SchoolLockMask, info.InterruptLockMs);
     }
 
     /// <summary>Применяет движущий эффект: рывок (сплайн) или телепорт вперёд/за спину цели. M7 #33.</summary>

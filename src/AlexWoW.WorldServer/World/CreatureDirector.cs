@@ -103,6 +103,22 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         => SummonDummyAsync(session, Npcs.AttackDummyGuid, Npcs.AttackDummy, Npcs.AttackDummyHealth,
             sideOffset: -2.5f, wounded: false, ct);
 
+    /// <summary>Кастующий манекен (Фаза 2 INT.1): крутит каст-бар по игроку — стенд для проверки прерывания.
+    /// В бою с игроком (CombatTargetGuid), чтобы тикала AI; первый каст — почти сразу.</summary>
+    public async Task SummonCasterDummyAsync(WorldSession session, CancellationToken ct)
+    {
+        await SummonDummyAsync(session, Npcs.CasterDummyGuid, Npcs.CasterDummy, Npcs.CasterDummyHealth,
+            sideOffset: 5f, wounded: false, ct);
+        if (world.FindCreature(Npcs.CasterDummyGuid) is { } caster)
+        {
+            caster.CombatTargetGuid = (ulong)session.InWorldGuid; // вводим в «бой» → тикает TickCreatureCombatAsync
+            caster.CastingSpellId = 0;
+            caster.SchoolLockUntilMs = 0;
+            caster.SchoolLockMask = 0;
+            caster.NextCastMs = Environment.TickCount64 + 1000; // первый каст через ~1с
+        }
+    }
+
     /// <summary>
     /// Общая логика призыва манекена (#29, расширено M12): телепортирует существо с фикс. GUID на ~3 ярда перед
     /// игроком (с боковым сдвигом <paramref name="sideOffset"/>), лицом к нему; DESTROY+CREATE наблюдателям; сброс

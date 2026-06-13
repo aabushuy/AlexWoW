@@ -60,6 +60,20 @@ public sealed class WorldCreature
     public uint CrowdControlSpellId { get; set; }
     public byte CrowdControlSlot { get; set; }
 
+    // --- Каст существа (Фаза 2 INT.1): кастующий манекен крутит каст-бар; прерывается interrupt-спеллом игрока. ---
+    /// <summary>Спелл, который существо сейчас кастует (0 — не кастует). Прерывание сбрасывает в 0.</summary>
+    public uint CastingSpellId { get; set; }
+    /// <summary>Школа текущего каста (для лока школы при прерывании).</summary>
+    public byte CastSchoolMask { get; set; }
+    /// <summary>Момент завершения текущего каста (<see cref="Environment.TickCount64"/>, мс).</summary>
+    public long CastEndMs { get; set; }
+    /// <summary>Когда существо начнёт следующий каст (пауза между кастами).</summary>
+    public long NextCastMs { get; set; }
+    /// <summary>Школа залочена прерыванием до этого момента (мс) — существо не может кастовать эту школу. INT.1.</summary>
+    public long SchoolLockUntilMs { get; set; }
+    /// <summary>Маска залоченных прерыванием школ (0 — нет лока).</summary>
+    public byte SchoolLockMask { get; set; }
+
     // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
     /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
     public bool Lootable { get; set; }

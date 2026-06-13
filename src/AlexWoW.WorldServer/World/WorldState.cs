@@ -264,6 +264,10 @@ public sealed class WorldState
     public Task SummonAttackDummyAsync(WorldSession session, CancellationToken ct)
         => Director.SummonAttackDummyAsync(session, ct);
 
+    /// <inheritdoc cref="CreatureDirector.SummonCasterDummyAsync"/>
+    public Task SummonCasterDummyAsync(WorldSession session, CancellationToken ct)
+        => Director.SummonCasterDummyAsync(session, ct);
+
     /// <inheritdoc cref="CreatureDirector.SpawnEnemiesAsync"/>
     public Task<int> SpawnEnemiesAsync(WorldSession session, byte creatureType, byte level, int count, CancellationToken ct)
         => Director.SpawnEnemiesAsync(session, creatureType, level, count, ct);

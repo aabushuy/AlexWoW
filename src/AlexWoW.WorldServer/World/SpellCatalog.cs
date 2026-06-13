@@ -35,6 +35,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectLeap = 29;                   // прыжок вперёд (Blink) — телепорт по направлению
     private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
     private const int EffectAddComboPoints = 80;         // +очки серии (генераторы рога/друид-кошки: Sinister Strike, Backstab…) — CP.2
+    private const int EffectInterruptCast = 68;          // прерывание каста + лок школы (Kick/Counterspell/Pummel/Mind Freeze) — INT.1
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
@@ -101,7 +102,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int AbsorbAmount = 0, byte AbsorbSchoolMask = 0,
         // ABS.2: Mana Shield (аура 97) — поглощение за счёт маны. >0 — это ман-щит: мана за 1 ед. урона
         // (EffectMultipleValue, 1.5); 0 — обычный щит без траты маны.
-        float ManaShieldMultiplier = 0f);
+        float ManaShieldMultiplier = 0f,
+        // INT.1: interrupt (эффект 68) — прерывает каст цели и лочит школу. IsInterrupt + длительность лока (мс).
+        bool IsInterrupt = false, int InterruptLockMs = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -226,6 +229,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
                 0 => t.EffectMultipleValue1, 1 => t.EffectMultipleValue2, 2 => t.EffectMultipleValue3, _ => 0f,
             }
             : 0f;
+        // INT.1: interrupt — эффект 68; длительность лока школы = DurationIndex (Kick 5с/Counterspell 8с/Pummel 4с).
+        var isInterrupt = effects.Any(e => e.Eff == EffectInterruptCast);
+        var interruptLockMs = isInterrupt ? SpellDurations.Get(t.DurationIndex) : 0;
         // Бафф/дебафф: по знаку BasePoints, НО защитный само-бафф со снижением урона (−% получаемого)
         // — положительный (на себя), несмотря на отрицательный Bp («Глухая оборона»).
         var auraPositive = auraBuff && (auraBuffEff.Bp >= 0 || damageTakenPct < 0);
@@ -329,7 +335,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             (t.Attributes & SpellAttrCooldownOnEvent) != 0,
             comboPointsGenerated,
             isFinisher, comboDamagePerPoint, comboTickPerPoint, maxDurationMs,
-            absorbAmount, absorbSchoolMask, manaShieldMultiplier);
+            absorbAmount, absorbSchoolMask, manaShieldMultiplier,
+            isInterrupt, interruptLockMs);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
