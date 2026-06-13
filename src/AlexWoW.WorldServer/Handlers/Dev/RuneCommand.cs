@@ -10,7 +10,7 @@ namespace AlexWoW.WorldServer.Handlers.Dev;
 internal sealed class RuneCommand(RuneService runes) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["runes"];
-    public string Help => ".runes [ready|spend <blood|frost|unholy>] — состояние/проверка рун DK (RUNE.1)";
+    public string Help => ".runes [ready|spend <тип>|death [slot]] — состояние/проверка рун DK (RUNE.1/5)";
     public int Order => 87; // рядом с .combo (86)
     public bool RequiresWorld => true;
 
@@ -44,6 +44,20 @@ internal sealed class RuneCommand(RuneService runes) : IDevCommand
                 session.Combat.Runes[slot].CooldownMs = RuneService.RuneCooldownMs;
                 await runes.SendResyncAsync(session, ct);
                 await ctx.ReplyAsync($"Руна #{slot} ({session.Combat.Runes[slot].CurrentType}) на кулдауне.", ct);
+                return;
+
+            case "death":
+                // RUNE.5: конвертировать слот (или первую руну крови) в death-руну.
+                var dslot = int.TryParse(ctx.ArgLower(1), out var di) && di >= 0 && di < session.Combat.Runes.Length
+                    ? di
+                    : Array.FindIndex(session.Combat.Runes, r => r.CurrentType == RuneType.Blood);
+                if (dslot < 0)
+                {
+                    await ctx.ReplyAsync("Нет руны для конвертации.", ct);
+                    return;
+                }
+                await runes.ConvertAsync(session, dslot, RuneType.Death, makeReady: true, ct);
+                await ctx.ReplyAsync($"Руна #{dslot} → death (готова).", ct);
                 return;
 
             default:

@@ -149,6 +149,53 @@ internal sealed class RuneService
             }
     }
 
+    /// <summary>Спелл Кровавая хватка (Blood Tap) — конвертирует руну крови в death и активирует её. RUNE.5.</summary>
+    internal const uint BloodTapSpellId = 45529;
+
+    /// <summary>
+    /// Blood Tap (RUNE.5): конвертирует одну руну крови в death-руну и делает её готовой. Предпочитает руну
+    /// крови на кулдауне (активирует её), иначе берёт готовую. Шлёт <c>SMSG_CONVERT_RUNE</c> + снимок.
+    /// No-op, если рун крови нет (не DK / уже все death).
+    /// </summary>
+    internal async Task BloodTapAsync(WorldSession session, CancellationToken ct)
+    {
+        var runes = session.Combat.Runes;
+        // Руна крови на кулдауне в приоритете (Blood Tap её и активирует); иначе — любая руна крови.
+        var slot = FindBloodSlot(runes, readyState: false);
+        if (slot < 0)
+            slot = FindBloodSlot(runes, readyState: true);
+        if (slot < 0)
+            return;
+
+        await ConvertAsync(session, slot, RuneType.Death, makeReady: true, ct);
+    }
+
+    /// <summary>Индекс руны с текущим типом Blood и заданной готовностью (−1 — нет).</summary>
+    private static int FindBloodSlot(RuneSlot[] runes, bool readyState)
+    {
+        for (var i = 0; i < runes.Length; i++)
+            if (runes[i].CurrentType == RuneType.Blood && runes[i].Ready == readyState)
+                return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// Конвертирует слот руны в <paramref name="newType"/> (RUNE.5). <paramref name="makeReady"/> сбрасывает
+    /// кулдаун (Blood Tap активирует руну). Шлёт <c>SMSG_CONVERT_RUNE</c> (перекраска) + снимок состояния.
+    /// </summary>
+    internal async Task ConvertAsync(WorldSession session, int slot, RuneType newType, bool makeReady, CancellationToken ct)
+    {
+        if (slot < 0 || slot >= session.Combat.Runes.Length)
+            return;
+        session.Combat.Runes[slot].CurrentType = newType;
+        if (makeReady)
+            session.Combat.Runes[slot].CooldownMs = 0;
+
+        await session.SendAsync(WorldOpcode.SmsgConvertRune,
+            CombatPackets.BuildConvertRune((byte)slot, (byte)newType), ct);
+        await SendResyncAsync(session, ct);
+    }
+
     /// <summary>Число готовых (не на кулдауне) рун.</summary>
     internal static int ReadyCount(WorldSession session)
     {
