@@ -14,7 +14,8 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSender spellGo,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
-    CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs)
+    CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs,
+    RuneService runes)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -68,6 +69,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             {
                 await combatResources.SpendPowerAsync(session, info.PowerType, cost, ct);
             }
+        }
+
+        // RUNE.3: рунная абилка DK — потратить руны нужных типов (ставит их на кулдаун) и начислить силу рун
+        // (RP×10, как ярость). Стоимость по spellId (SpellRuneCost). Доступность проверена гейтом каста.
+        if (info.PowerType == SpellCastService.PowerRune && RuneService.GetCost(spellId) is { } runeCost)
+        {
+            var rpGain = await runes.SpendAsync(session, runeCost, ct);
+            if (rpGain > 0)
+                await combatResources.GainPowerAsync(session, 6, (uint)(rpGain * 10), ct);
         }
 
         // M10.6: начисление ресурса кастеру (ENERGIZE/ярость Рывка) — с модификаторами талантов на

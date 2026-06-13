@@ -30,6 +30,38 @@ internal sealed class RuneService
     private static readonly RuneType[] SlotLayout =
         [RuneType.Blood, RuneType.Blood, RuneType.Unholy, RuneType.Unholy, RuneType.Frost, RuneType.Frost];
 
+    /// <summary>Стоимость рунной абилки: сколько рун каждого типа тратит + сколько силы рун даёт (в RP, не ×10).</summary>
+    internal readonly record struct RuneCost(byte Blood, byte Frost, byte Unholy, int RunicPowerGain)
+    {
+        internal int Total => Blood + Frost + Unholy;
+    }
+
+    /// <summary>
+    /// Стоимость рун по DK-абилке (RUNE.3). Источник 3.3.5a — SpellRuneCost.dbc (через RuneCostID), которого
+    /// нет ни в БД, ни DBC-файлом; значения сведены вручную по игровым данным для ключевых абилок. Спеллы с
+    /// PowerType=POWER_RUNE вне таблицы рунами не гейтятся (кастуются свободно). Сила рун даётся при трате.
+    /// </summary>
+    private static readonly Dictionary<uint, RuneCost> RuneCosts = new()
+    {
+        [45477] = new(0, 1, 0, 10),  // Icy Touch — 1 мороз
+        [45462] = new(0, 0, 1, 10),  // Plague Strike — 1 нечестие
+        [45902] = new(1, 0, 0, 10),  // Blood Strike — 1 кровь
+        [55050] = new(1, 0, 0, 10),  // Heart Strike — 1 кровь
+        [48721] = new(1, 0, 0, 10),  // Blood Boil — 1 кровь
+        [50842] = new(1, 0, 0, 10),  // Pestilence — 1 кровь
+        [48982] = new(1, 0, 0, 0),   // Rune Tap — 1 кровь (силу рун не даёт)
+        [49998] = new(0, 1, 1, 15),  // Death Strike — 1 мороз + 1 нечестие
+        [49020] = new(0, 1, 1, 15),  // Obliterate — 1 мороз + 1 нечестие
+        [55090] = new(0, 1, 1, 15),  // Scourge Strike — 1 мороз + 1 нечестие
+        [49184] = new(0, 1, 0, 10),  // Howling Blast — 1 мороз
+        [45524] = new(0, 1, 0, 10),  // Chains of Ice — 1 мороз
+        [43265] = new(1, 1, 1, 15),  // Death and Decay — по одной каждого типа
+    };
+
+    /// <summary>Стоимость рун абилки или null (не рунная / нет в таблице). RUNE.3.</summary>
+    internal static RuneCost? GetCost(uint spellId)
+        => RuneCosts.TryGetValue(spellId, out var c) ? c : null;
+
     /// <summary>True, если у класса есть руны (только DK).</summary>
     internal static bool HasRunes(byte charClass) => charClass == DeathKnightClass;
 
@@ -50,6 +82,71 @@ internal sealed class RuneService
         for (var i = 0; i < MaxRunes; i++)
             runes[i] = new RuneSlot { BaseType = SlotLayout[i], CurrentType = SlotLayout[i], CooldownMs = 0 };
         session.Combat.Runes = runes;
+    }
+
+    /// <summary>
+    /// Хватает ли готовых рун на стоимость (RUNE.3). Death-руна (RUNE.5) — джокер под любой тип, поэтому
+    /// сначала считаем готовые руны по типу, дефицит покрываем пулом готовых death-рун.
+    /// </summary>
+    internal static bool CanAfford(WorldSession session, RuneCost cost)
+        => CanAfford(session.Combat.Runes, cost);
+
+    /// <summary>Чистая проверка достаточности рун (для юнит-тестов и сессии). См. <see cref="CanAfford(WorldSession, RuneCost)"/>.</summary>
+    internal static bool CanAfford(IReadOnlyList<RuneSlot> runes, RuneCost cost)
+    {
+        int blood = 0, frost = 0, unholy = 0, death = 0;
+        foreach (var r in runes)
+        {
+            if (!r.Ready)
+                continue;
+            switch (r.CurrentType)
+            {
+                case RuneType.Blood: blood++; break;
+                case RuneType.Frost: frost++; break;
+                case RuneType.Unholy: unholy++; break;
+                case RuneType.Death: death++; break;
+            }
+        }
+
+        // Дефицит каждого типа добираем из общего пула death-рун.
+        death -= Math.Max(0, cost.Blood - blood);
+        death -= Math.Max(0, cost.Frost - frost);
+        death -= Math.Max(0, cost.Unholy - unholy);
+        return death >= 0;
+    }
+
+    /// <summary>
+    /// Тратит руны на каст (RUNE.3): по каждому типу гасит готовые руны этого типа, дефицит — готовыми
+    /// death-рунами (джокер). Гашение = постановка на кулдаун (<see cref="RuneCooldownMs"/>). Шлёт снимок.
+    /// Предполагает пройденный <see cref="CanAfford"/>. Возвращает прибавку силы рун (RP, не ×10).
+    /// </summary>
+    internal async Task<int> SpendAsync(WorldSession session, RuneCost cost, CancellationToken ct)
+    {
+        SpendType(session, RuneType.Blood, cost.Blood);
+        SpendType(session, RuneType.Frost, cost.Frost);
+        SpendType(session, RuneType.Unholy, cost.Unholy);
+        await SendResyncAsync(session, ct);
+        return cost.RunicPowerGain;
+    }
+
+    /// <summary>Гасит <paramref name="count"/> готовых рун типа <paramref name="type"/>; нехватку — death-рунами.</summary>
+    private static void SpendType(WorldSession session, RuneType type, int count)
+    {
+        var runes = session.Combat.Runes;
+        // Сначала руны нужного типа.
+        for (var i = 0; i < runes.Length && count > 0; i++)
+            if (runes[i].Ready && runes[i].CurrentType == type)
+            {
+                runes[i].CooldownMs = RuneCooldownMs;
+                count--;
+            }
+        // Затем death-руны (джокер).
+        for (var i = 0; i < runes.Length && count > 0; i++)
+            if (runes[i].Ready && runes[i].CurrentType == RuneType.Death)
+            {
+                runes[i].CooldownMs = RuneCooldownMs;
+                count--;
+            }
     }
 
     /// <summary>Число готовых (не на кулдауне) рун.</summary>

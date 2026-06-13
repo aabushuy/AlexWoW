@@ -1,3 +1,5 @@
+using AlexWoW.WorldServer.Handlers;
+using AlexWoW.WorldServer.Net.SessionState;
 using AlexWoW.WorldServer.Protocol;
 
 namespace AlexWoW.WorldServer.Tests;
@@ -6,6 +8,43 @@ namespace AlexWoW.WorldServer.Tests;
 public sealed class RuneScaffoldTests
 {
     private const int MaxCd = 10000;
+
+    /// <summary>Стандартная раскладка DK, все готовы: 2 крови, 2 нечестия, 2 мороза.</summary>
+    private static RuneSlot[] FullRunes() =>
+    [
+        new() { BaseType = RuneType.Blood, CurrentType = RuneType.Blood },
+        new() { BaseType = RuneType.Blood, CurrentType = RuneType.Blood },
+        new() { BaseType = RuneType.Unholy, CurrentType = RuneType.Unholy },
+        new() { BaseType = RuneType.Unholy, CurrentType = RuneType.Unholy },
+        new() { BaseType = RuneType.Frost, CurrentType = RuneType.Frost },
+        new() { BaseType = RuneType.Frost, CurrentType = RuneType.Frost },
+    ];
+
+    [Fact]
+    public void CanAfford_true_when_required_type_available()
+    {
+        // Death Strike — 1 мороз + 1 нечестие; в полном наборе хватает.
+        Assert.True(RuneService.CanAfford(FullRunes(), new RuneService.RuneCost(0, 1, 1, 15)));
+    }
+
+    [Fact]
+    public void CanAfford_false_when_type_on_cooldown()
+    {
+        var runes = FullRunes();
+        runes[4].CooldownMs = 5000; // обе руны мороза на КД
+        runes[5].CooldownMs = 5000;
+        Assert.False(RuneService.CanAfford(runes, new RuneService.RuneCost(0, 1, 0, 10))); // нужен мороз
+    }
+
+    [Fact]
+    public void Death_rune_substitutes_any_type()
+    {
+        var runes = FullRunes();
+        runes[4].CooldownMs = 5000; // оба мороза недоступны
+        runes[5].CooldownMs = 5000;
+        runes[0].CurrentType = RuneType.Death; // но руна крови сконвертирована в death
+        Assert.True(RuneService.CanAfford(runes, new RuneService.RuneCost(0, 1, 0, 10))); // death платит за мороз
+    }
 
     [Fact]
     public void Resync_encodes_count_then_type_and_passed_cooldown_per_rune()

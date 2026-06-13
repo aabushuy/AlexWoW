@@ -15,8 +15,12 @@ internal sealed class CombatResourcesService
 {
     private const byte PowerRage = 1;     // powertype ярости
     private const byte PowerEnergy = 3;   // powertype энергии
+    private const byte PowerRunic = 6;    // powertype силы рун (runic power) DK
     private const uint MaxRage = 1000;    // ×10 → 100 у клиента
     private const uint MaxEnergy = 100;
+    private const uint MaxRunicPower = 1000; // ×10 → 100 у клиента (как ярость)
+    /// <summary>Распад силы рун за тик (1 с) вне боя (×10 → 1.2 RP/с — эталон mangos 2.5/2с ≈ 1.25/с). RUNE.4.</summary>
+    private const uint RunicPowerDecayPerTick = 12;
 
     /// <summary>Кадэнс тика ресурса (мс): реген энергии / распад ярости.</summary>
     private const long ResourceTickMs = 1000;
@@ -65,7 +69,7 @@ internal sealed class CombatResourcesService
         if (session.InWorldGuid == 0 || session.Character is not { } c)
             return;
         var powerType = DisplayData.PowerTypeForClass(c.Class);
-        if (powerType != PowerRage && powerType != PowerEnergy)
+        if (powerType != PowerRage && powerType != PowerEnergy && powerType != PowerRunic)
             return; // мана-класс — реген маны отдельно
         if (now - session.Combat.LastResourceTickMs < ResourceTickMs)
             return;
@@ -77,6 +81,17 @@ internal sealed class CombatResourcesService
                 return;
             session.Combat.Energy = Math.Min(MaxEnergy, session.Combat.Energy + EnergyPerTick);
             await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
+            return;
+        }
+
+        // RUNE.4: сила рун — вне боя (спустя паузу) распадается до нуля (как ярость).
+        if (powerType == PowerRunic)
+        {
+            if (session.Combat.RunicPower == 0 || now - session.Combat.LastCombatMs < OutOfCombatDelayMs)
+                return;
+            session.Combat.RunicPower = session.Combat.RunicPower > RunicPowerDecayPerTick
+                ? session.Combat.RunicPower - RunicPowerDecayPerTick : 0;
+            await SendPowerAsync(session, PowerRunic, session.Combat.RunicPower, ct);
             return;
         }
 
@@ -101,6 +116,10 @@ internal sealed class CombatResourcesService
                 session.Combat.Energy = Math.Min(MaxEnergy, session.Combat.Energy + amount);
                 await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
                 break;
+            case PowerRunic:
+                session.Combat.RunicPower = Math.Min(MaxRunicPower, session.Combat.RunicPower + amount);
+                await SendPowerAsync(session, PowerRunic, session.Combat.RunicPower, ct);
+                break;
         }
     }
 
@@ -119,6 +138,10 @@ internal sealed class CombatResourcesService
             case PowerEnergy:
                 session.Combat.Energy = session.Combat.Energy > amount ? session.Combat.Energy - amount : 0;
                 await SendPowerAsync(session, PowerEnergy, session.Combat.Energy, ct);
+                break;
+            case PowerRunic:
+                session.Combat.RunicPower = session.Combat.RunicPower > amount ? session.Combat.RunicPower - amount : 0;
+                await SendPowerAsync(session, PowerRunic, session.Combat.RunicPower, ct);
                 break;
         }
     }
