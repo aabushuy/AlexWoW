@@ -32,6 +32,10 @@ internal sealed class SessionCastState
     /// <summary>Кулдауны спеллов: spellId → момент готовности (<see cref="Environment.TickCount64"/>, мс). M6.4.</summary>
     internal System.Collections.Generic.Dictionary<uint, long> SpellCooldowns { get; } = [];
 
+    /// <summary>Шанс крита заклинаний в % (CRIT.1). База 0 — крит из статов (интеллект/крит-рейтинг) пока не
+    /// моделируется, и 0 не зашумляет Spell QA (сверка с min/max). Включается дев-командой <c>.setcrit</c>.</summary>
+    internal int SpellCritChance { get; set; }
+
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (мана/GCD/тайминги переживают выход by design — переинициализируются при входе).</summary>
     internal void Reset()

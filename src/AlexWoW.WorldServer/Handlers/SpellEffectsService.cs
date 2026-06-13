@@ -28,10 +28,14 @@ internal sealed class SpellEffectsService(
 
         session.Combat.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
         var damage = ComputeDamage(session, info, comboPoints);
+        // CRIT.1: спелл-крит — ролл шанса, на крит урон ×1.5 (множитель CMaNGOS), флаг в лог (клиент рисует крит).
+        var crit = RollSpellCrit(session);
+        if (crit)
+            damage = damage * 3 / 2;
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
-            SpellPackets.BuildDamageLog(creature.Guid, (ulong)session.InWorldGuid, spellId, damage, overkill, info.School), ct);
+            SpellPackets.BuildDamageLog(creature.Guid, (ulong)session.InWorldGuid, spellId, damage, overkill, info.School, crit), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
 
         // M12 Spell QA: захват прямого урона (если активна сессия захвата — иначе no-op).
@@ -219,14 +223,16 @@ internal sealed class SpellEffectsService(
         if (targetGuid != 0 && session.World.FindCreature(targetGuid) is { } healDummy
             && Protocol.Npcs.IsHealDummy(healDummy.Template.Entry) && healDummy.IsAlive)
         {
+            var critH = RollSpellCrit(session);
             var amt = ComputeHealAmount(session, info);
+            if (critH) amt = amt * 3 / 2; // CRIT.1: крит-хил ×1.5
             var ceiling = healDummy.MaxHealth - healDummy.MaxHealth / 2; // не выше ½ макс. — остаётся раненым
             var beforeHp = healDummy.Health;
             healDummy.Health = Math.Min(ceiling, beforeHp + amt);
             var effHp = healDummy.Health - beforeHp;
             var overHp = amt - effHp;
             await session.World.BroadcastToObserversAsync(healDummy, WorldOpcode.SmsgSpellHealLog,
-                SpellPackets.BuildHealLog(healDummy.Guid, caster, spellId, effHp, overHp), ct);
+                SpellPackets.BuildHealLog(healDummy.Guid, caster, spellId, effHp, overHp, critH), ct);
             await session.World.BroadcastCreatureHealthAsync(healDummy, ct);
             await spellTestCapture.RecordHealAsync(session, spellId, info, amt, effHp, overHp, ct);
             return;
@@ -239,19 +245,25 @@ internal sealed class SpellEffectsService(
             return;
 
         var ts = target.Session;
+        var critHeal = RollSpellCrit(session);
         var amount = ComputeHealAmount(session, info);
+        if (critHeal) amount = amount * 3 / 2; // CRIT.1: крит-хил ×1.5
         var before = ts.Combat.Health;
         ts.Combat.Health = Math.Min(ts.Combat.MaxHealth, before + amount);
         var effective = ts.Combat.Health - before;
         var overheal = amount - effective;
 
         await session.World.BroadcastToPlayerObserversAsync(target, WorldOpcode.SmsgSpellHealLog,
-            SpellPackets.BuildHealLog(target.Guid, caster, spellId, effective, overheal), ct);
+            SpellPackets.BuildHealLog(target.Guid, caster, spellId, effective, overheal, critHeal), ct);
         await session.World.BroadcastPlayerHealthAsync(target, ct);
 
         // M12 Spell QA: захват прямого хила (если активна сессия захвата — иначе no-op).
         await spellTestCapture.RecordHealAsync(session, spellId, info, amount, effective, overheal, ct);
     }
+
+    /// <summary>CRIT.1: ролл спелл-крита по <see cref="Net.SessionState.SessionCastState.SpellCritChance"/> (% флэт).</summary>
+    private static bool RollSpellCrit(WorldSession session)
+        => session.Cast.SpellCritChance > 0 && Random.Shared.Next(100) < session.Cast.SpellCritChance;
 
     /// <summary>Величина хила (M6.4): бросок MinAmount..MaxAmount + модификаторы кастера (эффект + итог, M10.6).</summary>
     private static uint ComputeHealAmount(WorldSession session, SpellCatalog.SpellInfo info)
