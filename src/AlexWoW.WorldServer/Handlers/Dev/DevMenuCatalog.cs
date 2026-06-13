@@ -70,6 +70,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
 
         var buffs = b.Category("Баффы");
         b.Prompt(buffs, "Наложить бафф…", ".buff ", "ID спелла [секунды]:");
+        b.Prompt(buffs, "Наложить дебафф…", ".debuff ", "ID спелла [секунды] (стенд для диспела):");
         b.Prompt(buffs, "Снять бафф…", ".unbuff ", "ID спелла:");
 
         // Враги (.spawnenemy): по типу существа → prompt «уровень [кол-во]» (как «Выдать предмет»).
