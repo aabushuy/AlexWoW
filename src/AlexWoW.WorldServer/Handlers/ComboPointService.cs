@@ -21,6 +21,29 @@ internal sealed class ComboPointService
         return SendAsync(session, ct);
     }
 
+    /// <summary>
+    /// Начисляет очки серии на цели (CP.2: генератор). Смена комбо-цели обнуляет накопленное (очки
+    /// привязаны к конкретной цели). Clamp 0..5. <paramref name="count"/>=0 / <paramref name="targetGuid"/>=0 — no-op.
+    /// </summary>
+    internal Task AddAsync(WorldSession session, ulong targetGuid, byte count, CancellationToken ct)
+    {
+        if (targetGuid == 0 || count == 0)
+            return Task.CompletedTask;
+        if (session.Combat.ComboTargetGuid != targetGuid)
+        {
+            session.Combat.ComboTargetGuid = targetGuid;
+            session.Combat.ComboPoints = 0;
+        }
+        session.Combat.ComboPoints = (byte)Math.Min(session.Combat.ComboPoints + count, MaxComboPoints);
+        return SendAsync(session, ct);
+    }
+
+    /// <summary>Обнуляет очки серии, если они накоплены на <paramref name="targetGuid"/> (цель умерла). No-op иначе.</summary>
+    internal Task ClearForTargetAsync(WorldSession session, ulong targetGuid, CancellationToken ct)
+        => session.Combat.ComboTargetGuid == targetGuid && targetGuid != 0
+            ? ClearAsync(session, ct)
+            : Task.CompletedTask;
+
     /// <summary>Обнуляет очки серии и шлёт апдейт (смерть/смена цели, выход из стелса и т.п.). No-op, если уже пусто.</summary>
     internal Task ClearAsync(WorldSession session, CancellationToken ct)
     {

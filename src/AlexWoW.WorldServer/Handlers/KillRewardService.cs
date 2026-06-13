@@ -15,6 +15,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class KillRewardService(
     QuestProgressService questProgress,
     ProgressionService progression,
+    ComboPointService comboPoints,
     IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
@@ -26,6 +27,9 @@ internal sealed class KillRewardService(
     /// </summary>
     internal async Task OnCreatureKilledAsync(WorldSession session, WorldCreature creature, CancellationToken ct)
     {
+        // CP.2: очки серии теряются со смертью комбо-цели (no-op, если копились на другой/уже расходованы).
+        await comboPoints.ClearForTargetAsync(session, creature.Guid, ct);
+
         // M6.5: зачёт убийства в цели активных квестов.
         await questProgress.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
 

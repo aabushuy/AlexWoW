@@ -34,6 +34,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectTeleportUnits = 5;           // телепорт юнита (Shadowstep-триггер 36563) — за спину цели
     private const int EffectLeap = 29;                   // прыжок вперёд (Blink) — телепорт по направлению
     private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
+    private const int EffectAddComboPoints = 80;         // +очки серии (генераторы рога/друид-кошки: Sinister Strike, Backstab…) — CP.2
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
@@ -82,7 +83,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int DamageDonePct = 0, byte DamageDoneSchoolMask = 0,
         // SPELL_ATTR_COOLDOWN_ON_EVENT (бит 25): кулдаун стартует при СНЯТИИ ауры, а не на касте (Shadowform/Stealth).
         // На снятии шлём SMSG_COOLDOWN_EVENT — иначе клиент держит кнопку «активной»/недоступной до релога.
-        bool CooldownOnAuraRemove = false);
+        bool CooldownOnAuraRemove = false,
+        // CP.2: генератор очков серии (эффект 80 ADD_COMBO_POINTS) — сколько очков даёт по цели (0 — не генератор).
+        byte ComboPointsGenerated = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -134,6 +137,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var healIdx = Array.FindIndex(effects, e => e.Eff == EffectHeal);
         var dmgIdx = Array.FindIndex(effects, e => e.Eff == EffectSchoolDamage);
         var weaponIdx = Array.FindIndex(effects, e => IsWeapon(e.Eff));
+        // CP.2: генератор очков серии — эффект 80; кол-во = BasePoints+1 (Sinister Strike: 0→1, Mutilate: 1→2).
+        var comboGenIdx = Array.FindIndex(effects, e => e.Eff == EffectAddComboPoints);
+        var comboPointsGenerated = comboGenIdx >= 0 ? (byte)Math.Clamp(effects[comboGenIdx].Bp + 1, 0, 5) : (byte)0;
         var isHeal = healIdx >= 0;
         var chosenIdx = isHeal ? healIdx : dmgIdx >= 0 ? dmgIdx : weaponIdx;
         var chosen = chosenIdx >= 0 ? effects[chosenIdx] : default;
@@ -280,7 +286,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             energizeAmount, energizePower, energizeIdx,
             crowdControl, crowdControlMs,
             damageDonePct, damageDoneSchoolMask,
-            (t.Attributes & SpellAttrCooldownOnEvent) != 0);
+            (t.Attributes & SpellAttrCooldownOnEvent) != 0,
+            comboPointsGenerated);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
