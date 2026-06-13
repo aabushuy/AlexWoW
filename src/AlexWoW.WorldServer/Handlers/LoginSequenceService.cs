@@ -31,7 +31,8 @@ internal sealed class LoginSequenceService(
     SkillsService skills,
     TalentHandlers talents,
     SpellModifierService spellMods,
-    ProgressionService progression)
+    ProgressionService progression,
+    RuneService runes)
 {
     /// <summary>Вход персонажа в мир по CMSG_PLAYER_LOGIN (валидация владения + вся последовательность).</summary>
     internal async Task LoginAsync(WorldSession session, uint guid, CancellationToken ct)
@@ -115,6 +116,9 @@ internal sealed class LoginSequenceService(
         session.Combat.Rage = 0;
         session.Combat.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
         session.Combat.LastResourceTickMs = Environment.TickCount64;
+        // RUNE.1: руны DK — 6 слотов (Blood,Blood,Unholy,Unholy,Frost,Frost), все готовы. Поля рун лягут
+        // в спавн (PlayerSpawn), снимок состояния (SMSG_RESYNC_RUNES) уйдёт после спавна. No-op у не-DK.
+        RuneService.Initialize(session, character.Class);
         if (session.Inv.Inventory.Count > 0)
         {
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,
@@ -132,6 +136,10 @@ internal sealed class LoginSequenceService(
             character.X, character.Y, character.Z, 0f, (uint)Environment.TickCount, isSelf: true,
             session.Inv.Inventory, session.Quest.QuestSlots, stats, session.Progression.SkillBook.Skills);
         await session.SendAsync(WorldOpcode.SmsgUpdateObject, spawn, ct);
+
+        // RUNE.1: полный снимок состояния рун DK (SMSG_RESYNC_RUNES) — рунный фрейм рисует типы/готовность.
+        // Только после спавна (поле POWER_RUNE уже создано). No-op у не-DK.
+        await runes.SendResyncAsync(session, ct);
 
         // Без time sync игрок не управляется. Заодно — первая точка синхронизации часов (M6.3 ч.2).
         await timeSync.SendTimeSyncReqAsync(session, ct);

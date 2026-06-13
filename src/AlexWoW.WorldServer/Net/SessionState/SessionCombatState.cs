@@ -57,6 +57,11 @@ internal sealed class SessionCombatState
     /// <summary>Цель, на которой накоплены очки серии (0 — нет). Меняется при касте генератора по новой цели.</summary>
     internal ulong ComboTargetGuid { get; set; }
 
+    // --- Руны DK (Фаза 2, RUNE.1) ---
+    /// <summary>6 рунных слотов DK (раскладка Blood,Blood,Unholy,Unholy,Frost,Frost — эталон mangos
+    /// <c>runeSlotTypes</c>). Пусто у не-DK; инициализируется при входе в мир (<see cref="RuneType"/>/КД).</summary>
+    internal RuneSlot[] Runes { get; set; } = [];
+
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (HP/ресурсы/тайминги переживают выход by design — переинициализируются при входе).</summary>
     internal void Reset()
@@ -66,5 +71,32 @@ internal sealed class SessionCombatState
         IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
         ComboPoints = 0;      // CP.1: очки серии не переживают выход из мира
         ComboTargetGuid = 0;
+        Runes = [];           // RUNE.1: руны переинициализируются при входе в мир
     }
+}
+
+/// <summary>Тип руны DK (эталон mangos <c>RuneType</c>). Значения совпадают с клиентскими (рисует цвет руны).</summary>
+internal enum RuneType : byte
+{
+    Blood = 0,
+    Unholy = 1,
+    Frost = 2,
+    Death = 3,
+}
+
+/// <summary>
+/// Один рунный слот DK (RUNE.1): базовый тип, текущий тип (отличается от базового при death-конвертации,
+/// RUNE.5) и остаток кулдауна восстановления (мс; 0 — руна доступна). Аналог mangos <c>RuneInfo</c>.
+/// </summary>
+internal struct RuneSlot
+{
+    /// <summary>Базовый (исходный) тип слота — задаётся раскладкой при инициализации, не меняется.</summary>
+    internal RuneType BaseType;
+    /// <summary>Текущий тип (= базовому, пока не сконвертирован в Death). Им красится руна и резолвится стоимость.</summary>
+    internal RuneType CurrentType;
+    /// <summary>Остаток кулдауна восстановления (мс). 0 — руна готова к трате. Тикается в WorldTick (RUNE.2).</summary>
+    internal int CooldownMs;
+
+    /// <summary>Руна доступна к трате (кулдаун истёк).</summary>
+    internal readonly bool Ready => CooldownMs <= 0;
 }

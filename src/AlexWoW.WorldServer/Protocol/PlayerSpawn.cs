@@ -143,6 +143,17 @@ public static class PlayerSpawn
         var (powerField, maxPowerField, curPower, maxPower) = DisplayData.PowerFor(powerType, mana);
         m.SetUInt32(powerField, curPower);
         m.SetUInt32(maxPowerField, maxPower);
+        // RUNE.1: у DK (помимо силы рун выше) — ресурс рун POWER_RUNE(=5): max 8 (POWER_RUNE_DEFAULT), текущее =
+        // число готовых рун (на входе все 6). Поля скорости регена рун (4 типа) — иначе клиент не считает таймер.
+        if (Handlers.RuneService.HasRunes(c.Class))
+        {
+            const int powerRune = 5;
+            m.SetUInt32(UpdateField.UnitPower1 + powerRune, Handlers.RuneService.MaxRunes);
+            m.SetUInt32(UpdateField.UnitMaxPower1 + powerRune, 8);
+            if (isSelf)
+                for (var t = 0; t < 4; t++)
+                    m.SetFloat(UpdateField.PlayerRuneRegen1 + t, 0.1f);
+        }
         // Боевые поля (урон/скорость) шлются отдельно после спавна из экипированного оружия
         // (Progression.RefreshMeleeAsync) — иначе слот-тултип оружия показывает NaN/INF. M9.2.
 
