@@ -293,8 +293,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     public const byte GroupDkPresence = 6;   // присутствия DK (Blood/Frost/Unholy — не шейпшифт, эксклюзивны)
     public const byte GroupPaladinSeal = 7;  // печати паладина (Righteousness/Light/Wisdom/Justice — взаимоисключающие)
 
-    /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.</summary>
-    public readonly record struct Toggle(byte Form, byte Group);
+    /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.
+    /// <paramref name="Cancelable"/> — повторный каст ВЫХОДИТ из формы (Shadowform/Stealth/Ghost Wolf);
+    /// у стоек/аур/аспектов/присутствий false (всегда активна одна — повтор лишь освежает).</summary>
+    public readonly record struct Toggle(byte Form, byte Group, bool Cancelable = false);
 
     /// <summary>
     /// Спеллы-переключатели (M6.12/M7 #21): мгновенный каст без маны/цели → перманентная аура (персист).
@@ -325,12 +327,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         [34074] = new(0, GroupHunterAspect), // Aspect of the Viper
         [61846] = new(0, GroupHunterAspect), // Aspect of the Dragonhawk
         // Формы-шейпшифты (одна на класс → общая группа GroupShapeshift; форма из EffectMiscValue ауры 36).
-        [1784] = new(30, GroupShapeshift),   // Stealth (рога) — ранг 1
-        [1785] = new(30, GroupShapeshift),   // Stealth ранг 2
-        [1786] = new(30, GroupShapeshift),   // Stealth ранг 3
-        [1787] = new(30, GroupShapeshift),   // Stealth ранг 4
-        [15473] = new(28, GroupShapeshift),  // Shadowform (жрец)
-        [2645] = new(16, GroupShapeshift),   // Ghost Wolf (шаман)
+        // Cancelable: повторный каст выходит из формы (в отличие от стоек воина).
+        [1784] = new(30, GroupShapeshift, Cancelable: true),   // Stealth (рога) — ранг 1
+        [1785] = new(30, GroupShapeshift, Cancelable: true),   // Stealth ранг 2
+        [1786] = new(30, GroupShapeshift, Cancelable: true),   // Stealth ранг 3
+        [1787] = new(30, GroupShapeshift, Cancelable: true),   // Stealth ранг 4
+        [15473] = new(28, GroupShapeshift, Cancelable: true),  // Shadowform (жрец)
+        [2645] = new(16, GroupShapeshift, Cancelable: true),   // Ghost Wolf (шаман)
         // Присутствия DK (не шейпшифт, форма 0; эксклюзивны как ауры паладина).
         [48266] = new(0, GroupDkPresence),   // Blood Presence
         [48263] = new(0, GroupDkPresence),   // Frost Presence

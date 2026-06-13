@@ -22,6 +22,17 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
             return false;
 
         await spellGo.SendSpellGoAsync(session, spellId, targetGuid: 0, castCount, ct); // завершить каст у клиента
+
+        // Повторный каст ОТМЕНЯЕМОЙ формы (Shadowform/Stealth/Ghost Wolf) — выход из неё (как клик по кнопке
+        // формы на оффе): снимаем активную ауру той же формы (сбрасывает байт формы → кнопка «отжимается»).
+        if (toggle.Cancelable && toggle.Form != 0
+            && session.Progression.Auras.FirstOrDefault(a => a.ShapeshiftForm == toggle.Form) is { } active)
+        {
+            await auras.RemoveAsync(session, active.SpellId, ct);
+            session.Logger.LogDebug("TOGGLE-OFF '{User}': spell={Spell} форма={Form}", session.Account, active.SpellId, toggle.Form);
+            return true;
+        }
+
         // Стат-эффект формы-переключателя (Shadowform +15% Shadow): несём % урона по школе на ауре.
         var info = await spellCatalog.GetAsync(spellId, ct);
         await auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
