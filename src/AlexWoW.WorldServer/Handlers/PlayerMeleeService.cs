@@ -15,7 +15,8 @@ internal sealed class PlayerMeleeService(
     CreatureCombatAI creatureAi,
     CombatResourcesService combatResources,
     KillRewardService killReward,
-    SealService seals)
+    SealService seals,
+    ProcService procs)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
     internal const long SwingIntervalMs = 2000;
@@ -110,6 +111,9 @@ internal sealed class PlayerMeleeService(
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);
             return;
         }
+
+        // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.) — накладывают триггер-бафф на себя.
+        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct);
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))
