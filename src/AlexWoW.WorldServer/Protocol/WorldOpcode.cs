@@ -79,6 +79,7 @@ public enum WorldOpcode : uint
     SmsgAttackStop = 0x144,       // packed player + packed enemy + u32 0
     SmsgAttackSwingNotInRange = 0x145, // пустое — цель вне мили-радиуса
     SmsgAttackerStateUpdate = 0x14A,
+    SmsgUpdateComboPoints = 0x39D,               // packed guid цели + u8 очков серии (combo points рога/друид-кошка)
 
     // ИИ существ / смерть игрока (M6.7)
     SmsgMonsterMove = 0x0DD,      // packed guid + сплайн движения существа (преследование)

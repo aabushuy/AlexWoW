@@ -35,6 +35,19 @@ public static class CombatPackets
     public static byte[] BuildAiReaction(ulong guid, uint reaction)
         => new ByteWriter(12).UInt64(guid).UInt32(reaction).ToArray();
 
+    /// <summary>
+    /// SMSG_UPDATE_COMBO_POINTS (3.3.5): PackedGuid цели + u8 очков серии. Очки серверо-авторитетны,
+    /// привязаны к комбо-цели (генераторы рога/друида-кошки копят, финишеры расходуют). Сверено с
+    /// wow_messages (smsg_update_combo_points) и CMaNGOS <c>Player::SendComboPoints</c>.
+    /// </summary>
+    public static byte[] BuildUpdateComboPoints(ulong targetGuid, byte comboPoints)
+    {
+        var w = new ByteWriter(10);
+        PackedGuid.Write(w, targetGuid);
+        w.UInt8(comboPoints);
+        return w.ToArray();
+    }
+
     /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона. <paramref name="victimState"/>:
     /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
     /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>

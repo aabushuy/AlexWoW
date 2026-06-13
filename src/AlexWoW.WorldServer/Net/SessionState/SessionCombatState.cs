@@ -50,6 +50,13 @@ internal sealed class SessionCombatState
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
 
+    // --- Очки серии (combo points: рога/друид-кошка) — Фаза 2 (CP.1) ---
+    /// <summary>Очки серии (0..5), накопленные на <see cref="ComboTargetGuid"/>. Генераторы копят,
+    /// финишеры расходуют. Привязаны к конкретной цели: смена комбо-цели обнуляет.</summary>
+    internal byte ComboPoints { get; set; }
+    /// <summary>Цель, на которой накоплены очки серии (0 — нет). Меняется при касте генератора по новой цели.</summary>
+    internal ulong ComboTargetGuid { get; set; }
+
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (HP/ресурсы/тайминги переживают выход by design — переинициализируются при входе).</summary>
     internal void Reset()
@@ -57,5 +64,7 @@ internal sealed class SessionCombatState
         CombatTargetGuid = 0; // M6.3: вне мира боя нет
         SelectionGuid = 0;
         IsDead = false;       // M6.7: боевое/жизненное состояние сбрасывается при выходе
+        ComboPoints = 0;      // CP.1: очки серии не переживают выход из мира
+        ComboTargetGuid = 0;
     }
 }
