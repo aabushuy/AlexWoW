@@ -82,8 +82,13 @@ Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Free
 на длительность из DurationIndex (Kick 5с/Counterspell 8с/Pummel 4с/Wind Shear 2с). Проверочный стенд — кастующий
 манекен (`.dummy caster`, крутит Frostbolt). Todo: боевой спелл-AI существ (урон по игроку), лок школы у игрока (PvP).
 
-### 6. Dispel / Purge / Spellsteal
-Cleanse (Пал), Dispel/Cure (Жрец), Remove Curse/Abolish (Маг/Друид), Spellsteal (Маг), Purge (Шам), Cleanse Spirit (Шам). Статус: ⬜.
+### 6. Dispel / Purge / Spellsteal — ✅ (DSP.1–DSP.2)
+Cleanse (Пал), Dispel/Cure (Жрец), Remove Curse/Abolish (Маг/Друид), Spellsteal (Маг), Purge (Шам), Cleanse Spirit (Шам).
+Тип диспела ауры — `spell_template.Dispel` (1=Magic/2=Curse/3=Disease/4=Poison); снимаемые типы диспел-спелла —
+`EffectMiscValue` эффектов 38 (Spellsteal — эффект 126). **DSP.1 защитный:** снять свой дебафф нужного типа
+(Cleanse/Remove Curse/Dispel Magic), стенд — `.debuff <spellId>`. **DSP.2 атакующий:** Purge снимает бафф врага,
+Spellsteal крадёт Magic-бафф на себя; стенд — кастующий манекен с Magic-баффом (Arcane Intellect). Один диспел =
+одна аура (mass dispel — todo). Todo: диспел дружественных игроков (PvP/группа), резист диспела.
 
 ### 7. Procs / триггер-спеллы
 Hot Streak/Brain Freeze (Маг), Eclipse (Друид), Sudden Death (Воин), Lava Surge (Шам), Killing Machine (DK). Статус: ⬜ (триггерная инфраструктура нужна).

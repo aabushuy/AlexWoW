@@ -8,7 +8,7 @@
 | Абилка | Спелл | Школа/Аура | Тип | Статус |
 |---|---|---|---|---|
 | Призрачный волк (Ghost Wolf) | 2645 | форма 16 / MOD_SPEED | Toggle (форма) | 🟡 toggle-форма; бонус скорости не моделируется |
-| Очищение духа (Cleanse Spirit) | 51886 | dispel | Utility | ⬜ |
+| Очищение духа (Cleanse Spirit) | 51886 | dispel | Utility | ✅ снимает свой дебафф-проклятье (DSP.1); Purge (атакующий) — DSP.2 |
 | Цепи земли (Earthbind Totem) | 2484 | тотем / замедл. | Summon (тотем) | ⬜ |
 | Воскрешение (Ancestral Spirit) | 2008 | рес | Utility | ➖ |
 | Камнекожий тотем (Stoneskin Totem) | 8071 | тотем-аура | Summon | ⬜ |
