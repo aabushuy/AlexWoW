@@ -96,6 +96,18 @@ public static class SpellPackets
             .ToArray();
 
     /// <summary>
+    /// SMSG_COOLDOWN_EVENT (3.3.5): u32 spell + u64 guid. Активирует ОТЛОЖЕННЫЙ кулдаун у клиента —
+    /// для спеллов SPELL_ATTR_COOLDOWN_ON_EVENT (Shadowform/Stealth) кулдаун стартует не на касте, а при
+    /// СНЯТИИ ауры. Без этого пакета клиент держит кнопку «активной»/недоступной до релога. Сверено с
+    /// wow_messages (smsg_cooldown_event) и CMaNGOS <c>Player::AddCooldown</c> (на fade COOLDOWN_ON_EVENT-ауры).
+    /// </summary>
+    public static byte[] BuildCooldownEvent(ulong caster, uint spellId)
+        => new ByteWriter(12)
+            .UInt32(spellId)
+            .UInt64(caster)
+            .ToArray();
+
+    /// <summary>
     /// SMSG_SET_FLAT/PCT_SPELL_MODIFIER (3.3.5): u8 eff (бит 0–95 classmask) + u8 op (SPELLMOD_*) +
     /// i32 итог по биту. Клиент применяет к тултипам/стоимости/гейту кнопок (без этого пакета тултип
     /// Удара героя показывает базовые 15 ярости и кнопка не жмётся при 14). Сверено с wow_messages
