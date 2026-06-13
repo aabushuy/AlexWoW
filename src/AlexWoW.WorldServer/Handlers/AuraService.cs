@@ -108,6 +108,15 @@ internal sealed class AuraService(ICharacterStateRepository charState)
     private async Task RemoveInternalAsync(WorldSession session, ActiveAura aura, bool resetForm, CancellationToken ct)
     {
         session.Progression.Auras.Remove(aura);
+
+        // Сначала снять иконку ауры-баффа (SMSG_AURA_UPDATE), затем сбросить форму (UNIT_FIELD_BYTES_2) —
+        // иначе у формы с баффом (Shadowform) клиент не «отжимает» кнопку на панели при выходе (M7 #21 уточнение).
+        if (session.Player is { } player)
+        {
+            await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,
+                AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
+        }
+
         if (resetForm && aura.ShapeshiftForm != 0 && session.Progression.ShapeshiftForm == aura.ShapeshiftForm)
         {
             session.Progression.ShapeshiftForm = 0;
@@ -117,12 +126,6 @@ internal sealed class AuraService(ICharacterStateRepository charState)
         {
             try { await charState.RemoveAuraAsync(session.InWorldGuid, aura.SpellId, ct); }
             catch { /* персист не критичен */ }
-        }
-
-        if (session.Player is { } player)
-        {
-            await session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAuraUpdate,
-                AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
         }
     }
 
