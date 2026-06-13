@@ -8,6 +8,9 @@ public interface ISpellTemplateRepository
     /// <summary>Данные спелла по id или null, если такого спелла нет в дампе.</summary>
     Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default);
 
+    /// <summary>Строка <c>spell_proc_event</c> по entry (уточнение условий прока) или null. Крит-проки (PROC.2).</summary>
+    Task<SpellProcEventData?> GetProcEventAsync(uint id, CancellationToken ct = default);
+
     /// <summary>Пакетная загрузка спеллов по набору id (дедуп тиров профессий при входе). M11.</summary>
     Task<IReadOnlyList<SpellTemplateData>> GetSpellsAsync(IReadOnlyCollection<uint> ids, CancellationToken ct = default);
 

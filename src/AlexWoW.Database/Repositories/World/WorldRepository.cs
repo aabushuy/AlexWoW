@@ -70,6 +70,8 @@ public sealed class WorldRepository(
     // ---- ISpellTemplateRepository ----
     public Task<SpellTemplateData?> GetSpellAsync(uint id, CancellationToken ct = default)
         => spells.GetSpellAsync(id, ct);
+    public Task<SpellProcEventData?> GetProcEventAsync(uint id, CancellationToken ct = default)
+        => spells.GetProcEventAsync(id, ct);
     public Task<IReadOnlyList<SpellTemplateData>> GetSpellsAsync(IReadOnlyCollection<uint> ids, CancellationToken ct = default)
         => spells.GetSpellsAsync(ids, ct);
     public Task<uint> GetPrevRankAsync(uint spellId, CancellationToken ct = default)

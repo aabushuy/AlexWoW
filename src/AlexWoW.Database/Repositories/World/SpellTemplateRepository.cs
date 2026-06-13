@@ -39,6 +39,14 @@ public sealed class SpellTemplateRepository(string connectionString)
             SpellColumns + " WHERE Id = @id;", new { id }, cancellationToken: ct));
     }
 
+    public async Task<SpellProcEventData?> GetProcEventAsync(uint id, CancellationToken ct = default)
+    {
+        await using var db = await OpenAsync(ct);
+        return await db.QuerySingleOrDefaultAsync<SpellProcEventData>(new CommandDefinition(
+            "SELECT entry AS Entry, SchoolMask, procFlags AS ProcFlags, procEx AS ProcEx FROM spell_proc_event WHERE entry = @id;",
+            new { id }, cancellationToken: ct));
+    }
+
     public async Task<IReadOnlyList<SpellTemplateData>> GetSpellsAsync(IReadOnlyCollection<uint> ids, CancellationToken ct = default)
     {
         if (ids.Count == 0)
