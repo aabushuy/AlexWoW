@@ -53,6 +53,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
     private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
+    // AttributesEx: финишеры рога/друида-кошки — расходуют очки серии (combo points). CP.3.
+    private const uint SpellAttrExFinishingMoveDamage = 0x00100000;   // бит 20: урон/эффект скалируется очками (Eviscerate/Rupture/Envenom)
+    private const uint SpellAttrExFinishingMoveDuration = 0x00400000; // бит 22: длительность скалируется очками (Slice and Dice/Kidney Shot)
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -85,7 +88,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // На снятии шлём SMSG_COOLDOWN_EVENT — иначе клиент держит кнопку «активной»/недоступной до релога.
         bool CooldownOnAuraRemove = false,
         // CP.2: генератор очков серии (эффект 80 ADD_COMBO_POINTS) — сколько очков даёт по цели (0 — не генератор).
-        byte ComboPointsGenerated = 0);
+        byte ComboPointsGenerated = 0,
+        // CP.3: финишер (расходует очки серии). IsFinisher — гейт «нет очков» + расход всех очков.
+        // ComboDamagePerPoint/ComboTickPerPoint — бонус к прямому урону / тику DoT за каждое очко (Eviscerate/Rupture).
+        bool IsFinisher = false, int ComboDamagePerPoint = 0, int ComboTickPerPoint = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -174,6 +180,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var periodicHeal = periodic.Aura == AuraPeriodicHeal;
         var tickAmount = isPeriodic ? periodic.Bp + 1 : 0;          // CMaNGOS: BasePoints+1 за тик
         var tickInterval = isPeriodic ? periodic.Amp : 0;
+
+        // CP.3: финишер (расходует очки серии) — биты AttributesEx. Бонус за очко берём с PointsPerComboPoint
+        // соответствующего эффекта: прямой урон (Eviscerate) — с chosen, тик DoT (Rupture) — с periodic.
+        var perCombo = new[] { t.EffectPointsPerComboPoint1, t.EffectPointsPerComboPoint2, t.EffectPointsPerComboPoint3 };
+        var isFinisher = (t.AttributesEx & (SpellAttrExFinishingMoveDamage | SpellAttrExFinishingMoveDuration)) != 0;
+        var comboDamagePerPoint = isFinisher && chosenIdx >= 0 ? (int)MathF.Round(perCombo[chosenIdx]) : 0;
+        var comboTickPerPoint = isFinisher && periodicIdx >= 0 ? (int)MathF.Round(perCombo[periodicIdx]) : 0;
 
         // Непериодическая аура (бафф/дебафф, M10.4c): прочий APPLY_AURA. Бафф/дебафф различаем по знаку
         // BasePoints (>=0 — бафф на себя; <0 — дебафф на цель-существо) — надёжнее enum-целей. Простой
@@ -287,7 +300,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             crowdControl, crowdControlMs,
             damageDonePct, damageDoneSchoolMask,
             (t.Attributes & SpellAttrCooldownOnEvent) != 0,
-            comboPointsGenerated);
+            comboPointsGenerated,
+            isFinisher, comboDamagePerPoint, comboTickPerPoint);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

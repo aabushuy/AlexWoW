@@ -20,14 +20,14 @@ internal sealed class SpellEffectsService(
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
     internal async Task ApplyDamageAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
-        ulong targetGuid, long now, CancellationToken ct)
+        ulong targetGuid, long now, CancellationToken ct, byte comboPoints = 0)
     {
         var creature = targetGuid != 0 ? session.World.FindCreature(targetGuid) : null;
         if (creature is null || !creature.IsAlive)
             return; // цель пропала/мертва — спелл «впустую»
 
         session.Combat.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
-        var damage = ComputeDamage(session, info);
+        var damage = ComputeDamage(session, info, comboPoints);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
@@ -162,7 +162,7 @@ internal sealed class SpellEffectsService(
     /// M10.6: модификаторы талантов — величина ЭФФЕКТА (ALL_EFFECTS/EFFECT{N}, напр. Improved Cleave
     /// растит бонус, не бросок оружия — как CMaNGOS CalculateSpellEffectValue), затем итог (SPELLMOD_DAMAGE).
     /// </summary>
-    private static uint ComputeDamage(WorldSession session, SpellCatalog.SpellInfo info)
+    private static uint ComputeDamage(WorldSession session, SpellCatalog.SpellInfo info, byte comboPoints = 0)
     {
         var mods = session.Progression.SpellMods;
         int value, floor;
@@ -188,6 +188,9 @@ internal sealed class SpellEffectsService(
                 floor = 0;
             }
         }
+        // CP.3: финишер (Eviscerate) — бонус к урону за каждое израсходованное очко серии.
+        if (comboPoints > 0 && info.ComboDamagePerPoint > 0)
+            value += comboPoints * info.ComboDamagePerPoint;
         // Фаза 2: % наносимого урона по школе от активных аур (Shadowform +15% Shadow / Avenging Wrath +20% all).
         value = DamageDoneModifier.Apply(session, info.School, value);
         return (uint)Math.Max(floor, value);

@@ -20,6 +20,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     private const byte CastResultNoPower = 0x55;         // 85  — не хватает маны
     private const byte CastResultSpellInProgress = 0x69; // 105 — уже идёт другой каст
     private const byte CastResultReagents = 0x64;        // 100 — не хватает реагентов (крафт) M11.3
+    private const byte CastResultNoComboPoints = 0x4E;   // 78  — финишер без очков серии (SPELL_FAILED_NO_COMBO_POINTS) CP.3
     private const byte SpellFailedInterrupted = 0x28;
 
     /// <summary>Толеранс GCD-гейта (мс): не режем каст у границы GCD из-за скью клиент/сервер. M10.3.</summary>
@@ -112,6 +113,14 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultReagents), ct);
+            return;
+        }
+
+        // CP.3: финишер (Eviscerate/Rupture/Slice and Dice/Kidney Shot) без накопленных очков серии → отказ.
+        if (info.IsFinisher && session.Combat.ComboPoints == 0)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoComboPoints), ct);
             return;
         }
 

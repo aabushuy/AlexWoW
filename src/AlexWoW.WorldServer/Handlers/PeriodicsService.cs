@@ -40,7 +40,7 @@ internal sealed class PeriodicsService(
     /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
     /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо полной длительности (восстановление с остатком, M10.5).</summary>
     internal async Task ApplyAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
-        ulong targetCreatureGuid, CancellationToken ct, int durationOverrideMs = 0)
+        ulong targetCreatureGuid, CancellationToken ct, int durationOverrideMs = 0, byte comboPoints = 0)
     {
         if (!info.Periodic || info.AuraDurationMs <= 0 || session.InWorldGuid == 0)
             return;
@@ -48,8 +48,10 @@ internal sealed class PeriodicsService(
         // M10.6: модификаторы талантов — величина тика (ALL_EFFECTS/EFFECT{N} + SPELLMOD_DOT, напр.
         // Improved Rend) и длительность (SPELLMOD_DURATION). Остаток при восстановлении не трогаем.
         var mods = session.Progression.SpellMods;
+        // CP.3: DoT-финишер (Rupture) — бонус к тику за каждое израсходованное очко серии (до модификаторов).
+        var baseTick = info.TickAmount + (comboPoints > 0 ? comboPoints * info.ComboTickPerPoint : 0);
         var tickAmount = SpellModifiers.Apply(mods, info, SpellModOp.Dot,
-            SpellModifiers.ApplyEffectValue(mods, info, info.PeriodicEffectIndex, info.TickAmount));
+            SpellModifiers.ApplyEffectValue(mods, info, info.PeriodicEffectIndex, baseTick));
         var dur = durationOverrideMs > 0
             ? durationOverrideMs
             : Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Duration, info.AuraDurationMs));

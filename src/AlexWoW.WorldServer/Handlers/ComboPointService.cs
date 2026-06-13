@@ -38,6 +38,18 @@ internal sealed class ComboPointService
         return SendAsync(session, ct);
     }
 
+    /// <summary>
+    /// Снимает все очки серии (CP.3: финишер израсходовал) и шлёт апдейт (0). Возвращает сколько было —
+    /// для скалирования эффекта финишера. Комбо-цель сбрасывается (новый цикл копится заново).
+    /// </summary>
+    internal async Task<byte> ConsumeAsync(WorldSession session, CancellationToken ct)
+    {
+        var spent = session.Combat.ComboPoints;
+        if (spent > 0)
+            await ClearAsync(session, ct);
+        return spent;
+    }
+
     /// <summary>Обнуляет очки серии, если они накоплены на <paramref name="targetGuid"/> (цель умерла). No-op иначе.</summary>
     internal Task ClearForTargetAsync(WorldSession session, ulong targetGuid, CancellationToken ct)
         => session.Combat.ComboTargetGuid == targetGuid && targetGuid != 0
