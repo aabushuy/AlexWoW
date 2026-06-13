@@ -133,7 +133,10 @@ public static class SpellPackets
         => new ByteWriter(6).UInt8(eff).UInt8(op).Int32(value).ToArray();
 
     /// <summary>SMSG_SPELLNONMELEEDAMAGELOG (3.3.5): «числа урона» от спелла.</summary>
-    public static byte[] BuildDamageLog(ulong target, ulong attacker, uint spellId, uint damage, uint overkill, byte school)
+    /// <summary>SPELL_HIT_TYPE_CRIT (0x02) в hit_info — клиент рисует крит (жёлтое увеличенное число). CRIT.1.</summary>
+    private const uint SpellHitTypeCrit = 0x02;
+
+    public static byte[] BuildDamageLog(ulong target, ulong attacker, uint spellId, uint damage, uint overkill, byte school, bool crit = false)
     {
         var w = new ByteWriter(48);
         PackedGuid.Write(w, target);
@@ -142,19 +145,19 @@ public static class SpellPackets
         w.UInt32(damage);
         w.UInt32(overkill);
         w.UInt8(school);
-        w.UInt32(0)   // absorbed
-         .UInt32(0)   // resisted
-         .UInt8(0)    // periodic_log
-         .UInt8(0)    // unused
-         .UInt32(0)   // blocked
-         .UInt32(0)   // hit_info
-         .UInt8(0);   // extend_flag
+        w.UInt32(0)                                   // absorbed
+         .UInt32(0)                                   // resisted
+         .UInt8(0)                                    // periodic_log
+         .UInt8(0)                                    // unused
+         .UInt32(0)                                   // blocked
+         .UInt32(crit ? SpellHitTypeCrit : 0)         // hit_info (CRIT.1: бит крита)
+         .UInt8(0);                                   // extend_flag
         return w.ToArray();
     }
 
     /// <summary>SMSG_SPELLHEALLOG (3.3.5): packed victim + packed caster + spell + amount + overheal +
     /// absorb(0) + crit(u8) + unused(u8). Величина — эффективный хил (овёрхил отдельным полем).</summary>
-    public static byte[] BuildHealLog(ulong victim, ulong caster, uint spellId, uint amount, uint overheal)
+    public static byte[] BuildHealLog(ulong victim, ulong caster, uint spellId, uint amount, uint overheal, bool crit = false)
     {
         var w = new ByteWriter(32);
         PackedGuid.Write(w, victim);
@@ -162,9 +165,9 @@ public static class SpellPackets
         w.UInt32(spellId)
          .UInt32(amount)
          .UInt32(overheal)
-         .UInt32(0)   // absorb
-         .UInt8(0)    // critical
-         .UInt8(0);   // unused
+         .UInt32(0)               // absorb
+         .UInt8(crit ? (byte)1 : (byte)0) // critical (CRIT.1)
+         .UInt8(0);               // unused
         return w.ToArray();
     }
 
