@@ -165,17 +165,42 @@ internal sealed class SpellEffectsService(
     private static uint ComputeDamage(WorldSession session, SpellCatalog.SpellInfo info)
     {
         var mods = session.Progression.SpellMods;
+        int value, floor;
         if (info.WeaponPercent > 0)
         {
             var percent = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, (int)info.WeaponPercent);
             var total = Math.Max(1, WeaponRoll(session) * percent / 100);
-            return (uint)Math.Max(1, SpellModifiers.Apply(mods, info, SpellModOp.Damage, total));
+            value = SpellModifiers.Apply(mods, info, SpellModOp.Damage, total);
+            floor = 1;
         }
-        var bonus = info.MaxAmount > 0 ? Random.Shared.Next(info.MinAmount, info.MaxAmount + 1) : 0;
-        bonus = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, bonus);
-        if (info.WeaponDamage)
-            return (uint)Math.Max(1, SpellModifiers.Apply(mods, info, SpellModOp.Damage, WeaponRoll(session) + bonus));
-        return (uint)Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Damage, bonus));
+        else
+        {
+            var bonus = info.MaxAmount > 0 ? Random.Shared.Next(info.MinAmount, info.MaxAmount + 1) : 0;
+            bonus = SpellModifiers.ApplyEffectValue(mods, info, info.DirectEffectIndex, bonus);
+            if (info.WeaponDamage)
+            {
+                value = SpellModifiers.Apply(mods, info, SpellModOp.Damage, WeaponRoll(session) + bonus);
+                floor = 1;
+            }
+            else
+            {
+                value = SpellModifiers.Apply(mods, info, SpellModOp.Damage, bonus);
+                floor = 0;
+            }
+        }
+        // Фаза 2: % наносимого урона по школе от активных аур (Shadowform +15% Shadow / Arcane Power / Avenging Wrath).
+        value = ApplyDamageDonePct(session, info.School, value);
+        return (uint)Math.Max(floor, value);
+    }
+
+    /// <summary>Множитель «% наносимого урона» от активных аур кастера, совпадающих по маске школ (0 — все). Фаза 2.</summary>
+    private static int ApplyDamageDonePct(WorldSession session, byte school, int amount)
+    {
+        var pct = 0;
+        foreach (var a in session.Progression.Auras)
+            if (a.DamageDonePct != 0 && (a.DamageDoneSchool == 0 || (a.DamageDoneSchool & school) != 0))
+                pct += a.DamageDonePct;
+        return pct != 0 ? amount * (100 + pct) / 100 : amount;
     }
 
     /// <summary>Случайный бросок урона оружия главной руки (min..max из RefreshMeleeAsync). M10.4a.</summary>

@@ -10,7 +10,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// эксклюзивная в группе. Делегирует наложение в <see cref="AuraService"/>; отделено от обычного каста
 /// (<see cref="SpellCastService"/>) по SRP. GO шлёт <see cref="SpellGoSender"/> (разрыв цикла с кастом).
 /// </summary>
-internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService auras)
+internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService auras, SpellCatalog spellCatalog)
 {
     /// <summary>
     /// Если spell — переключатель: завершить каст у клиента (SPELL_GO) и наложить перманентную ауру-форму.
@@ -22,8 +22,11 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
             return false;
 
         await spellGo.SendSpellGoAsync(session, spellId, targetGuid: 0, castCount, ct); // завершить каст у клиента
+        // Стат-эффект формы-переключателя (Shadowform +15% Shadow): несём % урона по школе на ауре.
+        var info = await spellCatalog.GetAsync(spellId, ct);
         await auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
-            group: toggle.Group, persist: true);
+            group: toggle.Group, persist: true,
+            damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0);
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
             session.Account, spellId, toggle.Form, toggle.Group);
         return true;

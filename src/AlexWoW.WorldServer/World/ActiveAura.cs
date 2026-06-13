@@ -21,4 +21,9 @@ public sealed class ActiveAura
     public long ExpiresAtMs { get; init; }
     /// <summary>Полная длительность (мс) для пакета (0 — без таймера).</summary>
     public int DurationMs { get; init; }
+
+    /// <summary>% наносимого урона по школе (Shadowform +15% Shadow, Arcane Power и т.п.); 0 — нет. Фаза 2.</summary>
+    public int DamageDonePct { get; init; }
+    /// <summary>Маска школ для <see cref="DamageDonePct"/> (0 — все школы). Фаза 2.</summary>
+    public byte DamageDoneSchool { get; init; }
 }
