@@ -30,5 +30,28 @@ internal sealed class DispelService(SpellCatalog spellCatalog, AuraService auras
         return 0;
     }
 
+    /// <summary>
+    /// DSP.2: снимает положительный бафф существа, если его тип входит в <paramref name="dispelMask"/> (Purge).
+    /// <paramref name="steal"/> (Spellsteal) — украденный бафф накладывается на игрока (на 2 мин). Возвращает true,
+    /// если что-то снято. Эталон — CMaNGOS <c>Spell::EffectDispel</c>/<c>EffectStealBeneficialBuff</c>.
+    /// </summary>
+    internal async Task<bool> DispelCreatureAsync(WorldSession session, WorldCreature creature,
+        byte dispelMask, bool steal, CancellationToken ct)
+    {
+        if (creature.BuffSpellId == 0 || (dispelMask & (1 << creature.BuffDispelType)) == 0)
+            return false;
+
+        var stolen = creature.BuffSpellId;
+        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildRemove(creature.Guid, creature.BuffSlot), ct);
+        creature.BuffSpellId = 0;
+        creature.BuffDispelType = 0;
+
+        // Spellsteal: украденный бафф вешаем на себя (упрощённо — фикс. 2 мин).
+        if (steal)
+            await auras.ApplyAsync(session, stolen, durationMs: 120_000, positive: true, form: 0, ct);
+        return true;
+    }
+
     private static bool IsDebuff(ActiveAura aura) => (aura.Flags & AuraFlags.Negative) != 0;
 }

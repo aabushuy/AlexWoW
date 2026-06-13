@@ -135,6 +135,11 @@ public static class Npcs
     public const uint CasterDummyCastSpellId = 116;
     public const byte CasterDummyCastSchoolMask = 16; // SCHOOL_MASK_FROST
 
+    /// <summary>Снимаемый Magic-бафф на кастующем манекене (стенд для Purge/Spellsteal, DSP.2): Чародейский
+    /// интеллект (1459, Dispel=1 Magic). Висит, пока не снимут/украдут.</summary>
+    public const uint CasterDummyBuffSpellId = 1459;
+    public const byte CasterDummyBuffDispelType = 1; // Magic
+
     /// <summary>Шаблон кастующего манекена. Faction 7 (нейтрал, атакуемый); кастует по игроку. INT.1.</summary>
     public static readonly CreatureTemplate CasterDummy = new(
         Entry: CasterDummyEntry,

@@ -134,10 +134,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)
             await InterruptCreatureCastAsync(session, caster, info, now, ct);
 
-        // Фаза 2 DSP.1: защитный диспел (Cleanse/Remove Curse/Dispel Magic) по себе — снять свой дебафф нужного типа.
-        // Цель — сам игрок (нет цели / цель = свой guid). Атакующий Purge/Spellsteal по врагу — DSP.2.
-        if (info.DispelMask != 0 && (targetGuid == 0 || targetGuid == (ulong)session.InWorldGuid))
-            await dispel.DispelSelfAsync(session, info.DispelMask, ct);
+        // Фаза 2 DSP: диспел. По себе (нет цели / свой guid) — защитный, снимаем свой дебафф (DSP.1).
+        // По враждебному существу — атакующий Purge/Spellsteal, снимаем/крадём его бафф (DSP.2).
+        if (info.DispelMask != 0)
+        {
+            if (targetGuid == 0 || targetGuid == (ulong)session.InWorldGuid)
+                await dispel.DispelSelfAsync(session, info.DispelMask, ct);
+            else if (session.World.FindCreature(targetGuid) is { } dispelTarget)
+                await dispel.DispelCreatureAsync(session, dispelTarget, info.DispelMask, info.IsSpellsteal, ct);
+        }
 
         // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
         if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)
