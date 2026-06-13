@@ -80,6 +80,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
                 await combatResources.GainPowerAsync(session, 6, (uint)(rpGain * 10), ct);
         }
 
+        // RUNE.5: Blood Tap — конвертирует руну крови в death-руну и активирует её.
+        if (spellId == RuneService.BloodTapSpellId)
+            await runes.BloodTapAsync(session, ct);
+
         // M10.6: начисление ресурса кастеру (ENERGIZE/ярость Рывка) — с модификаторами талантов на
         // величину эффекта (Improved Charge: ALL_EFFECTS +50/+100 к 90 → 14/19 ярости).
         if (info.EnergizeAmount > 0)

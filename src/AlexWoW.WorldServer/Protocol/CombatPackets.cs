@@ -69,6 +69,11 @@ public static class CombatPackets
         return w.ToArray();
     }
 
+    /// <summary>SMSG_CONVERT_RUNE (3.3.5): <c>u8 index + u8 newType</c> — слот руны сменил тип (в death и
+    /// обратно). Клиент перекрашивает руну. Сверено с CMaNGOS <c>Player::ConvertRune</c>. RUNE.5.</summary>
+    public static byte[] BuildConvertRune(byte index, byte newType)
+        => new ByteWriter(2).UInt8(index).UInt8(newType).ToArray();
+
     /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона. <paramref name="victimState"/>:
     /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
     /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>
