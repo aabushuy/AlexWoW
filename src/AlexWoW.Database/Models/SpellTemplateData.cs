@@ -14,6 +14,9 @@ public sealed record SpellTemplateData
     /// пассивная классовая аура). Нужен, чтобы модификаторы (107/108) брать только от пассивных, а не от
     /// активируемых способностей (печати, Divine Plea, Envenom). M7 #48-bis / QA Spell.</summary>
     public uint Attributes { get; init; }
+    /// <summary>Доп. флаги (Spell.dbc AttributesEx): биты FINISHING_MOVE_DAMAGE (0x100000) /
+    /// FINISHING_MOVE_DURATION (0x400000) — финишер расходует очки серии (combo points). CP.3.</summary>
+    public uint AttributesEx { get; init; }
     public uint SchoolMask { get; init; }
     public uint CastingTimeIndex { get; init; }
     public int PowerType { get; init; }
@@ -34,6 +37,11 @@ public sealed record SpellTemplateData
     public int EffectDieSides1 { get; init; }
     public int EffectDieSides2 { get; init; }
     public int EffectDieSides3 { get; init; }
+    /// <summary>Бонус к величине эффекта за каждое очко серии (Spell.dbc EffectPointsPerComboPoint):
+    /// урон финишера = база + очки × это (Eviscerate 370, Rupture-тик 18 на макс. ранге). CP.3.</summary>
+    public float EffectPointsPerComboPoint1 { get; init; }
+    public float EffectPointsPerComboPoint2 { get; init; }
+    public float EffectPointsPerComboPoint3 { get; init; }
     /// <summary>Тип ауры эффекта (SPELL_AURA_*): 3=PERIODIC_DAMAGE, 8=PERIODIC_HEAL. M10.4b.</summary>
     public int EffectApplyAuraName1 { get; init; }
     public int EffectApplyAuraName2 { get; init; }

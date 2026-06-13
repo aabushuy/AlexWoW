@@ -101,15 +101,18 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
                 SpellPackets.BuildSpellCooldown((ulong)session.InWorldGuid, spellId, (uint)info.CooldownMs), ct);
         }
 
+        // CP.3: финишер расходует очки серии — фиксируем их ДО применения эффекта (скалирование урона/тика).
+        var combo = info.IsFinisher ? session.Combat.ComboPoints : (byte)0;
+
         // Прямой эффект: хил, либо урон (если есть прямой урон — чистый DoT без прямого числа не шлём).
         if (info.IsHeal)
             await spellEffects.ApplyHealAsync(session, spellId, info, targetGuid, ct);
         else if (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0)
-            await spellEffects.ApplyDamageAsync(session, spellId, info, targetGuid, now, ct);
+            await spellEffects.ApplyDamageAsync(session, spellId, info, targetGuid, now, ct, combo);
 
         // M10.4b: периодическая аура (DoT/HoT) — поверх прямого эффекта (напр. Immolate: удар + DoT).
         if (info.Periodic)
-            await periodics.ApplyAsync(session, spellId, info, targetGuid, ct);
+            await periodics.ApplyAsync(session, spellId, info, targetGuid, ct, comboPoints: combo);
         // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
         // CC-спеллы (стан/рут/…) сюда НЕ идут — их визуал/состояние ставит CrowdControlService (иначе дубль ауры).
         if (info.AuraBuff && info.CrowdControl == SpellCatalog.CrowdControlKind.None)
@@ -123,6 +126,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
         if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)
             await comboPoints.AddAsync(session, targetGuid, info.ComboPointsGenerated, ct);
+
+        // CP.3: финишер израсходовал все очки серии (эффект уже отмасштабирован зафиксированным `combo`).
+        if (info.IsFinisher)
+            await comboPoints.ConsumeAsync(session, ct);
 
         // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
         if (info.CreateItemId != 0)
