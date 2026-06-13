@@ -116,6 +116,16 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
+        // RUNE.3: рунная абилка DK — не хватает готовых рун нужных типов → отказ (NO_POWER → «Недостаточно
+        // энергии»). Стоимость не флэтовая (резолвится по типам рун), поэтому отдельно от ресурс-гейта выше.
+        if (info.PowerType == PowerRune && RuneService.GetCost(spellId) is { } runeCost
+            && !RuneService.CanAfford(session, runeCost))
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultNoPower), ct);
+            return;
+        }
+
         // CP.3: финишер (Eviscerate/Rupture/Slice and Dice/Kidney Shot) без накопленных очков серии → отказ.
         if (info.IsFinisher && session.Combat.ComboPoints == 0)
         {
@@ -153,6 +163,8 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     internal const byte PowerMana = 0;
     private const byte PowerRage = 1;
     private const byte PowerEnergy = 3;
+    internal const byte PowerRune = 5;  // POWER_RUNE — руны DK (стоимость не флэт, резолвится RuneService)
+    private const byte PowerRunic = 6;  // POWER_RUNIC_POWER — сила рун DK (флэт ManaCost, как ярость/энергия)
 
     /// <summary>
     /// Стоимость ресурса спелла (M10.2 → M10.4a): для маны — флэт из spell_template или % MaxMana (приближение
@@ -185,6 +197,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     {
         PowerRage => session.Combat.Rage,
         PowerEnergy => session.Combat.Energy,
+        PowerRunic => session.Combat.RunicPower,
         _ => session.Cast.Mana,
     };
 

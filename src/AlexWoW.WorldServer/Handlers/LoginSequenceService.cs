@@ -114,6 +114,7 @@ internal sealed class LoginSequenceService(
 
         // M6.12: боевые ресурсы. Воин — ярость 0 (копится в бою); разбойник — энергия полная (регенит).
         session.Combat.Rage = 0;
+        session.Combat.RunicPower = 0; // RUNE.4: сила рун DK копится в бою (старт 0)
         session.Combat.Energy = DisplayData.PowerTypeForClass(character.Class) == 3 ? 100u : 0u;
         session.Combat.LastResourceTickMs = Environment.TickCount64;
         // RUNE.1: руны DK — 6 слотов (Blood,Blood,Unholy,Unholy,Frost,Frost), все готовы. Поля рун лягут
