@@ -61,6 +61,8 @@ internal sealed class SessionCombatState
     /// <summary>6 рунных слотов DK (раскладка Blood,Blood,Unholy,Unholy,Frost,Frost — эталон mangos
     /// <c>runeSlotTypes</c>). Пусто у не-DK; инициализируется при входе в мир (<see cref="RuneType"/>/КД).</summary>
     internal RuneSlot[] Runes { get; set; } = [];
+    /// <summary>Время последнего тика регена рун (мс, <see cref="Environment.TickCount64"/>). 0 — не инициализирован. RUNE.2.</summary>
+    internal long LastRuneTickMs { get; set; }
 
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (HP/ресурсы/тайминги переживают выход by design — переинициализируются при входе).</summary>

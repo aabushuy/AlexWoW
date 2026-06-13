@@ -119,6 +119,7 @@ internal sealed class LoginSequenceService(
         // RUNE.1: руны DK — 6 слотов (Blood,Blood,Unholy,Unholy,Frost,Frost), все готовы. Поля рун лягут
         // в спавн (PlayerSpawn), снимок состояния (SMSG_RESYNC_RUNES) уйдёт после спавна. No-op у не-DK.
         RuneService.Initialize(session, character.Class);
+        session.Combat.LastRuneTickMs = Environment.TickCount64; // RUNE.2: база времени регена рун
         if (session.Inv.Inventory.Count > 0)
         {
             await session.SendAsync(WorldOpcode.SmsgUpdateObject,

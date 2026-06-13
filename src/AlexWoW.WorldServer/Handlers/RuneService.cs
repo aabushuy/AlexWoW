@@ -63,6 +63,47 @@ internal sealed class RuneService
     }
 
     /// <summary>
+    /// Реген рун по кулдауну (RUNE.2, из <see cref="World.WorldTick.UpdateAsync"/>): уменьшает остаток КД
+    /// каждой руны на прошедший интервал; руны восстанавливаются параллельно (эталон mangos
+    /// <c>Regenerate(POWER_RUNE)</c>). Когда руна становится готовой — шлёт снимок (<see cref="SendResyncAsync"/>),
+    /// обновляя число готовых рун. No-op у не-DK. Ускорение регена (Unholy Presence / рейтинг скорости) — TODO.
+    /// </summary>
+    internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        var runes = session.Combat.Runes;
+        if (runes.Length == 0)
+            return;
+
+        var last = session.Combat.LastRuneTickMs;
+        if (last == 0)
+        {
+            session.Combat.LastRuneTickMs = now; // первая инициализация базы времени
+            return;
+        }
+
+        var diff = (int)(now - last);
+        if (diff <= 0)
+            return;
+        session.Combat.LastRuneTickMs = now;
+
+        var becameReady = false;
+        for (var i = 0; i < runes.Length; i++)
+        {
+            if (runes[i].CooldownMs <= 0)
+                continue;
+            runes[i].CooldownMs -= diff;
+            if (runes[i].CooldownMs <= 0)
+            {
+                runes[i].CooldownMs = 0;
+                becameReady = true;
+            }
+        }
+
+        if (becameReady)
+            await SendResyncAsync(session, ct);
+    }
+
+    /// <summary>
     /// Шлёт клиенту полный снимок состояния рун: <c>SMSG_RESYNC_RUNES</c> + поле POWER_RUNE (число готовых).
     /// Вызывается после спавна (RUNE.1) и при любом изменении состояния рун (трата/реген — RUNE.2/RUNE.3).
     /// No-op у не-DK (рун нет).
