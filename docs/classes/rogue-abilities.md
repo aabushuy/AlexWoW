@@ -11,7 +11,7 @@
 | Бесшумность (Vanish) | 1856 | invis+стелс | Utility | ⬜ |
 | Отвлекающий удар (Distract) | 1725 | Utility | Utility | ⬜ |
 | Ослепление (Blind) | 2094 | disorient | CC | ⬜ |
-| Удар ниже пояса (Kick) | 1766 | interrupt | Interrupt | ⬜ |
+| Удар ниже пояса (Kick) | 1766 | interrupt | Interrupt | ✅ прерывает каст цели + лок школы 5с (INT.1) |
 | Финт (Feint) | 1966 | MOD_THREAT− | Utility | ➖ |
 | Уклонение (Evasion) | 5277 | MOD_DODGE_PERCENT | Buff | ⬜ (как dodge-бафф) |
 | Спринт (Sprint) | 2983 | MOD_SPEED | Buff | ⬜ |

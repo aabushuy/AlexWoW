@@ -76,8 +76,11 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Silence | Strangulate (DK), Silencing Shot (Охот), Arcane Torrent (Эльф крови); Counterspell-lockout (Маг) | 🟡 (визуал) / ⬜ (lockout) |
 | Disorient/Poly | Polymorph (Маг ✅), Blind (Разб), Dragon's Breath (Маг — AoE), Scatter Shot (Охот), Hibernate | ✅ одиночная цель (Polymorph проверен; стопает + визуал); break-on-damage ⬜ |
 
-### 5. Interrupt
-Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Freeze (DK), Wind Shear (Шам), Skull Bash (Друид), Spell Lock (пет ЧК). Статус: ⬜.
+### 5. Interrupt — ✅ (INT.1)
+Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Freeze (DK), Wind Shear (Шам), Skull Bash (Друид), Spell Lock (пет ЧК).
+Детект эффекта 68 (INTERRUPT_CAST) → прерывание каста цели-существа (SMSG_SPELL_FAILURE гасит каст-бар) + лок школы
+на длительность из DurationIndex (Kick 5с/Counterspell 8с/Pummel 4с/Wind Shear 2с). Проверочный стенд — кастующий
+манекен (`.dummy caster`, крутит Frostbolt). Todo: боевой спелл-AI существ (урон по игроку), лок школы у игрока (PvP).
 
 ### 6. Dispel / Purge / Spellsteal
 Cleanse (Пал), Dispel/Cure (Жрец), Remove Curse/Abolish (Маг/Друид), Spellsteal (Маг), Purge (Шам), Cleanse Spirit (Шам). Статус: ⬜.
