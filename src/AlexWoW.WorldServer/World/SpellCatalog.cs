@@ -46,6 +46,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
+    private const int AuraManaShield = 97;               // поглощение урона за счёт маны (Mana Shield мага) — ABS.2
     private const int AuraModDamagePercentDone = 79;     // % наносимого урона по школе (Shadowform/Arcane Power/Avenging Wrath)
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
@@ -97,7 +98,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // интерполируется очками: base + (max−base) × очки / 5 (Slice and Dice/Kidney Shot/Rupture).
         int MaxDurationMs = 0,
         // ABS.1: absorb-щит (SCHOOL_ABSORB, аура 69) — пул поглощения (BasePoints+1) + маска школ (EffectMiscValue).
-        int AbsorbAmount = 0, byte AbsorbSchoolMask = 0);
+        int AbsorbAmount = 0, byte AbsorbSchoolMask = 0,
+        // ABS.2: Mana Shield (аура 97) — поглощение за счёт маны. >0 — это ман-щит: мана за 1 ед. урона
+        // (EffectMultipleValue, 1.5); 0 — обычный щит без траты маны.
+        float ManaShieldMultiplier = 0f);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -208,13 +212,20 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, напр. «Глухая оборона»): отрицательный = снижение.
         var dmgTakenAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken);
         var damageTakenPct = dmgTakenAura.Eff == EffectApplyAura ? dmgTakenAura.Bp + 1 : 0;
-        // ABS.1: absorb-щит (SCHOOL_ABSORB, аура 69): пул = BasePoints+1, маска школ = EffectMiscValue эффекта.
-        var absorbIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraSchoolAbsorb);
+        // ABS.1/ABS.2: absorb-щит — SCHOOL_ABSORB (69, обычный) или MANA_SHIELD (97, за счёт маны).
+        // Пул = BasePoints+1, маска школ = EffectMiscValue. Mana Shield дополнительно несёт множитель маны.
+        var absorbIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura is AuraSchoolAbsorb or AuraManaShield);
         var absorbAmount = absorbIdx >= 0 ? effects[absorbIdx].Bp + 1 : 0;
         var absorbSchoolMask = absorbIdx switch
         {
             0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
         };
+        var manaShieldMultiplier = absorbIdx >= 0 && effects[absorbIdx].Aura == AuraManaShield
+            ? absorbIdx switch
+            {
+                0 => t.EffectMultipleValue1, 1 => t.EffectMultipleValue2, 2 => t.EffectMultipleValue3, _ => 0f,
+            }
+            : 0f;
         // Бафф/дебафф: по знаку BasePoints, НО защитный само-бафф со снижением урона (−% получаемого)
         // — положительный (на себя), несмотря на отрицательный Bp («Глухая оборона»).
         var auraPositive = auraBuff && (auraBuffEff.Bp >= 0 || damageTakenPct < 0);
@@ -318,7 +329,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             (t.Attributes & SpellAttrCooldownOnEvent) != 0,
             comboPointsGenerated,
             isFinisher, comboDamagePerPoint, comboTickPerPoint, maxDurationMs,
-            absorbAmount, absorbSchoolMask);
+            absorbAmount, absorbSchoolMask, manaShieldMultiplier);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
