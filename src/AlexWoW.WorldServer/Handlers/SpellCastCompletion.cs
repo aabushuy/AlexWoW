@@ -14,7 +14,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSender spellGo,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
-    CrowdControlService crowdControl, ComboPointService comboPoints)
+    CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -133,6 +133,11 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // Фаза 2 INT.1: прерывание каста цели-существа (Kick/Counterspell/Pummel) + лок школы.
         if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)
             await InterruptCreatureCastAsync(session, caster, info, now, ct);
+
+        // Фаза 2 DSP.1: защитный диспел (Cleanse/Remove Curse/Dispel Magic) по себе — снять свой дебафф нужного типа.
+        // Цель — сам игрок (нет цели / цель = свой guid). Атакующий Purge/Spellsteal по врагу — DSP.2.
+        if (info.DispelMask != 0 && (targetGuid == 0 || targetGuid == (ulong)session.InWorldGuid))
+            await dispel.DispelSelfAsync(session, info.DispelMask, ct);
 
         // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
         if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)

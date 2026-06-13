@@ -17,6 +17,9 @@ public sealed record SpellTemplateData
     /// <summary>Доп. флаги (Spell.dbc AttributesEx): биты FINISHING_MOVE_DAMAGE (0x100000) /
     /// FINISHING_MOVE_DURATION (0x400000) — финишер расходует очки серии (combo points). CP.3.</summary>
     public uint AttributesEx { get; init; }
+    /// <summary>Тип диспела ауры (Spell.dbc Dispel): 1=Magic, 2=Curse, 3=Disease, 4=Poison. 0 — не снимается
+    /// диспелом. Для диспел-спеллов снимаемые типы берутся из EffectMiscValue эффекта 38. DSP.1.</summary>
+    public uint Dispel { get; init; }
     public uint SchoolMask { get; init; }
     public uint CastingTimeIndex { get; init; }
     public int PowerType { get; init; }

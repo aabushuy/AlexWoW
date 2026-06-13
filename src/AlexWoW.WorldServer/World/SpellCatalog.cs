@@ -36,6 +36,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectTriggerSpell = 64;           // триггер другого спелла (Shadowstep 36554 → 36563)
     private const int EffectAddComboPoints = 80;         // +очки серии (генераторы рога/друид-кошки: Sinister Strike, Backstab…) — CP.2
     private const int EffectInterruptCast = 68;          // прерывание каста + лок школы (Kick/Counterspell/Pummel/Mind Freeze) — INT.1
+    private const int EffectDispel = 38;                 // диспел: снять ауры типа EffectMiscValue (Cleanse/Remove Curse/Dispel Magic/Purge) — DSP.1
+    private const int EffectStealBeneficialBuff = 126;   // Spellsteal: снять Magic-бафф врага и наложить на себя — DSP.2
+    private const int DispelMagic = 1;                   // DispelType: Magic (Spellsteal снимает только его) — DSP
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
@@ -104,7 +107,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // (EffectMultipleValue, 1.5); 0 — обычный щит без траты маны.
         float ManaShieldMultiplier = 0f,
         // INT.1: interrupt (эффект 68) — прерывает каст цели и лочит школу. IsInterrupt + длительность лока (мс).
-        bool IsInterrupt = false, int InterruptLockMs = 0);
+        bool IsInterrupt = false, int InterruptLockMs = 0,
+        // DSP.1/DSP.2: тип диспела САМОЙ ауры (1=Magic/2=Curse/3=Disease/4=Poison; 0 — не снимается).
+        byte DispelType = 0,
+        // Маска снимаемых типов диспел-спелла (биты по DispelType из эффектов 38). 0 — не диспел.
+        byte DispelMask = 0,
+        // Spellsteal (эффект 126) — снять Magic-бафф врага и наложить на себя. DSP.2.
+        bool IsSpellsteal = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -232,6 +241,18 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // INT.1: interrupt — эффект 68; длительность лока школы = DurationIndex (Kick 5с/Counterspell 8с/Pummel 4с).
         var isInterrupt = effects.Any(e => e.Eff == EffectInterruptCast);
         var interruptLockMs = isInterrupt ? SpellDurations.Get(t.DurationIndex) : 0;
+
+        // DSP.1/DSP.2: тип диспела самой ауры (для дебаффов/баффов) + маска снимаемых типов (диспел-спелл).
+        var dispelType = (byte)t.Dispel;
+        // Маска: бит (1<<тип) по EffectMiscValue каждого эффекта 38. Spellsteal (126) снимает Magic-баффы.
+        byte dispelMask = 0;
+        var dispelMisc = new[] { t.EffectMiscValue1, t.EffectMiscValue2, t.EffectMiscValue3 };
+        for (var i = 0; i < 3; i++)
+            if (effects[i].Eff == EffectDispel && dispelMisc[i] is > 0 and < 8)
+                dispelMask |= (byte)(1 << dispelMisc[i]);
+        var isSpellsteal = effects.Any(e => e.Eff == EffectStealBeneficialBuff);
+        if (isSpellsteal)
+            dispelMask |= 1 << DispelMagic; // Spellsteal снимает только Magic
         // Бафф/дебафф: по знаку BasePoints, НО защитный само-бафф со снижением урона (−% получаемого)
         // — положительный (на себя), несмотря на отрицательный Bp («Глухая оборона»).
         var auraPositive = auraBuff && (auraBuffEff.Bp >= 0 || damageTakenPct < 0);
@@ -336,7 +357,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             comboPointsGenerated,
             isFinisher, comboDamagePerPoint, comboTickPerPoint, maxDurationMs,
             absorbAmount, absorbSchoolMask, manaShieldMultiplier,
-            isInterrupt, interruptLockMs);
+            isInterrupt, interruptLockMs,
+            dispelType, dispelMask, isSpellsteal);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
