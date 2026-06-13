@@ -13,6 +13,16 @@ internal sealed class ComboPointService
 {
     internal const byte MaxComboPoints = 5;
 
+    /// <summary>
+    /// CP.3b: длительность финишера, интерполированная очками серии (эталон CMaNGOS CalculateSpellDuration):
+    /// <c>base + (max−base) × очки / 5</c>. Когда max==base (обычный спелл) или очков нет — возвращает base.
+    /// Применяется к стану (Kidney Shot), баффу (Slice and Dice) и DoT (Rupture).
+    /// </summary>
+    internal static int ScaledDurationMs(int baseMs, int maxMs, byte comboPoints)
+        => maxMs > baseMs && comboPoints > 0
+            ? baseMs + (maxMs - baseMs) * comboPoints / MaxComboPoints
+            : baseMs;
+
     /// <summary>Задаёт очки серии на цели и шлёт клиенту (clamp 0..5). CP.1: проверочный путь (дев-команда).</summary>
     internal Task SetAsync(WorldSession session, ulong targetGuid, byte points, CancellationToken ct)
     {
