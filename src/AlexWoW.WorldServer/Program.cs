@@ -109,6 +109,7 @@ builder.Services.AddSingleton<CraftingService>();
 builder.Services.AddSingleton<PlayerMeleeService>();
 builder.Services.AddSingleton<SealService>(); // Фаза 2: on-hit прок печатей паладина
 builder.Services.AddSingleton<CrowdControlService>(); // Фаза 2: контроль (стан/рут/страх/немота)
+builder.Services.AddSingleton<AbsorbShieldService>(); // Фаза 2 (ABS.1): absorb-щиты (PW:Shield/Ice Barrier)
 builder.Services.AddSingleton<CreatureCombatAI>();
 builder.Services.AddSingleton<RegenService>();
 // M7 S5: квест/лут-кластер — god-класс QuestHandlers разнесён по SRP-сервисам (прогресс/персист, иконки

@@ -11,10 +11,11 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Существо — авторитетная <see cref="WorldCreature"/> из реестра мира (общее HP для наблюдателей).
 /// Мили игрока — <see cref="PlayerMeleeService"/>, байты пакетов — <see cref="Protocol.CombatPackets"/>.
 /// </summary>
-internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
+internal sealed class CreatureCombatAI(CombatResourcesService combatResources, AbsorbShieldService absorbShields)
 {
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
+    private const byte SchoolMaskPhysical = 1; // SCHOOL_MASK_NORMAL — школа мили-урона существ (ABS.1)
 
     // --- Преследование/возврат (M6.7 инкр.2) ---
     /// <summary>Скорость бега существа (ярды/с) — совпадает с RunSpeed в create-блоке существа.</summary>
@@ -152,13 +153,16 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources)
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
                 raw, cs.DodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
+            // ABS.1: absorb-щиты гасят урон ПОСЛЕ митигейшна, до HP (мили существа — физическая школа, маска 1).
+            var absorbed = await absorbShields.AbsorbAsync(player.Session, SchoolMaskPhysical, damage, ct);
+            damage -= absorbed;
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена
             if (damage > 0)
                 await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked), ct);
+                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed), ct);
             await world.BroadcastPlayerHealthAsync(player, ct);
 
             if (died)
