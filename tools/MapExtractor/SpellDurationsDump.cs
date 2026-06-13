@@ -3,9 +3,10 @@ using System.Buffers.Binary;
 namespace AlexWoW.MapExtractor;
 
 /// <summary>
-/// Дамп <c>SpellDuration.dbc</c> (WotLK 3.3.5a) → C#-инициализатор словаря <c>index → base duration (ms)</c>.
+/// Дамп <c>SpellDuration.dbc</c> (WotLK 3.3.5a) → C#-инициализатор словаря <c>index → (base, max) duration (ms)</c>.
 /// В дампе CMaNGOS <c>spell_template</c> хранится только <c>DurationIndex</c> (ссылка на этот DBC), а не сама
-/// длительность ауры — нужна для DoT/HoT (M10.4b). Запись (WDBC): id u32, Duration i32 (мс),
+/// длительность ауры — нужна для DoT/HoT (M10.4b) и скалирования длительности финишеров очками серии (CP.3b:
+/// <c>duration = base + (max−base) × очки / 5</c>). Запись (WDBC): id u32, Duration i32 (мс),
 /// DurationPerLevel i32, MaxDuration i32 → fieldCount=4, recordSize=16. Отрицательная длительность
 /// (-1) = «до отмены» (бесконечная).
 /// </summary>
@@ -29,7 +30,8 @@ public static class SpellDurationsDump
             var rec = recordsOffset + i * recordSize;
             var id = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(rec));
             var baseMs = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(rec + 4));
-            Console.WriteLine($"[{id}] = {baseMs},");
+            var maxMs = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(rec + 12));
+            Console.WriteLine($"[{id}] = ({baseMs}, {maxMs}),");
         }
     }
 }

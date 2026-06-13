@@ -103,6 +103,13 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
 
         // CP.3: финишер расходует очки серии — фиксируем их ДО применения эффекта (скалирование урона/тика).
         var combo = info.IsFinisher ? session.Combat.ComboPoints : (byte)0;
+        // CP.3b: длительность финишера с base!=max в SpellDuration.dbc — интерполируется очками (стан/бафф/DoT).
+        // 0 — не скалируем (override не используется, берётся базовая длительность эффекта).
+        var finisherDur = combo > 0 && info.MaxDurationMs > 0
+            ? ComboPointService.ScaledDurationMs(
+                info.CrowdControl != SpellCatalog.CrowdControlKind.None ? info.CrowdControlMs : info.AuraDurationMs,
+                info.MaxDurationMs, combo)
+            : 0;
 
         // Прямой эффект: хил, либо урон (если есть прямой урон — чистый DoT без прямого числа не шлём).
         if (info.IsHeal)
@@ -112,16 +119,16 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
 
         // M10.4b: периодическая аура (DoT/HoT) — поверх прямого эффекта (напр. Immolate: удар + DoT).
         if (info.Periodic)
-            await periodics.ApplyAsync(session, spellId, info, targetGuid, ct, comboPoints: combo);
+            await periodics.ApplyAsync(session, spellId, info, targetGuid, ct, durationOverrideMs: finisherDur, comboPoints: combo);
         // M10.4c: непериодический бафф/дебафф (Battle Shout, Curse of Weakness, Fortitude и т.п.).
         // CC-спеллы (стан/рут/…) сюда НЕ идут — их визуал/состояние ставит CrowdControlService (иначе дубль ауры).
         if (info.AuraBuff && info.CrowdControl == SpellCatalog.CrowdControlKind.None)
-            await periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct);
+            await periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct, durationOverrideMs: finisherDur);
 
         // Фаза 2 CC: контроль цели-существа (стан/рут/страх/немота/дезориентация).
         if (info.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
             && session.World.FindCreature(targetGuid) is { } ccTarget)
-            await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct);
+            await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct, durationOverrideMs: finisherDur);
 
         // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
         if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)

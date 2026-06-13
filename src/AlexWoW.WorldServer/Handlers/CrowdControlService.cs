@@ -34,11 +34,14 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
             or SpellCatalog.CrowdControlKind.Disorient
            && now < c.CrowdControlUntilMs;
 
-    /// <summary>Накладывает CC на существо (после прямого эффекта каста): состояние + визуал ауры + UNIT_FLAG.</summary>
+    /// <summary>Накладывает CC на существо (после прямого эффекта каста): состояние + визуал ауры + UNIT_FLAG.
+    /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо базовой длительности (CP.3b: стан-финишер
+    /// Kidney Shot, длительность от очков серии; у ранга 1 base=0, поэтому работает только через override).</summary>
     internal async Task ApplyAsync(WorldSession session, WorldCreature creature, uint spellId,
-        SpellCatalog.SpellInfo info, long now, CancellationToken ct)
+        SpellCatalog.SpellInfo info, long now, CancellationToken ct, int durationOverrideMs = 0)
     {
-        if (info.CrowdControl == SpellCatalog.CrowdControlKind.None || info.CrowdControlMs <= 0
+        var durationMs = durationOverrideMs > 0 ? durationOverrideMs : info.CrowdControlMs;
+        if (info.CrowdControl == SpellCatalog.CrowdControlKind.None || durationMs <= 0
             || !creature.IsAlive || session.InWorldGuid == 0)
             return;
 
@@ -46,7 +49,7 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
             await RemoveVisualAsync(session.World, creature, ct); // освежить: снять прежний CC-визуал
 
         creature.CrowdControl = info.CrowdControl;
-        creature.CrowdControlUntilMs = now + info.CrowdControlMs;
+        creature.CrowdControlUntilMs = now + durationMs;
         creature.CrowdControlSpellId = spellId;
         creature.CrowdControlSlot = CcAuraSlot;
 
@@ -54,7 +57,7 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
         const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
             AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, CcAuraSlot, spellId,
-                Flags, level, 1, info.CrowdControlMs), ct);
+                Flags, level, 1, durationMs), ct);
 
         var flag = UnitFlagFor(info.CrowdControl);
         if (flag != 0)
@@ -62,7 +65,7 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
                 CreatureUpdate.BuildUnitFlagsUpdate(creature.Guid, flag), ct);
 
         logger.LogDebug("CC '{User}': {Kind} на '{Name}' на {Ms}мс", session.Account, info.CrowdControl,
-            creature.Template.Name, info.CrowdControlMs);
+            creature.Template.Name, durationMs);
     }
 
     /// <summary>Снимает истёкший CC (визуал + флаги + состояние). Зовётся из тика боя существа.</summary>

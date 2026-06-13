@@ -91,7 +91,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         byte ComboPointsGenerated = 0,
         // CP.3: финишер (расходует очки серии). IsFinisher — гейт «нет очков» + расход всех очков.
         // ComboDamagePerPoint/ComboTickPerPoint — бонус к прямому урону / тику DoT за каждое очко (Eviscerate/Rupture).
-        bool IsFinisher = false, int ComboDamagePerPoint = 0, int ComboTickPerPoint = 0);
+        bool IsFinisher = false, int ComboDamagePerPoint = 0, int ComboTickPerPoint = 0,
+        // CP.3b: верхняя граница длительности (SpellDuration.dbc max). max>base → длительность финишера
+        // интерполируется очками: base + (max−base) × очки / 5 (Slice and Dice/Kidney Shot/Rupture).
+        int MaxDurationMs = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -235,6 +238,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             _ => CrowdControlKind.Disorient, // AuraModConfuse
         };
         var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
+        // CP.3b: верхняя граница длительности (для combo-финишеров max>base → длит. от очков серии).
+        var maxDurationMs = (isPeriodic || auraBuff || crowdControl != CrowdControlKind.None)
+            ? SpellDurations.GetMax(t.DurationIndex) : 0;
 
         // M7 #33: движущий эффект. Charge(96)=рывок (сплайн); Leap(29)=прыжок вперёд (Blink);
         // TeleportUnits(5)=телепорт за спину цели (триггер Shadowstep 36563). TRIGGER_SPELL(64) — цепочка
@@ -301,7 +307,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             damageDonePct, damageDoneSchoolMask,
             (t.Attributes & SpellAttrCooldownOnEvent) != 0,
             comboPointsGenerated,
-            isFinisher, comboDamagePerPoint, comboTickPerPoint);
+            isFinisher, comboDamagePerPoint, comboTickPerPoint, maxDurationMs);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
