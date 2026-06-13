@@ -74,6 +74,14 @@ public sealed class WorldCreature
     /// <summary>Маска залоченных прерыванием школ (0 — нет лока).</summary>
     public byte SchoolLockMask { get; set; }
 
+    // --- Снимаемый бафф существа (Фаза 2 DSP.2): один положительный бафф для проверки Purge/Spellsteal. ---
+    /// <summary>Положительный бафф на существе (0 — нет). Снимается Purge / крадётся Spellsteal.</summary>
+    public uint BuffSpellId { get; set; }
+    /// <summary>Тип диспела баффа (1=Magic — для Purge/Spellsteal).</summary>
+    public byte BuffDispelType { get; set; }
+    /// <summary>Визуальный слот ауры-баффа на существе (для SMSG_AURA_UPDATE).</summary>
+    public byte BuffSlot { get; set; }
+
     // --- Лут (M6.6): труп можно обыскать, пока есть нетронутый лут. ---
     /// <summary>Труп помечен lootable (UNIT_DYNAMIC_FLAGS) — есть что забрать. Сброс при респавне.</summary>
     public bool Lootable { get; set; }

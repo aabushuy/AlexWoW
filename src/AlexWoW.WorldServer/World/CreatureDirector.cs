@@ -116,8 +116,21 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
             caster.SchoolLockUntilMs = 0;
             caster.SchoolLockMask = 0;
             caster.NextCastMs = Environment.TickCount64 + 1000; // первый каст через ~1с
+
+            // DSP.2: вешаем снимаемый Magic-бафф (стенд для Purge/Spellsteal).
+            caster.BuffSpellId = Npcs.CasterDummyBuffSpellId;
+            caster.BuffDispelType = Npcs.CasterDummyBuffDispelType;
+            caster.BuffSlot = CasterDummyBuffSlot;
+            var level = (byte)(session.Character?.Level ?? 80);
+            const byte flags = Protocol.AuraFlags.Effect1 | Protocol.AuraFlags.Positive | Protocol.AuraFlags.SelfCast;
+            await world.BroadcastToObserversAsync(caster, WorldOpcode.SmsgAuraUpdate,
+                Protocol.AuraPackets.BuildApplyByCaster(caster.Guid, caster.Guid, CasterDummyBuffSlot,
+                    Npcs.CasterDummyBuffSpellId, flags, level, 1, 0), ct);
         }
     }
+
+    /// <summary>Слот ауры-баффа кастующего манекена (отличный от CC-слота 40). DSP.2.</summary>
+    private const byte CasterDummyBuffSlot = 41;
 
     /// <summary>
     /// Общая логика призыва манекена (#29, расширено M12): телепортирует существо с фикс. GUID на ~3 ярда перед
