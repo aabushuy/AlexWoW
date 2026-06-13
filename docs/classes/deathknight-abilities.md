@@ -49,5 +49,7 @@
 | Тёмное превращение (Dark Transformation) | 63560 | пет-бафф | Buff | ➖ |
 | Армия мёртвых (Army of the Dead) | 42650 | призыв | Summon | ➖ |
 
-> **Чинить:** руны/runic power как ресурс — НЕТ (нужно завести); болезни (Frost Fever/Blood Plague) — DoT (умеем);
+> **Руны/runic power:** RUNE.1 — каркас рун готов (6 слотов, инициализация DK, `SMSG_RESYNC_RUNES`, `.runes`).
+> Дальше: RUNE.2 реген по КД · RUNE.3 стоимость/расход в касте · RUNE.4 runic power-ресурс · RUNE.5 death-руны.
+> **Чинить:** болезни (Frost Fever/Blood Plague) — DoT (умеем);
 > присутствия — toggle-формы; Anti-Magic Shell — абсорб; Icebound Fortitude — MOD_DAMAGE_PERCENT_TAKEN (умеем).

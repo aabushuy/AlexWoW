@@ -51,8 +51,15 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ресурс | Класс | Статус | Зажигает |
 |---|---|---|---|
 | Combo points | Разбойник, друид-кошка | ✅ (CP.1–CP.3b) | генераторы (Sinister Strike/Backstab/Rake) копят; финишеры гейтятся/расходуют, урон+тик и длительность скалируются очками (Eviscerate/Rupture/Slice and Dice/Kidney Shot) |
-| Руны + runic power | DK | ⬜ | почти все абилки DK |
+| Руны + runic power | DK | 🟡 (RUNE.1) | почти все абилки DK |
 | Осколки/камни души | Чернокнижник | ⬜ | призывы/Soulstone/Healthstone-гейт |
+
+> **Руны DK (RUNE.1 — каркас).** 6 рунных слотов (`SessionCombatState.Runes`, раскладка Blood,Blood,Unholy,
+> Unholy,Frost,Frost — эталон mangos `runeSlotTypes`), каждый слот = `{BaseType, CurrentType, CooldownMs}`.
+> Инициализация при входе в мир только у DK (`RuneService.Initialize`); поля рун (`POWER_RUNE`=5 max 8 + готовые,
+> `PLAYER_RUNE_REGEN_1..4`) кладутся в спавн, полный снимок — `SMSG_RESYNC_RUNES` (0x487) после спавна. Дев-команда
+> `.runes [ready|spend <тип>]` — проверка. **Todo:** RUNE.2 реген по КД (10с) · RUNE.3 стоимость/расход в касте +
+> генерация силы рун · RUNE.4 runic power как тратимый ресурс + распад вне боя · RUNE.5 death-руны/конвертация.
 
 ### 3. Митигейшн / avoidance / absorb — РАЗОГНАЛИСЬ (блок/Глухая оборона)
 | Аура | Абилки (класс) | Статус |
