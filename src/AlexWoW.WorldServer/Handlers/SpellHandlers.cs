@@ -1,6 +1,7 @@
 using AlexWoW.Common.Network;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
+using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Handlers;
 
@@ -35,6 +36,10 @@ internal sealed class SpellHandlers(SpellCastService spellCast, AuraService aura
     public async Task OnCancelAura(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var spellId = packet.Reader().UInt32();
+        // Toggle-формы/стойки/ауры/аспекты/присутствия правым кликом по иконке НЕ снимаются (как на оффе) —
+        // иначе кнопка формы рассинхронится (выход «не по протоколу»). Из формы выходят повторным кастом кнопки.
+        if (SpellCatalog.TryGetToggle(spellId, out _))
+            return;
         await auras.RemoveAsync(session, spellId, ct);
         await periodics.CancelSelfAsync(session, spellId, ct);
     }
