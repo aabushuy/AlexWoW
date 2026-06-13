@@ -134,7 +134,8 @@ internal sealed class PeriodicsService(
             // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP / +% блока) — здесь, со снятием по истечении.
             // Эксклюзивная группа (Фаза 2): брони мага/чернокнижника взаимоисключающие — новая снимает прежнюю.
             var exclusiveGroup = SpellCatalog.ExclusiveAuraGroup(spellId);
-            await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct, group: exclusiveGroup);
+            await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct, group: exclusiveGroup,
+                damageDonePct: info.DamageDonePct, damageDoneSchool: info.DamageDoneSchoolMask);
             if (info.HealthBonus > 0)
             {
                 session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);

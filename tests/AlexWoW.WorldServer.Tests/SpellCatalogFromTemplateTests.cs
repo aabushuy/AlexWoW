@@ -241,6 +241,18 @@ public class SpellCatalogFromTemplateTests
     }
 
     [Fact]
+    public void DamageDonePct_DetectedWithSchoolMask()
+    {
+        // Shadowform-подобный: APPLY_AURA(6) MOD_DAMAGE_PERCENT_DONE(79), MiscValue=32 (Shadow), Bp=14 → +15%.
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData
+        {
+            Id = 100, Effect2 = 6, EffectApplyAuraName2 = 79, EffectMiscValue2 = 32, EffectBasePoints2 = 14,
+        });
+        Assert.Equal(15, info.DamageDonePct);
+        Assert.Equal(32, info.DamageDoneSchoolMask);
+    }
+
+    [Fact]
     public void CrowdControl_NoneForNonCcSpell()
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData { Id = 1, Effect1 = 2, EffectBasePoints1 = 10 });

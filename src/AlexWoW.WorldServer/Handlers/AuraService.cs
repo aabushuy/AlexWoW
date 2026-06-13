@@ -24,7 +24,8 @@ internal sealed class AuraService(ICharacterStateRepository charState)
     /// (если <paramref name="persist"/>). Повтор того же спелла — рефреш.
     /// </summary>
     internal async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
-        bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false)
+        bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false,
+        int damageDonePct = 0, byte damageDoneSchool = 0)
     {
         if (session.InWorldGuid == 0)
             return;
@@ -59,6 +60,8 @@ internal sealed class AuraService(ICharacterStateRepository charState)
             Persist = doPersist,
             DurationMs = durationMs,
             ExpiresAtMs = durationMs > 0 ? Environment.TickCount64 + durationMs : 0,
+            DamageDonePct = damageDonePct,
+            DamageDoneSchool = damageDoneSchool,
         };
         session.Progression.Auras.Add(aura);
 

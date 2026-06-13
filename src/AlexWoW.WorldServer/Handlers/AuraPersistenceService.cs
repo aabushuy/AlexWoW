@@ -13,6 +13,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class AuraPersistenceService(
     AuraService auras,
     PeriodicsService periodics,
+    SpellCatalog spellCatalog,
     ICharacterStateRepository charState)
 {
     /// <summary>
@@ -44,8 +45,11 @@ internal sealed class AuraPersistenceService(
             // character_aura: восстановление второй стойки той же группы снимает первую (и её строку БД).
             if (SpellCatalog.TryGetToggle(spell, out var toggle))
             {
+                // Стат-эффект формы (Shadowform +15% Shadow) — восстановить вместе с формой, иначе пропадёт до перетогла.
+                var info = await spellCatalog.GetAsync(spell, ct);
                 await auras.ApplyAsync(session, spell, durationMs: 0, positive: true, toggle.Form, ct,
-                    group: toggle.Group, persist: true);
+                    group: toggle.Group, persist: true,
+                    damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0);
                 continue;
             }
 

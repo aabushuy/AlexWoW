@@ -44,6 +44,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
+    private const int AuraModDamagePercentDone = 79;     // % наносимого урона по школе (Shadowform/Arcane Power/Avenging Wrath)
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
     private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)
@@ -75,7 +76,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // M10.6: начисление ресурса кастеру (ENERGIZE / ярость Рывка): величина, power type, индекс эффекта.
         uint EnergizeAmount = 0, byte EnergizePower = 0, byte EnergizeEffectIndex = 0,
         // Фаза 2 CC: тип контроля (стан/рут/страх/немота/дезориентация) + длительность (мс). None — не CC.
-        CrowdControlKind CrowdControl = CrowdControlKind.None, int CrowdControlMs = 0);
+        CrowdControlKind CrowdControl = CrowdControlKind.None, int CrowdControlMs = 0,
+        // Фаза 2: % наносимого урона по школе (Shadowform/Arcane Power). Маска школ 0 — все школы.
+        int DamageDonePct = 0, byte DamageDoneSchoolMask = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -187,6 +190,15 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
 
+        // Фаза 2: % наносимого урона по школе (MOD_DAMAGE_PERCENT_DONE, aura 79): Shadowform +15% Shadow,
+        // Arcane Power/Avenging Wrath +урон. Величина = BasePoints+1, маска школ = EffectMiscValue (0 — все школы).
+        var ddIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentDone);
+        var damageDonePct = ddIdx >= 0 ? effects[ddIdx].Bp + 1 : 0;
+        var damageDoneSchoolMask = ddIdx switch
+        {
+            0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
+        };
+
         // Фаза 2 CC: тип контроля по первой найденной CC-ауре (стан/рут/страх/немота/дезориентация).
         // Длительность — из DurationIndex (даже если спелл не помечен auraBuff/periodic — CC всегда временный).
         var ccEff = Array.Find(effects, e => e.Eff == EffectApplyAura
@@ -262,7 +274,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
             (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
             energizeAmount, energizePower, energizeIdx,
-            crowdControl, crowdControlMs);
+            crowdControl, crowdControlMs,
+            damageDonePct, damageDoneSchoolMask);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
