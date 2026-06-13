@@ -49,8 +49,9 @@
 | Тёмное превращение (Dark Transformation) | 63560 | пет-бафф | Buff | ➖ |
 | Армия мёртвых (Army of the Dead) | 42650 | призыв | Summon | ➖ |
 
-> **Руны/runic power:** RUNE.1–4 готовы — каркас рун (6 слотов, `SMSG_RESYNC_RUNES`, `.runes`), реген по КД 10с,
+> **Руны/runic power (RUNE.1–5 готовы):** каркас рун (6 слотов, `SMSG_RESYNC_RUNES`, `.runes`), реген по КД 10с,
 > стоимость/расход рун в касте (`RuneService.RuneCosts`) + генерация силы рун, runic power как тратимый ресурс
-> (Frost Strike/Death Coil) с распадом вне боя (`.rp`). Дальше: RUNE.5 death-руны/конвертация.
+> (Frost Strike/Death Coil) с распадом вне боя (`.rp`), death-руны + Blood Tap-конвертация (`SMSG_CONVERT_RUNE`).
+> Todo: ускорение регена (Unholy Presence) · точные SpellRuneCost · авто-конверт (Blood of the North).
 > **Чинить:** болезни (Frost Fever/Blood Plague) — DoT (умеем);
 > присутствия — toggle-формы; Anti-Magic Shell — абсорб; Icebound Fortitude — MOD_DAMAGE_PERCENT_TAKEN (умеем).

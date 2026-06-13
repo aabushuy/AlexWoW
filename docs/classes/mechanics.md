@@ -51,7 +51,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ресурс | Класс | Статус | Зажигает |
 |---|---|---|---|
 | Combo points | Разбойник, друид-кошка | ✅ (CP.1–CP.3b) | генераторы (Sinister Strike/Backstab/Rake) копят; финишеры гейтятся/расходуют, урон+тик и длительность скалируются очками (Eviscerate/Rupture/Slice and Dice/Kidney Shot) |
-| Руны + runic power | DK | 🟡 (RUNE.1–4) | почти все абилки DK |
+| Руны + runic power | DK | 🟡 (RUNE.1–5) | почти все абилки DK |
 | Осколки/камни души | Чернокнижник | ⬜ | призывы/Soulstone/Healthstone-гейт |
 
 > **Руны DK (RUNE.1 — каркас).** 6 рунных слотов (`SessionCombatState.Runes`, раскладка Blood,Blood,Unholy,
@@ -63,8 +63,10 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 > (`RuneService.RuneCosts` — таблица по spellId, т.к. SpellRuneCost.dbc нет в БД); гейт каста (нет рун → NO_POWER),
 > расход (ставит руны на КД) + начисление силы рун; death-руна — джокер под любой тип. **RUNE.4:** сила рун
 > (runic power, POWER_RUNIC_POWER=6, ×10) — тратится RP-абилками (Frost Strike/Death Coil, PowerType=6 ManaCost=400=40RP
-> через общий ресурс-гейт), распад вне боя (`CombatResourcesService`), дев-команда `.rp [0-100]`. **Todo:** RUNE.5
-> death-руны/конвертация · ускорение регена (Unholy Presence / рейтинг скорости) · точные значения SpellRuneCost.
+> через общий ресурс-гейт), распад вне боя (`CombatResourcesService`), дев-команда `.rp [0-100]`. **RUNE.5:** death-руны —
+> конвертация слота (`SMSG_CONVERT_RUNE`), death — джокер под любой тип в стоимости; Blood Tap (45529) конвертит руну
+> крови в death и активирует; дев-проверка `.runes death [slot]`. **Todo:** ускорение регена (Unholy Presence /
+> рейтинг скорости) · точные значения SpellRuneCost · авто-конверт (Blood of the North/Reaping) · реверт death→base.
 
 ### 3. Митигейшн / avoidance / absorb — РАЗОГНАЛИСЬ (блок/Глухая оборона)
 | Аура | Абилки (класс) | Статус |
