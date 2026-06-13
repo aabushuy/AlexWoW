@@ -50,7 +50,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 ### 2. Ресурсы — рага/энергия/мана ✅; остальные НЕТ
 | Ресурс | Класс | Статус | Зажигает |
 |---|---|---|---|
-| Combo points | Разбойник, друид-кошка | ⬜ | все финишеры (Eviscerate/Rip/Kidney Shot/Ferocious Bite) |
+| Combo points | Разбойник, друид-кошка | ✅ урон-часть (CP.1–CP.3) | финишеры Eviscerate/Rupture (урон/тик от CP); генераторы Sinister Strike/Backstab/Rake. CP.3b: длит. финишеров (SnD/Kidney) |
 | Руны + runic power | DK | ⬜ | почти все абилки DK |
 | Осколки/камни души | Чернокнижник | ⬜ | призывы/Soulstone/Healthstone-гейт |
 
