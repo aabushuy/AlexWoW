@@ -51,7 +51,7 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Ресурс | Класс | Статус | Зажигает |
 |---|---|---|---|
 | Combo points | Разбойник, друид-кошка | ✅ (CP.1–CP.3b) | генераторы (Sinister Strike/Backstab/Rake) копят; финишеры гейтятся/расходуют, урон+тик и длительность скалируются очками (Eviscerate/Rupture/Slice and Dice/Kidney Shot) |
-| Руны + runic power | DK | 🟡 (RUNE.1–2) | почти все абилки DK |
+| Руны + runic power | DK | 🟡 (RUNE.1–4) | почти все абилки DK |
 | Осколки/камни души | Чернокнижник | ⬜ | призывы/Soulstone/Healthstone-гейт |
 
 > **Руны DK (RUNE.1 — каркас).** 6 рунных слотов (`SessionCombatState.Runes`, раскладка Blood,Blood,Unholy,
@@ -59,9 +59,12 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 > Инициализация при входе в мир только у DK (`RuneService.Initialize`); поля рун (`POWER_RUNE`=5 max 8 + готовые,
 > `PLAYER_RUNE_REGEN_1..4`) кладутся в спавн, полный снимок — `SMSG_RESYNC_RUNES` (0x487) после спавна. Дев-команда
 > `.runes [ready|spend <тип>]` — проверка. **RUNE.2:** реген рун по кулдауну (10с, параллельно — эталон mangos
-> `Regenerate(POWER_RUNE)`) в `WorldTick`; готовая руна шлёт снимок. **Todo:** RUNE.3 стоимость/расход в касте +
-> генерация силы рун · RUNE.4 runic power как тратимый ресурс + распад вне боя · RUNE.5 death-руны/конвертация ·
-> ускорение регена (Unholy Presence / рейтинг скорости).
+> `Regenerate(POWER_RUNE)`) в `WorldTick`; готовая руна шлёт снимок. **RUNE.3:** стоимость рун по абилке
+> (`RuneService.RuneCosts` — таблица по spellId, т.к. SpellRuneCost.dbc нет в БД); гейт каста (нет рун → NO_POWER),
+> расход (ставит руны на КД) + начисление силы рун; death-руна — джокер под любой тип. **RUNE.4:** сила рун
+> (runic power, POWER_RUNIC_POWER=6, ×10) — тратится RP-абилками (Frost Strike/Death Coil, PowerType=6 ManaCost=400=40RP
+> через общий ресурс-гейт), распад вне боя (`CombatResourcesService`), дев-команда `.rp [0-100]`. **Todo:** RUNE.5
+> death-руны/конвертация · ускорение регена (Unholy Presence / рейтинг скорости) · точные значения SpellRuneCost.
 
 ### 3. Митигейшн / avoidance / absorb — РАЗОГНАЛИСЬ (блок/Глухая оборона)
 | Аура | Абилки (класс) | Статус |
