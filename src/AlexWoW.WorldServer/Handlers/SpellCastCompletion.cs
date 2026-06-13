@@ -167,8 +167,13 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     private async Task InterruptCreatureCastAsync(WorldSession session, WorldCreature caster,
         SpellCatalog.SpellInfo info, long now, CancellationToken ct)
     {
+        var interruptedSpell = caster.CastingSpellId;
+        // SMSG_SPELL_FAILED_OTHER гасит каст-бар существа у наблюдателей (UNIT_SPELLCAST_INTERRUPTED);
+        // SMSG_SPELL_FAILURE — для полноты (как CMaNGOS Spell::SendInterrupted шлёт оба).
+        await session.World.BroadcastToObserversAsync(caster, WorldOpcode.SmsgSpellFailedOther,
+            SpellPackets.BuildSpellFailedOther(caster.Guid, interruptedSpell, SpellFailedInterrupted), ct);
         await session.World.BroadcastToObserversAsync(caster, WorldOpcode.SmsgSpellFailure,
-            SpellPackets.BuildSpellFailure(caster.Guid, caster.CastingSpellId, SpellFailedInterrupted), ct);
+            SpellPackets.BuildSpellFailure(caster.Guid, interruptedSpell, SpellFailedInterrupted), ct);
         caster.SchoolLockMask = caster.CastSchoolMask;
         caster.SchoolLockUntilMs = now + info.InterruptLockMs;
         caster.CastingSpellId = 0;
