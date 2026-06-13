@@ -20,7 +20,7 @@
 | Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
 | Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ⬜ |
 | Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |
-| Очищение (Cleanse) | 4987 | dispel | Utility | ⬜ |
+| Очищение (Cleanse) | 4987 | dispel | Utility | ✅ снимает свой дебафф (яд/болезнь) — DSP.1 |
 | Возложение рук (Lay on Hands) | 633 | Holy | Direct heal | ⬜ |
 | Божественная защита (Divine Protection) | 498 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ (как Shield Wall) |
 | Божественный щит (Divine Shield) | 642 | SCHOOL_IMMUNITY | Buff | ⬜ |

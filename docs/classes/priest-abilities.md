@@ -10,7 +10,7 @@
 | Слово Силы: Стойкость (Power Word: Fortitude) | 1243 | MOD_STAT (вынос.) | Buff | 🟡 |
 | Божественный дух (Divine Spirit) | 14752 | MOD_STAT (дух) | Buff | ⬜ |
 | Воскрешение (Resurrection) | 2006 | рес | Utility | ➖ |
-| Снятие магии (Dispel Magic) | 527 | dispel | Utility | ⬜ |
+| Снятие магии (Dispel Magic) | 527 | dispel | Utility | ✅ снимает свой Magic-дебафф (DSP.1) / Magic-бафф врага (DSP.2) |
 | Снятие болезни (Cure Disease) | 528 | dispel | Utility | ⬜ |
 | Левитация (Levitate) | 1706 | MOD_FLY/feather | Buff | ⬜ |
 | Психический крик (Psychic Scream) | 8122 | Fear (AoE) | CC | ⬜ |
