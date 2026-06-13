@@ -118,7 +118,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
 
         // RUNE.3: рунная абилка DK — не хватает готовых рун нужных типов → отказ (NO_POWER → «Недостаточно
         // энергии»). Стоимость не флэтовая (резолвится по типам рун), поэтому отдельно от ресурс-гейта выше.
-        if (info.PowerType == PowerRune && RuneService.GetCost(spellId) is { } runeCost
+        if (info.PowerType == PowerRune && RuneService.GetCost(info) is { } runeCost
             && !RuneService.CanAfford(session, runeCost))
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,

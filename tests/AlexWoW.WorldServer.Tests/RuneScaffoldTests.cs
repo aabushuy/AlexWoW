@@ -1,6 +1,7 @@
 using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Net.SessionState;
 using AlexWoW.WorldServer.Protocol;
+using AlexWoW.WorldServer.World;
 
 namespace AlexWoW.WorldServer.Tests;
 
@@ -34,6 +35,26 @@ public sealed class RuneScaffoldTests
         runes[4].CooldownMs = 5000; // обе руны мороза на КД
         runes[5].CooldownMs = 5000;
         Assert.False(RuneService.CanAfford(runes, new RuneService.RuneCost(0, 1, 0, 10))); // нужен мороз
+    }
+
+    // RUNE.3: стоимость матчится по SpellFamilyFlags (одинаковым у всех рангов) — иначе высокий ранг на ур.80
+    // не находился по spellId и руны не тратились. Семейство DK = 15; Icy Touch = флаг 0x2.
+    [Theory]
+    [InlineData(45477u, 0x2UL)]   // Icy Touch ранг 1
+    [InlineData(49909u, 0x2UL)]   // Icy Touch макс. ранг (тот же флаг семейства)
+    public void GetCost_matches_rune_ability_by_family_flags_across_ranks(uint _, ulong familyFlags)
+    {
+        var info = new SpellCatalog.SpellInfo(2, 0, 100, 0, 0, 0, PowerType: 5, FamilyName: 15, FamilyFlags: familyFlags);
+        var cost = RuneService.GetCost(info);
+        Assert.NotNull(cost);
+        Assert.Equal(1, cost!.Value.Frost); // Icy Touch — 1 руна мороза
+    }
+
+    [Fact]
+    public void GetCost_null_for_non_dk_family()
+    {
+        var info = new SpellCatalog.SpellInfo(2, 0, 100, 0, 0, 0, PowerType: 5, FamilyName: 8, FamilyFlags: 0x2);
+        Assert.Null(RuneService.GetCost(info)); // тот же флаг, но семейство мага — не DK
     }
 
     [Fact]
