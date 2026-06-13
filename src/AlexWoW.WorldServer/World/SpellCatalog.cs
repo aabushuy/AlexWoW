@@ -51,6 +51,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModStun = 12;                  // оглушение (Hammer of Justice/Concussion Blow)
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
+    private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
 
     /// <summary>
     /// Эффект спелла (M10.2 → M10.4a): школа, диапазон величины (урон/хил/бонус к урону оружия), время каста,
@@ -78,7 +79,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Фаза 2 CC: тип контроля (стан/рут/страх/немота/дезориентация) + длительность (мс). None — не CC.
         CrowdControlKind CrowdControl = CrowdControlKind.None, int CrowdControlMs = 0,
         // Фаза 2: % наносимого урона по школе (Shadowform/Arcane Power). Маска школ 0 — все школы.
-        int DamageDonePct = 0, byte DamageDoneSchoolMask = 0);
+        int DamageDonePct = 0, byte DamageDoneSchoolMask = 0,
+        // SPELL_ATTR_COOLDOWN_ON_EVENT (бит 25): кулдаун стартует при СНЯТИИ ауры, а не на касте (Shadowform/Stealth).
+        // На снятии шлём SMSG_COOLDOWN_EVENT — иначе клиент держит кнопку «активной»/недоступной до релога.
+        bool CooldownOnAuraRemove = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -275,7 +279,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
             energizeAmount, energizePower, energizeIdx,
             crowdControl, crowdControlMs,
-            damageDonePct, damageDoneSchoolMask);
+            damageDonePct, damageDoneSchoolMask,
+            (t.Attributes & SpellAttrCooldownOnEvent) != 0);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

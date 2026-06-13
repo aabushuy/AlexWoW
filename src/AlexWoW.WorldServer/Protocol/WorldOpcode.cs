@@ -105,6 +105,7 @@ public enum WorldOpcode : uint
     SmsgSpellGo = 0x132,
     SmsgSpellFailure = 0x133,
     SmsgSpellCooldown = 0x134,
+    SmsgCooldownEvent = 0x135,                   // u32 spell + guid — старт кулдауна по событию (снятие COOLDOWN_ON_EVENT-ауры: Shadowform/Stealth)
     SmsgSpellHealLog = 0x150,
     SmsgSpellEnergizeLog = 0x151,                // восполнение ресурса спеллом (плавающее «+мана») — Seal of Wisdom
     SmsgPeriodicAuraLog = 0x24E,                 // тик DoT/HoT (плавающее число) — M10.4b
