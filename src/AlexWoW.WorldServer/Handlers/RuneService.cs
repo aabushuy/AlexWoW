@@ -27,6 +27,9 @@ internal sealed class RuneService
     private static readonly RuneType[] SlotLayout =
         [RuneType.Blood, RuneType.Blood, RuneType.Unholy, RuneType.Unholy, RuneType.Frost, RuneType.Frost];
 
+    /// <summary>Семейство спеллов Рыцаря смерти (SpellFamilyName, CMaNGOS SPELLFAMILY_DEATHKNIGHT).</summary>
+    internal const uint DeathKnightFamily = 15;
+
     /// <summary>Стоимость рунной абилки: сколько рун каждого типа тратит + сколько силы рун даёт (в RP, не ×10).</summary>
     internal readonly record struct RuneCost(byte Blood, byte Frost, byte Unholy, int RunicPowerGain)
     {
@@ -34,30 +37,36 @@ internal sealed class RuneService
     }
 
     /// <summary>
-    /// Стоимость рун по DK-абилке (RUNE.3). Источник 3.3.5a — SpellRuneCost.dbc (через RuneCostID), которого
-    /// нет ни в БД, ни DBC-файлом; значения сведены вручную по игровым данным для ключевых абилок. Спеллы с
-    /// PowerType=POWER_RUNE вне таблицы рунами не гейтятся (кастуются свободно). Сила рун даётся при трате.
+    /// Стоимость рун по DK-абилке (RUNE.3), ключ — <b>SpellFamilyFlags</b> (одинаковы у всех РАНГОВ абилки,
+    /// в отличие от spellId/RuneCostID, которые меняются по рангу — поэтому на ур.80 высокий ранг не находился
+    /// по spellId). Источник стоимостей 3.3.5a — SpellRuneCost.dbc (через RuneCostID), которого нет ни в БД, ни
+    /// DBC-файлом; значения сведены вручную. Матчится только семейство DK (15) + PowerType=POWER_RUNE.
     /// </summary>
-    private static readonly Dictionary<uint, RuneCost> RuneCosts = new()
+    private static readonly Dictionary<ulong, RuneCost> RuneCosts = new()
     {
-        [45477] = new(0, 1, 0, 10),  // Icy Touch — 1 мороз
-        [45462] = new(0, 0, 1, 10),  // Plague Strike — 1 нечестие
-        [45902] = new(1, 0, 0, 10),  // Blood Strike — 1 кровь
-        [55050] = new(1, 0, 0, 10),  // Heart Strike — 1 кровь
-        [48721] = new(1, 0, 0, 10),  // Blood Boil — 1 кровь
-        [50842] = new(1, 0, 0, 10),  // Pestilence — 1 кровь
-        [48982] = new(1, 0, 0, 0),   // Rune Tap — 1 кровь (силу рун не даёт)
-        [49998] = new(0, 1, 1, 15),  // Death Strike — 1 мороз + 1 нечестие
-        [49020] = new(0, 1, 1, 15),  // Obliterate — 1 мороз + 1 нечестие
-        [55090] = new(0, 1, 1, 15),  // Scourge Strike — 1 мороз + 1 нечестие
-        [49184] = new(0, 1, 0, 10),  // Howling Blast — 1 мороз
-        [45524] = new(0, 1, 0, 10),  // Chains of Ice — 1 мороз
-        [43265] = new(1, 1, 1, 15),  // Death and Decay — по одной каждого типа
+        [0x2]                  = new(0, 1, 0, 10),  // Icy Touch — 1 мороз
+        [0x1]                  = new(0, 0, 1, 10),  // Plague Strike — 1 нечестие
+        [0x400000]             = new(1, 0, 0, 10),  // Blood Strike — 1 кровь
+        [0x1000000]            = new(1, 0, 0, 10),  // Heart Strike — 1 кровь
+        [0x40000]              = new(1, 0, 0, 10),  // Blood Boil — 1 кровь
+        [0x1000000000000]      = new(1, 0, 0, 10),  // Pestilence — 1 кровь
+        [0x8000000]            = new(1, 0, 0, 0),   // Rune Tap — 1 кровь (силу рун не даёт)
+        [0x10]                 = new(0, 1, 1, 15),  // Death Strike — 1 мороз + 1 нечестие
+        [0x2000000000000]      = new(0, 1, 1, 15),  // Obliterate — 1 мороз + 1 нечестие
+        [0x800000000000000]    = new(0, 1, 1, 15),  // Scourge Strike — 1 мороз + 1 нечестие
+        [0x200000000]          = new(0, 1, 0, 10),  // Howling Blast — 1 мороз
+        [211106232532996]      = new(0, 1, 0, 10),  // Chains of Ice — 1 мороз (составной флаг)
+        [0x20]                 = new(1, 1, 1, 15),  // Death and Decay — по одной каждого типа
     };
 
-    /// <summary>Стоимость рун абилки или null (не рунная / нет в таблице). RUNE.3.</summary>
-    internal static RuneCost? GetCost(uint spellId)
-        => RuneCosts.TryGetValue(spellId, out var c) ? c : null;
+    /// <summary>
+    /// Стоимость рун абилки по её <see cref="SpellCatalog.SpellInfo"/> или null (не рунная DK-абилка). Матч по
+    /// семейству DK + SpellFamilyFlags (рангонезависимо) и PowerType=POWER_RUNE (иначе прок/предметный спелл
+    /// того же семейства мог бы ошибочно списать руны). RUNE.3.
+    /// </summary>
+    internal static RuneCost? GetCost(World.SpellCatalog.SpellInfo info)
+        => info.FamilyName == DeathKnightFamily && info.FamilyFlags != 0
+           && RuneCosts.TryGetValue(info.FamilyFlags, out var c) ? c : null;
 
     /// <summary>True, если у класса есть руны (только DK).</summary>
     internal static bool HasRunes(byte charClass) => charClass == DeathKnightClass;

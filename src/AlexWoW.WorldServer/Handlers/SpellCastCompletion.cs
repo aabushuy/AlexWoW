@@ -73,7 +73,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
 
         // RUNE.3: рунная абилка DK — потратить руны нужных типов (ставит их на кулдаун) и начислить силу рун
         // (RP×10, как ярость). Стоимость по spellId (SpellRuneCost). Доступность проверена гейтом каста.
-        if (info.PowerType == SpellCastService.PowerRune && RuneService.GetCost(spellId) is { } runeCost)
+        if (info.PowerType == SpellCastService.PowerRune && RuneService.GetCost(info) is { } runeCost)
         {
             var rpGain = await runes.SpendAsync(session, runeCost, ct);
             if (rpGain > 0)
