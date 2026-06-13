@@ -31,13 +31,21 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 | Аспекты охотника (Hawk/Cheetah/Monkey) | Охотник | ✅ |
 | Брони мага (Frost/Mage/Molten Armor) | Маг | ✅ (эксклюзив проверен вживую; стат не моделируется) |
 | Печати (Seal of Righteousness/Light/Wisdom/Justice) | Паладин | ✅ (эксклюзив + on-hit: holy/хил/мана/стан проверены; величины упрощённые) |
-| Облик Тьмы (Shadowform) | Жрец | ✅ (форма 28 + **+15% Shadow** прямой+DoT; выход повторным кастом; Avenging Wrath +20% тоже ✅) |
+| Облик Тьмы (Shadowform) | Жрец | ✅ (форма 28 + **+15% Shadow** прямой+DoT; выход кнопкой в 1 клик + повторный вход без релога — `SMSG_COOLDOWN_EVENT`, см. ниже; Avenging Wrath +20% тоже ✅) |
 | Формы (Bear/Cat/Travel/Moonkin/Tree) | Друид | 🟡 (каркас форм) |
 | Присутствия (Blood/Frost/Unholy) | DK | 🟡 (эксклюзивная группа, форма 0) |
 | Брони (Demon Skin/Demon Armor/Fel Armor) | Чернокнижник | ✅ (тот же механизм, проверен на маге; стат не моделируется) |
 | Метаморфоза | Чернокнижник | ⬜ |
 | Призрачный волк (Ghost Wolf) | Шаман | 🟡 (toggle-форма 16) |
-| Скрытность (Stealth) | Разбойник | 🟡 (toggle-форма 30, все ранги) |
+| Скрытность (Stealth) | Разбойник | ✅ (toggle-форма 30, все ранги; выход + повторный вход без релога — `SMSG_COOLDOWN_EVENT`, кулдаун 10с) |
+
+> **Выход из формы и `SPELL_ATTR_COOLDOWN_ON_EVENT` (бит 25).** У Shadowform/Stealth кулдаун
+> (Category CD: Shadowform 1.5с, Stealth 10с) стартует **не на касте, а при СНЯТИИ ауры**. Клиент
+> держит кнопку «активной», пока не получит `SMSG_COOLDOWN_EVENT` (0x135: `u32 spell + guid`),
+> переводящий спелл `active → cooldown → ready`. Без него кнопка залипала «дожатой»/недоступной
+> («Заклинание пока недоступно») до релога. `AuraService` шлёт событие при реальном снятии аура-формы
+> (`resetForm`) со спелла с этим атрибутом (`SpellInfo.CooldownOnAuraRemove`). Эталон — CMaNGOS
+> `Player::AddCooldown` на fade COOLDOWN_ON_EVENT-ауры. Ghost Wolf атрибута не имеет — не затронут.
 
 ### 2. Ресурсы — рага/энергия/мана ✅; остальные НЕТ
 | Ресурс | Класс | Статус | Зажигает |

@@ -48,7 +48,7 @@
 | Слово Тьмы: Смерть (Shadow Word: Death) | 32379 | Shadow | Direct (откат на себя) | ⬜ |
 | Вампирическое прикосновение (Vampiric Touch) | 34914 | Shadow | DoT | 🟡 |
 | Чума разума (Devouring Plague) | 2944 | Shadow | DoT | 🟡 |
-| Облик Тьмы (Shadowform) | 15473 | форма 28 / MOD_DAMAGE% | Toggle (форма) | ✅ визуал + +15% Shadow (прямой + DoT: SW:Pain); выход повторным кастом (Cancelable). Mind Flay — канал ⬜ |
+| Облик Тьмы (Shadowform) | 15473 | форма 28 / MOD_DAMAGE% | Toggle (форма) | ✅ визуал + +15% Shadow (прямой + DoT: SW:Pain); выход кнопкой в 1 клик + повторный вход без релога (`SMSG_COOLDOWN_EVENT` при снятии — спелл `COOLDOWN_ON_EVENT`). Mind Flay — канал ⬜ |
 | Дисперсия (Dispersion) | 47585 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ |
 
 > **Чинить:** хил/DoT уже data-driven (🟡 → проверить). Новое: абсорб-щиты (PW:Shield), форма Shadowform (как стойка),
