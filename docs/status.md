@@ -13,9 +13,10 @@
 опкодов (навмеш, статы, ИИ, БД, веб) в 863 не попадают. Поэтому **основная метрика —
 домены геймплея**, опкоды — деталь внутри домена, вехи — историческая канва.
 
-Источники истины (этот файл — производная, обновляется вручную из них):
-[roadmap.md](roadmap.md) · [opcodes-Implemented.md](opcodes-Implemented.md) ·
-[opcodes-NotImplemented.md](opcodes-NotImplemented.md).
+Этот файл — **основной** для статуса проекта. Историческая детализация (вехи M0–M11,
+полные таблицы опкодов, дневники) перенесена в архив и обновляется по необходимости:
+[archive/roadmap.md](archive/roadmap.md) · [archive/opcodes-Implemented.md](archive/opcodes-Implemented.md) ·
+[archive/opcodes-NotImplemented.md](archive/opcodes-NotImplemented.md) · [archive/devlog/](archive/devlog/).
 
 ---
 
@@ -111,9 +112,11 @@
 ## Как обновлять этот файл
 
 1. При добавлении опкодов в `src/AlexWoW.WorldServer/Protocol/WorldOpcode.cs` —
-   синхронизировать [opcodes-Implemented.md](opcodes-Implemented.md) и
-   [opcodes-NotImplemented.md](opcodes-NotImplemented.md) (счётчики + категории).
-2. При закрытии среза вехи — обновить статус в [roadmap.md](roadmap.md).
-3. Затем пересобрать таблицы доменов здесь: статус домена ставится **по факту из
-   roadmap** (работает у клиента), а не по проценту опкодов. Пересчитать сводный
+   синхронизировать [archive/opcodes-Implemented.md](archive/opcodes-Implemented.md) и
+   [archive/opcodes-NotImplemented.md](archive/opcodes-NotImplemented.md) (счётчики + категории).
+2. При закрытии среза работы — обновить соответствующий домен в таблицах выше
+   (историческая канва вех — в [archive/roadmap.md](archive/roadmap.md)).
+3. Статус домена ставится **по факту** (работает у клиента), а не по проценту
+   опкодов. Прогресс по доменам ведётся на канбан-доске `https://tasks.home.srv`
+   (проекты `P[N] — <домен>`). Пересчитать сводный
    взвешенный % (вес: S=1, M=2, L=3, XL=5; кредит: ✅=1.0, 🟡=0.5, ⬜=0).
