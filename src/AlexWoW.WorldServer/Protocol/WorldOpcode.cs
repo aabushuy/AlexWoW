@@ -113,6 +113,8 @@ public enum WorldOpcode : uint
     SmsgPeriodicAuraLog = 0x24E,                 // тик DoT/HoT (плавающее число) — M10.4b
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
+    SmsgConvertRune = 0x486,                     // u8 index + u8 newType — конвертация руны DK в death (RUNE.5)
+    SmsgResyncRunes = 0x487,                     // u32 count + по руне (u8 type + u8 passedCooldown 0-255) — состояние рун DK (RUNE.1)
     SmsgAuraUpdate = 0x496,                      // одна аура на слоте (баффы/дебаффы/формы) — M6.11
     // M10.6: модификаторы спеллов у клиента (тултип/гейт стоимости и пр.). Сверено с wow_messages
     // (smsg_set_flat_spell_modifier: u8 eff + u8 op + u32 value) / CMaNGOS Player::SendAllSpellMods.

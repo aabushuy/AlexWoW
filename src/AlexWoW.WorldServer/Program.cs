@@ -103,6 +103,7 @@ builder.Services.AddSingleton<AuraPersistenceService>();
 builder.Services.AddSingleton<ManaRegenService>();
 builder.Services.AddSingleton<CombatResourcesService>();
 builder.Services.AddSingleton<ComboPointService>(); // Фаза 2 (CP.1): очки серии (combo points) рога/друид-кошки
+builder.Services.AddSingleton<RuneService>(); // Фаза 2 (RUNE.1): руны Рыцаря смерти
 builder.Services.AddSingleton<CraftingService>();
 // M7 S4: бой — god-класс CombatHandlers разнесён по SRP-сервисам (мили игрока, ИИ существ, реген HP);
 // опкод-входы — модуль CombatOpcodeHandlers (регистрируется assembly-сканом выше).

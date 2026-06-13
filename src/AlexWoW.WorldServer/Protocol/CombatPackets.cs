@@ -51,6 +51,24 @@ public static class CombatPackets
         return w.ToArray();
     }
 
+    /// <summary>
+    /// SMSG_RESYNC_RUNES (3.3.5): <c>u32 count</c> + по руне <c>u8 currentType + u8 passedCooldown</c>, где
+    /// passedCooldown = <c>255 − КД×255/maxКД</c> (доля пройденного КД 0..255; 255 = руна готова). Полный
+    /// снимок состояния рун DK клиенту. Сверено с CMaNGOS <c>Player::ResyncRunes</c>. RUNE.1.
+    /// </summary>
+    public static byte[] BuildResyncRunes(IReadOnlyList<(byte CurrentType, int CooldownMs)> runes, int maxCooldownMs)
+    {
+        var w = new ByteWriter(4 + runes.Count * 2);
+        w.UInt32((uint)runes.Count);
+        foreach (var (type, cd) in runes)
+        {
+            var clamped = Math.Clamp(cd, 0, maxCooldownMs);
+            var passed = maxCooldownMs > 0 ? (byte)(255 - clamped * 255 / maxCooldownMs) : (byte)255;
+            w.UInt8(type).UInt8(passed);
+        }
+        return w.ToArray();
+    }
+
     /// <summary>SMSG_ATTACKERSTATEUPDATE (3.3.5a) — одна запись урона. <paramref name="victimState"/>:
     /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
     /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>

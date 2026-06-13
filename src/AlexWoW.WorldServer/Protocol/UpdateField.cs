@@ -119,6 +119,10 @@ public static class UpdateField
     /// UpdateFields.cpp, калибровка по COINAGE=0x492). M9.6.</summary>
     public const int PlayerCharacterPoints1 = 0x03FC;
 
+    /// <summary>PLAYER_RUNE_REGEN_1 (UNIT_END 0x94 + 0x485), 4 float по типам рун (Blood/Unholy/Frost/Death) —
+    /// скорость регена руны (доля в секунду). Клиент DK без них не считает таймер восстановления рун. RUNE.1.</summary>
+    public const int PlayerRuneRegen1 = 0x0519;
+
     // Вторичные защитные/боевые проценты (float). UNIT_END=0x94; сверено с эталоном UpdateFields.h.
     public const int PlayerBlockPercentage = 0x0400;    // UNIT_END + 0x36C
     public const int PlayerDodgePercentage = 0x0401;    // UNIT_END + 0x36D
