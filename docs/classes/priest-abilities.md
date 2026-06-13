@@ -48,7 +48,7 @@
 | Слово Тьмы: Смерть (Shadow Word: Death) | 32379 | Shadow | Direct (откат на себя) | ⬜ |
 | Вампирическое прикосновение (Vampiric Touch) | 34914 | Shadow | DoT | 🟡 |
 | Чума разума (Devouring Plague) | 2944 | Shadow | DoT | 🟡 |
-| Облик Тьмы (Shadowform) | 15473 | форма 28 / MOD_DAMAGE% | Toggle (форма) | 🟡 toggle-форма (визуал 28) + **+15% Shadow-урона** (MOD_DAMAGE_PERCENT_DONE); пока только прямой урон, DoT-тики ⬜ |
+| Облик Тьмы (Shadowform) | 15473 | форма 28 / MOD_DAMAGE% | Toggle (форма) | ✅ визуал (форма 28) + **+15% Shadow прямого урона** проверены; DoT-тики ⬜ |
 | Дисперсия (Dispersion) | 47585 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ |
 
 > **Чинить:** хил/DoT уже data-driven (🟡 → проверить). Новое: абсорб-щиты (PW:Shield), форма Shadowform (как стойка),
