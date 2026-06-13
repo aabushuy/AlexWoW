@@ -14,7 +14,7 @@ namespace AlexWoW.WorldServer.Handlers;
 internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSender spellGo,
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
-    CrowdControlService crowdControl)
+    CrowdControlService crowdControl, ComboPointService comboPoints)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -119,6 +119,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
             && session.World.FindCreature(targetGuid) is { } ccTarget)
             await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct);
+
+        // CP.2: генератор очков серии (Sinister Strike/Backstab/Rake…) — +N очков на цели-существе (кап 5).
+        if (info.ComboPointsGenerated > 0 && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)
+            await comboPoints.AddAsync(session, targetGuid, info.ComboPointsGenerated, ct);
 
         // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
         if (info.CreateItemId != 0)
