@@ -95,6 +95,9 @@ internal sealed class PlayerMeleeService(
         session.Combat.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
         var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
+        // Фаза 2: % наносимого урона по школе (физ.) — напр. Divine Shield −50%. Мили-абилки получают это
+        // в SpellEffectsService; автоатака — здесь. Маска школы автоатаки — физ. (1).
+        damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, 1, (int)damage));
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
         await combatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за удар
 
