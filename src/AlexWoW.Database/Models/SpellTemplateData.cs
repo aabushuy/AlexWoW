@@ -39,6 +39,10 @@ public sealed record SpellTemplateData
     public int Effect1 { get; init; }
     public int Effect2 { get; init; }
     public int Effect3 { get; init; }
+    // Тип неявной цели A (EffectImplicitTargetA*): 22 = область вокруг точки/кастера (AoE) — для CC по площади (§4).
+    public int EffectImplicitTargetA1 { get; init; }
+    public int EffectImplicitTargetA2 { get; init; }
+    public int EffectImplicitTargetA3 { get; init; }
     public int EffectBasePoints1 { get; init; }
     public int EffectBasePoints2 { get; init; }
     public int EffectBasePoints3 { get; init; }

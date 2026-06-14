@@ -13,6 +13,7 @@ public sealed class SpellTemplateRepository(string connectionString)
                SchoolMask, CastingTimeIndex, PowerType, ManaCost, ManaCostPercentage,
                RecoveryTime, CategoryRecoveryTime, StartRecoveryTime, DurationIndex,
                Effect1, Effect2, Effect3,
+               EffectImplicitTargetA1, EffectImplicitTargetA2, EffectImplicitTargetA3,
                EffectBasePoints1, EffectBasePoints2, EffectBasePoints3,
                EffectDieSides1, EffectDieSides2, EffectDieSides3,
                EffectPointsPerComboPoint1, EffectPointsPerComboPoint2, EffectPointsPerComboPoint3,

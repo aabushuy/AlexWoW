@@ -68,6 +68,31 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
             creature.Template.Name, durationMs);
     }
 
+    /// <summary>§4 CC по площади (Frost Nova/Psychic Scream): накладывает CC на всех живых враждебных существ
+    /// в радиусе вокруг игрока (либо тех, кто уже в бою с ним). Радиус упрощён (DBC SpellRadius не загружен).</summary>
+    private const float AreaCcRadius = 10f;
+    internal async Task ApplyAreaAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
+        long now, CancellationToken ct, int durationOverrideMs = 0)
+    {
+        if (session.Player is not { } player)
+            return;
+        var playerFt = DisplayData.FactionForRace(player.Character.Race);
+        foreach (var creature in session.Visibility.VisibleNpcs.Values.ToList())
+        {
+            if (!creature.IsAlive)
+                continue;
+            var dx = creature.X - player.X;
+            var dy = creature.Y - player.Y;
+            var dz = creature.Z - player.Z;
+            if (dx * dx + dy * dy + dz * dz > AreaCcRadius * AreaCcRadius)
+                continue;
+            // Цель AoE-CC: враждебное по фракции ИЛИ уже атакующее игрока (тест-манекен «.dummy attack»).
+            if (!session.World.IsHostile(creature.Template.Faction, playerFt) && creature.CombatTargetGuid != player.Guid)
+                continue;
+            await ApplyAsync(session, creature, spellId, info, now, ct, durationOverrideMs);
+        }
+    }
+
     /// <summary>Снимает истёкший CC (визуал + флаги + состояние). Зовётся из тика боя существа.</summary>
     internal async Task ExpireIfDueAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
     {
