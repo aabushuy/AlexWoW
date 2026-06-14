@@ -18,12 +18,12 @@
 | Печать мудрости (Seal of Wisdom) | 20166 | toggle / on-hit mana | Toggle | ✅ эксклюзив + on-hit мана по свингу (3% макс.) |
 | Печать справедливости (Seal of Justice) | 20164 | toggle / on-hit stun-proc | Toggle | ✅ эксклюзив + on-hit стан цели (через CC-фреймворк, прок 20170) |
 | Кара (Judgement) | 20271 | Holy | Direct | ⬜ |
-| Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | 🟡 IMMUNITY.1 (физ. урон гасится в ноль) |
+| Длань защиты (Hand of Protection) | 1022 | физ. иммунитет | Buff | ✅ IMMUNITY.1 (физ. урон → «Иммунитет») |
 | Длань свободы (Hand of Freedom) | 1044 | MECHANIC_IMMUNITY (root) | Buff | ⬜ |
 | Очищение (Cleanse) | 4987 | dispel | Utility | ✅ снимает свой дебафф (яд/болезнь) — DSP.1 |
 | Возложение рук (Lay on Hands) | 633 | Holy | Direct heal | ⬜ |
 | Божественная защита (Divine Protection) | 498 | MOD_DAMAGE_PERCENT_TAKEN | Buff | ⬜ (как Shield Wall) |
-| Божественный щит (Divine Shield) | 642 | SCHOOL_IMMUNITY | Buff | 🟡 IMMUNITY.1 (иммунитет ко всем школам; мили-урон → «Иммунитет») |
+| Божественный щит (Divine Shield) | 642 | SCHOOL_IMMUNITY | Buff | ✅ IMMUNITY.1 (иммунитет ко всем школам; мили → «Иммунитет») + Forbearance |
 
 ## Свет (Holy)
 
