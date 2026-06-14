@@ -63,10 +63,18 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
         creature.CrowdControlSlot = CcAuraSlot;
 
         var level = (byte)(session.Character?.Level ?? 1);
-        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
-        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
-            AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, CcAuraSlot, spellId,
-                Flags, level, 1, durationMs), ct);
+        // Аура-иконку CC шлём ТОЛЬКО если спелл не периодический. Спелл с DoT (напр. Strangulate ранга 49916:
+        // немота + периодический урон) уже получает единственную аура-иконку от PeriodicsService на своём слоте —
+        // второй визуал на CC-слоте дал бы ДВЕ одинаковые иконки одного спелла. Состояние CC/флаг немоты/lockout
+        // ниже ставятся всегда (визуал DoT + UNIT_FLAG_SILENCED = одна корректная иконка). Чистый CC (Frost Nova,
+        // HoJ, Polymorph) DoT не несёт — шлёт свою иконку здесь.
+        if (!info.Periodic)
+        {
+            const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+                AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, CcAuraSlot, spellId,
+                    Flags, level, 1, durationMs), ct);
+        }
 
         var flag = UnitFlagFor(info.CrowdControl);
         if (flag != 0)
