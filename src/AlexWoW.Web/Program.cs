@@ -68,7 +68,7 @@ builder.Services.AddRazorPages(o =>
     o.Conventions.AuthorizeFolder("/");
     o.Conventions.AuthorizeFolder("/Admin", "Admin"); // M12: раздел только для администраторов
     o.Conventions.AllowAnonymousToPage("/Index");
-    o.Conventions.AllowAnonymousToPage("/Dashboard"); // прогресс-инфо, открыт
+    o.Conventions.AuthorizePage("/Dashboard", "Admin"); // дашборд прогресса — только админам
     o.Conventions.AllowAnonymousToPage("/Login");
     o.Conventions.AllowAnonymousToPage("/Register");
     o.Conventions.AllowAnonymousToPage("/Error");

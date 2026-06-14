@@ -2,6 +2,7 @@
 @model AlexWoW.Web.Pages.DashboardModel
 @{
     ViewData["Title"] = "Дашборд прогресса";
+    Layout = "_AdminLayout";
 }
 @functions {
     static string Pct(int part, int total) => total == 0 ? "0%" : $"{Math.Round(100.0 * part / total)}%";
@@ -99,20 +100,55 @@ else if (Model.Tracker is null)
 }
 else
 {
-    <table class="data-table">
-        <thead><tr><th>Проект</th><th>Опкоды</th><th>Вес</th><th class="nowrap">Задач (готово)</th><th>Статус</th></tr></thead>
+    <table class="data-table sortable" id="tracker-table">
+        <thead><tr>
+            <th data-type="text">Проект</th>
+            <th data-type="num">Опкоды</th>
+            <th data-type="text">Вес</th>
+            <th class="nowrap" data-type="num">Задач (готово)</th>
+            <th data-type="text">Статус</th>
+        </tr></thead>
         <tbody>
         @foreach (var p in Model.Tracker)
         {
             <tr>
                 <td><a href="@p.Url" target="_blank" rel="noopener">@p.Name</a></td>
-                <td class="nowrap">@p.Opcodes</td>
+                <td class="nowrap" data-sort="@p.Opcodes">@p.Opcodes</td>
                 <td>@p.Weight</td>
-                <td class="nowrap">@p.Tasks @(p.Done > 0 ? $"({p.Done})" : "")</td>
+                <td class="nowrap" data-sort="@p.Tasks">@p.Tasks @(p.Done > 0 ? $"({p.Done})" : "")</td>
                 <td>@p.Status</td>
             </tr>
         }
         </tbody>
     </table>
-    <p class="muted" style="font-size:.82rem;margin-top:8px">Данные трекера кэшируются ~60с. Источник: <a href="@(Model.Tracker.Count > 0 ? Model.Tracker[0].Url.Split("/projects")[0] : "#")" target="_blank" rel="noopener">tasks.home.srv</a>.</p>
+    <p class="muted" style="font-size:.82rem;margin-top:8px">Данные трекера кэшируются ~60с. Клик по заголовку — сортировка. Источник: <a href="@(Model.Tracker.Count > 0 ? Model.Tracker[0].Url.Split("/projects")[0] : "#")" target="_blank" rel="noopener">tasks.home.srv</a>.</p>
+
+    <script>
+        (function () {
+            const table = document.getElementById('tracker-table');
+            if (!table || !table.tHead) return;
+            const tbody = table.tBodies[0];
+            const ths = table.tHead.rows[0].cells;
+            const getVal = (row, i, type) => {
+                const cell = row.cells[i];
+                const v = cell.getAttribute('data-sort') ?? cell.innerText.trim();
+                if (type === 'num') { const m = String(v).match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : -Infinity; }
+                return String(v).toLowerCase();
+            };
+            Array.from(ths).forEach((th, i) => {
+                th.style.cursor = 'pointer';
+                th.title = 'Сортировать';
+                th.addEventListener('click', () => {
+                    const type = th.getAttribute('data-type') || 'text';
+                    const asc = th.getAttribute('data-dir') !== 'asc';
+                    Array.from(ths).forEach(h => { h.removeAttribute('data-dir'); const s = h.querySelector('.sort-ind'); if (s) s.remove(); });
+                    th.setAttribute('data-dir', asc ? 'asc' : 'desc');
+                    const ind = document.createElement('span'); ind.className = 'sort-ind'; ind.textContent = asc ? ' ▲' : ' ▼'; th.appendChild(ind);
+                    Array.from(tbody.rows)
+                        .sort((a, b) => { const va = getVal(a, i, type), vb = getVal(b, i, type); return (va < vb ? -1 : va > vb ? 1 : 0) * (asc ? 1 : -1); })
+                        .forEach(r => tbody.appendChild(r));
+                });
+            });
+        })();
+    </script>
 }

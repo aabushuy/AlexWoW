@@ -1,14 +1,13 @@
 using AlexWoW.Web.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages;
 
 /// <summary>
 /// Дашборд прогресса (одностраничный): срез 1 — БД <c>project</c> (механики/абилки/таланты/расы),
-/// срез 2 — трекер Vikunja (доменные проекты P01..P40). Read-only; доступен без логина (прогресс-инфо).
+/// срез 2 — трекер Vikunja (доменные проекты P01..P40). Read-only; только админам (политика "Admin",
+/// см. Program.cs), оформлен в админ-оболочке (_AdminLayout).
 /// </summary>
-[AllowAnonymous]
 public sealed class DashboardModel(ProjectDashboardService project, VikunjaDashboardService tracker) : PageModel
 {
     public ProjectDashboardService.DashboardData? Db { get; private set; }

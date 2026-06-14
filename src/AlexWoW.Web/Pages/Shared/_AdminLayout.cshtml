@@ -13,6 +13,8 @@
                asp-page="/Admin/Accounts/Index">Аккаунты</a>
             <a class="@(Active("/Admin/Server") ? "active" : null)"
                asp-page="/Admin/Server">Сервер</a>
+            <a class="@(Active("/Dashboard") ? "active" : null)"
+               asp-page="/Dashboard">Дашборд</a>
             <a class="@(Active("/Admin/Index", "/Admin/Session") ? "active" : null)"
                asp-page="/Admin/Index">Spell QA</a>
         </nav>
