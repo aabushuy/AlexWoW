@@ -46,7 +46,7 @@
 | Щит праведника (Avenger's Shield) | 31935 | Holy | Direct (бросок щита) | ✅ урон сверен #2 |
 | Щит праведности (Shield of Righteousness) | 61411 | Holy | Direct (требует щит) | ✅ урон сверен #2 |
 | Длань спасения (Hand of Reckoning) | 62124 | таунт+урон | Utility | ➖ |
-| Священный щит (Holy Shield) | 20925 | MOD_BLOCK_PERCENT | Buff | ⬜ (как Shield Block) |
+| Щит небес (Holy Shield) | 48952 | MOD_BLOCK_PERCENT + урон при блоке | Buff | ✅ BLOCK.2: +30% блока (5%→35%) + ~274 Свет по атакующему при блоке. Todo: 8 зарядов |
 
 ## Воздаяние (Retribution)
 
