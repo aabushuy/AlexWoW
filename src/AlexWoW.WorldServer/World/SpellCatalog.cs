@@ -128,7 +128,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         bool ImmuneSelfRoot = false,
         // DODGE.1: +% уклонения от ауры (Evasion рога) — само-бафф; учитывается в резолвере входящего мили-удара.
         int DodgePct = 0,
-        // BLOCK.2: урон по атакующему при блоке (Священный щит / Holy Shield) — школа из School. 0 — нет.
+        // BLOCK.2: урон по атакующему при блоке (Щит небес / Holy Shield) — школа из School. 0 — нет.
         int BlockReflectDamage = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
@@ -261,7 +261,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // в резолвере входящего мили-удара (avoidance до митигейшна).
         var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
         var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
-        // BLOCK.2: урон по атакующему при блоке (Священный щит / Holy Shield 48952): aura 43 PROC_TRIGGER_DAMAGE,
+        // BLOCK.2: урон по атакующему при блоке (Щит небес / Holy Shield 48952): aura 43 PROC_TRIGGER_DAMAGE,
         // величина = BasePoints+1, школа — из SchoolMask спелла (Holy). Наносится при успешном блоке.
         var reflectAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraProcTriggerDamage);
         var blockReflect = reflectAura.Eff == EffectApplyAura ? reflectAura.Bp + 1 : 0;
