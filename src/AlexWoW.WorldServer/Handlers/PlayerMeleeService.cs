@@ -17,6 +17,7 @@ internal sealed class PlayerMeleeService(
     KillRewardService killReward,
     SealService seals,
     ProcService procs,
+    CrowdControlService crowdControl,
     SpellCatalog spellCatalog)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
@@ -132,6 +133,10 @@ internal sealed class PlayerMeleeService(
                 session.Account, creature.Template.Name, creature.Guid, WorldState.RespawnDelay / 1000);
             return;
         }
+
+        // §4 break-on-damage: мили-удар ломает Polymorph/Disorient/Fear на цели (стан/рут/немота — нет).
+        if (damage > 0)
+            await crowdControl.TryBreakOnDamageAsync(session.World, creature, now, ct);
 
         // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.). Школа удара — физическая (1),
         // чтобы прок с SchoolMask (напр. Omen of Clarity, маска 127) проходил фильтр школы (PROC.2).

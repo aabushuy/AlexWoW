@@ -17,6 +17,7 @@ internal sealed class SpellEffectsService(
     KillRewardService killReward,
     SpellTestCaptureService spellTestCapture,
     ProcService procs,
+    CrowdControlService crowdControl,
     TerrainMaps terrain)
 {
     /// <summary>Прямой урон спеллом по существу-цели: лог урона + HP наблюдателям + смерть/лут + ответный бой.</summary>
@@ -52,6 +53,10 @@ internal sealed class SpellEffectsService(
                 session.Account, creature.Template.Name, spellId);
             return;
         }
+
+        // §4 break-on-damage: урон спеллом ломает Polymorph/Disorient/Fear на цели (стан/рут/немота — нет).
+        if (damage > 0)
+            await crowdControl.TryBreakOnDamageAsync(session.World, creature, now, ct);
 
         // M7 #13: урон спеллом (в т.ч. с дистанции) вводит существо в ответный бой (как landed-удар мили).
         await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
