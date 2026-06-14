@@ -78,6 +78,11 @@ services:
       Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # БД трекинга прогресса (дашборд, срез 1). Создаётся вручную: deploy/sql/project-schema.sql + project-seed.sql.
       Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера; .env стирается деплоем, поэтому здесь.
+      Web__Vikunja__BaseUrl: "https://tasks.home.srv"
+      Web__Vikunja__Token: "tk_e44d354839d35c4ab12bc171b7fbd32d11428055"
+      Web__Vikunja__ProjectId: "11"
+      Web__Vikunja__VerifySsl: "false"
     ports:
       - "8090:8080"   # HTTP; наружу (alexwow.home.srv) проксирует Caddy на 192.168.2.210:8090
     volumes:

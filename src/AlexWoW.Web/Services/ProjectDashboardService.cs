@@ -28,7 +28,7 @@ public sealed class ProjectDashboardService(IOptions<WebOptions> options, ILogge
     public sealed record Domain(string Key, string Title, StatusCounts Counts, IReadOnlyList<Group> Groups);
     public sealed record DashboardData(IReadOnlyList<Domain> Domains);
 
-    private sealed record Row(string GroupName, string Status, int Cnt);
+    private sealed record Row(string GroupName, string Status, long Cnt); // COUNT(*) -> BIGINT
 
     public async Task<DashboardData?> GetAsync(CancellationToken ct)
     {
@@ -74,10 +74,10 @@ public sealed class ProjectDashboardService(IOptions<WebOptions> options, ILogge
         foreach (var r in rows)
             switch (r.Status)
             {
-                case "✅": done += r.Cnt; break;
-                case "🟡": impl += r.Cnt; break;
-                case "⬜": todo += r.Cnt; break;
-                default: na += r.Cnt; break; // ➖ или пусто — вне этапа/без статуса
+                case "✅": done += (int)r.Cnt; break;
+                case "🟡": impl += (int)r.Cnt; break;
+                case "⬜": todo += (int)r.Cnt; break;
+                default: na += (int)r.Cnt; break; // ➖ или пусто — вне этапа/без статуса
             }
         return new StatusCounts(done, impl, todo, na);
     }
