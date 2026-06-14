@@ -121,7 +121,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         uint ProcTriggerSpellId = 0, uint ProcFlags = 0, uint ProcChance = 0,
         // IMMUNITY.1: маска школ, к урону которых даёт иммунитет (Divine Shield/Ice Block — 127 все школы;
         // Hand of Protection — 1 физ.). 0 — не «пузырь». Пока аура активна, урон этих школ гасится в ноль.
-        byte ImmuneSchoolMask = 0);
+        byte ImmuneSchoolMask = 0,
+        // IMMUNITY.1: пузырь обездвиживает кастующего (Ice Block «вмёрз в глыбу» — MOD_STUN на себя). Divine Shield — нет.
+        bool ImmuneSelfRoot = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -343,6 +345,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // IMMUNITY.1: «пузырь» неуязвимости (Ice Block) несёт MOD_STUN на СЕБЯ — это не offensive CC, а часть
         // защитного само-баффа. Без снятия CC-классификации каст ушёл бы в CC-ветку (стан на цель) мимо
         // ApplyAuraEffectAsync — и иммунитет бы не наложился. Пузырь всегда трактуем как само-бафф.
+        // Само-стан/рут (Ice Block «вмёрз в глыбу») переносим в флаг ImmuneSelfRoot → обездвиживание игрока.
+        // Divine Shield такой ауры не несёт (в нём можно двигаться) — рут не ставится.
+        var immuneSelfRoot = immuneSchoolMask != 0 && ccEff.Eff == EffectApplyAura
+            && ccEff.Aura is AuraModStun or AuraModRoot;
         if (immuneSchoolMask != 0)
             crowdControl = CrowdControlKind.None;
         var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
@@ -420,7 +426,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask);
+            immuneSchoolMask, immuneSelfRoot);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
