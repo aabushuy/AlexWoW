@@ -1,0 +1,118 @@
+@page
+@model AlexWoW.Web.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Дашборд прогресса";
+}
+@functions {
+    static string Pct(int part, int total) => total == 0 ? "0%" : $"{Math.Round(100.0 * part / total)}%";
+}
+
+<style>
+    .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 16px 0 28px; }
+    .dash-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 16px; }
+    .dash-card h3 { margin: 0 0 4px; font-size: 1rem; }
+    .dash-pct { font-size: 1.8rem; font-weight: 700; }
+    .dash-sub { font-size: .85rem; }
+    .bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; margin: 10px 0 6px; background: rgba(255,255,255,.08); }
+    .bar > i { display: block; height: 100%; }
+    .seg-done { background: #4caf50; } .seg-impl { background: #ffb300; } .seg-todo { background: #555c66; } .seg-na { background: #2e333a; }
+    .legend span { display: inline-flex; align-items: center; gap: 5px; margin-right: 14px; font-size: .82rem; }
+    .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+    .mini-bar { width: 120px; height: 8px; border-radius: 4px; overflow: hidden; display: inline-flex; background: rgba(255,255,255,.08); vertical-align: middle; }
+    .mini-bar > i { height: 100%; } .nowrap { white-space: nowrap; }
+</style>
+
+<h1>Дашборд прогресса</h1>
+<p class="lead muted">Два среза: трекинг по БД <code>project</code> (перенос из docs) и сводка по трекеру Vikunja.</p>
+
+<div class="legend" style="margin-bottom:6px">
+    <span><i class="seg-done"></i> готово (✅)</span>
+    <span><i class="seg-impl"></i> реализовано (🟡)</span>
+    <span><i class="seg-todo"></i> не сделано (⬜)</span>
+    <span><i class="seg-na"></i> вне этапа (➖)</span>
+</div>
+
+@functions {
+    string Bar(ProjectDashboardService.StatusCounts c)
+    {
+        int t = c.Total == 0 ? 1 : c.Total;
+        return $"<i class='seg-done' style='width:{100.0 * c.Done / t}%'></i>" +
+               $"<i class='seg-impl' style='width:{100.0 * c.Impl / t}%'></i>" +
+               $"<i class='seg-todo' style='width:{100.0 * c.Todo / t}%'></i>" +
+               $"<i class='seg-na' style='width:{100.0 * c.Na / t}%'></i>";
+    }
+}
+
+<h2>1. Трекинг (БД project)</h2>
+@if (!Model.DbConfigured)
+{
+    <div class="alert alert-warn">БД <code>project</code> не настроена (нет <code>Web:ProjectConnectionString</code>).</div>
+}
+else if (Model.Db is null)
+{
+    <div class="alert alert-error">Не удалось прочитать БД <code>project</code>.</div>
+}
+else
+{
+    <div class="dash-cards">
+        @foreach (var d in Model.Db.Domains)
+        {
+            <div class="dash-card">
+                <h3>@d.Title</h3>
+                <div class="dash-pct">@d.Counts.Percent%</div>
+                <div class="dash-sub muted">@d.Counts.Done ✅ · @d.Counts.Impl 🟡 · @d.Counts.Todo ⬜ · @d.Counts.Na ➖ &nbsp;(@d.Counts.Total)</div>
+                <div class="bar">@Html.Raw(Bar(d.Counts))</div>
+            </div>
+        }
+    </div>
+
+    @foreach (var d in Model.Db.Domains)
+    {
+        <details>
+            <summary><strong>@d.Title</strong> — разбивка (@d.Groups.Count)</summary>
+            <table class="data-table" style="margin:10px 0 22px">
+                <thead><tr><th>@d.Key</th><th class="nowrap">Прогресс</th><th>✅</th><th>🟡</th><th>⬜</th><th>➖</th><th>%</th></tr></thead>
+                <tbody>
+                @foreach (var g in d.Groups)
+                {
+                    <tr>
+                        <td>@g.Name</td>
+                        <td><span class="mini-bar">@Html.Raw(Bar(g.Counts))</span></td>
+                        <td>@g.Counts.Done</td><td>@g.Counts.Impl</td><td>@g.Counts.Todo</td><td>@g.Counts.Na</td>
+                        <td class="nowrap"><strong>@g.Counts.Percent%</strong></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </details>
+    }
+}
+
+<h2 style="margin-top:30px">2. Трекер Vikunja (домены P01–P40)</h2>
+@if (!Model.TrackerConfigured)
+{
+    <div class="alert alert-warn">Vikunja не настроена (нет <code>Web:Vikunja</code>).</div>
+}
+else if (Model.Tracker is null)
+{
+    <div class="alert alert-error">Не удалось получить данные из Vikunja.</div>
+}
+else
+{
+    <table class="data-table">
+        <thead><tr><th>Проект</th><th>Опкоды</th><th>Вес</th><th class="nowrap">Задач (готово)</th><th>Статус</th></tr></thead>
+        <tbody>
+        @foreach (var p in Model.Tracker)
+        {
+            <tr>
+                <td><a href="@p.Url" target="_blank" rel="noopener">@p.Name</a></td>
+                <td class="nowrap">@p.Opcodes</td>
+                <td>@p.Weight</td>
+                <td class="nowrap">@p.Tasks @(p.Done > 0 ? $"({p.Done})" : "")</td>
+                <td>@p.Status</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <p class="muted" style="font-size:.82rem;margin-top:8px">Данные трекера кэшируются ~60с. Источник: <a href="@(Model.Tracker.Count > 0 ? Model.Tracker[0].Url.Split("/projects")[0] : "#")" target="_blank" rel="noopener">tasks.home.srv</a>.</p>
+}
