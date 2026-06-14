@@ -340,6 +340,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             AuraModSilence => CrowdControlKind.Silence,
             _ => CrowdControlKind.Disorient, // AuraModConfuse
         };
+        // IMMUNITY.1: «пузырь» неуязвимости (Ice Block) несёт MOD_STUN на СЕБЯ — это не offensive CC, а часть
+        // защитного само-баффа. Без снятия CC-классификации каст ушёл бы в CC-ветку (стан на цель) мимо
+        // ApplyAuraEffectAsync — и иммунитет бы не наложился. Пузырь всегда трактуем как само-бафф.
+        if (immuneSchoolMask != 0)
+            crowdControl = CrowdControlKind.None;
         var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
         // CP.3b: верхняя граница длительности (для combo-финишеров max>base → длит. от очков серии).
         var maxDurationMs = (isPeriodic || auraBuff || crowdControl != CrowdControlKind.None)
