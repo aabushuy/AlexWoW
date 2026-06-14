@@ -34,6 +34,10 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
             or SpellCatalog.CrowdControlKind.Disorient
            && now < c.CrowdControlUntilMs;
 
+    /// <summary>§4: обездвижено ли существо рутом (Frost Nova) — не преследует, но бьёт в упор. Свинг рут не блокирует.</summary>
+    internal static bool IsRooted(WorldCreature c, long now)
+        => c.CrowdControl == SpellCatalog.CrowdControlKind.Root && now < c.CrowdControlUntilMs;
+
     /// <summary>Накладывает CC на существо (после прямого эффекта каста): состояние + визуал ауры + UNIT_FLAG.
     /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо базовой длительности (CP.3b: стан-финишер
     /// Kidney Shot, длительность от очков серии; у ранга 1 base=0, поэтому работает только через override).</summary>

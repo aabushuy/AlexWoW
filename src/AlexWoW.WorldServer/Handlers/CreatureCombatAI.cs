@@ -215,6 +215,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             return;
         }
 
+        // §4: рут (Ледяные оковы/Frost Nova) обездвиживает — существо не преследует (бить в упор может, выше).
+        if (CrowdControlService.IsRooted(creature, now))
+            return;
+
         if (now < creature.NextMoveMs)
             return;
         creature.NextMoveMs = now + MoveIntervalMs;
