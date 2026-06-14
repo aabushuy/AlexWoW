@@ -107,6 +107,10 @@ internal sealed class PlayerMeleeService(
             + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
         // Фаза 2: % наносимого урона по школе (Divine Shield −50% и т.п.) — для автоатаки/абилки.
         var damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, school, rawDamage));
+        // CRIT.2: мили-крит ×2 по шансу из статов (кэш RefreshMeleeAsync). Флаг крита — в пакете → клиент рисует крит.
+        var crit = Random.Shared.NextDouble() * 100.0 < session.Combat.MeleeCritPct;
+        if (crit)
+            damage *= 2;
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
         if (pendingInfo is null)
             await combatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за белый удар (спец — нет)
@@ -114,10 +118,10 @@ internal sealed class PlayerMeleeService(
         var attackerGuid = (ulong)session.InWorldGuid;
         if (pendingInfo is not null)
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
-                SpellPackets.BuildDamageLog(creature.Guid, attackerGuid, pendingId, damage, overkill, school, crit: false), ct);
+                SpellPackets.BuildDamageLog(creature.Guid, attackerGuid, pendingId, damage, overkill, school, crit), ct);
         else
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill), ct);
+                CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill, crit: crit), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
 
         if (died)
@@ -130,8 +134,9 @@ internal sealed class PlayerMeleeService(
         }
 
         // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.). Школа удара — физическая (1),
-        // чтобы прок с SchoolMask (напр. Omen of Clarity, маска 127) проходил фильтр школы (PROC.2). Мили-крита нет → wasCrit:false.
-        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct, wasCrit: false, spellSchoolMask: 1);
+        // чтобы прок с SchoolMask (напр. Omen of Clarity, маска 127) проходил фильтр школы (PROC.2).
+        // CRIT.2: передаём флаг крита — теперь работают и мили-крит-проки (procEx PROC_EX_CRITICAL_HIT).
+        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct, wasCrit: crit, spellSchoolMask: 1);
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))

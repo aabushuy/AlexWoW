@@ -49,6 +49,8 @@ internal sealed class SessionCombatState
     internal float DodgePct { get; set; }
     internal float ParryPct { get; set; }
     internal float BlockPct { get; set; }
+    /// <summary>Шанс мили-крита (%) из статов (кэш RefreshMeleeAsync) — ролл крита автоатаки/мили-абилки. CRIT.2.</summary>
+    internal float MeleeCritPct { get; set; }
     internal uint ArmorValue { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
