@@ -15,7 +15,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
     CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs,
-    RuneService runes)
+    RuneService runes, AuraService auras)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -138,6 +138,12 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // CC-спеллы (стан/рут/…) сюда НЕ идут — их визуал/состояние ставит CrowdControlService (иначе дубль ауры).
         if (info.AuraBuff && info.CrowdControl == SpellCatalog.CrowdControlKind.None)
             await periodics.ApplyAuraEffectAsync(session, spellId, info, targetGuid, ct, durationOverrideMs: finisherDur);
+
+        // IMMUNITY.2: Forbearance — пузыри/Lay on Hands/Avenging Wrath вешают на кастера дебафф 25771 (2 мин),
+        // блокирующий их повторное применение (общий КД; гейт — в SpellCastService).
+        if (SpellCatalog.IsForbearanceSpell(spellId))
+            await auras.ApplyAsync(session, SpellCatalog.ForbearanceDebuffId, SpellCatalog.ForbearanceDurationMs,
+                positive: false, form: 0, ct);
 
         // Фаза 2 CC: контроль цели-существа (стан/рут/страх/немота/дезориентация).
         if (info.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0

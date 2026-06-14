@@ -21,6 +21,7 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     private const byte CastResultSpellInProgress = 0x69; // 105 — уже идёт другой каст
     private const byte CastResultReagents = 0x64;        // 100 — не хватает реагентов (крафт) M11.3
     private const byte CastResultNoComboPoints = 0x4E;   // 78  — финишер без очков серии (SPELL_FAILED_NO_COMBO_POINTS) CP.3
+    private const byte CastResultCasterAurastate = 0x16; // 22  — нельзя из-за ауры кастера (Forbearance) — CMaNGOS SPELL_FAILED_CASTER_AURASTATE
     private const byte SpellFailedInterrupted = 0x28;
 
     /// <summary>Толеранс GCD-гейта (мс): не режем каст у границы GCD из-за скью клиент/сервер. M10.3.</summary>
@@ -44,6 +45,17 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // M6.12/M7 #21: переключатели (стойки/ауры/аспекты) — мгновенная перманентная аура, без маны/цели/КД.
         if (await spellToggles.TryToggleAsync(session, spellId, castCount, ct))
             return;
+
+        // IMMUNITY.2: Forbearance — Divine Shield/Protection/Hand of Protection/Lay on Hands/Avenging Wrath
+        // нельзя применить, пока висит дебафф 25771 (2 мин). Отказ → клиент пишет «Вы пока не можете…».
+        if (SpellCatalog.IsForbearanceSpell(spellId)
+            && session.Progression.Auras.Any(a => a.SpellId == SpellCatalog.ForbearanceDebuffId
+                && (a.ExpiresAtMs == 0 || Environment.TickCount64 < a.ExpiresAtMs)))
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
+            return;
+        }
 
         // M10.3: уже идёт каст-тайм спелл → новый каст нельзя (как на оффе: кнопка блокируется, текущий
         // каст сбивается только движением/прыжком). Без этого в окне «GCD истёк, но каст ещё идёт»
