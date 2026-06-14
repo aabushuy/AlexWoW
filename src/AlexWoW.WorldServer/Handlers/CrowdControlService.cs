@@ -144,6 +144,24 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
         creature.CrowdControlSpellId = 0;
     }
 
+    /// <summary>§4 break-on-damage: снимает CC, ломающийся при получении урона — Polymorph/Disorient и Fear.
+    /// Стан/рут/немота урон НЕ ломает (остаются по дизайну). Зовётся из путей нанесения урона существу
+    /// (мили/спелл/DoT-тик) при damage&gt;0. Возвращает true, если CC снят. Эталон — CMaNGOS: ауры с
+    /// AURA_INTERRUPT_FLAG_DAMAGE (Polymorph/Sap/…) спадают при уроне. Упрощение: Fear ломается с любого
+    /// урона (в оригинале — порог накопленного урона ~доли HP).</summary>
+    internal async Task<bool> TryBreakOnDamageAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
+    {
+        if (now >= creature.CrowdControlUntilMs
+            || creature.CrowdControl is not (SpellCatalog.CrowdControlKind.Disorient or SpellCatalog.CrowdControlKind.Fear))
+            return false;
+        var broken = creature.CrowdControl;
+        await RemoveVisualAsync(world, creature, ct);
+        creature.CrowdControl = SpellCatalog.CrowdControlKind.None;
+        creature.CrowdControlSpellId = 0;
+        logger.LogDebug("CC break-on-damage: '{Name}' — снят {Kind} по урону", creature.Template.Name, broken);
+        return true;
+    }
+
     /// <summary>Снимает CC-визуал существа: аура-дебафф + сброс UNIT_FIELD_FLAGS.</summary>
     private static async Task RemoveVisualAsync(WorldState world, WorldCreature creature, CancellationToken ct)
     {

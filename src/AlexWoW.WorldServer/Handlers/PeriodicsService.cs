@@ -41,7 +41,8 @@ internal sealed class PeriodicsService(
     SpellCatalog spellCatalog,
     CreatureCombatAI creatureAi,
     SpellTestCaptureService spellTestCapture,
-    KillRewardService killReward)
+    KillRewardService killReward,
+    CrowdControlService crowdControl)
 {
     /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
     /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо полной длительности (восстановление с остатком, M10.5).</summary>
@@ -331,6 +332,8 @@ internal sealed class PeriodicsService(
         }
         else
         {
+            // §4 break-on-damage: тик DoT тоже ломает Polymorph/Disorient/Fear на цели.
+            await crowdControl.TryBreakOnDamageAsync(session.World, creature, now, ct);
             await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: false, ct);
         }
     }
