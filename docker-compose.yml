@@ -76,6 +76,8 @@ services:
     environment:
       # Та же БД alexwow_auth, что и у игровых серверов (общие аккаунты/персонажи).
       Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # БД трекинга прогресса (дашборд, срез 1). Создаётся вручную: deploy/sql/project-schema.sql + project-seed.sql.
+      Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
     ports:
       - "8090:8080"   # HTTP; наружу (alexwow.home.srv) проксирует Caddy на 192.168.2.210:8090
     volumes:

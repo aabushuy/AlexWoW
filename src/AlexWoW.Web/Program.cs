@@ -34,6 +34,8 @@ builder.Services.AddSingleton<ISpellTestRepository, EfSpellTestRepository>(); //
 builder.Services.AddSingleton<ISettingRepository, EfSettingRepository>(); // M8.6: настройки сервера (стоимости)
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
+builder.Services.AddSingleton<ProjectDashboardService>();  // Дашборд: срез 1 — БД project (прогресс)
+builder.Services.AddSingleton<VikunjaDashboardService>();  // Дашборд: срез 2 — трекер Vikunja (P01..P40)
 builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -66,6 +68,7 @@ builder.Services.AddRazorPages(o =>
     o.Conventions.AuthorizeFolder("/");
     o.Conventions.AuthorizeFolder("/Admin", "Admin"); // M12: раздел только для администраторов
     o.Conventions.AllowAnonymousToPage("/Index");
+    o.Conventions.AllowAnonymousToPage("/Dashboard"); // прогресс-инфо, открыт
     o.Conventions.AllowAnonymousToPage("/Login");
     o.Conventions.AllowAnonymousToPage("/Register");
     o.Conventions.AllowAnonymousToPage("/Error");

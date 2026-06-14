@@ -8,6 +8,9 @@ public sealed class WebOptions
     /// <summary>Строка подключения к MySQL (БД alexwow_auth — те же аккаунты/персонажи, что и в игре).</summary>
     public string ConnectionString { get; set; } = string.Empty;
 
+    /// <summary>Строка подключения к БД <c>project</c> (трекинг прогресса для дашборда). Пусто — срез БД скрыт.</summary>
+    public string ProjectConnectionString { get; set; } = string.Empty;
+
     /// <summary>Интеграция с Vikunja (M12 Spell QA — заведение тикета по аномалиям сессии). Пусто — выключено.</summary>
     public VikunjaOptions Vikunja { get; set; } = new();
 
