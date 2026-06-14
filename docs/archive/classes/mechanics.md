@@ -83,14 +83,23 @@ Dragon's Breath, Frostbolt, Ice Lance, Frost Nova, Cone of Cold, Arcane Explosio
 Детект CC в `SpellCatalog.FromTemplate` (ауры 12/26/7/27/5 → Stun/Root/Fear/Silence/Disorient + длительность).
 На существе-цели: визуал (аура-дебафф + UNIT_FLAG) + состояние; стан/страх/дезориентация **блокируют свинг**
 существа (`CreatureCombatAI`); истечение — в `WorldTick` (у любого существа, в т.ч. манекена). PvE-фокус:
-рут/немота визуальны (существа не ходят/редко кастуют). Стат-эффекты/breaks-on-damage/иммунитеты — позже.
+рут визуален (существа не ходят), **немота лочит каст** (SILENCE.1, ниже). Стат-эффекты/breaks-on-damage/иммунитеты — позже.
 | Тип | Абилки (класс) | Статус |
 |---|---|---|
 | Stun | Hammer of Justice (Пал ✅), Concussion Blow (Воин), Cheap/Kidney Shot (Разб), Deep Freeze (Маг), Bash (Друид), Shadowfury (ЧК) | ✅ одиночная цель (HoJ + Seal of Justice проверены); AoE-стан ⬜ |
 | Root | Frost Nova (Маг — AoE!), Entangling Roots (Друид), Freezing Trap (Охот), Chains of Ice (DK) | 🟡 одиночная цель — визуал; AoE (Frost Nova) ⬜ |
 | Fear | Psychic Scream (Жрец — AoE), Fear/Howl of Terror (ЧК), Intimidating Shout (Воин), Scare Beast (Охот) | 🟡 одиночная цель (стопает + визуал); AoE/fleeing ⬜ |
-| Silence | Strangulate (DK), Silencing Shot (Охот), Arcane Torrent (Эльф крови); Counterspell-lockout (Маг) | 🟡 (визуал) / ⬜ (lockout) |
+| Silence | Strangulate (DK), Silencing Shot (Охот), Arcane Torrent (Эльф крови); Counterspell-lockout (Маг) | 🟡 SILENCE.1 (визуал + **lockout каста существа**: прерывает текущий каст + лочит все школы на длительность; ждёт проверки) |
 | Disorient/Poly | Polymorph (Маг ✅), Blind (Разб), Dragon's Breath (Маг — AoE), Scatter Shot (Охот), Hibernate | ✅ одиночная цель (Polymorph проверен; стопает + визуал); break-on-damage ⬜ |
+
+> **SILENCE.1 — немота как lockout каста.** Раньше немота была только визуалом (UNIT_FLAG_SILENCED).
+> Теперь при наложении CC-немоты (`CrowdControlService.ApplyAsync`, аура 27) существо: (1) если кастует —
+> каст прерывается (SMSG_SPELL_FAILED_OTHER + SMSG_SPELL_FAILURE, INTERRUPTED 0x28 — клиент гасит каст-бар,
+> как INT.1); (2) лочатся **все школы** (`SchoolLockMask=0x7F`, `SchoolLockUntilMs`/`NextCastMs` = конец немоты),
+> поэтому caster-AI (`CreatureCombatAI.TickCasterDummyAsync`) не возобновляет каст до истечения. По концу немоты
+> лок снимается сам (по времени). Отличие от INT.1: interrupt лочит ОДНУ школу на короткий фикс-лок из спелла,
+> немота лочит ВСЕ школы на свою длительность. Стенд — кастующий манекен `.dummy caster` (крутит Frostbolt):
+> немота на нём → каст-бар падает и не возобновляется, пока висит дебафф. PvP-немота игрока — позже.
 
 ### 5. Interrupt — ✅ (INT.1)
 Pummel/Shield Bash (Воин), Kick (Разб), Counterspell (Маг), Mind Freeze (DK), Wind Shear (Шам), Skull Bash (Друид), Spell Lock (пет ЧК).

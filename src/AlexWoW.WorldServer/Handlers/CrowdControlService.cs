@@ -17,6 +17,11 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
     /// <summary>Зарезервированный слот ауры CC на существе (выше DoT-слотов 0..N, чтобы не сталкиваться).</summary>
     private const byte CcAuraSlot = 40;
 
+    /// <summary>SpellCastResult INTERRUPTED (0x28) — гасит каст-бар существа у клиента (как INT.1).</summary>
+    private const byte SpellFailedInterrupted = 0x28;
+    /// <summary>Маска всех школ магии (SpellSchoolMask) — немота лочит каст любой школы.</summary>
+    private const byte AllSchoolsMask = 0x7F;
+
     /// <summary>UNIT_FLAG для клиентского визуала по типу CC (рут — без флага, клиент по ауре MOD_ROOT).</summary>
     private static uint UnitFlagFor(SpellCatalog.CrowdControlKind k) => k switch
     {
@@ -68,8 +73,32 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgUpdateObject,
                 CreatureUpdate.BuildUnitFlagsUpdate(creature.Guid, flag), ct);
 
+        // §4 SILENCE.1: немота — не только визуал, но и lockout каста. Прерываем текущий каст существа
+        // (гасим каст-бар, как INT.1) и лочим ВСЕ школы до конца немоты — caster-AI не возобновит каст.
+        if (info.CrowdControl == SpellCatalog.CrowdControlKind.Silence)
+            await ApplySilenceLockoutAsync(session.World, creature, now + durationMs, ct);
+
         logger.LogDebug("CC '{User}': {Kind} на '{Name}' на {Ms}мс", session.Account, info.CrowdControl,
             creature.Template.Name, durationMs);
+    }
+
+    /// <summary>§4 SILENCE.1: lockout каста существа на время немоты — прерывает текущий каст (если есть,
+    /// гасит каст-бар как INT.1) и лочит ВСЕ школы до <paramref name="untilMs"/>. Caster-AI (CreatureCombatAI)
+    /// ждёт разлок по <see cref="WorldCreature.SchoolLockUntilMs"/>; по истечении немоты каст возобновляется сам.</summary>
+    private async Task ApplySilenceLockoutAsync(WorldState world, WorldCreature creature, long untilMs, CancellationToken ct)
+    {
+        if (creature.CastingSpellId != 0)
+        {
+            var interrupted = creature.CastingSpellId;
+            await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellFailedOther,
+                SpellPackets.BuildSpellFailedOther(creature.Guid, interrupted, SpellFailedInterrupted), ct);
+            await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellFailure,
+                SpellPackets.BuildSpellFailure(creature.Guid, interrupted, SpellFailedInterrupted), ct);
+            creature.CastingSpellId = 0;
+        }
+        creature.SchoolLockMask = AllSchoolsMask;
+        creature.SchoolLockUntilMs = untilMs;
+        creature.NextCastMs = untilMs; // не возобновлять каст до конца немоты
     }
 
     /// <summary>§4 CC по площади (Frost Nova/Psychic Scream): накладывает CC на всех живых враждебных существ
