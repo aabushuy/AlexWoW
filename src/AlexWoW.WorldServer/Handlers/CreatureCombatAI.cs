@@ -178,6 +178,8 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
             // ABS.1: absorb-щиты гасят урон ПОСЛЕ митигейшна, до HP (мили существа — физическая школа, маска 1).
             var absorbed = await absorbShields.AbsorbAsync(player.Session, SchoolMaskPhysical, damage, ct);
+            // ABS.3 Sacred Shield (53601): прок-поглощение текущего удара (до ~500), не чаще раз в 6 с.
+            absorbed += await absorbShields.TrySacredShieldAsync(player.Session, damage - absorbed, now, ct);
             damage -= absorbed;
             var (_, died) = world.ApplyPlayerDamage(player, damage);
             player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена

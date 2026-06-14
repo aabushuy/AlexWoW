@@ -1,4 +1,5 @@
 using AlexWoW.WorldServer.Net;
+using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.Handlers;
@@ -9,8 +10,38 @@ namespace AlexWoW.WorldServer.Handlers;
 /// школы; Fire/Frost Ward — своя). Входящий урон (после митигейшна) гасится подходящими щитами до исчерпания
 /// пула; опустошённый щит спадает досрочно (снимаем ауру-иконку). Эталон — CMaNGOS <c>Unit::CalculateAbsorb</c>.
 /// </summary>
-internal sealed class AbsorbShieldService(AuraService auras, ManaRegenService manaRegen)
+internal sealed class AbsorbShieldService(AuraService auras, ManaRegenService manaRegen, SpellCatalog spellCatalog)
 {
+    // ABS.3 Sacred Shield (53601): пока висит бафф, при получении урона (не чаще раз в 6 с) накладывается
+    // поглощающий щит 58597 (~500 ед.). У нас существа бьют только мили → поглощаем сам удар напрямую.
+    private const uint SacredShieldAura = 53601;
+    private const uint SacredShieldTrigger = 58597;
+    private const long SacredShieldIcdMs = 6000;
+
+    /// <summary>
+    /// Sacred Shield (ABS.3): если активен бафф 53601 и прошёл ICD 6 с — поглощает до <c>cap</c> (из absorb-эффекта
+    /// 58597) от текущего удара, ставит ICD и показывает иконку щита 58597. Возвращает поглощённое.
+    /// </summary>
+    internal async Task<uint> TrySacredShieldAsync(WorldSession session, uint remainingDamage, long now, CancellationToken ct)
+    {
+        if (remainingDamage == 0 || now < session.Combat.SacredShieldNextProcMs)
+            return 0;
+        if (!session.Progression.Auras.Any(a => a.SpellId == SacredShieldAura))
+            return 0;
+
+        var trigger = await spellCatalog.GetAsync(SacredShieldTrigger, ct);
+        var cap = (uint)Math.Max(0, trigger?.AbsorbAmount ?? 0);
+        if (cap == 0)
+            return 0;
+
+        var take = Math.Min(cap, remainingDamage);
+        session.Combat.SacredShieldNextProcMs = now + SacredShieldIcdMs;
+        // Визуал «священного щита» (иконка 58597 на игроке на длительность ICD).
+        await auras.ApplyAsync(session, SacredShieldTrigger, (int)SacredShieldIcdMs, positive: true, form: 0, ct);
+        session.Logger.LogDebug("SACRED-SHIELD '{User}': поглощено {Take} (ICD 6с)", session.Account, take);
+        return take;
+    }
+
     /// <summary>
     /// Гасит <paramref name="damage"/> активными щитами, поглощающими школу <paramref name="damageSchoolMask"/>.
     /// Возвращает суммарно поглощённое (вызывающий вычитает из урона). Опустошённые щиты снимает (эффект + иконка).

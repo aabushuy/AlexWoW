@@ -52,6 +52,8 @@ internal sealed class SessionCombatState
     internal uint ArmorValue { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
+    /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
+    internal long SacredShieldNextProcMs { get; set; }
 
     // --- Очки серии (combo points: рога/друид-кошка) — Фаза 2 (CP.1) ---
     /// <summary>Очки серии (0..5), накопленные на <see cref="ComboTargetGuid"/>. Генераторы копят,
