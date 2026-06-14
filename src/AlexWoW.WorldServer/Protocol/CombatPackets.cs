@@ -16,6 +16,8 @@ public static class CombatPackets
     /// <summary>HITINFO_FULL_ABSORB (0x20): весь урон поглощён щитом; HITINFO_PARTIAL_ABSORB (0x40): часть. ABS.1.</summary>
     private const uint HitInfoFullAbsorb = 0x20;
     private const uint HitInfoPartialAbsorb = 0x40;
+    /// <summary>HITINFO_CRITICALHIT (0x200): крит. удар — клиент рисует крупное «крит» число. CRIT.2.</summary>
+    private const uint HitInfoCriticalHit = 0x200;
 
     private const byte VictimStateHit = 1;
     private const uint SchoolMaskPhysical = 1;
@@ -78,9 +80,11 @@ public static class CombatPackets
     /// 1=удар, 2=уклонение, 3=парирование. <paramref name="blockedAmount"/>&gt;0 — выставляет HITINFO_BLOCK
     /// и пишет сумму блока в конце (клиент рисует «Блокировка (N)»). Layout сверен с эталоном 3.3.5a.</summary>
     public static byte[] BuildAttackerStateUpdate(ulong attacker, ulong target, uint damage, uint overkill,
-        byte victimState = VictimStateHit, uint blockedAmount = 0, uint absorbedAmount = 0)
+        byte victimState = VictimStateHit, uint blockedAmount = 0, uint absorbedAmount = 0, bool crit = false)
     {
         var hitInfo = HitInfoAffectsVictim;
+        if (crit) // CRIT.2: крит. удар — клиент рисует крупное число
+            hitInfo |= HitInfoCriticalHit;
         if (blockedAmount > 0)
             hitInfo |= HitInfoBlock;
         // ABS.1: весь урон поглощён (damage==0) → FULL_ABSORB; часть → PARTIAL_ABSORB. Поле absorb пишется
