@@ -206,9 +206,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             if (trig is not null)
             {
                 await ApplyMovementAsync(session, trig.Movement, targetGuid, ct);
-                if (trig.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
-                    && session.World.FindCreature(targetGuid) is { } trigTarget)
-                    await crowdControl.ApplyAsync(session, trigTarget, info.TriggerSpellId, trig, now, ct);
+                if (targetGuid != 0 && session.World.FindCreature(targetGuid) is { } trigTarget)
+                {
+                    // §9 Intercept (20253 — стан): триггер с CC накладываем на цель после рывка.
+                    if (trig.CrowdControl != SpellCatalog.CrowdControlKind.None)
+                        await crowdControl.ApplyAsync(session, trigTarget, info.TriggerSpellId, trig, now, ct);
+                    // §9 Feral Charge — Bear (19675 — эффект 68 INTERRUPT_CAST): триггер прерывает каст цели.
+                    else if (trig.IsInterrupt && trigTarget.CastingSpellId != 0)
+                        await InterruptCreatureCastAsync(session, trigTarget, trig, now, ct);
+                }
             }
         }
     }
