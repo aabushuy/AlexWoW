@@ -29,6 +29,11 @@ public enum WorldOpcode : uint
     MsgMoveSetFacing = 0x0DA,
     MsgMoveSetPitch = 0x0DB,
     MsgMoveHeartbeat = 0x0EE,
+    // Принудительный рут движения игрока (Ice Block — «вмёрз в глыбу») + ACK клиента. IMMUNITY.1
+    SmsgForceMoveRoot = 0x0E8,
+    CmsgForceMoveRootAck = 0x0E9,
+    SmsgForceMoveUnroot = 0x0EA,
+    CmsgForceMoveUnrootAck = 0x0EB,
 
     // Логаут (M4)
     CmsgLogoutRequest = 0x04B,

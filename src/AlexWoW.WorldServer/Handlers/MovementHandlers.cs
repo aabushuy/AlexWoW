@@ -16,6 +16,12 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
     public Task OnTeleportAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => Task.CompletedTask;
 
+    /// <summary>CMSG_FORCE_MOVE_ROOT_ACK / CMSG_FORCE_MOVE_UNROOT_ACK (IMMUNITY.1): клиент подтвердил рут/анрут
+    /// движения (Ice Block) — сервер просто принимает (без валидации счётчика), чтобы не было «опкод без обработчика».</summary>
+    [WorldOpcodeHandler(WorldOpcode.CmsgForceMoveRootAck, WorldOpcode.CmsgForceMoveUnrootAck)]
+    public Task OnForceMoveAck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+        => Task.CompletedTask;
+
     /// <summary>MSG_MOVE_WORLDPORT_ACK (Devcommands #79): клиент догрузил новую карту после SMSG_NEW_WORLD —
     /// завершаем кросс-карта телепорт (пере-вход в мир, окрестности, time sync).</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgMoveWorldportAck)]

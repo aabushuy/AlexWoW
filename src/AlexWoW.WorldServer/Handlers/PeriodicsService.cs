@@ -25,6 +25,7 @@ public sealed class PeriodicEffect
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
     public float ManaShieldMultiplier; // ABS.2: Mana Shield — мана за 1 ед. поглощённого урона (1.5); 0 — обычный щит.
     public byte ImmuneSchoolMask; // IMMUNITY.1: «пузырь» — маска школ, урон которых гасится в ноль (Divine Shield/Ice Block 127); 0 — не иммунитет.
+    public bool SelfRoot; // IMMUNITY.1: пузырь обездвиживает игрока (Ice Block) — на снятии шлём UNROOT.
 }
 
 /// <summary>
@@ -212,7 +213,12 @@ internal sealed class PeriodicsService(
                     ExpiresAtMs = expires,
                     DoesTick = false,
                     ImmuneSchoolMask = info.ImmuneSchoolMask,
+                    SelfRoot = info.ImmuneSelfRoot,
                 });
+                if (info.ImmuneSelfRoot)
+                    // Ice Block «вмёрз в глыбу» — обездвиживаем игрока (UNROOT на снятии в RemoveAsync).
+                    await session.SendAsync(WorldOpcode.SmsgForceMoveRoot,
+                        MovementPackets.BuildForceMoveRoot(caster, session.NextTeleportCounter()), ct);
             }
             return;
         }
@@ -364,6 +370,11 @@ internal sealed class PeriodicsService(
         // Снять +% блока («Блок щитом») — пересчитать блок без истёкшего эффекта.
         if (p.BlockBonus != 0)
             await SendBlockAsync(session, ct);
+
+        // IMMUNITY.1: снять обездвиживание Ice Block (по истечении/отмене пузыря) — вернуть управление движением.
+        if (p.SelfRoot && session.InWorldGuid != 0)
+            await session.SendAsync(WorldOpcode.SmsgForceMoveUnroot,
+                MovementPackets.BuildForceMoveUnroot((ulong)session.InWorldGuid, session.NextTeleportCounter()), ct);
 
         if (!p.OwnsVisual)
             return; // визуал на себе (бафф/HoT-иконка) истечёт сам в AuraService.TickAsync (та же длительность)

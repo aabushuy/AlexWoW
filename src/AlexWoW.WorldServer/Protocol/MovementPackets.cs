@@ -47,4 +47,20 @@ public static class MovementPackets
     /// <summary>SMSG_NEW_WORLD: загрузить карту <paramref name="map"/> и поставить персонажа в точку. #79.</summary>
     public static byte[] BuildNewWorld(uint map, float x, float y, float z, float o)
         => new ByteWriter(20).UInt32(map).Single(x).Single(y).Single(z).Single(o).ToArray();
+
+    /// <summary>SMSG_FORCE_MOVE_ROOT (0xE8): обездвижить юнита (Ice Block). PackedGuid + счётчик движения. IMMUNITY.1</summary>
+    public static byte[] BuildForceMoveRoot(ulong guid, uint counter)
+    {
+        var w = new ByteWriter(16);
+        PackedGuid.Write(w, guid);
+        return w.UInt32(counter).ToArray();
+    }
+
+    /// <summary>SMSG_FORCE_MOVE_UNROOT (0xEA): снять обездвиживание. PackedGuid + счётчик движения. IMMUNITY.1</summary>
+    public static byte[] BuildForceMoveUnroot(ulong guid, uint counter)
+    {
+        var w = new ByteWriter(16);
+        PackedGuid.Write(w, guid);
+        return w.UInt32(counter).ToArray();
+    }
 }
