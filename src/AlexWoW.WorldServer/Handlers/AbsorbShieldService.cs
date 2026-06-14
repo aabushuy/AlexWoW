@@ -26,7 +26,8 @@ internal sealed class AbsorbShieldService(AuraService auras, ManaRegenService ma
     {
         if (remainingDamage == 0 || now < session.Combat.SacredShieldNextProcMs)
             return 0;
-        if (!session.Progression.Auras.Any(a => a.SpellId == SacredShieldAura))
+        var sacred = session.Progression.Auras.FirstOrDefault(a => a.SpellId == SacredShieldAura);
+        if (sacred is null)
             return 0;
 
         var trigger = await spellCatalog.GetAsync(SacredShieldTrigger, ct);
@@ -36,8 +37,14 @@ internal sealed class AbsorbShieldService(AuraService auras, ManaRegenService ma
 
         var take = Math.Min(cap, remainingDamage);
         session.Combat.SacredShieldNextProcMs = now + SacredShieldIcdMs;
-        // Визуал «священного щита» (иконка 58597 на игроке на длительность ICD).
-        await auras.ApplyAsync(session, SacredShieldTrigger, (int)SacredShieldIcdMs, positive: true, form: 0, ct);
+        // Визуал «священного щита» (иконка 58597) накладываем ОДИН раз — на остаток длительности баффа 53601,
+        // а не на каждый прок (иначе журнал спамит «эффект накладывается/заканчивается» каждые 6 с).
+        if (!session.Progression.Auras.Any(a => a.SpellId == SacredShieldTrigger))
+        {
+            var remain = sacred.ExpiresAtMs > 0 ? (int)(sacred.ExpiresAtMs - now) : (int)SacredShieldIcdMs;
+            if (remain > 0)
+                await auras.ApplyAsync(session, SacredShieldTrigger, remain, positive: true, form: 0, ct);
+        }
         session.Logger.LogDebug("SACRED-SHIELD '{User}': поглощено {Take} (ICD 6с)", session.Account, take);
         return take;
     }
