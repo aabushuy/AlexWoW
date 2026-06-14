@@ -20,6 +20,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     private const byte VictimStateImmune = 7;  // VICTIMSTATE_IS_IMMUNE — клиент рисует «Иммунитет» (IMMUNITY.1)
     private const uint HolyShieldAura = 48952; // Щит небес (Holy Shield): при блоке — урон Светом по атакующему. BLOCK.2
     private const byte SchoolHoly = 2;         // SCHOOL_MASK_HOLY — школа урона Щита небес
+    private const float CreatureCritChance = 5f; // % крита существа по игроку (упрощённо; ×2). CRIT.2
     private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
     private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
 
@@ -179,6 +180,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
                 raw, dodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
+            // CRIT.2: крит существа по игроку (фикс. шанс) — только по прошедшему удару, ×2 + флаг (клиент рисует крит).
+            var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < CreatureCritChance;
+            if (crit)
+                damage *= 2;
             // ABS.1: absorb-щиты гасят урон ПОСЛЕ митигейшна, до HP (мили существа — физическая школа, маска 1).
             var absorbed = await absorbShields.AbsorbAsync(player.Session, SchoolMaskPhysical, damage, ct);
             // ABS.3 Sacred Shield (53601): прок-поглощение текущего удара (до ~500), не чаще раз в 6 с.
@@ -190,7 +195,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
                 await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed), ct);
+                CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed, crit), ct);
             await world.BroadcastPlayerHealthAsync(player, ct);
 
             // BLOCK.2 Щит небес (Holy Shield 48952): при успешном блоке — урон Светом по атакующему.
