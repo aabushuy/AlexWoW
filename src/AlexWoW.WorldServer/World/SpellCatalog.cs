@@ -50,6 +50,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
+    private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
     private const int AuraManaShield = 97;               // поглощение урона за счёт маны (Mana Shield мага) — ABS.2
@@ -126,7 +127,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // IMMUNITY.1: пузырь обездвиживает кастующего (Ice Block «вмёрз в глыбу» — MOD_STUN на себя). Divine Shield — нет.
         bool ImmuneSelfRoot = false,
         // DODGE.1: +% уклонения от ауры (Evasion рога) — само-бафф; учитывается в резолвере входящего мили-удара.
-        int DodgePct = 0);
+        int DodgePct = 0,
+        // BLOCK.2: урон по атакующему при блоке (Священный щит / Holy Shield) — школа из School. 0 — нет.
+        int BlockReflectDamage = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -258,6 +261,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // в резолвере входящего мили-удара (avoidance до митигейшна).
         var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
         var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
+        // BLOCK.2: урон по атакующему при блоке (Священный щит / Holy Shield 48952): aura 43 PROC_TRIGGER_DAMAGE,
+        // величина = BasePoints+1, школа — из SchoolMask спелла (Holy). Наносится при успешном блоке.
+        var reflectAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraProcTriggerDamage);
+        var blockReflect = reflectAura.Eff == EffectApplyAura ? reflectAura.Bp + 1 : 0;
         // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, напр. «Глухая оборона»): отрицательный = снижение.
         var dmgTakenAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken);
         var damageTakenPct = dmgTakenAura.Eff == EffectApplyAura ? dmgTakenAura.Bp + 1 : 0;
@@ -433,7 +440,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask, immuneSelfRoot, dodgeBonus);
+            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

@@ -11,12 +11,15 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Существо — авторитетная <see cref="WorldCreature"/> из реестра мира (общее HP для наблюдателей).
 /// Мили игрока — <see cref="PlayerMeleeService"/>, байты пакетов — <see cref="Protocol.CombatPackets"/>.
 /// </summary>
-internal sealed class CreatureCombatAI(CombatResourcesService combatResources, AbsorbShieldService absorbShields)
+internal sealed class CreatureCombatAI(CombatResourcesService combatResources, AbsorbShieldService absorbShields,
+    SpellCatalog spellCatalog, KillRewardService killReward)
 {
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
     private const byte SchoolMaskPhysical = 1; // SCHOOL_MASK_NORMAL — школа мили-урона существ (ABS.1)
     private const byte VictimStateImmune = 7;  // VICTIMSTATE_IS_IMMUNE — клиент рисует «Иммунитет» (IMMUNITY.1)
+    private const uint HolyShieldAura = 48952; // Священный щит (Holy Shield): при блоке — урон Светом по атакующему. BLOCK.2
+    private const byte SchoolHoly = 2;         // SCHOOL_MASK_HOLY — школа урона Священного щита
     private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
     private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
 
@@ -190,6 +193,11 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
                 CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed), ct);
             await world.BroadcastPlayerHealthAsync(player, ct);
 
+            // BLOCK.2 Священный щит (Holy Shield 48952): при успешном блоке — урон Светом по атакующему.
+            if (blocked > 0 && creature.IsAlive
+                && player.Session.Progression.Auras.Any(a => a.SpellId == HolyShieldAura))
+                await HolyShieldReflectAsync(world, player, creature, now, ct);
+
             if (died)
                 await HandlePlayerDeathAsync(world, player, creature, ct);
             return;
@@ -350,6 +358,24 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         creature.CastEndMs = now + CasterDummyCastMs;
         await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellStart,
             SpellPackets.BuildSpellStart(creature.Guid, Npcs.CasterDummyCastSpellId, 0, CasterDummyCastMs, player.Guid), ct);
+    }
+
+    /// <summary>BLOCK.2 Священный щит (Holy Shield): при блоке — урон Светом по атакующему существу
+    /// (величина = aura 43 спелла 48952, ~274). Лог как спелл-урон; добивание учитывает награду.
+    /// Todo: 8 зарядов (сейчас бьёт всё время действия баффа), поглощение блоком отдельно.</summary>
+    private async Task HolyShieldReflectAsync(WorldState world, WorldPlayer player, WorldCreature creature, long now, CancellationToken ct)
+    {
+        var info = await spellCatalog.GetAsync(HolyShieldAura, ct);
+        var amount = (uint)Math.Max(0, info?.BlockReflectDamage ?? 0);
+        if (amount == 0)
+            return;
+        var (_, overkill, cdied) = world.ApplyCreatureDamage(creature, amount);
+        player.Session.Combat.LastCombatMs = now;
+        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
+            SpellPackets.BuildDamageLog(creature.Guid, (ulong)player.Session.InWorldGuid, HolyShieldAura, amount, overkill, SchoolHoly), ct);
+        await world.BroadcastCreatureHealthAsync(creature, ct);
+        if (cdied)
+            await killReward.OnCreatureKilledAsync(player.Session, creature, ct);
     }
 
     /// <summary>Мили-урон существа (упрощённо по уровню; точные статы — позже). Чуть мягче игрока.</summary>
