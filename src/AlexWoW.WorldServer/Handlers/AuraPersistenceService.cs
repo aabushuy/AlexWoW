@@ -49,7 +49,8 @@ internal sealed class AuraPersistenceService(
                 var info = await spellCatalog.GetAsync(spell, ct);
                 await auras.ApplyAsync(session, spell, durationMs: 0, positive: true, toggle.Form, ct,
                     group: toggle.Group, persist: true,
-                    damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0);
+                    damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
+                    damageTakenPct: info?.DamageTakenPct ?? 0);
                 continue;
             }
 

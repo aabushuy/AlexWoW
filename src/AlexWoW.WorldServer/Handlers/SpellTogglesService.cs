@@ -37,7 +37,8 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
         var info = await spellCatalog.GetAsync(spellId, ct);
         await auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
             group: toggle.Group, persist: true,
-            damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0);
+            damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
+            damageTakenPct: info?.DamageTakenPct ?? 0);
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
             session.Account, spellId, toggle.Form, toggle.Group);
         return true;

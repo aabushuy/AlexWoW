@@ -26,4 +26,7 @@ public sealed class ActiveAura
     public int DamageDonePct { get; init; }
     /// <summary>Маска школ для <see cref="DamageDonePct"/> (0 — все школы). Фаза 2.</summary>
     public byte DamageDoneSchool { get; init; }
+    /// <summary>% получаемого урона (отрицательный = снижение): Frost Presence −9% и т.п. на перманентной
+    /// ауре-переключателе. Суммируется в резолвере входящего мили-удара. 0 — нет. §1.</summary>
+    public int DamageTakenPct { get; init; }
 }
