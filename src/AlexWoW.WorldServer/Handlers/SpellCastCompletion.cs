@@ -149,10 +149,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             await auras.ApplyAsync(session, SpellCatalog.ForbearanceDebuffId, SpellCatalog.ForbearanceDurationMs,
                 positive: false, form: 0, ct);
 
-        // Фаза 2 CC: контроль цели-существа (стан/рут/страх/немота/дезориентация).
-        if (info.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
-            && session.World.FindCreature(targetGuid) is { } ccTarget)
-            await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct, durationOverrideMs: finisherDur);
+        // Фаза 2 CC: контроль (стан/рут/страх/немота/дезориентация). §4: по площади (Frost Nova/Psychic Scream)
+        // — на всех враждебных рядом; иначе — на одну цель-существо.
+        if (info.CrowdControl != SpellCatalog.CrowdControlKind.None)
+        {
+            if (info.IsAreaCrowdControl)
+                await crowdControl.ApplyAreaAsync(session, spellId, info, now, ct, durationOverrideMs: finisherDur);
+            else if (targetGuid != 0 && session.World.FindCreature(targetGuid) is { } ccTarget)
+                await crowdControl.ApplyAsync(session, ccTarget, spellId, info, now, ct, durationOverrideMs: finisherDur);
+        }
 
         // Фаза 2 INT.1: прерывание каста цели-существа (Kick/Counterspell/Pummel) + лок школы.
         if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)

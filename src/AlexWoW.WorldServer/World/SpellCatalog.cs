@@ -63,6 +63,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModStun = 12;                  // оглушение (Hammer of Justice/Concussion Blow)
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
+    private const int TargetAreaEnemy = 22;              // EffectImplicitTargetA: область вокруг точки/кастера → CC по площади (§4)
     private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
     private const uint SpellAttrOnNextSwing1 = 0x00000004;    // бит 2: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — MELEE.1
     private const uint SpellAttrOnNextSwing2 = 0x00000040;    // бит 6: «на следующий замах» (второй вариант атрибута) — MELEE.1
@@ -133,7 +134,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // BLOCK.2: урон по атакующему при блоке (Щит небес / Holy Shield) — школа из School. 0 — нет.
         int BlockReflectDamage = 0,
         // MELEE.1: «на следующий замах» — замещает следующую автоатаку (Героический удар/Раскол/Свирепый удар).
-        bool OnNextSwing = false);
+        bool OnNextSwing = false,
+        // §4: CC по площади (Frost Nova/Psychic Scream) — накладывать CC на всех враждебных рядом, не на одну цель.
+        bool IsAreaCrowdControl = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -373,6 +376,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         if (immuneSchoolMask != 0)
             crowdControl = CrowdControlKind.None;
         var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
+        // §4 CC по площади: CC-спелл с area-целью (EffectImplicitTargetA = 22, «вокруг точки/кастера») —
+        // Frost Nova (рут), Psychic Scream (страх). Накладываем CC на ВСЕХ враждебных рядом, не на одну цель.
+        var isAreaCrowdControl = crowdControl != CrowdControlKind.None
+            && (t.EffectImplicitTargetA1 == TargetAreaEnemy || t.EffectImplicitTargetA2 == TargetAreaEnemy
+                || t.EffectImplicitTargetA3 == TargetAreaEnemy);
         // CP.3b: верхняя граница длительности (для combo-финишеров max>base → длит. от очков серии).
         var maxDurationMs = (isPeriodic || auraBuff || crowdControl != CrowdControlKind.None)
             ? SpellDurations.GetMax(t.DurationIndex) : 0;
@@ -447,7 +455,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing);
+            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
