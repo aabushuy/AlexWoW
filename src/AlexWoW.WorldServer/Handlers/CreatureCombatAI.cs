@@ -171,8 +171,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             var blockPct = CombatStats.BlockPercent(pclass, cs.HasShield,
                 periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus));
             var dmgTaken = periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct);
+            // DODGE.1: базовый dodge (статы) + бонус от аур (Evasion рога) — avoidance до митигейшна.
+            var dodgePct = cs.DodgePct + periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DodgeBonus);
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
-                raw, cs.DodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
+                raw, dodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
             // ABS.1: absorb-щиты гасят урон ПОСЛЕ митигейшна, до HP (мили существа — физическая школа, маска 1).
             var absorbed = await absorbShields.AbsorbAsync(player.Session, SchoolMaskPhysical, damage, ct);

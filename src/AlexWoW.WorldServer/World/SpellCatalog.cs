@@ -49,6 +49,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraPeriodicHeal = 8;
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
+    private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
     private const int AuraManaShield = 97;               // поглощение урона за счёт маны (Mana Shield мага) — ABS.2
@@ -123,7 +124,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Hand of Protection — 1 физ.). 0 — не «пузырь». Пока аура активна, урон этих школ гасится в ноль.
         byte ImmuneSchoolMask = 0,
         // IMMUNITY.1: пузырь обездвиживает кастующего (Ice Block «вмёрз в глыбу» — MOD_STUN на себя). Divine Shield — нет.
-        bool ImmuneSelfRoot = false);
+        bool ImmuneSelfRoot = false,
+        // DODGE.1: +% уклонения от ауры (Evasion рога) — само-бафф; учитывается в резолвере входящего мили-удара.
+        int DodgePct = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -251,6 +254,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // +% блока (MOD_BLOCK_PERCENT, напр. «Блок щитом»): величина = BasePoints+1.
         var blockAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModBlockPercent);
         var blockBonus = blockAura.Eff == EffectApplyAura ? blockAura.Bp + 1 : 0;
+        // DODGE.1: +% уклонения (MOD_DODGE_PERCENT, Evasion рога): величина = BasePoints+1. Учитывается
+        // в резолвере входящего мили-удара (avoidance до митигейшна).
+        var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
+        var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
         // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, напр. «Глухая оборона»): отрицательный = снижение.
         var dmgTakenAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken);
         var damageTakenPct = dmgTakenAura.Eff == EffectApplyAura ? dmgTakenAura.Bp + 1 : 0;
@@ -426,7 +433,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask, immuneSelfRoot);
+            immuneSchoolMask, immuneSelfRoot, dodgeBonus);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
