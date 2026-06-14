@@ -126,7 +126,11 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             : 0;
 
         // Прямой эффект: хил, либо урон (если есть прямой урон — чистый DoT без прямого числа не шлём).
-        if (info.IsHeal)
+        // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — НЕ бьём сейчас, ставим в
+        // очередь; следующая автоатака заместится этой абилкой (PlayerMeleeService). Ярость уже списана на касте.
+        if (info.OnNextSwing)
+            session.Combat.PendingNextSwingSpellId = spellId;
+        else if (info.IsHeal)
             await spellEffects.ApplyHealAsync(session, spellId, info, targetGuid, ct);
         else if (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0)
             await spellEffects.ApplyDamageAsync(session, spellId, info, targetGuid, now, ct, combo);

@@ -64,6 +64,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
     private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
+    private const uint SpellAttrOnNextSwing1 = 0x00000004;    // бит 2: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — MELEE.1
+    private const uint SpellAttrOnNextSwing2 = 0x00000040;    // бит 6: «на следующий замах» (второй вариант атрибута) — MELEE.1
     // AttributesEx: финишеры рога/друида-кошки — расходуют очки серии (combo points). CP.3.
     private const uint SpellAttrExFinishingMoveDamage = 0x00100000;   // бит 20: урон/эффект скалируется очками (Eviscerate/Rupture/Envenom)
     private const uint SpellAttrExFinishingMoveDuration = 0x00400000; // бит 22: длительность скалируется очками (Slice and Dice/Kidney Shot)
@@ -129,7 +131,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // DODGE.1: +% уклонения от ауры (Evasion рога) — само-бафф; учитывается в резолвере входящего мили-удара.
         int DodgePct = 0,
         // BLOCK.2: урон по атакующему при блоке (Щит небес / Holy Shield) — школа из School. 0 — нет.
-        int BlockReflectDamage = 0);
+        int BlockReflectDamage = 0,
+        // MELEE.1: «на следующий замах» — замещает следующую автоатаку (Героический удар/Раскол/Свирепый удар).
+        bool OnNextSwing = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -261,6 +265,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // в резолвере входящего мили-удара (avoidance до митигейшна).
         var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
         var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
+        // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — абилка не бьёт мгновенно,
+        // а замещает следующую автоатаку (бросок оружия + флэт-бонус). Распознаём по атрибуту.
+        var onNextSwing = (t.Attributes & (SpellAttrOnNextSwing1 | SpellAttrOnNextSwing2)) != 0;
         // BLOCK.2: урон по атакующему при блоке (Щит небес / Holy Shield 48952): aura 43 PROC_TRIGGER_DAMAGE,
         // величина = BasePoints+1, школа — из SchoolMask спелла (Holy). Наносится при успешном блоке.
         var reflectAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraProcTriggerDamage);
@@ -440,7 +447,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect);
+            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
