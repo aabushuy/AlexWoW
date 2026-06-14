@@ -2,6 +2,7 @@
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Navigation;
+using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ namespace AlexWoW.WorldServer.World;
 /// по навмешу, респавн, тренировочный манекен дев-команды. Реестр/рассылку берёт из
 /// <see cref="WorldState"/>; навмеш — для путей по земле.
 /// </summary>
-public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRepository worldDb, ILogger logger)
+public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRepository worldDb, TerrainMaps terrain, ILogger logger)
 {
     /// <summary>Счётчик id сплайнов SMSG_MONSTER_MOVE (монотонный). M6.7.</summary>
     private int _splineId;
@@ -144,7 +145,9 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         // 3 ярда вперёд + боковой сдвиг (перпендикуляр к направлению взгляда) — чтобы два манекена не слипались.
         float x = session.PosX + 3f * MathF.Cos(session.PosO) + sideOffset * MathF.Cos(session.PosO + MathF.PI / 2);
         float y = session.PosY + 3f * MathF.Sin(session.PosO) + sideOffset * MathF.Sin(session.PosO + MathF.PI / 2);
-        float z = session.PosZ;
+        // Z по рельефу в точке манекена (а не Z игрока): на склоне земля под манекеном выше/ниже игрока —
+        // иначе манекен проваливается в текстуры или висит в воздухе. Фолбэк на Z игрока, если рельеф недоступен.
+        float z = terrain.GetHeight(map, x, y) ?? session.PosZ;
         float o = session.PosO + MathF.PI;            // лицом к игроку
 
         var dummy = world.GetOrAddCreature(guid, () => new WorldCreature

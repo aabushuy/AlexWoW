@@ -23,14 +23,15 @@ public sealed class WorldState
     private readonly PlayerVisibility _visibility;
 
     public WorldState(ILogger<WorldState> logger, Navmesh navmesh, IWorldRepository worldDb, FactionStore factions,
-        QuestStore quests, LevelStore levels, StatStore stats, AlexWoW.DataStores.CombatRatings ratings)
+        QuestStore quests, LevelStore levels, StatStore stats, AlexWoW.DataStores.CombatRatings ratings,
+        AlexWoW.DataStores.Terrain.TerrainMaps terrain)
     {
         _factions = factions;
         Quests = quests;
         Levels = levels;
         Stats = stats;
         Ratings = ratings;
-        Director = new CreatureDirector(this, navmesh, worldDb, logger);
+        Director = new CreatureDirector(this, navmesh, worldDb, terrain, logger);
         _visibility = new PlayerVisibility(this, logger);
     }
 
