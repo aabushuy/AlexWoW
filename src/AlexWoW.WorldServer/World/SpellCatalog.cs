@@ -435,6 +435,21 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             (reagents ??= []).Add(((uint)item, count));
     }
 
+    // Forbearance (Изречение, IMMUNITY.2): сильные защитные/«божественные» абилки паладина вешают на кастера
+    // дебафф 25771 на 2 мин и не могут применяться, пока он висит (общий КД). В DBC нет флага — список спеллов
+    // скриптуется (как в CMaNGOS spell scripts). Берём ИГРОВЫЕ ранги (без NPC-версий тех же имён).
+    public const uint ForbearanceDebuffId = 25771;
+    public const int ForbearanceDurationMs = 120000;
+    private static readonly HashSet<uint> ForbearanceSpellIds =
+    [
+        642,                            // Divine Shield
+        498,                            // Divine Protection
+        1022, 5599, 10278,              // Hand of Protection (R1–R3)
+        633, 2800, 10310, 27154, 48788, // Lay on Hands (R1–R5)
+    ];
+    /// <summary>Спелл вешает Forbearance и блокируется им (Divine Shield/Protection/Hand of Protection/Lay on Hands).</summary>
+    public static bool IsForbearanceSpell(uint spellId) => ForbearanceSpellIds.Contains(spellId);
+
     // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида
     public const byte GroupPaladinAura = 2;  // ауры паладина
