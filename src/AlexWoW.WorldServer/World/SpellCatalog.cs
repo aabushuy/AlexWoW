@@ -63,7 +63,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModStun = 12;                  // оглушение (Hammer of Justice/Concussion Blow)
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
-    private const int TargetAreaEnemy = 22;              // EffectImplicitTargetA: область вокруг точки/кастера → CC по площади (§4)
+    // EffectImplicitTargetA — площадные «враги в области» → CC по площади (§4). 22 — вокруг точки/кастера
+    // (Frost Nova/Psychic Scream); 15/16 — все враги в радиусе; 18 — вокруг кастера (War Stomp); 104 — фронт.
+    // конус (Shockwave, упрощаем до радиуса). Конкретный подтип нам не важен — все = «AoE по врагам».
+    private static readonly int[] AreaEnemyTargets = [15, 16, 18, 22, 104];
+    private static bool IsAreaEnemyTarget(int target) => Array.IndexOf(AreaEnemyTargets, target) >= 0;
     private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
     private const uint SpellAttrOnNextSwing1 = 0x00000004;    // бит 2: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — MELEE.1
     private const uint SpellAttrOnNextSwing2 = 0x00000040;    // бит 6: «на следующий замах» (второй вариант атрибута) — MELEE.1
@@ -376,11 +380,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         if (immuneSchoolMask != 0)
             crowdControl = CrowdControlKind.None;
         var crowdControlMs = crowdControl != CrowdControlKind.None ? SpellDurations.Get(t.DurationIndex) : 0;
-        // §4 CC по площади: CC-спелл с area-целью (EffectImplicitTargetA = 22, «вокруг точки/кастера») —
-        // Frost Nova (рут), Psychic Scream (страх). Накладываем CC на ВСЕХ враждебных рядом, не на одну цель.
+        // §4 CC по площади: CC-спелл с площадной «враги в области» целью (см. AreaEnemyTargets) — Frost Nova
+        // (рут), Psychic Scream (страх), War Stomp/Shadowfury/Shockwave (стан). Накладываем CC на ВСЕХ
+        // враждебных рядом, не на одну цель.
         var isAreaCrowdControl = crowdControl != CrowdControlKind.None
-            && (t.EffectImplicitTargetA1 == TargetAreaEnemy || t.EffectImplicitTargetA2 == TargetAreaEnemy
-                || t.EffectImplicitTargetA3 == TargetAreaEnemy);
+            && (IsAreaEnemyTarget(t.EffectImplicitTargetA1) || IsAreaEnemyTarget(t.EffectImplicitTargetA2)
+                || IsAreaEnemyTarget(t.EffectImplicitTargetA3));
         // CP.3b: верхняя граница длительности (для combo-финишеров max>base → длит. от очков серии).
         var maxDurationMs = (isPeriodic || auraBuff || crowdControl != CrowdControlKind.None)
             ? SpellDurations.GetMax(t.DurationIndex) : 0;
