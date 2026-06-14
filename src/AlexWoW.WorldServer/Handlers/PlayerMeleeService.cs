@@ -16,7 +16,8 @@ internal sealed class PlayerMeleeService(
     CombatResourcesService combatResources,
     KillRewardService killReward,
     SealService seals,
-    ProcService procs)
+    ProcService procs,
+    SpellCatalog spellCatalog)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
     internal const long SwingIntervalMs = 2000;
@@ -94,16 +95,29 @@ internal sealed class PlayerMeleeService(
         session.Combat.NextMeleeSwingMs = now + SwingIntervalMs;
         session.Combat.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
-        var damage = ComputeMeleeDamage(session.Character?.Level ?? 1);
-        // Фаза 2: % наносимого урона по школе (физ.) — напр. Divine Shield −50%. Мили-абилки получают это
-        // в SpellEffectsService; автоатака — здесь. Маска школы автоатаки — физ. (1).
-        damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, 1, (int)damage));
+        var level = (byte)(session.Character?.Level ?? 1);
+        // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — замещает эту автоатаку:
+        // бросок оружия + флэт-бонус абилки, лог как спелл-урон. Иначе — обычная белая автоатака.
+        var pendingId = session.Combat.PendingNextSwingSpellId;
+        var pendingInfo = pendingId != 0 ? await spellCatalog.GetAsync(pendingId, ct) : null;
+        session.Combat.PendingNextSwingSpellId = 0;
+
+        var school = pendingInfo is { School: > 0 } ? pendingInfo.School : (byte)1; // физ. (1)
+        var rawDamage = (int)ComputeMeleeDamage(level)
+            + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
+        // Фаза 2: % наносимого урона по школе (Divine Shield −50% и т.п.) — для автоатаки/абилки.
+        var damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, school, rawDamage));
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
-        await combatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за удар
+        if (pendingInfo is null)
+            await combatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за белый удар (спец — нет)
 
         var attackerGuid = (ulong)session.InWorldGuid;
-        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
-            CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill), ct);
+        if (pendingInfo is not null)
+            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
+                SpellPackets.BuildDamageLog(creature.Guid, attackerGuid, pendingId, damage, overkill, school, crit: false), ct);
+        else
+            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
+                CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
 
         if (died)

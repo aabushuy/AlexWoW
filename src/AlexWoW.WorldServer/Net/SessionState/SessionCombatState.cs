@@ -54,6 +54,9 @@ internal sealed class SessionCombatState
     internal long LastResourceTickMs { get; set; }
     /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
     internal long SacredShieldNextProcMs { get; set; }
+    /// <summary>«На следующий замах» (MELEE.1): id абилки (Героический удар/Раскол/Свирепый удар), заместит
+    /// следующую автоатаку; 0 — нет. Расходуется в <see cref="Handlers.PlayerMeleeService"/>.</summary>
+    internal uint PendingNextSwingSpellId { get; set; }
 
     // --- Очки серии (combo points: рога/друид-кошка) — Фаза 2 (CP.1) ---
     /// <summary>Очки серии (0..5), накопленные на <see cref="ComboTargetGuid"/>. Генераторы копят,
