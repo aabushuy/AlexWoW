@@ -20,6 +20,7 @@ public sealed class PeriodicEffect
     public bool DoesTick = true; // false — непериодический бафф/дебафф (только визуал + истечение). M10.4c
     public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
     public int BlockBonus;     // +% блока от баффа (MOD_BLOCK_PERCENT, напр. «Блок щитом») — снять при истечении.
+    public int DodgeBonus;     // +% уклонения от баффа (MOD_DODGE_PERCENT, Evasion рога) — снять при истечении. DODGE.1
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
@@ -172,6 +173,20 @@ internal sealed class PeriodicsService(
                     BlockBonus = info.BlockBonus,
                 });
                 await SendBlockAsync(session, ct);
+            }
+            if (info.DodgePct != 0)
+            {
+                // DODGE.1: +% уклонения (Evasion) — записываем эффект и обновляем PLAYER_DODGE_PERCENTAGE.
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0 && p.DodgeBonus != 0);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    DodgeBonus = info.DodgePct,
+                });
+                await SendDodgeAsync(session, ct);
             }
             if (info.DamageTakenPct != 0)
             {
@@ -354,6 +369,18 @@ internal sealed class PeriodicsService(
                 m => m.SetFloat(UpdateField.PlayerBlockPercentage, block)), ct);
     }
 
+    /// <summary>DODGE.1: обновляет PLAYER_DODGE_PERCENTAGE = базовый dodge (из статов, <see cref="SessionCombatState.DodgePct"/>)
+    /// + сумма активных аур-бонусов уклонения (Evasion). Базовый кэш не трогаем — резолвер удара добавляет бонус сам.</summary>
+    private Task SendDodgeAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        var dodge = session.Combat.DodgePct + session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DodgeBonus);
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
+                m => m.SetFloat(UpdateField.PlayerDodgePercentage, dodge)), ct);
+    }
+
     private async Task RemoveAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
     {
         session.Progression.Periodics.Remove(p);
@@ -370,6 +397,10 @@ internal sealed class PeriodicsService(
         // Снять +% блока («Блок щитом») — пересчитать блок без истёкшего эффекта.
         if (p.BlockBonus != 0)
             await SendBlockAsync(session, ct);
+
+        // DODGE.1: снять +% уклонения (Evasion) — пересчитать без истёкшего эффекта.
+        if (p.DodgeBonus != 0)
+            await SendDodgeAsync(session, ct);
 
         // IMMUNITY.1: снять обездвиживание Ice Block (по истечении/отмене пузыря) — вернуть управление движением.
         if (p.SelfRoot && session.InWorldGuid != 0)
