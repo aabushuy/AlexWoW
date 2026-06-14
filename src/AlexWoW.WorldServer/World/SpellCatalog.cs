@@ -479,6 +479,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     /// <summary>Спелл вешает Forbearance и блокируется им (Divine Shield/Protection/Hand of Protection/Lay on Hands).</summary>
     public static bool IsForbearanceSpell(uint spellId) => ForbearanceSpellIds.Contains(spellId);
 
+    // §9 Death Grip (DK): притягивание цели к кастеру — скриптовый dummy-эффект (нет чистого флага в DBC).
+    private static readonly HashSet<uint> DeathGripSpellIds = [49576];
+    /// <summary>Death Grip (рывок цели к ногам игрока). Скриптовый эффект — распознаём по spellId.</summary>
+    public static bool IsDeathGrip(uint spellId) => DeathGripSpellIds.Contains(spellId);
+
     // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида
     public const byte GroupPaladinAura = 2;  // ауры паладина

@@ -15,7 +15,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
     CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs,
-    RuneService runes, AuraService auras)
+    RuneService runes, AuraService auras, CreatureCombatAI creatureAi)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -163,6 +163,11 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)
             await InterruptCreatureCastAsync(session, caster, info, now, ct);
 
+        // §9 Death Grip (DK): притягиваем цель-существо к ногам игрока (рывок) и вводим в бой (таунт-эффект).
+        if (SpellCatalog.IsDeathGrip(spellId) && targetGuid != 0 && session.Player is { } gripPlayer
+            && session.World.FindCreature(targetGuid) is { IsAlive: true } gripped)
+            await DeathGripAsync(session, gripped, gripPlayer, now, ct);
+
         // Фаза 2 DSP: диспел. По себе (нет цели / свой guid) — защитный, снимаем свой дебафф (DSP.1).
         // По враждебному существу — атакующий Purge/Spellsteal, снимаем/крадём его бафф (DSP.2).
         if (info.DispelMask != 0)
@@ -235,4 +240,20 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             SpellCatalog.SpellMovement.TeleportBehind => spellEffects.ApplyTeleportAsync(session, targetGuid, behind: true, ct),
             _ => Task.CompletedTask,
         };
+
+    /// <summary>§9 Death Grip: быстрый рывок цели-существа к ногам игрока (~2 ярда от него) + ввод в бой (таунт-эффект:
+    /// после рывка существо идёт на игрока). Скриптовый эффект (CMaNGOS Spell::EffectDummy → MoveTo). Todo: точная угроза.</summary>
+    private async Task DeathGripAsync(WorldSession session, WorldCreature creature, WorldPlayer player, long now, CancellationToken ct)
+    {
+        var dx = creature.X - player.X;
+        var dy = creature.Y - player.Y;
+        var dz = creature.Z - player.Z;
+        var dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        var flat = MathF.Sqrt(dx * dx + dy * dy);
+        float lx = player.X, ly = player.Y;
+        if (flat > 0.1f) { var f = 2f / flat; lx = player.X + dx * f; ly = player.Y + dy * f; } // ~2 ярда от игрока
+        var durationMs = (uint)Math.Clamp(dist / 30f * 1000f, 100f, 800f); // быстрый рывок ~30 ярд/с
+        await session.World.MoveCreatureAsync(creature, lx, ly, player.Z, durationMs, ct);
+        await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: false, ct);
+    }
 }
