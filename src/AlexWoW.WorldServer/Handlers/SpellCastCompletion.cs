@@ -197,12 +197,19 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
 
         // M7 #33: движущий эффект — рывок к цели (Charge) или телепорт (Blink/Shadowstep).
         await ApplyMovementAsync(session, info.Movement, targetGuid, ct);
-        // Цепочка триггера (Shadowstep 36554 → 36563 с эффектом телепорта): резолвим тип у триггера.
+        // Цепочка триггера: у триггер-спелла резолвим движение (Shadowstep 36554 → 36563 телепорт) И контроль
+        // (§9 Intercept 20252 → стан 20253: рывок воина к цели в бою + 3с стан). Эффект самой абилки —
+        // рывок (Charge) выше; стан несёт триггер-спелл (EffectTriggerSpell), накладываем после рывка.
         if (info.TriggerSpellId != 0)
         {
             var trig = await spellCatalog.GetAsync(info.TriggerSpellId, ct);
             if (trig is not null)
+            {
                 await ApplyMovementAsync(session, trig.Movement, targetGuid, ct);
+                if (trig.CrowdControl != SpellCatalog.CrowdControlKind.None && targetGuid != 0
+                    && session.World.FindCreature(targetGuid) is { } trigTarget)
+                    await crowdControl.ApplyAsync(session, trigTarget, info.TriggerSpellId, trig, now, ct);
+            }
         }
     }
 
