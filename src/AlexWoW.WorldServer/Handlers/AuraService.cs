@@ -25,7 +25,7 @@ internal sealed class AuraService(ICharacterStateRepository charState, SpellCata
     /// </summary>
     internal async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
         bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false,
-        int damageDonePct = 0, byte damageDoneSchool = 0)
+        int damageDonePct = 0, byte damageDoneSchool = 0, int damageTakenPct = 0)
     {
         if (session.InWorldGuid == 0)
             return;
@@ -62,6 +62,7 @@ internal sealed class AuraService(ICharacterStateRepository charState, SpellCata
             ExpiresAtMs = durationMs > 0 ? Environment.TickCount64 + durationMs : 0,
             DamageDonePct = damageDonePct,
             DamageDoneSchool = damageDoneSchool,
+            DamageTakenPct = damageTakenPct,
         };
         session.Progression.Auras.Add(aura);
 

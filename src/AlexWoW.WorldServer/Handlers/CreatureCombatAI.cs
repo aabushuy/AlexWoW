@@ -174,7 +174,11 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             var periodics = player.Session.Progression.Periodics;
             var blockPct = CombatStats.BlockPercent(pclass, cs.HasShield,
                 periodics.Where(p => p.TargetGuid == 0).Sum(p => p.BlockBonus));
-            var dmgTaken = periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct);
+            // % получаемого урона: из временных аур-эффектов (Глухая оборона/Shield Wall — Periodics) И из
+            // перманентных аур-переключателей (§1 Frost Presence −9% — ActiveAura). Спелл живёт в одном из
+            // путей, не в обоих, → двойного учёта нет.
+            var dmgTaken = periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DamageTakenPct)
+                + player.Session.Progression.Auras.Sum(a => a.DamageTakenPct);
             // DODGE.1: базовый dodge (статы) + бонус от аур (Evasion рога) — avoidance до митигейшна.
             var dodgePct = cs.DodgePct + periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DodgeBonus);
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
