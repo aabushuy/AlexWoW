@@ -24,7 +24,12 @@ internal sealed class PoisonService(KillRewardService killReward, ILogger<Poison
     private static readonly HashSet<uint> Crippling = [3408, 11201];
 
     private const byte SchoolNature = 8; // SCHOOL_MASK_NATURE — школа ядов
-    private const double ProcChance = 0.30; // шанс прока на удар (упрощённо для всех урон-ядов)
+    private const double ProcChance = 0.30; // шанс прока на удар (Instant) / наложения стека (Deadly)
+
+    // Deadly Poison — стек-DoT: до 5 зарядов, тик каждые 3с в течение 12с, урон тика = базовый × число зарядов.
+    private const byte DeadlyMaxStacks = 5;
+    private const int DeadlyTickIntervalMs = 3000;
+    private const int DeadlyDurationMs = 12000;
 
     /// <summary>Является ли спелл нанесением яда разбойника (любой ранг Instant/Deadly/Wound/Crippling).</summary>
     internal static bool IsPoison(uint spellId)
@@ -36,13 +41,24 @@ internal sealed class PoisonService(KillRewardService killReward, ILogger<Poison
         var poison = session.Progression.Auras.FirstOrDefault(a => IsPoison(a.SpellId));
         if (poison is null)
             return false;
-        // Crippling — чистый слоу (не моделируем): урона нет.
-        if (Crippling.Contains(poison.SpellId))
-            return false;
-        if (Random.Shared.NextDouble() >= ProcChance)
+        // Crippling/Wound — слоу/дебафф лечения (моделируются в отдельной под-итерации): здесь урона нет.
+        if (Crippling.Contains(poison.SpellId) || Wound.Contains(poison.SpellId))
             return false;
 
         var level = (byte)(session.Character?.Level ?? 1);
+
+        // Deadly Poison — стек-DoT: по шансу добавляем заряд (до 5) и обновляем DoT на цели. Урон идёт тиками
+        // (PeriodicsService.TickAsync), поэтому наложение само по себе не убивает (died=false).
+        if (Deadly.Contains(poison.SpellId))
+        {
+            if (Random.Shared.NextDouble() < ProcChance)
+                await ApplyDeadlyStackAsync(session, creature, poison.SpellId, level, now, ct);
+            return false;
+        }
+
+        // Instant Poison — разовый природный урон по шансу.
+        if (Random.Shared.NextDouble() >= ProcChance)
+            return false;
         var amount = (uint)Random.Shared.Next(level, level * 2 + 1);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, amount);
         session.Combat.LastCombatMs = now;
@@ -55,5 +71,57 @@ internal sealed class PoisonService(KillRewardService killReward, ILogger<Poison
             logger.LogDebug("POISON '{User}': яд {Spell} добил '{Name}'", session.Account, poison.SpellId, creature.Template.Name);
         }
         return died;
+    }
+
+    /// <summary>
+    /// Deadly Poison: накладывает/освежает стек-DoT на цели. Новый заряд (до 5) увеличивает урон тика
+    /// (базовый × заряды) и обновляет длительность; визуал — одна аура-иконка с числом зарядов. Тики урона
+    /// идёт общий <see cref="PeriodicsService"/> (DoesTick), поэтому ведём эффект в session.Progression.Periodics.
+    /// </summary>
+    private async Task ApplyDeadlyStackAsync(WorldSession session, WorldCreature creature, uint spellId,
+        byte level, long now, CancellationToken ct)
+    {
+        var perStack = Math.Max(1, (int)level); // базовый урон тика на 1 заряд (без SP/AP — по уровню)
+        var existing = session.Progression.Periodics.FirstOrDefault(
+            p => p.SpellId == spellId && p.TargetGuid == creature.Guid && p.DoesTick);
+
+        byte stacks;
+        byte slot;
+        if (existing is not null)
+        {
+            stacks = (byte)Math.Min(DeadlyMaxStacks, existing.StackCount + 1);
+            existing.StackCount = stacks;
+            existing.Amount = perStack * stacks;
+            existing.ExpiresAtMs = now + DeadlyDurationMs;
+            existing.NextTickMs = Math.Min(existing.NextTickMs, now + DeadlyTickIntervalMs);
+            slot = existing.Slot;
+        }
+        else
+        {
+            stacks = 1;
+            slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == creature.Guid);
+            session.Progression.Periodics.Add(new PeriodicEffect
+            {
+                SpellId = spellId,
+                TargetGuid = creature.Guid,
+                SchoolMask = SchoolNature,
+                Amount = perStack,
+                StackCount = 1,
+                IntervalMs = DeadlyTickIntervalMs,
+                NextTickMs = now + DeadlyTickIntervalMs,
+                ExpiresAtMs = now + DeadlyDurationMs,
+                IsHeal = false,
+                OwnsVisual = true,
+                Slot = slot,
+            });
+        }
+
+        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, slot, spellId,
+                Flags, level, stacks, DeadlyDurationMs), ct);
+        session.Combat.LastCombatMs = now;
+        logger.LogDebug("POISON '{User}': Deadly стек {Stacks}/{Max} на '{Name}'",
+            session.Account, stacks, DeadlyMaxStacks, creature.Template.Name);
     }
 }

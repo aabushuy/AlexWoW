@@ -27,6 +27,7 @@ public sealed class PeriodicEffect
     public float ManaShieldMultiplier; // ABS.2: Mana Shield — мана за 1 ед. поглощённого урона (1.5); 0 — обычный щит.
     public byte ImmuneSchoolMask; // IMMUNITY.1: «пузырь» — маска школ, урон которых гасится в ноль (Divine Shield/Ice Block 127); 0 — не иммунитет.
     public bool SelfRoot; // IMMUNITY.1: пузырь обездвиживает игрока (Ice Block) — на снятии шлём UNROOT.
+    public byte StackCount = 1; // §8 стек-DoT (Deadly Poison): число зарядов; тик = базовый урон × стек.
     public bool IsCurse; // §3 дебафф-проклятие ЧК на цели — для правила «один кёрс на цель от кастера».
     public int CurseDamageTakenPct; // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера.
     public byte CurseSchoolMask; // §3 маска школ для CurseDamageTakenPct (126 — вся магия).
