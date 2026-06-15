@@ -144,6 +144,47 @@ internal sealed class CrowdControlService(ILogger<CrowdControlService> logger)
         creature.CrowdControlSpellId = 0;
     }
 
+    /// <summary>Слот ауры-снары существа (отличен от CC-слота 40 и баффа манекена 41).</summary>
+    private const byte SnareAuraSlot = 42;
+
+    /// <summary>§8 Снара (Crippling Poison): замедляет бег существа на <paramref name="pct"/>% на <paramref name="durationMs"/>.
+    /// Освежается повторным наложением. Полный рут НЕ ставит (бьёт/преследует, но медленнее).</summary>
+    internal async Task ApplySnareAsync(WorldSession session, WorldCreature creature, uint spellId,
+        byte pct, int durationMs, long now, CancellationToken ct)
+    {
+        if (!creature.IsAlive || session.InWorldGuid == 0 || durationMs <= 0)
+            return;
+        var refresh = creature.SnareSpellId != 0 && now < creature.SnareUntilMs;
+        creature.SnareUntilMs = now + durationMs;
+        creature.SnarePct = pct;
+        creature.SnareSpellId = spellId;
+        if (refresh)
+            return; // визуал уже висит — только продлили
+        var level = (byte)(session.Character?.Level ?? 1);
+        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, SnareAuraSlot, spellId,
+                Flags, level, 1, durationMs), ct);
+        logger.LogDebug("SNARE '{User}': {Pct}% на '{Name}' на {Ms}мс", session.Account, pct, creature.Template.Name, durationMs);
+    }
+
+    /// <summary>Снимает истёкшую снару (визуал + состояние). Зовётся из тика боя существа.</summary>
+    internal async Task ExpireSnareIfDueAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
+    {
+        if (creature.SnareSpellId == 0 || now < creature.SnareUntilMs)
+            return;
+        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildRemove(creature.Guid, SnareAuraSlot), ct);
+        creature.SnareSpellId = 0;
+        creature.SnarePct = 0;
+    }
+
+    /// <summary>Множитель скорости бега существа с учётом активной снары (1.0 — нет снары). Для шага движения.</summary>
+    internal static float SnareSpeedFactor(WorldCreature creature, long now)
+        => creature.SnareSpellId != 0 && now < creature.SnareUntilMs
+            ? Math.Max(0.1f, 1f - creature.SnarePct / 100f)
+            : 1f;
+
     /// <summary>§4 break-on-damage: снимает CC, ломающийся при получении урона — Polymorph/Disorient и Fear.
     /// Стан/рут/немота урон НЕ ломает (остаются по дизайну). Зовётся из путей нанесения урона существу
     /// (мили/спелл/DoT-тик) при damage&gt;0. Возвращает true, если CC снят. Эталон — CMaNGOS: ауры с
