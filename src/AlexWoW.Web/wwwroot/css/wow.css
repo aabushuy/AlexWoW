@@ -428,6 +428,21 @@ h1, h2, h3 {
 
 /* ── Поиск предметов (админка): фильтр, таблица, тултип ── */
 .item-filter .form-row { align-items: flex-end; }
+.item-icon-col { width: 44px; text-align: center; }
+.item-icon { display: block; border-radius: 3px; border: 1px solid #000; background: #0e0d0a; }
+/* Рамка иконки по качеству предмета (как в игре). */
+.item-icon.q0 { border-color: #9d9d9d; }
+.item-icon.q1 { border-color: #ffffff; }
+.item-icon.q2 { border-color: #1eff00; }
+.item-icon.q3 { border-color: #0070dd; }
+.item-icon.q4 { border-color: #a335ee; }
+.item-icon.q5 { border-color: #ff8000; }
+.item-icon.q6, .item-icon.q7 { border-color: #e6cc80; }
+.item-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.item-table th.sortable:hover { color: var(--gold); }
+.item-table th.sortable::after { content: "\2195"; opacity: 0.35; margin-left: 6px; } /* ↕ по умолчанию */
+.item-table th.sorted-asc::after { content: "\25B2"; opacity: 0.9; }  /* ▲ */
+.item-table th.sorted-desc::after { content: "\25BC"; opacity: 0.9; } /* ▼ */
 .item-table .item-name { font-weight: 600; cursor: help; outline: none; }
 .item-table .item-name:hover,
 .item-table .item-name:focus { text-decoration: underline; }

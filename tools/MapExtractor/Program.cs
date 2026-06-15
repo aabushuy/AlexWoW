@@ -53,6 +53,15 @@ if (args.Length >= 3 && args[0].Equals("talent", StringComparison.OrdinalIgnoreC
     return;
 }
 
+// Иконки предметов: iconmap <dataDir> <usedIds.txt> <iconsOutDir> <map.tsv> —
+//   ItemDisplayInfo.dbc + Interface\Icons\*.blp → PNG + карта displayid→иконка (админка Web, полный офлайн).
+if (args.Length >= 5 && args[0].Equals("iconmap", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqIm = new MpqChain(args[1]);
+    IconMapDump.Extract(mpqIm, args[2], args[3], args[4]);
+    return;
+}
+
 // Боевые рейтинги: combatratings <dataDir> <out.json> — gtChanceToMeleeCrit(+Base).dbc → JSON (защитные статы).
 if (args.Length >= 3 && args[0].Equals("combatratings", StringComparison.OrdinalIgnoreCase))
 {

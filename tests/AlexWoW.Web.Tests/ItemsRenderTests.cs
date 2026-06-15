@@ -23,6 +23,7 @@ public sealed class ItemsRenderTests
     {
         Entry = 23456,
         Name = "Gladiator's Plate Legguards",
+        DisplayId = 9913,
         Quality = 4,            // эпическое
         Class = 4,              // доспех
         SubClass = 4,           // латы
@@ -49,6 +50,8 @@ public sealed class ItemsRenderTests
         Assert.Contains(ItemDisplay.QualityColor(4), html);             // цвет качества (эпик)
         Assert.Contains("item-tip", html);                              // блок тултипа
         Assert.Contains("Броня: 1100", html);                          // тултип содержит броню
+        Assert.Contains("class=\"item-icon", html);                    // колонка иконки
+        Assert.Contains("/icons/", html);                              // src иконки
     }
 
     [Fact]
