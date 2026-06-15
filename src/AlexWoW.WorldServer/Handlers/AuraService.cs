@@ -12,7 +12,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// M6.12; формы друида — позже). Фундамент под расход/эффекты абилок и баффы спеллов. Точка применения —
 /// каст спелла с аура-эффектом (SpellHandlers). Персист через релог — <see cref="AuraPersistenceService"/>.
 /// </summary>
-internal sealed class AuraService(ICharacterStateRepository charState, SpellCatalog spellCatalog)
+internal sealed class AuraService(ICharacterStateRepository charState, SpellCatalog spellCatalog,
+    CombatResourcesService combatResources)
 {
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
@@ -76,6 +77,9 @@ internal sealed class AuraService(ICharacterStateRepository charState, SpellCata
         {
             session.Progression.ShapeshiftForm = form;
             await BroadcastFormAsync(session, ct);
+            // §1 Формы друида: сменить тип ресурса под форму (медведь→ярость, кошка→энергия). Централизованно
+            // здесь — покрывает вход и смену формы любым путём (toggle/персист). Не-друид/не-фераль — no-op.
+            await combatResources.ApplyFormPowerAsync(session, form, ct);
         }
 
         if (doPersist)
@@ -113,6 +117,9 @@ internal sealed class AuraService(ICharacterStateRepository charState, SpellCata
         {
             session.Progression.ShapeshiftForm = 0;
             await BroadcastFormAsync(session, ct);
+            // §1 Формы друида: ЛЮБОЙ полный выход из формы (повторный каст / отмена через не-форменную абилку
+            // CMSG_CANCEL_AURA / истечение) → вернуть тип ресурса в ману. Централизация чинит «частичный выход».
+            await combatResources.ApplyFormPowerAsync(session, 0, ct);
         }
         if (aura.Persist)
         {

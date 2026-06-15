@@ -14,7 +14,6 @@ internal sealed class AuraPersistenceService(
     AuraService auras,
     PeriodicsService periodics,
     SpellCatalog spellCatalog,
-    CombatResourcesService combatResources,
     ICharacterStateRepository charState)
 {
     /// <summary>
@@ -51,9 +50,7 @@ internal sealed class AuraPersistenceService(
                 await auras.ApplyAsync(session, spell, durationMs: 0, positive: true, toggle.Form, ct,
                     group: toggle.Group, persist: true,
                     damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
-                    damageTakenPct: info?.DamageTakenPct ?? 0);
-                // §1 Формы друида: восстановить тип ресурса формы после релога (иначе медведь/кошка на мане).
-                await combatResources.ApplyFormPowerAsync(session, toggle.Form, ct);
+                    damageTakenPct: info?.DamageTakenPct ?? 0); // ресурс формы — централизованно в AuraService.ApplyAsync
                 continue;
             }
 
