@@ -116,20 +116,33 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             return;
         }
 
+        // §4 Страх: пока существо в панике, leash не выводит из боя — иначе fleeing-побег за 50 ярдов сразу
+        // обрывал бы страх (evade). После окончания страха leash сработает штатно (вернётся на спавн).
+        var feared = creature.CrowdControl == SpellCatalog.CrowdControlKind.Fear
+            && CrowdControlService.PreventsAction(creature, now);
+
         // Leash: ушли от дома слишком далеко (игрок «утащил») — выходим из боя и возвращаемся.
         var hx = creature.X - creature.HomeX;
         var hy = creature.Y - creature.HomeY;
         var hz = creature.Z - creature.HomeZ;
-        if (hx * hx + hy * hy + hz * hz > LeashRadius * LeashRadius)
+        if (!feared && hx * hx + hy * hy + hz * hz > LeashRadius * LeashRadius)
         {
             await BeginEvadeAsync(world, creature, ct);
             return;
         }
 
-        // Фаза 2 CC: активный стан/страх/дезориентация — существо не действует (не бьёт и не преследует),
-        // оставаясь «в бою». Истечение снимается в WorldTick. Рут/немота свинг не блокируют (визуал на клиенте).
+        // Фаза 2 CC: активный стан/страх/дезориентация — существо не атакует, оставаясь «в бою». Стан/
+        // дезориентация — стоит на месте; СТРАХ — в панике бежит прочь от игрока (§4 fleeing). Рут/немота
+        // свинг не блокируют (визуал на клиенте). Истечение CC снимается в WorldTick.
         if (CrowdControlService.PreventsAction(creature, now))
+        {
+            if (feared && now >= creature.NextMoveMs)
+            {
+                creature.NextMoveMs = now + MoveIntervalMs;
+                await FleeFromAsync(world, creature, player.X, player.Y, player.Z, ct);
+            }
             return;
+        }
 
         // Фаза 2 INT.1: кастующий манекен — крутит каст-бар по игроку (стенд для проверки прерывания), не бьёт.
         if (Npcs.IsCasterDummy(creature.Template.Entry))
@@ -297,6 +310,39 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             durationMs = (uint)MoveIntervalMs;
         }
         await world.MoveCreatureAsync(creature, nx, ny, nz, durationMs, ct);
+    }
+
+    /// <summary>
+    /// §4 Страх (fleeing): шаг побега прочь от источника угрозы. Направление = от игрока к существу со
+    /// случайным отклонением (паника бежит эрратично, перевыбор каждый тик). Цель — ~8 ярдов прочь;
+    /// дальше работает <see cref="StepTowardAsync"/> (навмеш: обход препятствий + Z по земле).
+    /// </summary>
+    private static async Task FleeFromAsync(WorldState world, WorldCreature creature,
+        float px, float py, float pz, CancellationToken ct)
+    {
+        const float FleeGoalDistance = 8f; // целевая точка побега впереди по направлению «прочь»
+        var dx = creature.X - px;
+        var dy = creature.Y - py;
+        var dist = MathF.Sqrt(dx * dx + dy * dy);
+        float dirX, dirY;
+        if (dist < 1e-3f)
+        {
+            var a = (float)(Random.Shared.NextDouble() * 2 * Math.PI); // совпали по позиции — бежим в случайную сторону
+            dirX = MathF.Cos(a);
+            dirY = MathF.Sin(a);
+        }
+        else
+        {
+            dirX = dx / dist;
+            dirY = dy / dist;
+        }
+        // Эрратичность страха: поворот направления на случайный угол ±~0.5 рад.
+        var jitter = (float)((Random.Shared.NextDouble() - 0.5) * 1.0);
+        var ca = MathF.Cos(jitter);
+        var sa = MathF.Sin(jitter);
+        var gx = creature.X + (dirX * ca - dirY * sa) * FleeGoalDistance;
+        var gy = creature.Y + (dirX * sa + dirY * ca) * FleeGoalDistance;
+        await StepTowardAsync(world, creature, gx, gy, creature.Z, ct);
     }
 
     /// <summary>Существо выходит из боя и переходит в возврат на спавн (evade): ATTACKSTOP + флаг. M6.7.</summary>
