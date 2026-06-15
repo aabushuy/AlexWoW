@@ -13,9 +13,12 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class CombatResourcesService
 {
+    private const byte PowerMana = 0;     // powertype маны
     private const byte PowerRage = 1;     // powertype ярости
     private const byte PowerEnergy = 3;   // powertype энергии
     private const byte PowerRunic = 6;    // powertype силы рун (runic power) DK
+    private const byte ClassDruid = 11;   // друид — тип ресурса зависит от формы (§1)
+    private const byte FormCat = 1, FormBear = 5, FormDireBear = 8; // феральные формы: энергия/ярость
     private const uint MaxRage = 1000;    // ×10 → 100 у клиента
     private const uint MaxEnergy = 100;
     private const uint MaxRunicPower = 1000; // ×10 → 100 у клиента (как ярость)
@@ -37,7 +40,7 @@ internal sealed class CombatResourcesService
     /// </summary>
     internal async Task GainRageAsync(WorldSession session, uint damage, bool attacker, CancellationToken ct)
     {
-        if (session.Character is not { } c || DisplayData.PowerTypeForClass(c.Class) != PowerRage)
+        if (session.Character is not { } c || EffectivePowerType(session) != PowerRage)
             return;
         if (damage == 0 || session.Combat.Rage >= MaxRage)
             return;
@@ -66,11 +69,11 @@ internal sealed class CombatResourcesService
     /// </summary>
     internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0 || session.Character is not { } c)
+        if (session.InWorldGuid == 0 || session.Character is null)
             return;
-        var powerType = DisplayData.PowerTypeForClass(c.Class);
+        var powerType = EffectivePowerType(session);
         if (powerType != PowerRage && powerType != PowerEnergy && powerType != PowerRunic)
-            return; // мана-класс — реген маны отдельно
+            return; // мана-класс/форма — реген маны отдельно
         if (now - session.Combat.LastResourceTickMs < ResourceTickMs)
             return;
         session.Combat.LastResourceTickMs = now;
@@ -144,6 +147,49 @@ internal sealed class CombatResourcesService
                 await SendPowerAsync(session, PowerRunic, session.Combat.RunicPower, ct);
                 break;
         }
+    }
+
+    /// <summary>Эффективный тип ресурса сессии: для друида в феральной форме — ресурс формы
+    /// (<see cref="SessionState.SessionCombatState.FormPowerType"/>), иначе — по классу. §1.</summary>
+    internal static byte EffectivePowerType(WorldSession session)
+    {
+        if (session.Combat.FormPowerType != 0)
+            return session.Combat.FormPowerType;
+        return session.Character is { } c ? DisplayData.PowerTypeForClass(c.Class) : PowerMana;
+    }
+
+    /// <summary>
+    /// §1 Формы друида: смена типа ресурса под форму (кошка→энергия, медведь/лютый медведь→ярость,
+    /// прочее/без формы→мана). Шлёт клиенту тип ресурса (UNIT_FIELD_BYTES_0, байт 3) + текущее/макс значение,
+    /// чтобы сменилась полоска и стали доступны абилки формы (ярость/энергия). Только друид (воин в стойках
+    /// уже на ярости). Эталон — CMaNGOS <c>Aura::HandleAuraModShapeshift</c> (SetPowerType по форме).
+    /// </summary>
+    internal async Task ApplyFormPowerAsync(WorldSession session, byte form, CancellationToken ct)
+    {
+        if (session.Character is not { } c || c.Class != ClassDruid)
+            return;
+        byte pt = form switch { FormCat => PowerEnergy, FormBear or FormDireBear => PowerRage, _ => PowerMana };
+        if (pt == session.Combat.FormPowerType)
+            return; // тип ресурса не изменился
+        session.Combat.FormPowerType = pt;
+
+        uint cur, max;
+        switch (pt)
+        {
+            case PowerRage: max = MaxRage; cur = session.Combat.Rage; break;                       // ярость копится боем
+            case PowerEnergy: max = MaxEnergy; session.Combat.Energy = MaxEnergy; cur = MaxEnergy; break; // полная энергия на входе
+            default: max = session.Cast.MaxMana; cur = session.Cast.Mana; break;                   // выход в форму без ресурса → мана
+        }
+
+        var guid = (ulong)session.InWorldGuid;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate(guid, m =>
+            {
+                m.SetBytes(UpdateField.UnitBytes0, c.Race, c.Class, c.Gender, pt); // тип ресурса
+                m.SetUInt32(UpdateField.UnitPower1 + pt, cur);
+                m.SetUInt32(UpdateField.UnitMaxPower1 + pt, max);
+            }), ct);
+        await SendPowerAsync(session, pt, cur, ct); // двигает полоску (SMSG_POWER_UPDATE)
     }
 
     /// <summary>

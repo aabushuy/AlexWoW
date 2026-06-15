@@ -38,6 +38,9 @@ internal sealed class SessionCombatState
     /// <summary>Сила рун DK (runic power, UNIT_FIELD_POWER1+6). Хранится ×10 (0..1000 = 0..100 у клиента).
     /// Копится от трат рун (RUNE.3), тратится RP-абилками (Frost Strike/Death Coil), распадается вне боя (RUNE.4).</summary>
     internal uint RunicPower { get; set; }
+    /// <summary>§1 Формы друида: тип ресурса активной формы (0 — класс по умолчанию/мана; 1 — ярость медведя;
+    /// 3 — энергия кошки). Делает реген/трату ресурса форм-зависимыми для друида (класс=мана). Сброс при выходе.</summary>
+    internal byte FormPowerType { get; set; }
     /// <summary>Скорость оружия главной руки (мс) — для формулы ярости. Ставится в RefreshMeleeAsync. M6.12.</summary>
     internal uint MainHandSpeedMs { get; set; } = 2000;
     /// <summary>Урон оружия главной руки (min/max) — для мили-абилок (WEAPON_DAMAGE). RefreshMeleeAsync. M10.4a.</summary>
