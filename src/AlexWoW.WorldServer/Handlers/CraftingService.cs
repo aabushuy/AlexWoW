@@ -30,18 +30,23 @@ internal sealed class CraftingService(
         return true;
     }
 
-    /// <summary>Завершение крафта: повторная проверка реагентов → расход → создание результата → skill-up.</summary>
+    /// <summary>§2: расход реагентов спелла (осколок души 6265, травы/порошки крафта и буффов). Для любого
+    /// спелла с реагентами — не только крафта. Наличие проверено гейтом на старте каста (<see cref="HasReagents"/>).</summary>
+    internal async Task ConsumeReagentsAsync(WorldSession session, SpellCatalog.SpellInfo info, CancellationToken ct)
+    {
+        if (info.Reagents is null)
+            return;
+        foreach (var (item, count) in info.Reagents)
+            await inventoryGrant.ConsumeAsync(session, item, count, ct);
+    }
+
+    /// <summary>Завершение крафта: создание результата + skill-up. Реагенты уже списаны
+    /// (<see cref="ConsumeReagentsAsync"/> из <see cref="SpellCastCompletion"/>).</summary>
     internal async Task DoCraftAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
         CancellationToken ct)
     {
-        if (info.CreateItemId == 0 || !HasReagents(session, info))
+        if (info.CreateItemId == 0)
             return;
-
-        if (info.Reagents is not null)
-        {
-            foreach (var (item, count) in info.Reagents)
-                await inventoryGrant.ConsumeAsync(session, item, count, ct);
-        }
 
         var placed = await inventoryGrant.TryGiveAsync(session, info.CreateItemId, info.CreateItemCount, ct);
         session.Logger.LogInformation("CRAFT '{User}': spell={Spell} → {Count}×{Item}{Full}",

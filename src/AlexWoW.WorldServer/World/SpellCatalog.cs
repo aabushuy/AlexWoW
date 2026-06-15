@@ -489,6 +489,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     /// <summary>Death Grip (рывок цели к ногам игрока). Скриптовый эффект — распознаём по spellId.</summary>
     public static bool IsDeathGrip(uint spellId) => DeathGripSpellIds.Contains(spellId);
 
+    /// <summary>§2 Осколок души — item 6265 (расходный реагент призывов/Soulstone/Healthstone/Soul Fire).</summary>
+    public const uint SoulShardItem = 6265;
+    // Drain Soul (все ранги): channel, метит цель — при её убийстве ЧК получает осколок души (EffectItemType=6265).
+    private static readonly HashSet<uint> DrainSoulSpellIds = [1120, 8288, 8289, 11675, 27217, 47855];
+    /// <summary>Drain Soul (метит цель → осколок при убийстве). Скриптовая генерация — распознаём по spellId.</summary>
+    public static bool IsDrainSoul(uint spellId) => DrainSoulSpellIds.Contains(spellId);
+
     // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида
     public const byte GroupPaladinAura = 2;  // ауры паладина
