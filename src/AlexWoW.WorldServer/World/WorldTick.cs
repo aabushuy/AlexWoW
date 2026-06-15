@@ -58,6 +58,8 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                 {
                     // Фаза 2 CC: снять истёкший контроль у ЛЮБОГО существа (в т.ч. вне боя — манекен).
                     await crowdControl.ExpireIfDueAsync(world, creature, now, ct);
+                    // §8 снара (Crippling Poison): снять истёкшее замедление.
+                    await crowdControl.ExpireSnareIfDueAsync(world, creature, now, ct);
                     if (creature.Evading)
                         await creatureAi.TickEvadeAsync(world, creature, now, ct);
                     else if (creature.CombatTargetGuid != 0)

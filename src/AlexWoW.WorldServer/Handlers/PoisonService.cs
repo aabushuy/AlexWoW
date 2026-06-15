@@ -12,7 +12,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// бафф вешает <see cref="SpellCastCompletion"/>. Зеркало <see cref="ImbueService"/>/<see cref="SealService"/>.
 /// Упрощения: Deadly-стек DoT, Wound-дебафф лечения, Crippling-слоу не моделируются — все дают разовый природный урон.
 /// </summary>
-internal sealed class PoisonService(KillRewardService killReward, ILogger<PoisonService> logger)
+internal sealed class PoisonService(KillRewardService killReward, CrowdControlService crowdControl,
+    ILogger<PoisonService> logger)
 {
     // Ранги спеллов-применения ядов (эффект 54). Классификация по набору id (тип определяет прок).
     private static readonly HashSet<uint> Instant =
@@ -31,6 +32,10 @@ internal sealed class PoisonService(KillRewardService killReward, ILogger<Poison
     private const int DeadlyTickIntervalMs = 3000;
     private const int DeadlyDurationMs = 12000;
 
+    // Crippling Poison — снара цели: −50% скорости бега на 12с (обновляется ударами).
+    private const byte CripplingSlowPct = 50;
+    private const int CripplingDurationMs = 12000;
+
     /// <summary>Является ли спелл нанесением яда разбойника (любой ранг Instant/Deadly/Wound/Crippling).</summary>
     internal static bool IsPoison(uint spellId)
         => Instant.Contains(spellId) || Deadly.Contains(spellId) || Wound.Contains(spellId) || Crippling.Contains(spellId);
@@ -41,8 +46,15 @@ internal sealed class PoisonService(KillRewardService killReward, ILogger<Poison
         var poison = session.Progression.Auras.FirstOrDefault(a => IsPoison(a.SpellId));
         if (poison is null)
             return false;
-        // Crippling/Wound — слоу/дебафф лечения (моделируются в отдельной под-итерации): здесь урона нет.
-        if (Crippling.Contains(poison.SpellId) || Wound.Contains(poison.SpellId))
+
+        // Crippling Poison — снара цели (−50% скорости, 12с); урона нет. Накладывается почти каждый удар.
+        if (Crippling.Contains(poison.SpellId))
+        {
+            await crowdControl.ApplySnareAsync(session, creature, poison.SpellId, CripplingSlowPct, CripplingDurationMs, now, ct);
+            return false;
+        }
+        // Wound — дебафф лечения (моделируется в отдельной под-итерации): здесь урона нет.
+        if (Wound.Contains(poison.SpellId))
             return false;
 
         var level = (byte)(session.Character?.Level ?? 1);

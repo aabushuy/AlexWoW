@@ -60,6 +60,14 @@ public sealed class WorldCreature
     public uint CrowdControlSpellId { get; set; }
     public byte CrowdControlSlot { get; set; }
 
+    // --- Снара (§8 Crippling Poison и т.п.): частичное замедление бега (НЕ полный рут). ---
+    /// <summary>Момент окончания снары (мс); 0/прошлое — нет снары.</summary>
+    public long SnareUntilMs { get; set; }
+    /// <summary>Процент замедления бега (напр. 50 = −50% скорости), пока активна снара.</summary>
+    public byte SnarePct { get; set; }
+    /// <summary>Spell-id наложившей снары (для снятия визуальной ауры-дебаффа).</summary>
+    public uint SnareSpellId { get; set; }
+
     // --- Каст существа (Фаза 2 INT.1): кастующий манекен крутит каст-бар; прерывается interrupt-спеллом игрока. ---
     /// <summary>Спелл, который существо сейчас кастует (0 — не кастует). Прерывание сбрасывает в 0.</summary>
     public uint CastingSpellId { get; set; }

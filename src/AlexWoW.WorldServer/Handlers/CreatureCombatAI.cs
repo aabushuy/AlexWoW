@@ -293,13 +293,15 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         if (dist < 1e-3f)
             return;
 
-        var stepLen = CreatureRunSpeed * MoveIntervalMs / 1000f;
+        // §8 снара (Crippling Poison): замедляем эффективную скорость бега (преследование и побег при страхе).
+        var speed = CreatureRunSpeed * CrowdControlService.SnareSpeedFactor(creature, Environment.TickCount64);
+        var stepLen = speed * MoveIntervalMs / 1000f;
         float nx, ny, nz;
         uint durationMs;
         if (dist <= stepLen)
         {
             nx = tx; ny = ty; nz = tz;
-            durationMs = (uint)MathF.Max(1f, dist / CreatureRunSpeed * 1000f);
+            durationMs = (uint)MathF.Max(1f, dist / speed * 1000f);
         }
         else
         {
