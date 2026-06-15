@@ -75,13 +75,17 @@
                     @foreach (var it in Model.Results)
                     {
                         <tr>
-                            <td class="item-icon-col"><img class="item-icon q@(it.Quality)" src="@Icons.IconUrl(it.DisplayId)" alt="" loading="lazy" width="36" height="36" /></td>
+                            <td class="item-icon-col">
+                                <span class="item-icon-wrap">
+                                    <img class="item-icon q@(it.Quality)" src="@Icons.IconUrl(it.DisplayId)" alt="" loading="lazy" width="36" height="36" tabindex="0" />
+                                    <div class="item-tip" role="tooltip">
+                                        <partial name="_ItemTooltip" model="it" />
+                                    </div>
+                                </span>
+                            </td>
                             <td data-sort="@it.Entry">@it.Entry</td>
                             <td data-sort="@it.Name">
-                                <span class="item-name" style="color:@ItemDisplay.QualityColor(it.Quality)" tabindex="0">@it.Name</span>
-                                <div class="item-tip" role="tooltip">
-                                    <partial name="_ItemTooltip" model="it" />
-                                </div>
+                                <span class="item-name" style="color:@ItemDisplay.QualityColor(it.Quality)">@it.Name</span>
                             </td>
                             <td data-sort="@ItemDisplay.TypeName(it.Class, it.SubClass)">@ItemDisplay.TypeName(it.Class, it.SubClass)</td>
                             <td data-sort="@it.RequiredLevel">@(it.RequiredLevel > 0 ? it.RequiredLevel.ToString() : "—")</td>
@@ -142,16 +146,16 @@
                 tip.style.left = left + 'px';
                 tip.style.top = top + 'px';
             }
-            document.querySelectorAll('.item-table .item-name').forEach(function (name) {
-                var tip = name.parentElement.querySelector('.item-tip');
+            document.querySelectorAll('.item-table .item-icon-wrap').forEach(function (wrap) {
+                var tip = wrap.querySelector('.item-tip');
                 if (!tip) return;
                 function show(e) { active = tip; tip.classList.add('show'); place(tip, e.clientX || 0, e.clientY || 0); }
                 function hide() { tip.classList.remove('show'); if (active === tip) active = null; }
-                name.addEventListener('mouseenter', show);
-                name.addEventListener('mousemove', function (e) { if (active === tip) place(tip, e.clientX, e.clientY); });
-                name.addEventListener('mouseleave', hide);
-                name.addEventListener('focus', function () { tip.classList.add('show'); var r = name.getBoundingClientRect(); place(tip, r.right, r.bottom); });
-                name.addEventListener('blur', hide);
+                wrap.addEventListener('mouseenter', show);
+                wrap.addEventListener('mousemove', function (e) { if (active === tip) place(tip, e.clientX, e.clientY); });
+                wrap.addEventListener('mouseleave', hide);
+                wrap.addEventListener('focus', function () { tip.classList.add('show'); var r = wrap.getBoundingClientRect(); place(tip, r.right, r.bottom); }, true);
+                wrap.addEventListener('blur', hide, true);
             });
         })();
     </script>

@@ -23,7 +23,7 @@ html, body { height: 100%; }
 
 body {
     margin: 0;
-    font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
     color: var(--ink);
     background:
         radial-gradient(ellipse at top, #2a2620 0%, #100f0c 60%, #080706 100%) fixed,
@@ -36,7 +36,7 @@ a { color: var(--gold); text-decoration: none; }
 a:hover { color: #fff; text-shadow: 0 0 8px rgba(255, 209, 0, 0.5); }
 
 h1, h2, h3 {
-    font-family: "Trajan Pro", "Georgia", "Times New Roman", serif;
+    font-family: Arial, sans-serif;
     letter-spacing: 0.04em;
     color: var(--gold);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
@@ -59,8 +59,7 @@ h1, h2, h3 {
     justify-content: space-between;
     gap: 16px;
     padding: 14px 6px;
-    border-bottom: 2px solid var(--gold-deep);
-    box-shadow: 0 6px 16px -10px rgba(0, 0, 0, 0.9);
+    border-bottom: 1px solid #2a3550;
     flex-wrap: wrap;
 }
 
@@ -68,7 +67,7 @@ h1, h2, h3 {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    font-family: "Trajan Pro", Georgia, serif;
+    font-family: Arial, sans-serif;
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: 0.06em;
@@ -114,11 +113,10 @@ h1, h2, h3 {
     right: 0;
     top: calc(100% + 12px);
     min-width: 190px;
-    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
-    border: 1px solid var(--panel-edge);
-    border-top: 2px solid var(--gold-deep);
-    border-radius: 6px;
-    box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.9);
+    background: #06080e;
+    border: 1px solid #2a3550;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
     padding: 6px;
     z-index: 30;
     display: flex;
@@ -143,7 +141,7 @@ h1, h2, h3 {
     color: var(--gold);
     text-shadow: none;
 }
-.nav-dropdown-menu form { margin: 4px 0 0; border-top: 1px solid var(--panel-edge); padding-top: 4px; }
+.nav-dropdown-menu form { margin: 4px 0 0; border-top: 1px solid #2a3550; padding-top: 4px; }
 .nav-dropdown-menu button { color: var(--danger); }
 .nav-dropdown-menu button:hover { background: rgba(224, 82, 75, 0.12); color: #f3b4b0; }
 
@@ -153,17 +151,16 @@ h1, h2, h3 {
     text-align: center;
     color: var(--ink-dim);
     font-size: 0.85rem;
-    border-top: 1px solid var(--panel-edge);
+    border-top: 1px solid #2a3550;
 }
 
-/* ── Панели ── */
+/* ── Панели (WoW-тултип стиль) ── */
 .panel {
-    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
-    border: 1px solid var(--panel-edge);
-    border-top: 2px solid var(--gold-deep);
-    border-radius: 6px;
+    background: #06080e;
+    border: 1px solid #2a3550;
+    border-radius: 4px;
     padding: 26px 28px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 28px -16px rgba(0, 0, 0, 0.9);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
 }
 .panel + .panel { margin-top: 20px; }
 
@@ -184,7 +181,7 @@ h1, h2, h3 {
     width: 100%;
     padding: 10px 12px;
     background: #0e0d0a;
-    border: 1px solid var(--gold-deep);
+    border: 1px solid #2a3550;
     border-radius: 4px;
     color: var(--ink);
     font-size: 1rem;
@@ -222,7 +219,7 @@ h1, h2, h3 {
 .btn-ghost {
     background: transparent;
     color: var(--gold);
-    border: 1px solid var(--gold-deep);
+    border: 1px solid #2a3550;
     box-shadow: none;
     text-shadow: none;
 }
@@ -249,17 +246,18 @@ h1, h2, h3 {
 }
 .char-card {
     display: block;
-    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
-    border: 1px solid var(--panel-edge);
+    background: #06080e;
+    border: 1px solid #2a3550;
     border-left: 3px solid var(--gold-deep);
-    border-radius: 6px;
+    border-radius: 4px;
     padding: 16px 18px;
     transition: border-color 0.15s, transform 0.08s, box-shadow 0.15s;
 }
 .char-card:hover {
     border-color: var(--gold);
+    border-left-color: var(--gold);
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.9);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
     text-shadow: none;
 }
 .char-name { font-size: 1.25rem; font-weight: 700; font-family: Georgia, serif; }
@@ -271,7 +269,7 @@ h1, h2, h3 {
     text-align: center;
     padding: 2px 8px;
     background: #0e0d0a;
-    border: 1px solid var(--gold-deep);
+    border: 1px solid #2a3550;
     border-radius: 12px;
     color: var(--gold);
     font-weight: 700;
@@ -293,7 +291,7 @@ h1, h2, h3 {
 .equip-table th, .equip-table td {
     text-align: left;
     padding: 8px 10px;
-    border-bottom: 1px solid var(--panel-edge);
+    border-bottom: 1px solid #2a3550;
     font-size: 0.92rem;
 }
 .equip-table th { color: var(--gold-dim); font-weight: 600; }
@@ -310,14 +308,14 @@ h1, h2, h3 {
 
 /* ── Админ Spell QA (M12) ── */
 .muted { color: var(--ink-dim); }
-.alert-warn { background: rgba(255, 209, 0, 0.10); border-color: var(--gold-deep); color: #f0dca0; }
+.alert-warn { background: rgba(42, 53, 80, 0.25); border-color: #2a3550; color: #f0dca0; }
 .data-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .data-table th, .data-table td {
     text-align: left;
     padding: 7px 12px;
-    border-bottom: 1px solid var(--panel-edge);
+    border-bottom: 1px solid #2a3550;
 }
-.data-table th { color: var(--gold-dim); font-weight: 600; border-bottom: 1px solid var(--gold-deep); }
+.data-table th { color: var(--gold-dim); font-weight: 600; border-bottom: 1px solid #2a3550; }
 .data-table tbody tr:hover { background: rgba(255, 209, 0, 0.05); }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0; }
 .kv dt { color: var(--gold-dim); font-weight: 600; }
@@ -330,12 +328,12 @@ h1, h2, h3 {
     border: 1px solid;
 }
 .badge-ok { background: rgba(91, 191, 99, 0.12); border-color: var(--ok); color: #bfe6c3; }
-.badge-warn { background: rgba(255, 209, 0, 0.12); border-color: var(--gold-deep); color: #f0dca0; }
+.badge-warn { background: rgba(42, 53, 80, 0.25); border-color: #2a3550; color: #f0dca0; }
 .ticket-body {
     width: 100%;
     margin-top: 6px;
     background: var(--stone-1);
-    border: 1px solid var(--gold-deep);
+    border: 1px solid #2a3550;
     border-radius: 4px;
     color: var(--ink);
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -347,10 +345,9 @@ h1, h2, h3 {
 /* ── Админ-раздел: левое меню (M8.9) ── */
 .admin-shell { display: grid; grid-template-columns: 210px 1fr; gap: 24px; align-items: start; }
 .admin-sidebar {
-    background: linear-gradient(180deg, var(--stone-2), var(--stone-1));
-    border: 1px solid var(--panel-edge);
-    border-top: 2px solid var(--gold-deep);
-    border-radius: 6px;
+    background: #06080e;
+    border: 1px solid #2a3550;
+    border-radius: 4px;
     padding: 14px 12px;
     position: sticky;
     top: 16px;
@@ -361,7 +358,7 @@ h1, h2, h3 {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 2px 8px 10px;
-    border-bottom: 1px solid var(--panel-edge);
+    border-bottom: 1px solid #2a3550;
     margin-bottom: 8px;
 }
 .admin-menu { display: flex; flex-direction: column; gap: 2px; }
@@ -392,7 +389,7 @@ h1, h2, h3 {
 
 /* ── Карточка персонажа в админке: статичная (не ссылка) + кнопки действий ── */
 .char-card-static { cursor: default; }
-.char-card-static:hover { transform: none; border-color: var(--panel-edge); box-shadow: none; }
+.char-card-static:hover { transform: none; border-color: #2a3550; box-shadow: none; }
 .char-actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .char-actions form { margin: 0; }
 
@@ -413,7 +410,7 @@ h1, h2, h3 {
     width: 100%;
     padding: 10px 12px;
     background: #0e0d0a;
-    border: 1px solid var(--gold-deep);
+    border: 1px solid #2a3550;
     border-radius: 4px;
     color: var(--ink);
     font-size: 1rem;
@@ -429,6 +426,7 @@ h1, h2, h3 {
 /* ── Поиск предметов (админка): фильтр, таблица, тултип ── */
 .item-filter .form-row { align-items: flex-end; }
 .item-icon-col { width: 44px; text-align: center; }
+.item-icon-wrap { display: inline-block; cursor: pointer; }
 .item-icon { display: block; border-radius: 3px; border: 1px solid #000; background: #0e0d0a; }
 /* Рамка иконки по качеству предмета (как в игре). */
 .item-icon.q0 { border-color: #9d9d9d; }
@@ -443,9 +441,7 @@ h1, h2, h3 {
 .item-table th.sortable::after { content: "\2195"; opacity: 0.35; margin-left: 6px; } /* ↕ по умолчанию */
 .item-table th.sorted-asc::after { content: "\25B2"; opacity: 0.9; }  /* ▲ */
 .item-table th.sorted-desc::after { content: "\25BC"; opacity: 0.9; } /* ▼ */
-.item-table .item-name { font-weight: 600; cursor: help; outline: none; }
-.item-table .item-name:hover,
-.item-table .item-name:focus { text-decoration: underline; }
+.item-table .item-name { font-weight: 600; }
 
 /* Скрытый тултип; .show + позиционирование к курсору задаёт JS (position: fixed). */
 .item-tip {
