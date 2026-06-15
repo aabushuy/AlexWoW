@@ -42,6 +42,28 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         if ((targetFlags & SpellPackets.TargetFlagUnit) != 0)
             targetGuid = r.PackedGuid();
 
+        await StartCastAsync(session, spellId, castCount, targetGuid, ct);
+    }
+
+    /// <summary>
+    /// Разбор CMSG_USE_ITEM (3.3.5): bag, slot, cast_count, spellId, … — использование предмета кастует его
+    /// on-use спелл (нанесение яда на оружие у разбойника — спелл-применение 8679/2823/3408 и т.п.). Извлекаем
+    /// spellId и запускаем общее ядро каста. Цель не нужна (яд вешается на своё оружие → бафф).
+    /// </summary>
+    internal async Task HandleUseItemAsync(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var r = packet.Reader();
+        r.UInt8();                  // bag
+        r.UInt8();                  // slot
+        var castCount = r.UInt8();  // cast_count
+        var spellId = r.UInt32();   // spellId предмета (on-use)
+        await StartCastAsync(session, spellId, castCount, targetGuid: 0, ct);
+    }
+
+    /// <summary>Ядро каста (после разбора цели): переключатели/гейты/GCD/стоимость → мгновенное или отложенное
+    /// завершение. Общее для CMSG_CAST_SPELL и CMSG_USE_ITEM (предмет несёт spellId, напр. нанесение яда).</summary>
+    internal async Task StartCastAsync(WorldSession session, uint spellId, byte castCount, ulong targetGuid, CancellationToken ct)
+    {
         // M6.12/M7 #21: переключатели (стойки/ауры/аспекты) — мгновенная перманентная аура, без маны/цели/КД.
         if (await spellToggles.TryToggleAsync(session, spellId, castCount, ct))
             return;

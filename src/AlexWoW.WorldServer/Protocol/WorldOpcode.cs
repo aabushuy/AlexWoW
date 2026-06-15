@@ -103,6 +103,7 @@ public enum WorldOpcode : uint
     SmsgLootClearMoney = 0x165,    // пустое — деньги забраны (убрать из окна)
 
     // Спеллы (M6.4)
+    CmsgUseItem = 0x0AB,           // §8: использование предмета (яд на оружие, зелья) — кастует on-use спелл
     CmsgCastSpell = 0x12E,
     CmsgCancelCast = 0x12F,
     CmsgCancelAura = 0x136,                      // u32 spell — снять свой бафф (правый клик по иконке) M10.4c
