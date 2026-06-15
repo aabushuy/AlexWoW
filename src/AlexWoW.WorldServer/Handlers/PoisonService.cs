@@ -36,6 +36,11 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
     private const byte CripplingSlowPct = 50;
     private const int CripplingDurationMs = 12000;
 
+    // Wound Poison — стек-дебафф снижения лечения цели: до 5 зарядов по −10% (=−50%), 15с.
+    private const byte WoundMaxStacks = 5;
+    private const int WoundReductionPerStack = 10;
+    private const int WoundDurationMs = 15000;
+
     /// <summary>Является ли спелл нанесением яда разбойника (любой ранг Instant/Deadly/Wound/Crippling).</summary>
     internal static bool IsPoison(uint spellId)
         => Instant.Contains(spellId) || Deadly.Contains(spellId) || Wound.Contains(spellId) || Crippling.Contains(spellId);
@@ -53,9 +58,13 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
             await crowdControl.ApplySnareAsync(session, creature, poison.SpellId, CripplingSlowPct, CripplingDurationMs, now, ct);
             return false;
         }
-        // Wound — дебафф лечения (моделируется в отдельной под-итерации): здесь урона нет.
+        // Wound Poison — стек-дебафф снижения лечения цели (до 5×10% = −50%); урона нет. По шансу +1 заряд.
         if (Wound.Contains(poison.SpellId))
+        {
+            if (Random.Shared.NextDouble() < ProcChance)
+                await ApplyWoundStackAsync(session, creature, poison.SpellId, now, ct);
             return false;
+        }
 
         var level = (byte)(session.Character?.Level ?? 1);
 
@@ -135,5 +144,51 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
         session.Combat.LastCombatMs = now;
         logger.LogDebug("POISON '{User}': Deadly стек {Stacks}/{Max} на '{Name}'",
             session.Account, stacks, DeadlyMaxStacks, creature.Template.Name);
+    }
+
+    /// <summary>
+    /// Wound Poison: накладывает/освежает стек-дебафф снижения лечения цели (−10% за заряд, до 5 = −50%).
+    /// Непериодический (урона нет) — учитывается при лечении цели (<see cref="SpellEffectsService"/>).
+    /// </summary>
+    private async Task ApplyWoundStackAsync(WorldSession session, WorldCreature creature, uint spellId, long now, CancellationToken ct)
+    {
+        var existing = session.Progression.Periodics.FirstOrDefault(
+            p => p.SpellId == spellId && p.TargetGuid == creature.Guid && p.HealReductionPct != 0);
+
+        byte stacks;
+        byte slot;
+        if (existing is not null)
+        {
+            stacks = (byte)Math.Min(WoundMaxStacks, existing.StackCount + 1);
+            existing.StackCount = stacks;
+            existing.HealReductionPct = stacks * WoundReductionPerStack;
+            existing.ExpiresAtMs = now + WoundDurationMs;
+            slot = existing.Slot;
+        }
+        else
+        {
+            stacks = 1;
+            slot = (byte)session.Progression.Periodics.Count(p => p.TargetGuid == creature.Guid);
+            session.Progression.Periodics.Add(new PeriodicEffect
+            {
+                SpellId = spellId,
+                TargetGuid = creature.Guid,
+                StackCount = 1,
+                HealReductionPct = WoundReductionPerStack,
+                ExpiresAtMs = now + WoundDurationMs,
+                DoesTick = false,
+                OwnsVisual = true,
+                Slot = slot,
+            });
+        }
+
+        var level = (byte)(session.Character?.Level ?? 1);
+        const byte Flags = AuraFlags.Effect1 | AuraFlags.Negative | AuraFlags.Duration;
+        await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAuraUpdate,
+            AuraPackets.BuildApplyByCaster(creature.Guid, (ulong)session.InWorldGuid, slot, spellId,
+                Flags, level, stacks, WoundDurationMs), ct);
+        session.Combat.LastCombatMs = now;
+        logger.LogDebug("POISON '{User}': Wound стек {Stacks}/{Max} (−{Pct}% лечения) на '{Name}'",
+            session.Account, stacks, WoundMaxStacks, stacks * WoundReductionPerStack, creature.Template.Name);
     }
 }

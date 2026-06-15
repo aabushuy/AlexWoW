@@ -237,6 +237,10 @@ internal sealed class SpellEffectsService(
             var critH = RollSpellCrit(session);
             var amt = ComputeHealAmount(session, info);
             if (critH) amt = amt * 3 / 2; // CRIT.1: крит-хил ×1.5
+            // §8 Wound Poison: входящее лечение цели снижено на % дебаффа лечения от кастера.
+            var healCutDummy = PeriodicsService.HealReductionPctFor(session, healDummy.Guid);
+            if (healCutDummy > 0)
+                amt = amt * (uint)(100 - healCutDummy) / 100;
             var ceiling = healDummy.MaxHealth - healDummy.MaxHealth / 2; // не выше ½ макс. — остаётся раненым
             var beforeHp = healDummy.Health;
             healDummy.Health = Math.Min(ceiling, beforeHp + amt);
