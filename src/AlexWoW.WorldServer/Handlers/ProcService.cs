@@ -31,6 +31,12 @@ internal sealed class ProcService(SpellCatalog spellCatalog, AuraService auras)
 
         foreach (var aura in session.Progression.Auras.ToList())
         {
+            // §8 Печати паладина — on-hit прок обрабатывает SealService (по свингу), НЕ дублируем generic-проком:
+            // иначе триггер-спелл печати наложился бы на САМОГО паладина как само-бафф (Печать справедливости →
+            // оглушение себя; Печать мудрости/света → дубль-аура «второй печатью», ломающая эксклюзивность). §8 фикс.
+            if (SpellCatalog.ExclusiveAuraGroup(aura.SpellId) == SpellCatalog.GroupPaladinSeal)
+                continue;
+
             var info = await spellCatalog.GetAsync(aura.SpellId, ct);
             if (info is not { ProcTriggerSpellId: not 0 })
                 continue;
