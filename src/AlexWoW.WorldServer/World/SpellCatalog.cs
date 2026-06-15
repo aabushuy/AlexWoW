@@ -144,7 +144,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         bool IsAreaCrowdControl = false,
         // §1 Шейпшифт-форма (аура 36 MOD_SHAPESHIFT): номер формы из EffectMiscValue (FORM_*, напр. 22 = Metamorphosis).
         // 0 — не форма. Ненулевое значение → ApplyAuraEffectAsync передаёт форму в AuraService (байт формы + модель).
-        byte ShapeshiftForm = 0);
+        byte ShapeshiftForm = 0,
+        // §3 Проклятие ЧК (Curse of …): один активный кёрс на цель от кастера — новый снимает прежний.
+        bool IsCurse = false,
+        // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера (аура 87 на дебаффе).
+        // CurseSchoolMask — маска школ (EffectMiscValue, 126 = вся магия). Применяется в уроне по проклятой цели.
+        int CurseDamageTakenPct = 0, byte CurseSchoolMask = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -292,6 +297,17 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var shapeIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModShapeshift);
         var shapeMisc = shapeIdx switch { 0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, _ => t.EffectMiscValue3 };
         var shapeshiftForm = shapeIdx >= 0 ? (byte)Math.Clamp(shapeMisc, 0, 255) : (byte)0;
+        // §3 Проклятие: один кёрс на цель. Curse of the Elements несёт MOD_DAMAGE_PERCENT_TAKEN (аура 87) на дебаффе
+        // → цель получает +% урона совпадающей школы от кастера (амплификация магического урона).
+        var isCurse = IsCurseSpell((uint)t.Id);
+        var curseAmpIdx = isCurse
+            ? Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken)
+            : -1;
+        var curseDamageTakenPct = curseAmpIdx >= 0 ? effects[curseAmpIdx].Bp + 1 : 0;
+        var curseSchoolMask = curseAmpIdx switch
+        {
+            0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
+        };
         // ABS.1/ABS.2: absorb-щит — SCHOOL_ABSORB (69, обычный) или MANA_SHIELD (97, за счёт маны).
         // Пул = BasePoints+1, маска школ = EffectMiscValue. Mana Shield дополнительно несёт множитель маны.
         var absorbIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura is AuraSchoolAbsorb or AuraManaShield);
@@ -475,7 +491,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
             immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
-            shapeshiftForm);
+            shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
@@ -510,6 +526,20 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private static readonly HashSet<uint> DrainSoulSpellIds = [1120, 8288, 8289, 11675, 27217, 47855];
     /// <summary>Drain Soul (метит цель → осколок при убийстве). Скриптовая генерация — распознаём по spellId.</summary>
     public static bool IsDrainSoul(uint spellId) => DrainSoulSpellIds.Contains(spellId);
+
+    // §3 Проклятия ЧК (Curse of …) — у цели может быть лишь ОДИН кёрс от данного кастера: новый снимает прежний.
+    // Игровые ранги (без NPC-версий тех же имён). SpellName в catalog не загружается → распознаём по spellId.
+    private static readonly HashSet<uint> CurseSpellIds =
+    [
+        1490, 11721, 11722, 27228, 47865,                       // Curse of the Elements
+        702, 1108, 6205, 7646, 11707, 11708, 27224, 30909, 50511, // Curse of Weakness
+        1714, 11719,                                            // Curse of Tongues
+        980, 1014, 6217, 11711, 11712, 11713, 27218, 47863, 47864, // Curse of Agony (DoT)
+        603, 30910, 47867,                                      // Curse of Doom (DoT)
+        18223,                                                  // Curse of Exhaustion (замедление)
+    ];
+    /// <summary>Спелл — проклятие ЧК (для правила «один кёрс на цель от кастера»). Распознаём по spellId.</summary>
+    public static bool IsCurseSpell(uint spellId) => CurseSpellIds.Contains(spellId);
 
     // Группы эксклюзивных переключателей (M7 #21): один активен в группе.
     public const byte GroupShapeshift = 1;   // стойки воина / формы друида

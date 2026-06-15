@@ -184,6 +184,44 @@ public class SpellCatalogFromTemplateTests
     }
 
     [Fact]
+    public void CurseOfTheElements_IsCurseWithDamageTakenAmp()
+    {
+        // §3 CoE (1490): MOD_RESISTANCE(22) Bp=-46 (дебафф) + MOD_DAMAGE_PERCENT_TAKEN(87) Bp=5 misc=126 (магия).
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData
+        {
+            Id = 1490, DurationIndex = 5,
+            Effect1 = 6, EffectApplyAuraName1 = 22, EffectBasePoints1 = -46, EffectMiscValue1 = 126,
+            Effect2 = 6, EffectApplyAuraName2 = 87, EffectBasePoints2 = 5, EffectMiscValue2 = 126,
+        });
+        Assert.True(info.IsCurse);
+        Assert.False(info.AuraPositive);              // дебафф на цель
+        Assert.Equal(6, info.CurseDamageTakenPct);    // Bp+1 → +6% урона по проклятой цели
+        Assert.Equal((byte)126, info.CurseSchoolMask);
+    }
+
+    [Fact]
+    public void CurseOfWeakness_IsCurseWithoutAmp()
+    {
+        // §3 CoW (702): MOD_ATTACK_POWER(99) Bp=-22 — кёрс, но без амплификации урона (нет ауры 87).
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData
+        {
+            Id = 702, DurationIndex = 4,
+            Effect1 = 6, EffectApplyAuraName1 = 99, EffectBasePoints1 = -22,
+        });
+        Assert.True(info.IsCurse);
+        Assert.Equal(0, info.CurseDamageTakenPct);
+    }
+
+    [Fact]
+    public void NonCurseSpell_NotFlaggedAsCurse()
+    {
+        // Fireball (133) — не проклятие.
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData { Id = 133, Effect1 = 2, EffectBasePoints1 = 10 });
+        Assert.False(info.IsCurse);
+        Assert.Equal(0, info.CurseDamageTakenPct);
+    }
+
+    [Fact]
     public void Charge_MovementParsed()
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData { Id = 12, Effect1 = 96 });

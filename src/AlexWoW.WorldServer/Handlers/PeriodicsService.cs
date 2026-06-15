@@ -27,6 +27,9 @@ public sealed class PeriodicEffect
     public float ManaShieldMultiplier; // ABS.2: Mana Shield — мана за 1 ед. поглощённого урона (1.5); 0 — обычный щит.
     public byte ImmuneSchoolMask; // IMMUNITY.1: «пузырь» — маска школ, урон которых гасится в ноль (Divine Shield/Ice Block 127); 0 — не иммунитет.
     public bool SelfRoot; // IMMUNITY.1: пузырь обездвиживает игрока (Ice Block) — на снятии шлём UNROOT.
+    public bool IsCurse; // §3 дебафф-проклятие ЧК на цели — для правила «один кёрс на цель от кастера».
+    public int CurseDamageTakenPct; // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера.
+    public byte CurseSchoolMask; // §3 маска школ для CurseDamageTakenPct (126 — вся магия).
 }
 
 /// <summary>
@@ -92,6 +95,10 @@ internal sealed class PeriodicsService(
         if (creature is null || !creature.IsAlive)
             return;
 
+        // §3 Проклятие-DoT (Curse of Agony/Doom): один кёрс на цель — снять прежний кёрс кастера.
+        if (info.IsCurse)
+            await RemoveCursesOnTargetAsync(session, targetCreatureGuid, exceptSpellId: spellId, ct);
+
         // Рефреш: снять прежний экземпляр того же DoT на этой цели (тот же слот).
         var dup = session.Progression.Periodics.FirstOrDefault(p => p.SpellId == spellId && p.TargetGuid == targetCreatureGuid);
         byte slot;
@@ -116,6 +123,7 @@ internal sealed class PeriodicsService(
             IsHeal = false,
             OwnsVisual = true,
             Slot = slot,
+            IsCurse = info.IsCurse,
         });
     }
 
@@ -241,10 +249,13 @@ internal sealed class PeriodicsService(
             return;
         }
 
-        // Дебафф на существо (визуал; стат-эффект пока не моделируется).
+        // Дебафф на существо (визуал; стат-эффект пока не моделируется, кроме §3 Curse of the Elements).
         var creature = targetCreatureGuid != 0 ? session.World.FindCreature(targetCreatureGuid) : null;
         if (creature is null || !creature.IsAlive)
             return;
+        // §3 Проклятие: один кёрс на цель от кастера — новый снимает прежний (включая кёрс-DoT, напр. Agony).
+        if (info.IsCurse)
+            await RemoveCursesOnTargetAsync(session, targetCreatureGuid, exceptSpellId: spellId, ct);
         var dup = session.Progression.Periodics.FirstOrDefault(p => p.SpellId == spellId && p.TargetGuid == targetCreatureGuid);
         byte slot;
         if (dup is not null) { slot = dup.Slot; session.Progression.Periodics.Remove(dup); }
@@ -264,7 +275,29 @@ internal sealed class PeriodicsService(
             DoesTick = false,
             OwnsVisual = true,
             Slot = slot,
+            IsCurse = info.IsCurse,
+            CurseDamageTakenPct = info.CurseDamageTakenPct,
+            CurseSchoolMask = info.CurseSchoolMask,
         });
+    }
+
+    /// <summary>§3 Снимает все активные проклятия кастера на цели (кроме exceptSpellId) — правило «один кёрс на цель».</summary>
+    private async Task RemoveCursesOnTargetAsync(WorldSession session, ulong targetGuid, uint exceptSpellId, CancellationToken ct)
+    {
+        foreach (var c in session.Progression.Periodics
+                     .Where(p => p.TargetGuid == targetGuid && p.IsCurse && p.SpellId != exceptSpellId).ToList())
+            await RemoveAsync(session, c, ct);
+    }
+
+    /// <summary>§3 Множитель урона по проклятой цели: Curse of the Elements (+% урона совпадающей школы от кастера).</summary>
+    internal static int CurseAmplify(WorldSession session, ulong targetGuid, byte schoolMask, int damage)
+    {
+        if (damage <= 0 || targetGuid == 0)
+            return damage;
+        var pct = session.Progression.Periodics
+            .Where(p => p.TargetGuid == targetGuid && p.CurseDamageTakenPct != 0 && (p.CurseSchoolMask & schoolMask) != 0)
+            .Sum(p => p.CurseDamageTakenPct);
+        return pct != 0 ? damage + damage * pct / 100 : damage;
     }
 
     /// <summary>
@@ -321,6 +354,8 @@ internal sealed class PeriodicsService(
         session.Combat.LastCombatMs = now;
         // Фаза 2: % наносимого урона по школе (Shadowform +15% Shadow к DoT — SW:Pain/Mind Flay и т.п.).
         var amount = (uint)Math.Max(1, DamageDoneModifier.Apply(session, p.SchoolMask, p.Amount));
+        // §3 Curse of the Elements: +% урона совпадающей школы по проклятой цели (амплифицируем и тики DoT).
+        amount = (uint)CurseAmplify(session, p.TargetGuid, p.SchoolMask, (int)amount);
         var (_, _, died) = session.World.ApplyCreatureDamage(creature, amount);
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgPeriodicAuraLog,
             AuraPackets.BuildPeriodicLog(creature.Guid, caster, p.SpellId, isHeal: false, amount, p.SchoolMask), ct);

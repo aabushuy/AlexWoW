@@ -34,6 +34,8 @@ internal sealed class SpellEffectsService(
         var crit = RollSpellCrit(session);
         if (crit)
             damage = damage * 3 / 2;
+        // §3 Curse of the Elements: +% урона совпадающей школы по проклятой цели (амплификация магического урона).
+        damage = (uint)PeriodicsService.CurseAmplify(session, creature.Guid, info.School, (int)damage);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
 
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
