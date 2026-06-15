@@ -19,6 +19,11 @@ internal sealed class SpellHandlers(SpellCastService spellCast, AuraService aura
     public Task OnCastSpell(WorldSession session, IncomingPacket packet, CancellationToken ct)
         => spellCast.HandleCastAsync(session, packet, ct);
 
+    /// <summary>§8 CMSG_USE_ITEM — использование предмета кастует его on-use спелл (нанесение яда на оружие).</summary>
+    [WorldOpcodeHandler(WorldOpcode.CmsgUseItem)]
+    public Task OnUseItem(WorldSession session, IncomingPacket packet, CancellationToken ct)
+        => spellCast.HandleUseItemAsync(session, packet, ct);
+
     [WorldOpcodeHandler(WorldOpcode.CmsgCancelCast)]
     public Task OnCancelCast(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
