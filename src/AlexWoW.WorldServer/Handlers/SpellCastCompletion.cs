@@ -48,7 +48,11 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     internal async Task CompleteCastAsync(WorldSession session, uint spellId, SpellCatalog.SpellInfo info,
         ulong targetGuid, byte castCount, CancellationToken ct)
     {
-        await spellGo.SendSpellGoAsync(session, spellId, targetGuid, castCount, ct);
+        // MELEE.1 «на следующий замах»: НЕ шлём SPELL_GO на касте — иначе клиент считает удар совершённым и
+        // «отжимает» кнопку. Для on-next-swing SPELL_GO уйдёт на самом замахе (PlayerMeleeService), а до тех
+        // пор кнопка остаётся подсвеченной (абилка «в очереди»). Ресурс (ярость) списывается ниже, как на касте.
+        if (!info.OnNextSwing)
+            await spellGo.SendSpellGoAsync(session, spellId, targetGuid, castCount, ct);
 
         // Расход ресурса: мана (правило 5 секунд: реген паузится от LastSpellCastMs) — или ярость/энергия
         // для мили-абилок (списание + апдейт полоски). M10.4a.
@@ -129,7 +133,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — НЕ бьём сейчас, ставим в
         // очередь; следующая автоатака заместится этой абилкой (PlayerMeleeService). Ярость уже списана на касте.
         if (info.OnNextSwing)
+        {
             session.Combat.PendingNextSwingSpellId = spellId;
+            session.Combat.PendingNextSwingCastCount = castCount; // для SPELL_GO на замахе (снятие подсветки кнопки)
+        }
         else if (info.IsHeal)
             await spellEffects.ApplyHealAsync(session, spellId, info, targetGuid, ct);
         else if (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0)

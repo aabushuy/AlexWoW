@@ -66,6 +66,9 @@ internal sealed class SessionCombatState
     /// <summary>«На следующий замах» (MELEE.1): id абилки (Героический удар/Раскол/Свирепый удар), заместит
     /// следующую автоатаку; 0 — нет. Расходуется в <see cref="Handlers.PlayerMeleeService"/>.</summary>
     internal uint PendingNextSwingSpellId { get; set; }
+    /// <summary>cast_count исходного каста on-next-swing абилки — для SMSG_SPELL_GO на самом замахе
+    /// (клиент сопоставляет с pending-кастом и снимает подсветку кнопки). MELEE.1.</summary>
+    internal byte PendingNextSwingCastCount { get; set; }
 
     // --- Очки серии (combo points: рога/друид-кошка) — Фаза 2 (CP.1) ---
     /// <summary>Очки серии (0..5), накопленные на <see cref="ComboTargetGuid"/>. Генераторы копят,
