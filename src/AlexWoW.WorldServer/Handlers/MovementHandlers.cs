@@ -7,9 +7,13 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <summary>Движение (M4): все MSG_MOVE_* несут packed guid + MovementInfo — извлекаем позицию.
 /// (DI-модуль, M7 #36; прерывание каста движением — <see cref="SpellCastService"/>, S3;
 /// телепорт/видимость — DI-сервисы, S7.)</summary>
-internal sealed class MovementHandlers(SpellCastService spellCast, TeleportService teleport, VisibilityService visibility)
+internal sealed class MovementHandlers(SpellCastService spellCast, TeleportService teleport,
+    VisibilityService visibility, AuraService auras)
     : IOpcodeHandlerModule
 {
+    /// <summary>§1 Водный облик друида (Aquatic Form) — форма 4: доступен только в воде, снимается при выходе.</summary>
+    private const byte AquaticForm = 4;
+
     /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
     /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
     [WorldOpcodeHandler(WorldOpcode.MsgMoveTeleportAck)]
@@ -65,6 +69,12 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
         // CANCEL_CAST — без этого эффект применился бы и анимация залипала).
         if (session.Cast.CastingSpellId != 0)
             await spellCast.InterruptOnMoveAsync(session, ct);
+
+        // §1 Формы друида: водный облик (Aquatic Form) доступен только в воде — при выходе из плавания
+        // (StopSwim) снимаем его (как на оффе: на суше котиком не остаться). Снятие = полный выход (модель/ресурс/кнопка).
+        if (packet.Opcode == WorldOpcode.MsgMoveStopSwim && session.Progression.ShapeshiftForm == AquaticForm
+            && session.Progression.Auras.FirstOrDefault(a => a.ShapeshiftForm == AquaticForm) is { } aqua)
+            await auras.RemoveAsync(session, aqua.SpellId, ct);
 
         // M5.3: ретранслируем движение соседям (с нормализацией поля time, если часы синхронизированы).
         if (session.Player is { } player)
