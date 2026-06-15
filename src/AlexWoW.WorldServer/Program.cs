@@ -109,6 +109,7 @@ builder.Services.AddSingleton<CraftingService>();
 // опкод-входы — модуль CombatOpcodeHandlers (регистрируется assembly-сканом выше).
 builder.Services.AddSingleton<PlayerMeleeService>();
 builder.Services.AddSingleton<SealService>(); // Фаза 2: on-hit прок печатей паладина
+builder.Services.AddSingleton<ImbueService>(); // §8: on-hit прок оружейных имбу шамана
 builder.Services.AddSingleton<CrowdControlService>(); // Фаза 2: контроль (стан/рут/страх/немота)
 builder.Services.AddSingleton<AbsorbShieldService>(); // Фаза 2 (ABS.1): absorb-щиты (PW:Shield/Ice Barrier)
 builder.Services.AddSingleton<DispelService>(); // Фаза 2 (DSP.1): диспел аур (Cleanse/Remove Curse/Dispel Magic)

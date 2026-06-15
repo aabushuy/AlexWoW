@@ -16,6 +16,7 @@ internal sealed class PlayerMeleeService(
     CombatResourcesService combatResources,
     KillRewardService killReward,
     SealService seals,
+    ImbueService imbues,
     ProcService procs,
     CrowdControlService crowdControl,
     SpellCatalog spellCatalog)
@@ -145,6 +146,13 @@ internal sealed class PlayerMeleeService(
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))
+        {
+            await StopAttackAsync(session, creature.Guid, ct);
+            return;
+        }
+
+        // §8: on-hit прок оружейного имбу шамана (Flametongue огонь / Frostbrand фрост / Windfury доп.удар). Может добить.
+        if (await imbues.OnMeleeHitAsync(session, creature, now, ct))
         {
             await StopAttackAsync(session, creature.Guid, ct);
             return;
