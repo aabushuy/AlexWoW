@@ -20,7 +20,8 @@ internal sealed class PlayerMeleeService(
     PoisonService poisons,
     ProcService procs,
     CrowdControlService crowdControl,
-    SpellCatalog spellCatalog)
+    SpellCatalog spellCatalog,
+    SpellGoSender spellGo)
 {
     /// <summary>Интервал мили-свинга (мс). Упрощённо — без учёта скорости оружия (точнее в M6.4+).</summary>
     internal const long SwingIntervalMs = 2000;
@@ -120,8 +121,14 @@ internal sealed class PlayerMeleeService(
 
         var attackerGuid = (ulong)session.InWorldGuid;
         if (pendingInfo is not null)
+        {
+            // MELEE.1: на самом замахе шлём SPELL_GO «на следующий замах»-абилки — клиент снимает подсветку
+            // кнопки (она держалась «в очереди» с момента каста), затем лог урона как от спелла (жёлтым).
+            await spellGo.SendSpellGoAsync(session, pendingId, creature.Guid, session.Combat.PendingNextSwingCastCount, ct);
+            session.Combat.PendingNextSwingCastCount = 0;
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
                 SpellPackets.BuildDamageLog(creature.Guid, attackerGuid, pendingId, damage, overkill, school, crit), ct);
+        }
         else
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
                 CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, damage, overkill, crit: crit), ct);
