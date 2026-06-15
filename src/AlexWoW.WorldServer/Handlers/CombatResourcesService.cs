@@ -176,9 +176,9 @@ internal sealed class CombatResourcesService
         uint cur, max;
         switch (pt)
         {
-            case PowerRage: max = MaxRage; cur = session.Combat.Rage; break;                       // ярость копится боем
-            case PowerEnergy: max = MaxEnergy; session.Combat.Energy = MaxEnergy; cur = MaxEnergy; break; // полная энергия на входе
-            default: max = session.Cast.MaxMana; cur = session.Cast.Mana; break;                   // выход в форму без ресурса → мана
+            case PowerRage: max = MaxRage; cur = session.Combat.Rage; break;       // ярость копится боем (с 0)
+            case PowerEnergy: max = MaxEnergy; cur = session.Combat.Energy; break; // энергия копится регеном (с 0; тик в кошке)
+            default: max = session.Cast.MaxMana; cur = session.Cast.Mana; break;  // выход в форму без ресурса → мана
         }
 
         var guid = (ulong)session.InWorldGuid;
