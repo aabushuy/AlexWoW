@@ -146,10 +146,25 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
     internal Task BroadcastFormAsync(WorldSession session, CancellationToken ct)
     {
         // sheath/pvp/pet байты пока не используем (0); форма — старший байт.
-        var bytes2 = (uint)session.Progression.ShapeshiftForm << 24;
+        var form = session.Progression.ShapeshiftForm;
+        var bytes2 = (uint)form << 24;
+        // §1 Формы друида: модель облика (медведь/кошка/…) — UNIT_FIELD_DISPLAYID. Форма без модели формы
+        // (стойки воина / нет в таблице) или выход → нативная модель расы. Так вход даёт модель формы, выход —
+        // обратно игрока. NATIVEDISPLAYID не трогаем (остаётся модель игрока для возврата). Эталон — CMaNGOS SetDisplayId.
+        uint displayId = 0;
+        if (session.Character is { } c)
+        {
+            displayId = form != 0 ? DisplayData.ModelForForm(c.Race, form) : 0u;
+            if (displayId == 0)
+                displayId = DisplayData.ModelForRace(c.Race, c.Gender);
+        }
         return session.World.BroadcastToPlayerObserversAsync(session.Player!, WorldOpcode.SmsgUpdateObject,
-            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
-                m => m.SetUInt32(UpdateField.UnitBytes2, bytes2)), ct);
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.UnitBytes2, bytes2);
+                if (displayId != 0)
+                    m.SetUInt32(UpdateField.UnitDisplayId, displayId);
+            }), ct);
     }
 
     /// <summary>Первый свободный визуальный слот ауры (чистый хелпер; нужен и персисту аур).</summary>

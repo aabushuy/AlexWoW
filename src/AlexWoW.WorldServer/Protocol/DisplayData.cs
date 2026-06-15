@@ -41,6 +41,26 @@ public static class DisplayData
         return gender == 0 ? pair.Male : pair.Female;
     }
 
+    // Display id облика друида (modelID_A из SpellShapeshiftForm.dbc — модели НОЧНОГО ЭЛЬФА; пол не различается,
+    // скин — по цвету волос). Орда/таурен — отдельные модели (todo). Формы без модели (стойки воина) — не в таблице.
+    private static readonly Dictionary<(byte Race, byte Form), uint> FormModels = new()
+    {
+        [(4, 1)] = 892,    // Night Elf — Cat Form
+        [(4, 5)] = 2281,   // Bear Form
+        [(4, 8)] = 2289,   // Dire Bear Form
+        [(4, 3)] = 632,    // Travel Form
+        [(4, 4)] = 2428,   // Aquatic Form
+        [(4, 31)] = 15374, // Moonkin Form
+        [(4, 2)] = 15500,  // Tree of Life
+        [(4, 29)] = 20872, // Flight Form
+        [(4, 27)] = 21244, // Swift Flight Form
+    };
+
+    /// <summary>§1 Display id модели облика друида по расе/форме (0 — нет модели → нативная модель расы).
+    /// Пока только ночной эльф; таурен — todo. Пол феральные облики не различают.</summary>
+    public static uint ModelForForm(byte race, byte form)
+        => FormModels.TryGetValue((race, form), out var m) ? m : 0;
+
     public static uint FactionForRace(byte race)
         => Factions.TryGetValue(race, out var f) ? f : 1;
 
