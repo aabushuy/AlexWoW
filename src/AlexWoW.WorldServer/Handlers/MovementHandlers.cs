@@ -13,6 +13,8 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
 {
     /// <summary>§1 Водный облик друида (Aquatic Form) — форма 4: доступен только в воде, снимается при выходе.</summary>
     private const byte AquaticForm = 4;
+    /// <summary>MOVEMENTFLAG_SWIMMING (3.3.5) — игрок плывёт (в воде). Нет флага → на суше/у поверхности.</summary>
+    private const uint MoveFlagSwimming = 0x00200000;
 
     /// <summary>MSG_MOVE_TELEPORT_ACK (ответ клиента на телепорт, M7 #33): позиция уже применена сервером —
     /// просто подтверждаем (без обработки), чтобы не было «опкод без обработчика».</summary>
@@ -46,11 +48,13 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
         // -1 = не распарсили (нестандартный пакет) → ретранслируем как есть.
         var timeFieldOffset = -1;
         uint moverTime = 0;
+        uint moveFlags = 0;
+        var parsed = false;
         try
         {
             var reader = packet.Reader();
             reader.PackedGuid();   // mover guid
-            reader.UInt32();       // movement flags
+            moveFlags = reader.UInt32(); // movement flags (бит SWIMMING — в воде ли)
             reader.UInt16();       // movement flags 2
             timeFieldOffset = reader.Position; // time идёт сразу после flags2
             moverTime = reader.UInt32();       // time
@@ -58,6 +62,7 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
             session.PosY = reader.Single();
             session.PosZ = reader.Single();
             session.PosO = reader.Single();
+            parsed = true;
         }
         catch (InvalidOperationException)
         {
@@ -70,9 +75,10 @@ internal sealed class MovementHandlers(SpellCastService spellCast, TeleportServi
         if (session.Cast.CastingSpellId != 0)
             await spellCast.InterruptOnMoveAsync(session, ct);
 
-        // §1 Формы друида: водный облик (Aquatic Form) доступен только в воде — при выходе из плавания
-        // (StopSwim) снимаем его (как на оффе: на суше котиком не остаться). Снятие = полный выход (модель/ресурс/кнопка).
-        if (packet.Opcode == WorldOpcode.MsgMoveStopSwim && session.Progression.ShapeshiftForm == AquaticForm
+        // §1 Формы друида: водный облик (Aquatic Form) доступен только в воде. Если в этом облике, а флаг
+        // SWIMMING в пакете НЕ выставлен (игрок не в воде — выплыл / скастовал на суше) — снимаем облик
+        // (полный выход: модель/ресурс/кнопка). По любому движению, не только StopSwim. Эталон — оффа дропает Aquatic вне воды.
+        if (parsed && (moveFlags & MoveFlagSwimming) == 0 && session.Progression.ShapeshiftForm == AquaticForm
             && session.Progression.Auras.FirstOrDefault(a => a.ShapeshiftForm == AquaticForm) is { } aqua)
             await auras.RemoveAsync(session, aqua.SpellId, ct);
 
