@@ -1,0 +1,84 @@
+@model AlexWoW.Database.Models.ItemTemplateData
+@{
+    var slot = ItemDisplay.SlotName(Model.InventoryType);
+    var type = ItemDisplay.TypeName(Model.Class, Model.SubClass);
+    var classes = ItemDisplay.AllowableClasses(Model.AllowableClass);
+    var hasDamage = Model.Damages.Any(d => d.Max > 0);
+    var (g, s, c) = GameData.SplitMoney(Model.SellPrice);
+    string Bonding(uint b) => b switch
+    {
+        1 => "Становится персональным при получении",
+        2 => "Становится персональным при надевании",
+        3 => "Становится персональным при использовании",
+        4 => "Задание",
+        _ => "",
+    };
+}
+<div class="item-tip-name" style="color:@ItemDisplay.QualityColor(Model.Quality)">@Model.Name</div>
+@if (Model.Bonding is >= 1 and <= 4)
+{
+    <div class="item-tip-line">@Bonding(Model.Bonding)</div>
+}
+@if (slot is not null)
+{
+    <div class="item-tip-row">
+        <span>@slot</span>
+        <span class="item-tip-sub">@type</span>
+    </div>
+}
+else
+{
+    <div class="item-tip-line">@type</div>
+}
+@if (Model.Armor > 0)
+{
+    <div class="item-tip-line">Броня: @Model.Armor</div>
+}
+@if (Model.Block > 0)
+{
+    <div class="item-tip-line">Блок: @Model.Block</div>
+}
+@if (hasDamage)
+{
+    var min = Model.Damages.Sum(d => d.Min);
+    var max = Model.Damages.Sum(d => d.Max);
+    <div class="item-tip-row">
+        <span>@min.ToString("0") - @max.ToString("0") урона</span>
+        <span class="item-tip-sub">Скорость @ItemDisplay.SpeedSeconds(Model.Delay).ToString("0.00")</span>
+    </div>
+    <div class="item-tip-line">(@ItemDisplay.Dps(Model).ToString("0.0") урона в секунду)</div>
+}
+@foreach (var st in Model.Stats.Where(st => st.Value != 0))
+{
+    <div class="item-tip-stat">@(st.Value > 0 ? "+" : "")@st.Value @ItemDisplay.StatName(st.Type)</div>
+}
+@if (Model.RequiredLevel > 0)
+{
+    <div class="item-tip-line">Требуется уровень @Model.RequiredLevel</div>
+}
+@if (classes is not null)
+{
+    <div class="item-tip-line">Классы: @string.Join(", ", classes)</div>
+}
+@if (Model.MaxDurability > 0)
+{
+    <div class="item-tip-line">Прочность @Model.MaxDurability / @Model.MaxDurability</div>
+}
+@if (Model.ItemLevel > 0)
+{
+    <div class="item-tip-line">Уровень предмета @Model.ItemLevel</div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.Description))
+{
+    <div class="item-tip-desc">"@Model.Description"</div>
+}
+<div class="item-tip-line item-tip-price">
+    Цена продажи:
+    <span class="coin">
+        @if (g > 0)
+        {<span class="g">@g</span>}
+        @if (s > 0 || g > 0)
+        {<span class="s"> @s</span>}
+        <span class="c"> @c</span>
+    </span>
+</div>

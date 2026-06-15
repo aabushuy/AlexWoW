@@ -11,6 +11,8 @@
         <nav class="admin-menu">
             <a class="@(Active("/Admin/Accounts", "/Admin/Characters") ? "active" : null)"
                asp-page="/Admin/Accounts/Index">Аккаунты</a>
+            <a class="@(Active("/Admin/Items") ? "active" : null)"
+               asp-page="/Admin/Items/Index">Предметы</a>
             <a class="@(Active("/Admin/Server") ? "active" : null)"
                asp-page="/Admin/Server">Сервер</a>
             <a class="@(Active("/Dashboard") ? "active" : null)"
