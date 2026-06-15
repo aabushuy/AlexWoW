@@ -1,6 +1,7 @@
 using AlexWoW.Database;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Repositories;
+using AlexWoW.Database.Repositories.World;
 using AlexWoW.Web;
 using AlexWoW.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -32,6 +33,9 @@ builder.Services.AddSingleton<ICharacterRepository, EfCharacterRepository>();
 builder.Services.AddSingleton<IInventoryRepository, EfInventoryRepository>();
 builder.Services.AddSingleton<ISpellTestRepository, EfSpellTestRepository>(); // M12 Spell QA: чтение/анализ захвата
 builder.Services.AddSingleton<ISettingRepository, EfSettingRepository>(); // M8.6: настройки сервера (стоимости)
+// Поиск предметов в админке (БД мира mangos, Dapper read-only). Отдельная строка подключения.
+builder.Services.AddSingleton<IItemSearchRepository>(sp => new ItemSearchRepository(
+    sp.GetRequiredService<IOptions<WebOptions>>().Value.WorldConnectionString));
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
 builder.Services.AddSingleton<ProjectDashboardService>();  // Дашборд: срез 1 — БД project (прогресс)

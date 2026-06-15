@@ -133,6 +133,10 @@ public static class GameData
     public static IReadOnlyList<KeyValuePair<byte, string>> AllRaces { get; } =
         [.. Races.OrderBy(r => r.Key)];
 
+    /// <summary>Все игровые классы (id + имя), в каноничном порядке — для дропдаунов админ/фильтров.</summary>
+    public static IReadOnlyList<KeyValuePair<byte, string>> AllClasses { get; } =
+        [.. Classes.OrderBy(c => c.Key)];
+
     /// <summary>Полы (id + имя): 0 — мужской, 1 — женский.</summary>
     public static IReadOnlyList<KeyValuePair<byte, string>> AllGenders { get; } =
         [new((byte)0, GenderName(0)), new((byte)1, GenderName(1))];

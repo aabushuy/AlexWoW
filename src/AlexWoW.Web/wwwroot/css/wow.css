@@ -425,3 +425,34 @@ h1, h2, h3 {
     box-shadow: 0 0 0 2px rgba(255, 209, 0, 0.18);
 }
 .field select.select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Поиск предметов (админка): фильтр, таблица, тултип ── */
+.item-filter .form-row { align-items: flex-end; }
+.item-table .item-name { font-weight: 600; cursor: help; outline: none; }
+.item-table .item-name:hover,
+.item-table .item-name:focus { text-decoration: underline; }
+
+/* Скрытый тултип; .show + позиционирование к курсору задаёт JS (position: fixed). */
+.item-tip {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    max-width: 340px;
+    padding: 10px 12px;
+    background: #06080e;
+    border: 1px solid #2a3550;
+    border-radius: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    color: #ffffff;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    pointer-events: none;
+}
+.item-tip.show { display: block; }
+.item-tip-name { font-size: 1.02rem; font-weight: 700; margin-bottom: 4px; }
+.item-tip-line { color: #ffffff; }
+.item-tip-row { display: flex; justify-content: space-between; gap: 16px; }
+.item-tip-sub { color: var(--ink-dim); }
+.item-tip-stat { color: #1eff00; }
+.item-tip-desc { color: var(--gold); margin-top: 4px; font-style: italic; }
+.item-tip-price { margin-top: 4px; }

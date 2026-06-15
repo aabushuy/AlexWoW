@@ -55,6 +55,18 @@ internal sealed class EmptyInventory : IInventoryRepository
     public Task SetItemStackAsync(uint itemGuid, uint stackCount, CancellationToken ct = default) => throw new NotImplementedException();
 }
 
+/// <summary>Фейк поиска предметов: возвращает заранее заданный набор, игнорируя фильтр.</summary>
+internal sealed class FakeItemSearchRepository(IReadOnlyList<ItemTemplateData> items) : IItemSearchRepository
+{
+    public ItemSearchFilter? LastFilter { get; private set; }
+
+    public Task<IReadOnlyList<ItemTemplateData>> SearchAsync(ItemSearchFilter filter, CancellationToken ct = default)
+    {
+        LastFilter = filter;
+        return Task.FromResult(items);
+    }
+}
+
 /// <summary>Фейк настроек: ключей нет → используются дефолты (1000/2000).</summary>
 internal sealed class EmptySettings : ISettingRepository
 {

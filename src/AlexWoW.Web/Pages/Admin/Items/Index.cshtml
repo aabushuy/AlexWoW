@@ -1,0 +1,119 @@
+@page
+@model AlexWoW.Web.Pages.Admin.Items.IndexModel
+@using AlexWoW.Database.Models
+@{
+    ViewData["Title"] = "Предметы";
+}
+<h1>Предметы</h1>
+<p class="muted">Поиск по базе предметов (item_template). Заполните фильтр и нажмите «Найти».</p>
+
+<form method="get" class="panel item-filter">
+    <div class="form-row">
+        <div class="field">
+            <label for="LevelMin">Треб. уровень от</label>
+            <input type="number" min="0" max="80" id="LevelMin" name="LevelMin" value="@Model.LevelMin" />
+        </div>
+        <div class="field">
+            <label for="LevelMax">до</label>
+            <input type="number" min="0" max="80" id="LevelMax" name="LevelMax" value="@Model.LevelMax" />
+        </div>
+        <div class="field">
+            <label for="PlayerClass">Класс</label>
+            <select class="select" id="PlayerClass" name="PlayerClass">
+                <option value="">— любой —</option>
+                @foreach (var cls in GameData.AllClasses)
+                {
+                    <option value="@cls.Key" selected="@(Model.PlayerClass == cls.Key)">@cls.Value</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label for="Kind">Тип</label>
+            <select class="select" id="Kind" name="Kind">
+                <option value="">— любой —</option>
+                <option value="@nameof(ItemKind.Weapon)" selected="@(Model.Kind == ItemKind.Weapon)">Оружие</option>
+                <option value="@nameof(ItemKind.Armor)" selected="@(Model.Kind == ItemKind.Armor)">Доспех</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="field" style="flex:2">
+            <label for="Name">Содержит фразу</label>
+            <input type="text" id="Name" name="Name" value="@Model.Name" placeholder="напр. Gladiator Plate" />
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Найти</button>
+        <a class="btn-ghost" asp-page="Index">Сбросить</a>
+    </div>
+    <p class="form-hint">Пробелы во фразе = «%»: «Gladiator Plate» ищет «%Gladiator%Plate%». Показываем не более @IndexModel.Limit.</p>
+</form>
+
+@if (Model.Searched)
+{
+    <div class="panel">
+        @if (Model.Results.Count == 0)
+        {
+            <div class="empty-state"><p>Ничего не найдено. Измените фильтр.</p></div>
+        }
+        else
+        {
+            <p class="muted">Найдено: @Model.Results.Count@(Model.Results.Count >= IndexModel.Limit ? " (показаны первые " + IndexModel.Limit + ")" : "").</p>
+            <table class="data-table item-table">
+                <thead>
+                    <tr>
+                        <th>Entry</th>
+                        <th>Название</th>
+                        <th>Тип</th>
+                        <th>Треб. ур.</th>
+                        <th>Ур. пред.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var it in Model.Results)
+                    {
+                        <tr>
+                            <td>@it.Entry</td>
+                            <td>
+                                <span class="item-name" style="color:@ItemDisplay.QualityColor(it.Quality)" tabindex="0">@it.Name</span>
+                                <div class="item-tip" role="tooltip">
+                                    <partial name="_ItemTooltip" model="it" />
+                                </div>
+                            </td>
+                            <td>@ItemDisplay.TypeName(it.Class, it.SubClass)</td>
+                            <td>@(it.RequiredLevel > 0 ? it.RequiredLevel.ToString() : "—")</td>
+                            <td>@it.ItemLevel</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <script>
+        // Тултип предмета у курсора: показываем скрытый блок рядом со строкой, позиционируем к мыши.
+        (function () {
+            var active = null;
+            function place(tip, x, y) {
+                var w = tip.offsetWidth, h = tip.offsetHeight, pad = 16;
+                var left = x + pad, top = y + pad;
+                if (left + w > window.innerWidth - 8) left = x - w - pad;
+                if (top + h > window.innerHeight - 8) top = window.innerHeight - h - 8;
+                if (top < 8) top = 8;
+                tip.style.left = left + 'px';
+                tip.style.top = top + 'px';
+            }
+            document.querySelectorAll('.item-table .item-name').forEach(function (name) {
+                var tip = name.parentElement.querySelector('.item-tip');
+                if (!tip) return;
+                function show(e) { active = tip; tip.classList.add('show'); place(tip, e.clientX || 0, e.clientY || 0); }
+                function hide() { tip.classList.remove('show'); if (active === tip) active = null; }
+                name.addEventListener('mouseenter', show);
+                name.addEventListener('mousemove', function (e) { if (active === tip) place(tip, e.clientX, e.clientY); });
+                name.addEventListener('mouseleave', hide);
+                name.addEventListener('focus', function () { tip.classList.add('show'); var r = name.getBoundingClientRect(); place(tip, r.right, r.bottom); });
+                name.addEventListener('blur', hide);
+            });
+        })();
+    </script>
+}

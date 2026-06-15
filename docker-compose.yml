@@ -76,6 +76,8 @@ services:
     environment:
       # Та же БД alexwow_auth, что и у игровых серверов (общие аккаунты/персонажи).
       Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # БД мира (дамп CMaNGOS): item_template — поиск предметов в админке.
+      Web__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # БД трекинга прогресса (дашборд, срез 1). Создаётся вручную: deploy/sql/project-schema.sql + project-seed.sql.
       Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера; .env стирается деплоем, поэтому здесь.
