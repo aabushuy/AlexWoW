@@ -10,8 +10,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// эксклюзивная в группе. Делегирует наложение в <see cref="AuraService"/>; отделено от обычного каста
 /// (<see cref="SpellCastService"/>) по SRP. GO шлёт <see cref="SpellGoSender"/> (разрыв цикла с кастом).
 /// </summary>
-internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService auras, SpellCatalog spellCatalog,
-    CombatResourcesService combatResources)
+internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService auras, SpellCatalog spellCatalog)
 {
     /// <summary>
     /// Если spell — переключатель: завершить каст у клиента (SPELL_GO) и наложить перманентную ауру-форму.
@@ -29,9 +28,7 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
         if (toggle.Cancelable && toggle.Form != 0
             && session.Progression.Auras.FirstOrDefault(a => a.ShapeshiftForm == toggle.Form) is { } active)
         {
-            await auras.RemoveAsync(session, active.SpellId, ct);
-            // §1 Формы друида: выход из формы → вернуть тип ресурса (мана) по текущей (уже сброшенной) форме.
-            await combatResources.ApplyFormPowerAsync(session, session.Progression.ShapeshiftForm, ct);
+            await auras.RemoveAsync(session, active.SpellId, ct); // смена ресурса формы — централизованно в AuraService
             session.Logger.LogDebug("TOGGLE-OFF '{User}': spell={Spell} форма={Form}", session.Account, active.SpellId, toggle.Form);
             return true;
         }
@@ -41,9 +38,7 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
         await auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
             group: toggle.Group, persist: true,
             damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
-            damageTakenPct: info?.DamageTakenPct ?? 0);
-        // §1 Формы друида: вход в форму → сменить тип ресурса (медведь→ярость, кошка→энергия, прочее→мана).
-        await combatResources.ApplyFormPowerAsync(session, toggle.Form, ct);
+            damageTakenPct: info?.DamageTakenPct ?? 0); // смена ресурса формы — централизованно в AuraService
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
             session.Account, spellId, toggle.Form, toggle.Group);
         return true;
