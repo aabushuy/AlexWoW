@@ -43,3 +43,6 @@ charstartoutfit.sql
 
 # Локальный справочник протокола (gtker/wow_messages .wowm) — не в репозиторий
 reference/
+
+# Промежуточный список displayid для извлечения иконок (регенерится из БД, см. iconmap)
+tools/MapExtractor/used-displayids.txt

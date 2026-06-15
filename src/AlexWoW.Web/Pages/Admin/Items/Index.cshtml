@@ -1,6 +1,7 @@
 @page
 @model AlexWoW.Web.Pages.Admin.Items.IndexModel
 @using AlexWoW.Database.Models
+@inject AlexWoW.Web.Services.ItemIconService Icons
 @{
     ViewData["Title"] = "Предметы";
 }
@@ -62,27 +63,29 @@
             <table class="data-table item-table">
                 <thead>
                     <tr>
-                        <th>Entry</th>
-                        <th>Название</th>
-                        <th>Тип</th>
-                        <th>Треб. ур.</th>
-                        <th>Ур. пред.</th>
+                        <th class="item-icon-col"></th>
+                        <th class="sortable" data-type="number">Entry</th>
+                        <th class="sortable" data-type="text">Название</th>
+                        <th class="sortable" data-type="text">Тип</th>
+                        <th class="sortable" data-type="number">Треб. ур.</th>
+                        <th class="sortable" data-type="number">Ур. пред.</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var it in Model.Results)
                     {
                         <tr>
-                            <td>@it.Entry</td>
-                            <td>
+                            <td class="item-icon-col"><img class="item-icon q@(it.Quality)" src="@Icons.IconUrl(it.DisplayId)" alt="" loading="lazy" width="36" height="36" /></td>
+                            <td data-sort="@it.Entry">@it.Entry</td>
+                            <td data-sort="@it.Name">
                                 <span class="item-name" style="color:@ItemDisplay.QualityColor(it.Quality)" tabindex="0">@it.Name</span>
                                 <div class="item-tip" role="tooltip">
                                     <partial name="_ItemTooltip" model="it" />
                                 </div>
                             </td>
-                            <td>@ItemDisplay.TypeName(it.Class, it.SubClass)</td>
-                            <td>@(it.RequiredLevel > 0 ? it.RequiredLevel.ToString() : "—")</td>
-                            <td>@it.ItemLevel</td>
+                            <td data-sort="@ItemDisplay.TypeName(it.Class, it.SubClass)">@ItemDisplay.TypeName(it.Class, it.SubClass)</td>
+                            <td data-sort="@it.RequiredLevel">@(it.RequiredLevel > 0 ? it.RequiredLevel.ToString() : "—")</td>
+                            <td data-sort="@it.ItemLevel">@it.ItemLevel</td>
                         </tr>
                     }
                 </tbody>
@@ -91,6 +94,42 @@
     </div>
 
     <script>
+        // Сортировка результатов по клику на заголовок колонки (на стороне UI, без перезапроса).
+        (function () {
+            var table = document.querySelector('.item-table');
+            if (!table) return;
+            var tbody = table.tBodies[0];
+            var headers = table.tHead.rows[0].cells;
+            var collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+
+            function sortBy(index, type, asc) {
+                var rows = Array.prototype.slice.call(tbody.rows);
+                rows.sort(function (a, b) {
+                    var x = a.cells[index].dataset.sort || '';
+                    var y = b.cells[index].dataset.sort || '';
+                    var cmp = type === 'number'
+                        ? (parseFloat(x) || 0) - (parseFloat(y) || 0)
+                        : collator.compare(x, y);
+                    return asc ? cmp : -cmp;
+                });
+                rows.forEach(function (r) { tbody.appendChild(r); });
+            }
+
+            Array.prototype.forEach.call(headers, function (th, index) {
+                if (!th.classList.contains('sortable')) return;
+                th.addEventListener('click', function () {
+                    var asc = th.dataset.dir !== 'asc'; // переключаем направление
+                    Array.prototype.forEach.call(headers, function (h) {
+                        h.removeAttribute('data-dir');
+                        h.classList.remove('sorted-asc', 'sorted-desc');
+                    });
+                    th.dataset.dir = asc ? 'asc' : 'desc';
+                    th.classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+                    sortBy(index, th.dataset.type, asc);
+                });
+            });
+        })();
+
         // Тултип предмета у курсора: показываем скрытый блок рядом со строкой, позиционируем к мыши.
         (function () {
             var active = null;

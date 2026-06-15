@@ -36,6 +36,7 @@ builder.Services.AddSingleton<ISettingRepository, EfSettingRepository>(); // M8.
 // Поиск предметов в админке (БД мира mangos, Dapper read-only). Отдельная строка подключения.
 builder.Services.AddSingleton<IItemSearchRepository>(sp => new ItemSearchRepository(
     sp.GetRequiredService<IOptions<WebOptions>>().Value.WorldConnectionString));
+builder.Services.AddSingleton<ItemIconService>(); // карта displayid→иконка (офлайн из клиента)
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
 builder.Services.AddSingleton<ProjectDashboardService>();  // Дашборд: срез 1 — БД project (прогресс)
