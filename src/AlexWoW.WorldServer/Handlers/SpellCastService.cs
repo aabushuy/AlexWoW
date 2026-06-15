@@ -120,8 +120,9 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
-        // M11.3: крафт — нет реагентов → отказ ДО старта каст-бара (как на оффе).
-        if (info.CreateItemId != 0 && !crafting.HasReagents(session, info))
+        // §2/M11.3: нет реагентов → отказ ДО старта каст-бара (как на оффе). Для ЛЮБОГО спелла с реагентами:
+        // крафт (травы), осколок души ЧК (призывы/Soulstone/Healthstone/Soul Fire — item 6265), реагенты буффов.
+        if (info.Reagents is not null && !crafting.HasReagents(session, info))
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultReagents), ct);

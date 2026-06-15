@@ -163,6 +163,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.IsInterrupt && targetGuid != 0 && session.World.FindCreature(targetGuid) is { CastingSpellId: not 0 } caster)
             await InterruptCreatureCastAsync(session, caster, info, now, ct);
 
+        // §2 Drain Soul (ЧК): метим цель-существо — при её убийстве игрок получит осколок души (KillRewardService).
+        if (SpellCatalog.IsDrainSoul(spellId) && targetGuid != 0 && session.World.FindCreature(targetGuid) is not null)
+            session.Combat.DrainSoulTargetGuid = targetGuid;
+
         // §9 Death Grip (DK): притягиваем цель-существо к ногам игрока (рывок) и вводим в бой (таунт-эффект).
         if (SpellCatalog.IsDeathGrip(spellId) && targetGuid != 0 && session.Player is { } gripPlayer
             && session.World.FindCreature(targetGuid) is { IsAlive: true } gripped)
@@ -191,7 +195,11 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         if (info.MaxAmount == 0 && info.Periodic && !info.PeriodicHeal)
             await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct, wasCrit: false, spellSchoolMask: info.School);
 
-        // M11.3: крафт профессии — расход реагентов, создание предмета, прокачка навыка.
+        // §2/M11.3: расход реагентов — для ЛЮБОГО спелла с реагентами (осколок души 6265 у призывов/Soulstone/
+        // Healthstone/Soul Fire; травы/порошки крафта и буффов). Гейт «есть ли реагент» — на старте каста.
+        if (info.Reagents is not null)
+            await crafting.ConsumeReagentsAsync(session, info, ct);
+        // M11.3: крафт профессии — создание предмета (реагенты уже списаны выше) + прокачка навыка.
         if (info.CreateItemId != 0)
             await crafting.DoCraftAsync(session, spellId, info, ct);
 

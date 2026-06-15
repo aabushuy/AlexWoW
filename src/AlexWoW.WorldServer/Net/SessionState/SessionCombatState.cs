@@ -41,6 +41,10 @@ internal sealed class SessionCombatState
     /// <summary>§1 Формы друида: тип ресурса активной формы (0 — класс по умолчанию/мана; 1 — ярость медведя;
     /// 3 — энергия кошки). Делает реген/трату ресурса форм-зависимыми для друида (класс=мана). Сброс при выходе.</summary>
     internal byte FormPowerType { get; set; }
+
+    /// <summary>§2 Осколки души: guid существа, на которое ЧК скастовал Drain Soul. При убийстве этого существа
+    /// игрок получает осколок души (item 6265). 0 — метки нет. Перезаписывается новым кастом Drain Soul.</summary>
+    internal ulong DrainSoulTargetGuid { get; set; }
     /// <summary>Скорость оружия главной руки (мс) — для формулы ярости. Ставится в RefreshMeleeAsync. M6.12.</summary>
     internal uint MainHandSpeedMs { get; set; } = 2000;
     /// <summary>Урон оружия главной руки (min/max) — для мили-абилок (WEAPON_DAMAGE). RefreshMeleeAsync. M10.4a.</summary>

@@ -16,6 +16,7 @@ internal sealed class KillRewardService(
     QuestProgressService questProgress,
     ProgressionService progression,
     ComboPointService comboPoints,
+    InventoryGrantService inventoryGrant,
     IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
@@ -29,6 +30,15 @@ internal sealed class KillRewardService(
     {
         // CP.2: очки серии теряются со смертью комбо-цели (no-op, если копились на другой/уже расходованы).
         await comboPoints.ClearForTargetAsync(session, creature.Guid, ct);
+
+        // §2 Drain Soul (ЧК): убито существо, помеченное Drain Soul → игрок получает осколок души (item 6265).
+        if (session.Combat.DrainSoulTargetGuid == creature.Guid)
+        {
+            session.Combat.DrainSoulTargetGuid = 0;
+            await inventoryGrant.TryGiveAsync(session, SpellCatalog.SoulShardItem, 1, ct);
+            session.Logger.LogInformation("SOULSHARD '{User}': осколок души за Drain Soul-убийство '{Name}'",
+                session.Account, creature.Template.Name);
+        }
 
         // M6.5: зачёт убийства в цели активных квестов.
         await questProgress.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
