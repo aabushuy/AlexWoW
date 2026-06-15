@@ -504,6 +504,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     public const byte GroupWarlockArmor = 5; // брони чернокнижника (Demon Skin/Demon Armor/Fel Armor)
     public const byte GroupDkPresence = 6;   // присутствия DK (Blood/Frost/Unholy — не шейпшифт, эксклюзивны)
     public const byte GroupPaladinSeal = 7;  // печати паладина (Righteousness/Light/Wisdom/Justice — взаимоисключающие)
+    public const byte GroupShamanImbue = 8;  // §8 оружейные имбу шамана (Flametongue/Frostbrand/Windfury — один активный)
 
     /// <summary>Переключатель: форма шейпшифта (0 — без формы) + группа эксклюзивности. M7 #21.
     /// <paramref name="Cancelable"/> — повторный каст ВЫХОДИТ из формы (Shadowform/Stealth/Ghost Wolf);

@@ -149,6 +149,12 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             await auras.ApplyAsync(session, SpellCatalog.ForbearanceDebuffId, SpellCatalog.ForbearanceDurationMs,
                 positive: false, form: 0, ct);
 
+        // §8 Оружейный имбу шамана (Flametongue/Frostbrand/Windfury) — энчант (эффект 54), движок его не
+        // материализует. Вешаем видимый бафф (эксклюзив — один активный имбу); on-hit прок — ImbueService на свинге.
+        if (ImbueService.IsImbue(spellId))
+            await auras.ApplyAsync(session, spellId, ImbueDurationMs, positive: true, form: 0, ct,
+                group: SpellCatalog.GroupShamanImbue);
+
         // Фаза 2 CC: контроль (стан/рут/страх/немота/дезориентация). §4: по площади (Frost Nova/Psychic Scream)
         // — на всех враждебных рядом; иначе — на одну цель-существо.
         if (info.CrowdControl != SpellCatalog.CrowdControlKind.None)
@@ -229,6 +235,9 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
 
     /// <summary>SpellCastResult INTERRUPTED (0x28) — гасит каст-бар существа у клиента. INT.1.</summary>
     private const byte SpellFailedInterrupted = 0x28;
+
+    /// <summary>§8 Длительность оружейного имбу шамана (бафф-визуал): 30 мин, как на оффе.</summary>
+    private const int ImbueDurationMs = 30 * 60 * 1000;
 
     /// <summary>
     /// Фаза 2 INT.1: прерывает текущий каст существа и лочит его школу на <see cref="SpellCatalog.SpellInfo.InterruptLockMs"/>.
