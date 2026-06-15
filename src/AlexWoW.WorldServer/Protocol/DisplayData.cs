@@ -54,6 +54,18 @@ public static class DisplayData
         [(4, 2)] = 15500,  // Tree of Life
         [(4, 29)] = 20872, // Flight Form
         [(4, 27)] = 21244, // Swift Flight Form
+        // Таурен (race 6). Феральные — авторитетно из mangos.creature_model_race (NE-модель → расовая):
+        // кошка 892→8571, медведь 2281→2289. Лютый медведь без маппинга → 2289 (как медведь). Tree/Aquatic
+        // race-нейтральны. Travel/Flight без Орда-данных — берём NE (косметически возможны отличия).
+        [(6, 1)] = 8571,   // Cat Form
+        [(6, 5)] = 2289,   // Bear Form
+        [(6, 8)] = 2289,   // Dire Bear Form
+        [(6, 3)] = 632,    // Travel Form
+        [(6, 4)] = 2428,   // Aquatic Form
+        [(6, 31)] = 15375, // Moonkin Form (таурен — отдельная модель)
+        [(6, 2)] = 15500,  // Tree of Life
+        [(6, 29)] = 20872, // Flight Form
+        [(6, 27)] = 21244, // Swift Flight Form
     };
 
     /// <summary>§1 Display id модели облика друида по расе/форме (0 — нет модели → нативная модель расы).
