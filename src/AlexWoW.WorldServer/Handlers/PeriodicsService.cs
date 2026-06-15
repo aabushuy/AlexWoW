@@ -28,6 +28,7 @@ public sealed class PeriodicEffect
     public byte ImmuneSchoolMask; // IMMUNITY.1: «пузырь» — маска школ, урон которых гасится в ноль (Divine Shield/Ice Block 127); 0 — не иммунитет.
     public bool SelfRoot; // IMMUNITY.1: пузырь обездвиживает игрока (Ice Block) — на снятии шлём UNROOT.
     public byte StackCount = 1; // §8 стек-DoT (Deadly Poison): число зарядов; тик = базовый урон × стек.
+    public int HealReductionPct; // §8 Wound Poison: −% входящего лечения цели (стек×10); 0 — не дебафф лечения.
     public bool IsCurse; // §3 дебафф-проклятие ЧК на цели — для правила «один кёрс на цель от кастера».
     public int CurseDamageTakenPct; // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера.
     public byte CurseSchoolMask; // §3 маска школ для CurseDamageTakenPct (126 — вся магия).
@@ -288,6 +289,17 @@ internal sealed class PeriodicsService(
         foreach (var c in session.Progression.Periodics
                      .Where(p => p.TargetGuid == targetGuid && p.IsCurse && p.SpellId != exceptSpellId).ToList())
             await RemoveAsync(session, c, ct);
+    }
+
+    /// <summary>§8 Wound Poison: суммарный % снижения входящего лечения цели (дебаффы кастера на ней; кап 50%).</summary>
+    internal static int HealReductionPctFor(WorldSession session, ulong targetGuid)
+    {
+        if (targetGuid == 0)
+            return 0;
+        var pct = session.Progression.Periodics
+            .Where(p => p.TargetGuid == targetGuid && p.HealReductionPct != 0)
+            .Sum(p => p.HealReductionPct);
+        return Math.Clamp(pct, 0, 50);
     }
 
     /// <summary>§3 Множитель урона по проклятой цели: Curse of the Elements (+% урона совпадающей школы от кастера).</summary>
