@@ -12,8 +12,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// M6.12; формы друида — позже). Фундамент под расход/эффекты абилок и баффы спеллов. Точка применения —
 /// каст спелла с аура-эффектом (SpellHandlers). Персист через релог — <see cref="AuraPersistenceService"/>.
 /// </summary>
-internal sealed class AuraService(ICharacterStateRepository charState, SpellCatalog spellCatalog,
-    CombatResourcesService combatResources)
+internal sealed class AuraService(ICharacterStateRepository charState, CombatResourcesService combatResources)
 {
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
@@ -133,17 +132,13 @@ internal sealed class AuraService(ICharacterStateRepository charState, SpellCata
                 AuraPackets.BuildRemove((ulong)session.InWorldGuid, aura.Slot), ct);
         }
 
-        // SPELL_ATTR_COOLDOWN_ON_EVENT (Shadowform/Stealth): кулдаун у таких спеллов стартует не на касте, а при
-        // СНЯТИИ ауры. Шлём SMSG_COOLDOWN_EVENT — клиент выводит кнопку из «активного» состояния и запускает
-        // кулдаун (его длительность клиент знает из DBC). Без этого кнопка формы залипает «дожатой»/недоступной
-        // до релога (повторный вход в форму невозможен). Только реальный выход (resetForm) — не смена стойки.
+        // Кнопка формы/стойки залипает «дожатой» после снятия ауры, пока клиент не получит SMSG_COOLDOWN_EVENT
+        // (переводит спелл active→ready). Нужно ВСЕМ шейпшифт-кнопкам, а не только COOLDOWN_ON_EVENT
+        // (Shadowform/Stealth) — формы друида кнопку тоже не отжимали. Клиент берёт длительность КД из DBC:
+        // у форм без кулдауна (медведь/кошка) событие просто отжимает кнопку (КД 0). Только полный выход (resetForm).
         if (resetForm && aura.ShapeshiftForm != 0)
-        {
-            var info = await spellCatalog.GetAsync(aura.SpellId, ct);
-            if (info?.CooldownOnAuraRemove == true)
-                await session.SendAsync(WorldOpcode.SmsgCooldownEvent,
-                    SpellPackets.BuildCooldownEvent((ulong)session.InWorldGuid, aura.SpellId), ct);
-        }
+            await session.SendAsync(WorldOpcode.SmsgCooldownEvent,
+                SpellPackets.BuildCooldownEvent((ulong)session.InWorldGuid, aura.SpellId), ct);
     }
 
     /// <summary>VALUES-апдейт UNIT_FIELD_BYTES_2 (байт 3 = форма) себе и наблюдателям. M6.11.
