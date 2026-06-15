@@ -543,6 +543,17 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         [48266] = new(0, GroupDkPresence),   // Blood Presence
         [48263] = new(0, GroupDkPresence),   // Frost Presence
         [48265] = new(0, GroupDkPresence),   // Unholy Presence
+        // Формы друида (шейпшифт; эксклюзивны в общей GroupShapeshift; форма = EffectMiscValue ауры 36).
+        // Cancelable: повторный каст выходит из формы. Значения формы сверены по данным spell_template.
+        [768] = new(1, GroupShapeshift, Cancelable: true),    // Cat Form (форма 1)
+        [33891] = new(2, GroupShapeshift, Cancelable: true),  // Tree of Life (2)
+        [783] = new(3, GroupShapeshift, Cancelable: true),    // Travel Form (3)
+        [1066] = new(4, GroupShapeshift, Cancelable: true),   // Aquatic Form (4)
+        [5487] = new(5, GroupShapeshift, Cancelable: true),   // Bear Form (5)
+        [9634] = new(8, GroupShapeshift, Cancelable: true),   // Dire Bear Form (8)
+        [40120] = new(27, GroupShapeshift, Cancelable: true), // Swift Flight Form (27)
+        [33943] = new(29, GroupShapeshift, Cancelable: true), // Flight Form (29)
+        [24858] = new(31, GroupShapeshift, Cancelable: true), // Moonkin Form (31)
     };
 
     /// <summary>
