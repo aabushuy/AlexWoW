@@ -61,6 +61,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
     private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)
     private const int AuraModStun = 12;                  // оглушение (Hammer of Justice/Concussion Blow)
+    private const int AuraModShapeshift = 36;            // шейпшифт-форма (Metamorphosis ЧК и др.): EffectMiscValue = номер формы (FORM_*). §1 toggle-формы
     private const int AuraModRoot = 26;                  // обездвиживание (Frost Nova/Entangling Roots)
     private const int AuraModSilence = 27;               // немота (Strangulate/Silence)
     // EffectImplicitTargetA — площадные «враги в области» → CC по площади (§4). 22 — вокруг точки/кастера
@@ -140,7 +141,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // MELEE.1: «на следующий замах» — замещает следующую автоатаку (Героический удар/Раскол/Свирепый удар).
         bool OnNextSwing = false,
         // §4: CC по площади (Frost Nova/Psychic Scream) — накладывать CC на всех враждебных рядом, не на одну цель.
-        bool IsAreaCrowdControl = false);
+        bool IsAreaCrowdControl = false,
+        // §1 Шейпшифт-форма (аура 36 MOD_SHAPESHIFT): номер формы из EffectMiscValue (FORM_*, напр. 22 = Metamorphosis).
+        // 0 — не форма. Ненулевое значение → ApplyAuraEffectAsync передаёт форму в AuraService (байт формы + модель).
+        byte ShapeshiftForm = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -282,6 +286,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, напр. «Глухая оборона»): отрицательный = снижение.
         var dmgTakenAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken);
         var damageTakenPct = dmgTakenAura.Eff == EffectApplyAura ? dmgTakenAura.Bp + 1 : 0;
+        // §1 Шейпшифт-форма (MOD_SHAPESHIFT, аура 36): EffectMiscValue = номер формы (FORM_*). Metamorphosis (47241)
+        // несёт форму 22. Форма как бафф применяется через AuraService (байт формы UNIT_FIELD_BYTES_2 + модель).
+        // MiscValue берём из t (кортеж effects его не несёт) по индексу найденного эффекта.
+        var shapeIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModShapeshift);
+        var shapeMisc = shapeIdx switch { 0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, _ => t.EffectMiscValue3 };
+        var shapeshiftForm = shapeIdx >= 0 ? (byte)Math.Clamp(shapeMisc, 0, 255) : (byte)0;
         // ABS.1/ABS.2: absorb-щит — SCHOOL_ABSORB (69, обычный) или MANA_SHIELD (97, за счёт маны).
         // Пул = BasePoints+1, маска школ = EffectMiscValue. Mana Shield дополнительно несёт множитель маны.
         var absorbIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura is AuraSchoolAbsorb or AuraManaShield);
@@ -345,6 +355,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // IMMUNITY.1: «пузырь» неуязвимости — защитный само-бафф (положителен), хотя первый аура-эффект может
         // быть отрицателен (Divine Shield: −50% урона; Ice Block: стан-себя) — иначе движок счёл бы дебаффом.
         if (auraBuff && !auraPositive && immuneSchoolMask != 0)
+            auraPositive = true;
+        // §1 Шейпшифт-форма (Metamorphosis 47241 и др.) — положительный само-бафф, хотя BasePoints ауры 36
+        // отрицателен (−1): это номер формы в EffectMiscValue, не «магнитуда» → иначе движок счёл бы дебаффом.
+        if (auraBuff && !auraPositive && shapeshiftForm != 0)
             auraPositive = true;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
@@ -460,7 +474,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             isInterrupt, interruptLockMs,
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
-            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl);
+            immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
+            shapeshiftForm);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

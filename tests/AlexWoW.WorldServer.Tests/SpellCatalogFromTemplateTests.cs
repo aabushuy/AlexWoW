@@ -168,6 +168,22 @@ public class SpellCatalogFromTemplateTests
     }
 
     [Fact]
+    public void Metamorphosis_ShapeshiftFormBuff()
+    {
+        // Метаморфоза ЧК (47241): APPLY_AURA(6) MOD_SHAPESHIFT(36), MiscValue=22 (форма демона), Bp=-1,
+        // DurationIndex=9 (30с). Несмотря на отрицательный Bp ауры формы — это позитивный само-бафф с формой 22.
+        var info = SpellCatalog.FromTemplate(new SpellTemplateData
+        {
+            Id = 47241, DurationIndex = 9,
+            Effect1 = 6, EffectApplyAuraName1 = 36, EffectMiscValue1 = 22, EffectBasePoints1 = -1,
+        });
+        Assert.True(info.AuraBuff);
+        Assert.True(info.AuraPositive);
+        Assert.Equal((byte)22, info.ShapeshiftForm);
+        Assert.Equal(30000, info.AuraDurationMs);
+    }
+
+    [Fact]
     public void Charge_MovementParsed()
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData { Id = 12, Effect1 = 96 });

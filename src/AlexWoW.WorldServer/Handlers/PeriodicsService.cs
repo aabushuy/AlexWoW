@@ -142,8 +142,10 @@ internal sealed class PeriodicsService(
         {
             // Бафф на себя: иконка — через систему аур; простой эффект (+макс.HP / +% блока) — здесь, со снятием по истечении.
             // Эксклюзивная группа (Фаза 2): брони мага/чернокнижника взаимоисключающие — новая снимает прежнюю.
+            // §1: форма (info.ShapeshiftForm) передаётся в AuraService → байт формы UNIT_FIELD_BYTES_2 + модель
+            // (Metamorphosis ЧК: форма 22 → демон-модель). По истечении баффа AuraService снимет форму (resetForm).
             var exclusiveGroup = SpellCatalog.ExclusiveAuraGroup(spellId);
-            await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct, group: exclusiveGroup,
+            await auras.ApplyAsync(session, spellId, dur, positive: true, form: info.ShapeshiftForm, ct, group: exclusiveGroup,
                 damageDonePct: info.DamageDonePct, damageDoneSchool: info.DamageDoneSchoolMask);
             if (info.HealthBonus > 0)
             {
