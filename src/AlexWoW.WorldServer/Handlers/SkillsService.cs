@@ -64,6 +64,48 @@ internal sealed class SkillsService(ICharacterStateRepository charState)
         await SendSkillUpdateAsync(session, skillId, sk.Value, sk.Max, ct);
     }
 
+    /// <summary>Забывает навык (§177): убирает из книги и <c>character_skill</c>, затем пересылает блок
+    /// PLAYER_SKILL_INFO (слоты после удалённого сдвигаются). false — навык не был изучен.</summary>
+    internal async Task<bool> ForgetAsync(WorldSession session, ushort skillId, CancellationToken ct)
+    {
+        var book = session.Progression.SkillBook;
+        if (!book.Has(skillId))
+            return false;
+        var oldCount = book.Skills.Count; // число слотов профессий ДО удаления (хвост обнулим)
+        book.Remove(skillId);
+        await charState.DeleteSkillAsync(session.InWorldGuid, skillId, ct);
+        await ResendSkillBlockAsync(session, oldCount, ct);
+        return true;
+    }
+
+    /// <summary>Перезаписывает слоты PLAYER_SKILL_INFO профессий [LanguageSlots .. +oldCount): текущие
+    /// навыки на новых позициях, освободившийся хвост — нулями. Один VALUES-апдейт себе (§177).</summary>
+    private static async Task ResendSkillBlockAsync(WorldSession session, int oldCount, CancellationToken ct)
+    {
+        var book = session.Progression.SkillBook;
+        await session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                for (var i = 0; i < oldCount; i++)
+                {
+                    var baseIdx = UpdateField.PlayerSkillInfo11 + (book.LanguageSlots + i) * 3;
+                    if (i < book.Skills.Count)
+                    {
+                        var sk = book.Skills[i];
+                        m.SetUInt32(baseIdx, sk.SkillId);
+                        m.SetUInt32(baseIdx + 1, (uint)(sk.Value | (sk.Max << 16)));
+                        m.SetUInt32(baseIdx + 2, 0);
+                    }
+                    else
+                    {
+                        m.SetUInt32(baseIdx, 0);
+                        m.SetUInt32(baseIdx + 1, 0);
+                        m.SetUInt32(baseIdx + 2, 0);
+                    }
+                }
+            }), ct);
+    }
+
     /// <summary>VALUES-апдейт одного слота PLAYER_SKILL_INFO (skillId | value | max), только себе.</summary>
     private static async Task SendSkillUpdateAsync(WorldSession session, ushort skillId, ushort value, ushort max,
         CancellationToken ct)

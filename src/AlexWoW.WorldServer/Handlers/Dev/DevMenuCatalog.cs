@@ -89,22 +89,22 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Cmd(classes, "Маг", ".trainer mage");
         b.Cmd(classes, "Чернокнижник", ".trainer warlock");
         b.Cmd(classes, "Друид", ".trainer druid");
-        // Профессии: §177 переведёт на per-профессию «Выучить/Забыть»; пока — спавн тренера (.proftrainer).
+        // §177: профессии — прямое «Выучить/Забыть» у самого игрока (.prof <prof> learn|forget),
+        // без спавна тренера. Команда .proftrainer остаётся доступной вручную, но из меню убрана.
         var profs = b.Sub(trainers, "Профессии");
-        b.Cmd(profs, "Портняжное", ".proftrainer tailoring");
-        b.Cmd(profs, "Кузнечное", ".proftrainer blacksmithing");
-        b.Cmd(profs, "Кожевничество", ".proftrainer leatherworking");
-        b.Cmd(profs, "Алхимия", ".proftrainer alchemy");
-        b.Cmd(profs, "Наложение чар", ".proftrainer enchanting");
-        b.Cmd(profs, "Инженерное", ".proftrainer engineering");
-        b.Cmd(profs, "Ювелирное", ".proftrainer jewelcrafting");
-        b.Cmd(profs, "Горное дело", ".proftrainer mining");
-        b.Cmd(profs, "Травничество", ".proftrainer herbalism");
-        b.Cmd(profs, "Снятие шкур", ".proftrainer skinning");
-        b.Cmd(profs, "Кулинария", ".proftrainer cooking");
-        b.Cmd(profs, "Первая помощь", ".proftrainer firstaid");
-        b.Cmd(profs, "Рыбная ловля", ".proftrainer fishing");
-        b.Cmd(profs, "Снять", ".proftrainer off");
+        ProfLearnForget(b, profs, "Портняжное", "tailoring");
+        ProfLearnForget(b, profs, "Кузнечное", "blacksmithing");
+        ProfLearnForget(b, profs, "Кожевничество", "leatherworking");
+        ProfLearnForget(b, profs, "Алхимия", "alchemy");
+        ProfLearnForget(b, profs, "Наложение чар", "enchanting");
+        ProfLearnForget(b, profs, "Инженерное", "engineering");
+        ProfLearnForget(b, profs, "Ювелирное", "jewelcrafting");
+        ProfLearnForget(b, profs, "Горное дело", "mining");
+        ProfLearnForget(b, profs, "Травничество", "herbalism");
+        ProfLearnForget(b, profs, "Снятие шкур", "skinning");
+        ProfLearnForget(b, profs, "Кулинария", "cooking");
+        ProfLearnForget(b, profs, "Первая помощь", "firstaid");
+        ProfLearnForget(b, profs, "Рыбная ловля", "fishing");
 
         // 7. Крафт → Станки / Реагенты
         var craft = b.Category("Крафт");
@@ -131,6 +131,14 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Prompt(spellTest, "Авто-прогон ×N", ".spelltest run ", "Повторов на спелл:");
 
         return b.Lines;
+    }
+
+    /// <summary>Профессия в меню (§177): подкатегория с листьями «Выучить»/«Забыть» (.prof KEY learn|forget).</summary>
+    private static void ProfLearnForget(Builder b, int parent, string label, string key)
+    {
+        var node = b.Sub(parent, label);
+        b.Cmd(node, "Выучить", $".prof {key} learn");
+        b.Cmd(node, "Забыть", $".prof {key} forget");
     }
 
     /// <summary>

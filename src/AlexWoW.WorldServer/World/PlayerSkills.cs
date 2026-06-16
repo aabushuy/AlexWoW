@@ -51,6 +51,17 @@ public sealed class PlayerSkillBook
         return i < 0 ? -1 : LanguageSlots + i;
     }
 
+    /// <summary>Убирает навык из книги (забыть профессию, §177). Возвращает true, если был. Слоты
+    /// последующих навыков сдвигаются — вызывающий обязан переслать блок PLAYER_SKILL_INFO клиенту
+    /// (см. <c>SkillsService.ForgetAsync</c>), иначе клиентские слоты разойдутся с серверными.</summary>
+    public bool Remove(ushort skillId)
+    {
+        if (!_byId.Remove(skillId))
+            return false;
+        _skills.RemoveAll(s => s.SkillId == skillId);
+        return true;
+    }
+
     /// <summary>Добавляет навык (или обновляет значение/потолок существующего). Возвращает запись.</summary>
     public PlayerSkill AddOrSet(ushort skillId, ushort value, ushort max)
     {
