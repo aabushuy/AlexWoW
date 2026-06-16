@@ -130,6 +130,7 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
             PlayerClass = playerClass,
             NameContains = string.IsNullOrWhiteSpace(name) ? null : name,
             OrderByItemLevel = true, // §183: сортировка по уровню предмета по умолчанию
+            ExcludeTestItems = true, // §183: прятать QA/служебные предметы дампа
             Limit = 100,
         };
 
