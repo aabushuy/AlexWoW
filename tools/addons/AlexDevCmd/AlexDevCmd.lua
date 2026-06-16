@@ -183,7 +183,9 @@ end
 local function BuildUI()
   local f = CreateFrame("Frame", "AlexDevCmdFrame", UIParent)
   f:SetWidth(300); f:SetHeight(460)
-  f:SetPoint("CENTER")
+  -- Дефолт при первом запуске — правый верх (под миникартой); сохранённая позиция (AlexDevCmdDB.pos)
+  -- переопределяет это в ADDON_LOADED.
+  f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -16, -200)
   f:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
