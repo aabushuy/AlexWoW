@@ -76,6 +76,8 @@ builder.Services.AddRazorPages(o =>
     o.Conventions.AuthorizeFolder("/Admin", "Admin"); // M12: раздел только для администраторов
     o.Conventions.AllowAnonymousToPage("/Index");
     o.Conventions.AuthorizePage("/Dashboard", "Admin"); // дашборд прогресса — только админам
+    o.Conventions.AuthorizePage("/Board", "Admin");     // KB3: канбан-доска QA — только админам
+    o.Conventions.AuthorizePage("/Ticket", "Admin");    // KB4: карточка тикета — только админам
     o.Conventions.AllowAnonymousToPage("/Login");
     o.Conventions.AllowAnonymousToPage("/Register");
     o.Conventions.AllowAnonymousToPage("/Error");
