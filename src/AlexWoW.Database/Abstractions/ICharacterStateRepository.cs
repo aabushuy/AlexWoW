@@ -32,6 +32,9 @@ public interface ICharacterStateRepository
     /// <summary>Ставит/обновляет навык персонажа (upsert значения и потолка). M11.1.</summary>
     Task UpsertSkillAsync(uint ownerGuid, ushort skillId, ushort value, ushort max, CancellationToken ct = default);
 
+    /// <summary>Удаляет навык персонажа (забыть профессию, §177).</summary>
+    Task DeleteSkillAsync(uint ownerGuid, ushort skillId, CancellationToken ct = default);
+
     /// <summary>Сохранённые ауры персонажа: (spell, form, remainingMs). remainingMs=0 — перманентный
     /// переключатель; &gt;0 — временны́й бафф/HoT с остатком длительности (M10.5).</summary>
     Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default);

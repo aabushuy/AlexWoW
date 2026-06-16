@@ -28,6 +28,46 @@ public static class Professions
         return 0;
     }
 
+    /// <summary>
+    /// Dev-ключ профессии → стартовый (апрентис) спелл-открывашка. Учится через <c>SpellLearnService</c>:
+    /// каждый несёт Effect SKILL(118) с id навыка → выдаёт навык-линию + окно профессии (Mining доп. даёт
+    /// плавку 2656 через <see cref="AutoGrantSpells"/>). Id сверены с реальным spell_template (§177).
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, uint> ApprenticeSpellByKeyword = new Dictionary<string, uint>
+    {
+        ["tailoring"] = 3908,
+        ["blacksmithing"] = 2018,
+        ["leatherworking"] = 2108,
+        ["alchemy"] = 2259,
+        ["enchanting"] = 7411,
+        ["engineering"] = 4036,
+        ["jewelcrafting"] = 25229,
+        ["mining"] = 2575,
+        ["herbalism"] = 2366,
+        ["skinning"] = 8613,
+        ["cooking"] = 2550,
+        ["firstaid"] = 3273,
+        ["fishing"] = 7620,
+    };
+
+    /// <summary>Dev-ключ профессии → id навыка-линии (SkillLine.dbc). Для забывания профессии (§177).</summary>
+    public static readonly IReadOnlyDictionary<string, ushort> SkillIdByKeyword = new Dictionary<string, ushort>
+    {
+        ["tailoring"] = 197,
+        ["blacksmithing"] = 164,
+        ["leatherworking"] = 165,
+        ["alchemy"] = 171,
+        ["enchanting"] = 333,
+        ["engineering"] = 202,
+        ["jewelcrafting"] = 755,
+        ["mining"] = 186,
+        ["herbalism"] = 182,
+        ["skinning"] = 393,
+        ["cooking"] = 185,
+        ["firstaid"] = 129,
+        ["fishing"] = 356,
+    };
+
     /// <summary>Потолок навыка апрентис-тира (стартовый при изучении профессии). M11.2.</summary>
     public const ushort ApprenticeMax = 75;
 

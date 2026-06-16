@@ -83,6 +83,12 @@ public sealed class EfCharacterStateRepository(IDbContextFactory<AuthDbContext> 
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task DeleteSkillAsync(uint ownerGuid, ushort skillId, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.CharacterSkills.Where(x => x.OwnerGuid == ownerGuid && x.SkillId == skillId).ExecuteDeleteAsync(ct);
+    }
+
     public async Task<IReadOnlyList<(uint Spell, byte Form, uint RemainingMs)>> GetAurasAsync(uint ownerGuid, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
