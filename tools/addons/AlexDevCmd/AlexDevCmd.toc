@@ -2,7 +2,7 @@
 ## Title: Alex Dev Commands
 ## Notes: Древовидный пульт dev-команд + телепорт по городам. Каталог отдаёт сервер. Кнопка у миникарты. Гейт is_admin — на сервере.
 ## Author: AlexWoW
-## Version: 2.0
+## Version: 2.1
 ## SavedVariables: AlexDevCmdDB
 
 AlexDevCmd.lua
