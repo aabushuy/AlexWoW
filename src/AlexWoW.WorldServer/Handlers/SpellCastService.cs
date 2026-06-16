@@ -13,7 +13,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <see cref="SpellCatalog"/>; переключатели — <see cref="SpellTogglesService"/> (SRP-разбиение).
 /// </summary>
 internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender spellGo,
-    SpellCastCompletion completion, SpellTogglesService spellToggles, CraftingService crafting)
+    SpellCastCompletion completion, SpellTogglesService spellToggles, CraftingService crafting,
+    InventoryGrantService inventoryGrant)
 {
     // --- SpellCastResult (3.3.5a, сверено с CMaNGOS SpellDefines.h) ---
     private const byte CastResultNotReady = 0x43;        // 67  — спелл на кулдауне/GCD
@@ -53,11 +54,17 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     internal async Task HandleUseItemAsync(WorldSession session, IncomingPacket packet, CancellationToken ct)
     {
         var r = packet.Reader();
-        r.UInt8();                  // bag
-        r.UInt8();                  // slot
+        var bag = r.UInt8();        // bag (контейнер; 255 = основной рюкзак)
+        var slot = r.UInt8();       // slot в контейнере
         var castCount = r.UInt8();  // cast_count
         var spellId = r.UInt32();   // spellId предмета (on-use)
         await StartCastAsync(session, spellId, castCount, targetGuid: 0, ct);
+
+        // §8 Яд разбойника нанесён яд-предметом на оружие → расход 1 заряда яда из сумки (item-use путь;
+        // при нанесении через .learn-каст предмета нет — расходовать нечего). Яды без КД/стоимости → каст
+        // применился, поэтому списываем безусловно.
+        if (PoisonService.IsPoison(spellId) && BagInventory.ItemAt(session, bag, slot) is { } poisonItem)
+            await inventoryGrant.ConsumeAsync(session, poisonItem.ItemEntry, 1, ct);
     }
 
     /// <summary>Ядро каста (после разбора цели): переключатели/гейты/GCD/стоимость → мгновенное или отложенное
