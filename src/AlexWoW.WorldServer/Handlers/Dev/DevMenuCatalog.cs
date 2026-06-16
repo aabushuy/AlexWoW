@@ -41,9 +41,9 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         var buffsRemove = b.Sub(buffs, "Снять");
         b.Prompt(buffsRemove, "Снять по id", ".unbuff ", "ID спелла:");
         b.Cmd(buffsRemove, "Снять все", ".unbuff all"); // §176
-        // «Характеристики» (редактор вторичных статов) — §178/§179.
-        // «Шанс крита заклинаний» временно остаётся листом Баффов до Фазы 3 (переедет в редактор статов).
-        b.Prompt(buffs, "Шанс крита заклинаний", ".setcrit ", "Процент 0–100 (для проверки крита):");
+        // §178/§179 «Характеристики» — лист kind=stats, открывает в аддоне окно редактора вторичных
+        // характеристик (крит/уклон/броня/оружие…). Запрос/запись значений — addon-протокол stats/.setstat.
+        b.StatsEditor(buffs, "Характеристики");
 
         // 3. Враги (.spawnenemy): по типу существа → prompt «уровень [кол-во]» (как «Выдать предмет»).
         var enemies = b.Category("Враги");
@@ -145,7 +145,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
     /// Сборщик строк-узлов. Каждый узел: <c>N|id|parentId|kind|label|payload…</c>, разделитель — '|'
     /// (в метках/командах его нет). kind: <c>cat</c> (категория/подкатегория, parentId 0 = корень),
     /// <c>cmd</c> (лист-команда, payload = команда для SAY), <c>prompt</c> (лист-ввод, payload =
-    /// префикс|подсказка), <c>tp</c> (лист-телепорт, payload = id города; метка = имя города).
+    /// префикс|подсказка), <c>tp</c> (лист-телепорт, payload = id города; метка = имя города),
+    /// <c>stats</c> (§178, лист-открывашка окна редактора вторичных характеристик, без payload).
     /// </summary>
     private sealed class Builder
     {
@@ -155,6 +156,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         public int Category(string label) => Node(0, "cat", label);
         public int Sub(int parent, string label) => Node(parent, "cat", label);
         public void Cmd(int parent, string label, string command) => Node(parent, "cmd", label, command);
+        public void StatsEditor(int parent, string label) => Node(parent, "stats", label); // §178: лист-открывашка окна редактора статов
         public void Prompt(int parent, string label, string prefix, string hint) => Node(parent, "prompt", label, prefix, hint);
         public void Tp(int parent, string cityName, uint cityId)
             => Node(parent, "tp", cityName, cityId.ToString(System.Globalization.CultureInfo.InvariantCulture));
