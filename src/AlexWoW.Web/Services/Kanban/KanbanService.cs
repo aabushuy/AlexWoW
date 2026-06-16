@@ -16,6 +16,9 @@ public sealed class KanbanService(KanbanRepository repo)
     public Task<IReadOnlyList<KanbanTicket>> EpicsAsync(int projectId, CancellationToken ct) =>
         repo.ListAsync(new KanbanFilter { Type = "Epic", ProjectId = projectId }, ct);
 
+    public Task<IReadOnlyList<KanbanTicket>> AllEpicsAsync(CancellationToken ct) =>
+        repo.ListAsync(new KanbanFilter { Type = "Epic" }, ct);
+
     public async Task<(KanbanTicket? Ticket, IReadOnlyList<KanbanComment> Comments)> GetAsync(int id, CancellationToken ct)
     {
         var t = await repo.GetAsync(id, ct);
