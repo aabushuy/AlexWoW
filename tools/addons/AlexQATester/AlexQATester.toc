@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: Alex QA Tester
+## Notes: Задачи на тестирование с канбан-доски: список, проверка, отправка результата. Кнопка у миникарты или /qa.
+## Author: AlexWoW
+## Version: 1.0
+## SavedVariables: AlexQATesterDB
+
+AlexQATester.lua
