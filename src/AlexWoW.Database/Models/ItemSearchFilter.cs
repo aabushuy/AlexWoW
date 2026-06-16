@@ -33,8 +33,15 @@ public sealed record ItemSearchFilter
     /// (2,4) и т.п. Имеет приоритет над <see cref="Kind"/>. null/пусто — без ограничения по классу.</summary>
     public IReadOnlyCollection<uint>? Classes { get; init; }
 
+    /// <summary>Набор подклассов (item_template.subclass) для <c>subclass IN (...)</c> — напр. мечи (7,8).
+    /// null/пусто — без ограничения. Используется деревом фильтров окна «Добавить вещь» (§183).</summary>
+    public IReadOnlyCollection<uint>? SubClasses { get; init; }
+
     /// <summary>Минимальное качество (item_template.Quality ≥). null — любое. 0 серый … 4 эпик …</summary>
     public uint? QualityMin { get; init; }
+
+    /// <summary>Сортировать по уровню предмета (ItemLevel DESC) вместо требуемого уровня. §183.</summary>
+    public bool OrderByItemLevel { get; init; }
 
     /// <summary>Подстрока названия. Пробелы трактуются как «%» (как в ручном LIKE '%a%b%').</summary>
     public string? NameContains { get; init; }
@@ -68,6 +75,11 @@ public sealed record ItemSearchFilter
         {
             clauses.Add("class = @class");
             parameters.Add("class", (uint)kind);
+        }
+        if (SubClasses is { Count: > 0 })
+        {
+            clauses.Add("subclass IN @subclasses");
+            parameters.Add("subclasses", SubClasses);
         }
         if (QualityMin is { } qmin)
         {
