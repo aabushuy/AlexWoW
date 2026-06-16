@@ -14,7 +14,8 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources, RuneService runes,
     AuraService auras, PeriodicsService periodics, Handlers.PoisonService poisons,
     PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
-    Handlers.CrowdControlService crowdControl, TimeSyncService timeSync, ILogger<WorldTick> logger)
+    Handlers.CrowdControlService crowdControl, TimeSyncService timeSync,
+    Handlers.SpellTestRequestService spellTestQueue, ILogger<WorldTick> logger)
 {
     /// <summary>Период рассылки SMSG_TIME_SYNC_REQ каждому игроку (нормализация часов). M6.3 ч.2.</summary>
     private const long TimeSyncIntervalMs = 10_000;
@@ -23,6 +24,12 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
     {
         var now = Environment.TickCount64;
         await factions.EnsureLoadedAsync(ct); // M6.7: ленивая загрузка реакций фракций (один раз)
+
+        // QA T1 (Vikunja 185): опрос очереди внешних запросов на авто-прогон харнесса (DB-flag). Свой гард
+        // in-flight внутри сервиса — не блокирует тик (прогон идёт в фоновой задаче). До per-player цикла,
+        // т.к. обработчик сам найдёт target-сессию по аккаунту из строки-запроса.
+        try { await spellTestQueue.TickAsync(ct); }
+        catch (Exception ex) { logger.LogDebug(ex, "SpellTest-queue tick: {Msg}", ex.Message); }
 
         foreach (var player in world.Players)
         {

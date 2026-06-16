@@ -33,4 +33,27 @@ public interface ISpellTestRepository
 
     /// <summary>Помечает сессию проанализированной и проставляет id заведённого тикета Vikunja.</summary>
     Task MarkAnalyzedAsync(long sessionId, uint ticketId, CancellationToken ct = default);
+
+    // --- QA T1 (Vikunja 185): очередь внешних запросов на авто-прогон харнесса (DB-flag + World-tick) ---
+
+    /// <summary>
+    /// Создаёт запрос на авто-прогон для онлайн-персонажа аккаунта <paramref name="account"/>. Возвращает id
+    /// строки-запроса — Claude/Web затем опрашивает <see cref="GetRequestAsync"/> до статуса done (session_id).
+    /// </summary>
+    Task<long> EnqueueRequestAsync(string account, int casts, string? note, CancellationToken ct = default);
+
+    /// <summary>
+    /// Выбирает ОДНУ pending-строку (FIFO по requested_at) и атомарно переводит её в running (CAS pending→running).
+    /// Возвращает её (id/account/casts/note) либо null, если pending-запросов нет. Зовётся World-tick'ом.
+    /// </summary>
+    Task<SpellTestRequestClaim?> ClaimPendingRequestAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Финализирует запрос: статус done + проставляет <paramref name="sessionId"/> созданной spell_test_session
+    /// (Claude читает его SELECT'ом). Либо failed + <paramref name="error"/> (нет онлайн-сессии/исключение).
+    /// </summary>
+    Task CompleteRequestAsync(long requestId, bool success, long? sessionId, string? error, CancellationToken ct = default);
+
+    /// <summary>Строка-запрос по id (Claude/Web опрашивает до done/failed). null — нет такой строки.</summary>
+    Task<SpellTestRequestView?> GetRequestAsync(long requestId, CancellationToken ct = default);
 }

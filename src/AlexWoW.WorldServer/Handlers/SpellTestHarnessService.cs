@@ -20,11 +20,15 @@ internal sealed class SpellTestHarnessService(
 {
     private const int MaxCastsPerSpell = 50;
 
-    /// <summary>Запускает прогон: возвращает число протестированных спеллов, либо −1 если нет персонажа в мире.</summary>
-    internal async Task<int> RunAsync(WorldSession session, int castsPerSpell, CancellationToken ct)
+    /// <summary>Результат прогона: число протестированных спеллов и id созданной сессии захвата
+    /// (для hands-off T1 — обработчик очереди пишет его в spell_test_request.session_id). −1/пусто — нет персонажа.</summary>
+    public sealed record RunResult(int Tested, long? SessionId);
+
+    /// <summary>Запускает прогон: возвращает число протестированных спеллов + id сессии захвата.</summary>
+    internal async Task<RunResult> RunAsync(WorldSession session, int castsPerSpell, CancellationToken ct)
     {
         if (session.Character is null || session.InWorldGuid == 0)
-            return -1;
+            return new RunResult(-1, null);
 
         // Оба манекена перед игроком (урон + лечебный).
         await session.World.SummonTrainingDummyAsync(session, ct);
@@ -99,11 +103,14 @@ internal sealed class SpellTestHarnessService(
         session.PosX = px; session.PosY = py; session.PosZ = pz; session.PosO = po;
         session.Cast.SpellCooldowns.Clear();
 
+        // id сессии захвата — до StopAsync (она снимает активный capture). Нужен hands-off T1: обработчик
+        // очереди пишет его в spell_test_request.session_id, чтобы Claude/Web читали результат прогона.
+        var sessionId = capture.ActiveSessionId(session);
         if (startedHere)
             await capture.StopAsync(session, ct);
 
         logger.LogInformation("SpellTest harness '{User}': протестировано {Tested}, пропущено {Skipped}, ×{N}",
             session.Account, tested, skipped, n);
-        return tested;
+        return new RunResult(tested, sessionId);
     }
 }
