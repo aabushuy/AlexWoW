@@ -23,7 +23,8 @@ end
 local function SetMsg(text, isErr)
   if not D.msg then return end
   D.msg:SetText(text or "")
-  D.msg:SetTextColor(isErr and 1 or 0.4, isErr and 0.4 or 1, 0.4)
+  -- Тёмные тона — читаются на пергаменте.
+  if isErr then D.msg:SetTextColor(0.6, 0.1, 0.05) else D.msg:SetTextColor(0.1, 0.4, 0.1) end
 end
 
 local function Submit()
@@ -109,7 +110,7 @@ ShowDetail = function()
     D.title:SetText("")
     D.body:SetText("Выберите задачу слева.")
     D.child:SetHeight(D.body:GetStringHeight() + 4)
-    D.check:Hide(); D.commentBg:Hide(); D.comLabel:Hide(); D.doneBtn:Hide()
+    D.check:Hide(); D.checkLabel:Hide(); D.commentBg:Hide(); D.comLabel:Hide(); D.doneBtn:Hide()
     SetMsg("", false)
     return
   end
@@ -119,7 +120,7 @@ ShowDetail = function()
   D.child:SetHeight(D.body:GetStringHeight() + 4)
   D.check:SetChecked(false)
   D.comment:SetText("")
-  D.check:Show(); D.commentBg:Show(); D.comLabel:Show(); D.doneBtn:Show()
+  D.check:Show(); D.checkLabel:Show(); D.commentBg:Show(); D.comLabel:Show(); D.doneBtn:Show()
   SetMsg("", false)
 end
 
@@ -169,7 +170,7 @@ local function Build()
     row.sel = sel
     local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("LEFT", 4, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT")
-    fs:SetTextColor(0.15, 0.1, 0.05) -- тёмный текст на пергаменте
+    fs:SetTextColor(1, 0.82, 0) -- левая панель тёмная (как список квест-лога) → светлый текст
     row.text = fs
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
@@ -193,9 +194,9 @@ local function Build()
 
   D.check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
   D.check:SetWidth(24); D.check:SetHeight(24); D.check:SetPoint("TOPLEFT", rx - 2, -272)
-  local checkLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); checkLabel:SetText("Соответствует ожидаемому результату")
-  checkLabel:SetTextColor(0.2, 0.12, 0.04)
+  D.checkLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); D.checkLabel:SetText("Соответствует ожидаемому результату")
+  D.checkLabel:SetTextColor(0.2, 0.12, 0.04)
 
   D.comLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   D.comLabel:SetPoint("TOPLEFT", rx, -302); D.comLabel:SetText("Комментарий:"); D.comLabel:SetTextColor(0.2, 0.12, 0.04)
