@@ -36,10 +36,11 @@ internal sealed class SpellTestCommand(SpellTestCaptureService capture, SpellTes
             case "run":
                 var n = int.TryParse(ctx.ArgLower(1), out var v) && v > 0 ? v : 5;
                 await ctx.ReplyAsync($"Авто-прогон абилок класса ×{n}…", ct);
-                var tested = await harness.RunAsync(ctx.Session, n, ct);
-                await ctx.ReplyAsync(tested < 0
+                var run = await harness.RunAsync(ctx.Session, n, ct);
+                await ctx.ReplyAsync(run.Tested < 0
                     ? "Нужен персонаж в мире"
-                    : $"Прогон завершён: протестировано спеллов {tested} (×{n})", ct);
+                    : $"Прогон завершён: протестировано спеллов {run.Tested} (×{n})" +
+                        (run.SessionId is { } sid ? $", сессия #{sid}" : ""), ct);
                 break;
 
             default:

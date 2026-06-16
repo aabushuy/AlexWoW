@@ -27,6 +27,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<TeleportLocation> TeleportLocations => Set<TeleportLocation>();
     public DbSet<SpellTestSession> SpellTestSessions => Set<SpellTestSession>();
     public DbSet<SpellTestResult> SpellTestResults => Set<SpellTestResult>();
+    public DbSet<SpellTestRequest> SpellTestRequests => Set<SpellTestRequest>(); // QA T1: очередь запросов на авто-прогон харнесса
     public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -261,6 +262,25 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.RecordedAt).HasColumnName("recorded_at").HasColumnType("datetime(3)");
             e.HasIndex(x => x.SessionId).HasDatabaseName("ix_str_session");
             e.HasIndex(x => x.SpellId).HasDatabaseName("ix_str_spell");
+        });
+
+        // QA T1 (Vikunja 185): очередь внешних запросов на авто-прогон харнесса. Web/Claude вставляет
+        // (status=pending), World-tick подхватывает (CAS pending→running) и финализирует (done/failed).
+        modelBuilder.Entity<SpellTestRequest>(e =>
+        {
+            e.ToTable("spell_test_request");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Account).HasColumnName("account").HasMaxLength(32).IsRequired();
+            e.Property(x => x.Casts).HasColumnName("casts");
+            e.Property(x => x.Note).HasColumnName("note").HasMaxLength(128);
+            e.Property(x => x.Status).HasColumnName("status").HasDefaultValue((byte)0);
+            e.Property(x => x.SessionId).HasColumnName("session_id");
+            e.Property(x => x.Error).HasColumnName("error").HasMaxLength(255);
+            e.Property(x => x.RequestedAt).HasColumnName("requested_at").HasColumnType("datetime(3)");
+            e.Property(x => x.ProcessedAt).HasColumnName("processed_at").HasColumnType("datetime(3)");
+            // World-tick ищет невыполненные — индекс по статусу + времени (FIFO).
+            e.HasIndex(x => new { x.Status, x.RequestedAt }).HasDatabaseName("ix_strq_status");
         });
 
         // Key-value настройки сервера (M8.6: стоимость смены расы/пола и т.п.).
