@@ -78,7 +78,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         // 6. Тренеры → Классы / Профессии
         var trainers = b.Category("Тренеры");
         var classes = b.Sub(trainers, "Классы");
-        b.Cmd(classes, "Разучить всё", ".trainer off");
+        b.Cmd(classes, "Забыть навыки", ".forgetspells");   // снять изученные абилки (БД + сессия)
+        b.Cmd(classes, "Забыть таланты", ".resettalents");  // сброс талантов (с возвратом очков)
         b.Cmd(classes, "Воин", ".trainer warrior");
         b.Cmd(classes, "Паладин", ".trainer paladin");
         b.Cmd(classes, "Охотник", ".trainer hunter");
