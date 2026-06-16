@@ -134,6 +134,10 @@ public static class UpdateField
     /// <summary>Поле OBJECT_FIELD_ENTRYID видимого предмета для слота экипировки 0..18.</summary>
     public static int VisibleItemEntry(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2;
 
+    /// <summary>Поле ENCHANTMENT видимого предмета (свечение временного энчанта оружия — яды/имбу, §8).
+    /// На пару (EntryId, Enchantment) на слот; энчант — следующее поле за EntryId.</summary>
+    public static int VisibleItemEnchant(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2 + 1;
+
     /// <summary>Поле guid предмета для слота-контейнера 0..38 (экипировка/сумки/рюкзак).</summary>
     public static int InvSlotGuid(int slot) => PlayerFieldInvSlotHead + slot * 2;
 }

@@ -12,7 +12,7 @@ namespace AlexWoW.WorldServer.World;
 /// </summary>
 internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources, RuneService runes,
-    AuraService auras, PeriodicsService periodics,
+    AuraService auras, PeriodicsService periodics, Handlers.PoisonService poisons,
     PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
     Handlers.CrowdControlService crowdControl, TimeSyncService timeSync, ILogger<WorldTick> logger)
 {
@@ -36,6 +36,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                 await runes.TickAsync(player.Session, now, ct);                      // RUNE.2: реген рун DK по кулдауну
                 await auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
                 await periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
+                await poisons.TickAsync(player.Session, now, ct);                    // §8: истечение яда-энчанта оружия
                 await regen.TickPlayerRegenAsync(player.Session, now, ct);            // M6.7: внебоевой реген HP
                 await creatureAi.TickAggroScanAsync(world, player, now, ct);          // M6.7: авто-агро по фракции
 

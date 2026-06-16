@@ -45,24 +45,58 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
     internal static bool IsPoison(uint spellId)
         => Instant.Contains(spellId) || Deadly.Contains(spellId) || Wound.Contains(spellId) || Crippling.Contains(spellId);
 
+    /// <summary>Слот экипировки основной руки — для свечения временного энчанта-яда.</summary>
+    private const int MainHandEquipSlot = 15;
+
+    /// <summary>§8 Свечение временного энчанта на оружии (visible-item enchant основной руки). 0 — снять.
+    /// Поле на объекте игрока → видно себе и наблюдателям.</summary>
+    internal static Task SetWeaponGlowAsync(WorldSession session, uint enchantId, CancellationToken ct)
+    {
+        if (session.Player is not { } player || session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        return session.World.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid,
+                m => m.SetUInt32(UpdateField.VisibleItemEnchant(MainHandEquipSlot), enchantId)), ct);
+    }
+
+    /// <summary>Снять активный яд: сброс состояния сессии + свечения оружия (истечение/смена/выход).</summary>
+    internal static async Task ClearAsync(WorldSession session, CancellationToken ct)
+    {
+        session.Combat.ActivePoisonSpellId = 0;
+        session.Combat.ActivePoisonExpiresMs = 0;
+        await SetWeaponGlowAsync(session, 0, ct);
+    }
+
+    /// <summary>Тик истечения яда (из WorldTick): по таймеру снять яд и свечение оружия.</summary>
+    internal async Task TickAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        if (session.Combat.ActivePoisonSpellId != 0 && now >= session.Combat.ActivePoisonExpiresMs)
+            await ClearAsync(session, ct);
+    }
+
     /// <summary>Прок активного яда по прошедшему свингу. Возвращает true, если цель умерла от прок-урона.</summary>
     internal async Task<bool> OnMeleeHitAsync(WorldSession session, WorldCreature creature, long now, CancellationToken ct)
     {
-        var poison = session.Progression.Auras.FirstOrDefault(a => IsPoison(a.SpellId));
-        if (poison is null)
+        var spellId = session.Combat.ActivePoisonSpellId; // активный яд — энчант оружия (в сессии), не бафф
+        if (spellId == 0)
             return false;
+        if (now >= session.Combat.ActivePoisonExpiresMs) // яд истёк — снять + без прока
+        {
+            await ClearAsync(session, ct);
+            return false;
+        }
 
         // Crippling Poison — снара цели (−50% скорости, 12с); урона нет. Накладывается почти каждый удар.
-        if (Crippling.Contains(poison.SpellId))
+        if (Crippling.Contains(spellId))
         {
-            await crowdControl.ApplySnareAsync(session, creature, poison.SpellId, CripplingSlowPct, CripplingDurationMs, now, ct);
+            await crowdControl.ApplySnareAsync(session, creature, spellId, CripplingSlowPct, CripplingDurationMs, now, ct);
             return false;
         }
         // Wound Poison — стек-дебафф снижения лечения цели (до 5×10% = −50%); урона нет. По шансу +1 заряд.
-        if (Wound.Contains(poison.SpellId))
+        if (Wound.Contains(spellId))
         {
             if (Random.Shared.NextDouble() < ProcChance)
-                await ApplyWoundStackAsync(session, creature, poison.SpellId, now, ct);
+                await ApplyWoundStackAsync(session, creature, spellId, now, ct);
             return false;
         }
 
@@ -70,10 +104,10 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
 
         // Deadly Poison — стек-DoT: по шансу добавляем заряд (до 5) и обновляем DoT на цели. Урон идёт тиками
         // (PeriodicsService.TickAsync), поэтому наложение само по себе не убивает (died=false).
-        if (Deadly.Contains(poison.SpellId))
+        if (Deadly.Contains(spellId))
         {
             if (Random.Shared.NextDouble() < ProcChance)
-                await ApplyDeadlyStackAsync(session, creature, poison.SpellId, level, now, ct);
+                await ApplyDeadlyStackAsync(session, creature, spellId, level, now, ct);
             return false;
         }
 
@@ -84,12 +118,12 @@ internal sealed class PoisonService(KillRewardService killReward, CrowdControlSe
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, amount);
         session.Combat.LastCombatMs = now;
         await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellNonMeleeDamageLog,
-            SpellPackets.BuildDamageLog(creature.Guid, (ulong)session.InWorldGuid, poison.SpellId, amount, overkill, SchoolNature), ct);
+            SpellPackets.BuildDamageLog(creature.Guid, (ulong)session.InWorldGuid, spellId, amount, overkill, SchoolNature), ct);
         await session.World.BroadcastCreatureHealthAsync(creature, ct);
         if (died)
         {
             await killReward.OnCreatureKilledAsync(session, creature, ct);
-            logger.LogDebug("POISON '{User}': яд {Spell} добил '{Name}'", session.Account, poison.SpellId, creature.Template.Name);
+            logger.LogDebug("POISON '{User}': яд {Spell} добил '{Name}'", session.Account, spellId, creature.Template.Name);
         }
         return died;
     }

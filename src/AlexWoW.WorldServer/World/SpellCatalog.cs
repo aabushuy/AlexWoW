@@ -42,6 +42,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraProcTriggerSpell = 42;         // прок: на событии (procFlags) кастует EffectTriggerSpell — PROC.1
     private const int EffectCharge = 96;                 // рывок к цели (SPELL_EFFECT_CHARGE) — движение игрока
     private const int EffectCreateItem = 24;             // создание предмета (крафт профессии) — M11.3
+    private const int EffectEnchantItemTemporary = 54;   // §8 временный энчант оружия (яды/имбу): MiscValue = SpellItemEnchantment id
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
     private const int EffectDummy = 3;                   // dummy — скриптовый эффект (ярость Рывка) — M10.6
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
@@ -149,7 +150,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         bool IsCurse = false,
         // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера (аура 87 на дебаффе).
         // CurseSchoolMask — маска школ (EffectMiscValue, 126 = вся магия). Применяется в уроне по проклятой цели.
-        int CurseDamageTakenPct = 0, byte CurseSchoolMask = 0);
+        int CurseDamageTakenPct = 0, byte CurseSchoolMask = 0,
+        // §8 Временный энчант оружия (эффект 54): SpellItemEnchantment id для свечения оружия (яды/имбу). 0 — нет.
+        uint EnchantId = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -299,6 +302,13 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var shapeshiftForm = shapeIdx >= 0 ? (byte)Math.Clamp(shapeMisc, 0, 255) : (byte)0;
         // §3 Проклятие: один кёрс на цель. Curse of the Elements несёт MOD_DAMAGE_PERCENT_TAKEN (аура 87) на дебаффе
         // → цель получает +% урона совпадающей школы от кастера (амплификация магического урона).
+        // §8 Временный энчант оружия (яды/имбу): id из EffectMiscValue эффекта 54 (для свечения оружия).
+        var enchantIdx = Array.FindIndex(effects, e => e.Eff == EffectEnchantItemTemporary);
+        var enchantId = enchantIdx switch
+        {
+            0 => (uint)t.EffectMiscValue1, 1 => (uint)t.EffectMiscValue2, 2 => (uint)t.EffectMiscValue3, _ => 0u,
+        };
+
         var isCurse = IsCurseSpell((uint)t.Id);
         var curseAmpIdx = isCurse
             ? Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDamagePercentTaken)
@@ -491,7 +501,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
             immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
-            shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask);
+            shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
