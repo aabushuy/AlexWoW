@@ -40,7 +40,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Prompt(buffsApply, "Дебафф", ".debuff ", "ID спелла [секунды] (стенд для диспела):");
         var buffsRemove = b.Sub(buffs, "Снять");
         b.Prompt(buffsRemove, "Снять по id", ".unbuff ", "ID спелла:");
-        // «Снять все» — §176; «Характеристики» (редактор вторичных статов) — §178/§179.
+        b.Cmd(buffsRemove, "Снять все", ".unbuff all"); // §176
+        // «Характеристики» (редактор вторичных статов) — §178/§179.
         // «Шанс крита заклинаний» временно остаётся листом Баффов до Фазы 3 (переедет в редактор статов).
         b.Prompt(buffs, "Шанс крита заклинаний", ".setcrit ", "Процент 0–100 (для проверки крита):");
 
