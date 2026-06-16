@@ -3,12 +3,14 @@
 @model AlexWoW.Web.Pages.BoardModel
 @{
     ViewData["Title"] = "Доска QA";
-    Layout = "_AdminLayout";
+    Layout = "_Layout"; // KB3-fix: без админ-сайдбара, доска на всю ширину (колонки не умещались)
     string PrioColor(string p) => p switch { "Blocker" => "#e53935", "Major" => "#fb8c00", _ => "#8a929c" };
     string TypeColor(string t) => t switch { "Project" => "#7e57c2", "Epic" => "#5c6bc0", "Bug" => "#e53935", _ => "#43a047" };
 }
 
 <style>
+    /* Выход за центрированный .page-frame (max-width 1040) — доска во всю ширину окна. */
+    .kb-full { width: 100vw; margin-left: calc(50% - 50vw); padding: 0 24px; box-sizing: border-box; }
     .kb-bar { display: flex; gap: 10px; align-items: flex-end; margin: 12px 0 16px; flex-wrap: wrap; }
     .kb-bar label { font-size: .8rem; display: block; margin-bottom: 3px; opacity: .8; }
     .kb-bar select, .kb-bar button { padding: 5px 8px; }
@@ -36,6 +38,7 @@
 }
 else
 {
+    <div class="kb-full">
     <form method="get" class="kb-bar">
         <div>
             <label>Проект</label>
@@ -116,5 +119,6 @@ else
                 </div>
             </div>
         }
+    </div>
     </div>
 }
