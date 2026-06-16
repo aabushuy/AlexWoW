@@ -159,6 +159,13 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.ActionBars, actionBars), ct);
     }
 
+    public async Task SetTesterAsync(uint guid, bool isTester, CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await db.Characters.Where(c => c.Guid == guid)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsTester, isTester), ct);
+    }
+
     public async Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

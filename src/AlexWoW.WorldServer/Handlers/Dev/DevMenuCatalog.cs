@@ -23,7 +23,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
 
         // Порядок корней = порядок создания категорий ниже (CommitCatalog собирает roots по `order`).
         // §175: новая структура меню (Персонаж → Баффы → Враги → Манекены → Телепорт → Тренеры → Крафт →
-        // Прочее → Spell QA), вложенные подкатегории, без многоточий в подписях.
+        // Прочее → QA), вложенные подкатегории, без многоточий в подписях.
 
         // 1. Персонаж
         var character = b.Category("Персонаж");
@@ -124,8 +124,12 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         var misc = b.Category("Прочее");
         b.Cmd(misc, "Снести dev-сущности", ".devclean");
 
-        // 9. Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.
-        var spellTest = b.Category("Spell QA");
+        // 9. QA (KB10): тестировщик канбан-доски + Spell QA внутри.
+        var qa = b.Category("QA");
+        b.Cmd(qa, "Сделать тестировщиком", ".tester on");
+        b.Cmd(qa, "Убрать из тестировщиков", ".tester off");
+        // Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.
+        var spellTest = b.Sub(qa, "Spell QA");
         b.Cmd(spellTest, "Старт захвата", ".spelltest start");
         b.Cmd(spellTest, "Стоп захвата", ".spelltest stop");
         b.Cmd(spellTest, "Статус", ".spelltest status");

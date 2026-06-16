@@ -50,6 +50,9 @@ public interface ICharacterRepository
     /// <summary>Сохраняет маску видимых доп. панелей (PLAYER_FIELD_BYTES[2]).</summary>
     Task SetActionBarsAsync(uint guid, byte actionBars, CancellationToken ct = default);
 
+    /// <summary>Помечает/снимает персонажа как тестировщика QA-доски (KB10).</summary>
+    Task SetTesterAsync(uint guid, bool isTester, CancellationToken ct = default);
+
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>
     Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default);
 }
