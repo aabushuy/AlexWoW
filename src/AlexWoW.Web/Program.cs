@@ -40,6 +40,8 @@ builder.Services.AddSingleton<ItemIconService>(); // карта displayid→ик
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
 builder.Services.AddSingleton<ProjectDashboardService>();  // Дашборд: срез 1 — БД project (прогресс)
+builder.Services.AddSingleton<AlexWoW.Web.Services.Kanban.KanbanRepository>(); // KB2: канбан-доска (БД project)
+builder.Services.AddSingleton<AlexWoW.Web.Services.Kanban.KanbanService>();
 builder.Services.AddSingleton<VikunjaDashboardService>();  // Дашборд: срез 2 — трекер Vikunja (P01..P40)
 builder.Services.AddScoped<IAccountService, AccountService>();
 
