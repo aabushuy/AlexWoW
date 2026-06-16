@@ -4,6 +4,7 @@ using AlexWoW.Database.Repositories;
 using AlexWoW.Database.Repositories.World;
 using AlexWoW.Web;
 using AlexWoW.Web.Services;
+using AlexWoW.Web.Services.Kanban;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -95,6 +96,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapRazorPages();
+app.MapKanbanApi(); // KB5: REST API канбан-доски (/api/kanban/*, гейт по X-Api-Token)
 
 app.Run();
 

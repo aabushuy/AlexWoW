@@ -14,6 +14,9 @@ public sealed class WebOptions
     /// <summary>Строка подключения к БД <c>project</c> (трекинг прогресса для дашборда). Пусто — срез БД скрыт.</summary>
     public string ProjectConnectionString { get; set; } = string.Empty;
 
+    /// <summary>Токен REST API канбан-доски (KB5, заголовок <c>X-Api-Token</c>). Пусто — API отключён.</summary>
+    public string ApiToken { get; set; } = string.Empty;
+
     /// <summary>Интеграция с Vikunja (M12 Spell QA — заведение тикета по аномалиям сессии). Пусто — выключено.</summary>
     public VikunjaOptions Vikunja { get; set; } = new();
 
