@@ -1,0 +1,151 @@
+@page
+@using AlexWoW.Web.Services.Kanban
+@model AlexWoW.Web.Pages.TicketModel
+@{
+    ViewData["Title"] = Model.IsNew ? "Новый тикет" : $"Тикет #{Model.Input.Id}";
+    Layout = "_AdminLayout";
+    var projectsById = Model.Projects.ToDictionary(p => p.Id, p => p.Title);
+}
+
+<style>
+    .tk-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+    .tk-field { margin-bottom: 12px; }
+    .tk-field label { display: block; font-size: .82rem; opacity: .8; margin-bottom: 3px; }
+    .tk-field input[type=text], .tk-field input[type=number], .tk-field select, .tk-field textarea {
+        width: 100%; padding: 6px 8px; box-sizing: border-box; }
+    .tk-field textarea { min-height: 80px; resize: vertical; }
+    .tk-row { display: flex; gap: 10px; }
+    .tk-row > div { flex: 1; }
+    .tk-comments { margin-top: 8px; }
+    .tk-comment { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+    .tk-comment .meta { font-size: .75rem; opacity: .6; margin-bottom: 3px; }
+    .tk-err { color: #ff6b6b; margin: 8px 0; }
+    .tk-panel { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px; }
+</style>
+
+<p><a asp-page="/Board">← К доске</a></p>
+<h1>@(Model.IsNew ? "Новый тикет" : $"#{Model.Input.Id} · {Model.Input.Title}")</h1>
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warn">БД <code>project</code> не настроена.</div>
+}
+else
+{
+    @if (Model.Error != null)
+    {
+        <div class="tk-err">@Model.Error</div>
+    }
+    <form method="post" asp-page-handler="Save">
+        <input type="hidden" asp-for="Input.Id" />
+        <div class="tk-grid">
+            <div>
+                <div class="tk-field">
+                    <label>Заголовок</label>
+                    <input type="text" asp-for="Input.Title" />
+                </div>
+                <div class="tk-field">
+                    <label>Описание</label>
+                    <textarea asp-for="Input.Description"></textarea>
+                </div>
+                <div class="tk-field">
+                    <label>Шаги тестирования</label>
+                    <textarea asp-for="Input.TestSteps"></textarea>
+                </div>
+                <div class="tk-field">
+                    <label>Ожидаемый результат</label>
+                    <textarea asp-for="Input.ExpectedResult"></textarea>
+                </div>
+            </div>
+            <div class="tk-panel">
+                <div class="tk-row">
+                    <div class="tk-field">
+                        <label>Тип</label>
+                        <select asp-for="Input.Type">
+                            @foreach (var v in KanbanVocab.Types)
+                            {
+                                <option value="@v" selected="@(Model.Input.Type == v)">@v</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="tk-field">
+                        <label>Приоритет</label>
+                        <select asp-for="Input.Priority">
+                            @foreach (var v in KanbanVocab.Priorities)
+                            {
+                                <option value="@v" selected="@(Model.Input.Priority == v)">@v</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="tk-field">
+                    <label>Статус</label>
+                    <select asp-for="Input.Status">
+                        @foreach (var v in KanbanVocab.Statuses)
+                        {
+                            <option value="@v" selected="@(Model.Input.Status == v)">@v</option>
+                        }
+                    </select>
+                </div>
+                <div class="tk-field">
+                    <label>Проект (для Эпика)</label>
+                    <select asp-for="Input.ProjectId">
+                        <option value="">—</option>
+                        @foreach (var p in Model.Projects)
+                        {
+                            <option value="@p.Id" selected="@(Model.Input.ProjectId == p.Id)">@p.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="tk-field">
+                    <label>Эпик (для Задачи/Бага)</label>
+                    <select asp-for="Input.EpicId">
+                        <option value="">—</option>
+                        @foreach (var e in Model.Epics)
+                        {
+                            var pn = e.ProjectId is { } pid && projectsById.TryGetValue(pid, out var t) ? t : "?";
+                            <option value="@e.Id" selected="@(Model.Input.EpicId == e.Id)">[@pn] @e.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="tk-field">
+                    <label>Исполнитель</label>
+                    <input type="text" asp-for="Input.Assignee" />
+                </div>
+                <div class="tk-field">
+                    <label>Тестировщик (guid персонажа)</label>
+                    <input type="number" asp-for="Input.TesterGuid" />
+                </div>
+                <div class="tk-field">
+                    <label><input type="checkbox" asp-for="Input.ClientCheck" /> Проверка на клиенте</label>
+                </div>
+                <button type="submit">@(Model.IsNew ? "Создать" : "Сохранить")</button>
+            </div>
+        </div>
+    </form>
+
+    @if (!Model.IsNew)
+    {
+        <h2>Комментарии</h2>
+        <div class="tk-comments">
+            @foreach (var c in Model.Comments)
+            {
+                <div class="tk-comment">
+                    <div class="meta">@(string.IsNullOrEmpty(c.Author) ? "—" : c.Author) · @c.CreatedAt.ToString("yyyy-MM-dd HH:mm")</div>
+                    <div>@c.Body</div>
+                </div>
+            }
+            @if (Model.Comments.Count == 0)
+            {
+                <p style="opacity:.6">Пока нет комментариев.</p>
+            }
+        </div>
+        <form method="post" asp-page-handler="Comment">
+            <input type="hidden" name="id" value="@Model.Input.Id" />
+            <div class="tk-field">
+                <textarea name="body" placeholder="Добавить комментарий…"></textarea>
+            </div>
+            <button type="submit">Добавить комментарий</button>
+        </form>
+    }
+}
