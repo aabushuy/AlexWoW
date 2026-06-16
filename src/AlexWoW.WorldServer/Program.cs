@@ -62,6 +62,9 @@ builder.Services.AddSingleton<IPlayerDataRepository>(sp => new PlayerDataReposit
 builder.Services.AddSingleton<ISpellTemplateRepository>(sp => new SpellTemplateRepository(WorldConn(sp)));
 builder.Services.AddSingleton<ITalentRepository>(sp => new TalentRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IWorldRepository, WorldRepository>();
+// KB7: доступ к канбан-доске в БД project (задачи на тестирование для тестировщиков). Отдельная строка подключения.
+builder.Services.AddSingleton<IKanbanBoardRepository>(sp =>
+    new KanbanBoardRepository(sp.GetRequiredService<IOptions<WorldServerOptions>>().Value.ProjectConnectionString));
 builder.Services.AddSingleton(sp =>
 {
     var options = sp.GetRequiredService<IOptions<WorldServerOptions>>().Value;
