@@ -134,12 +134,15 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         return b.Lines;
     }
 
-    /// <summary>Профессия в меню (§177): подкатегория с листьями «Выучить»/«Забыть» (.prof KEY learn|forget).</summary>
+    /// <summary>Профессия в меню (§177): подкатегория с листьями «Выучить»/«Забыть» (.prof KEY learn|forget)
+    /// и тренером «Поставить»/«Убрать» (.proftrainer KEY|off) — как у классовых тренеров.</summary>
     private static void ProfLearnForget(Builder b, int parent, string label, string key)
     {
         var node = b.Sub(parent, label);
         b.Cmd(node, "Выучить", $".prof {key} learn");
         b.Cmd(node, "Забыть", $".prof {key} forget");
+        b.Cmd(node, "Поставить тренера", $".proftrainer {key}");
+        b.Cmd(node, "Убрать тренера", ".proftrainer off");
     }
 
     /// <summary>
