@@ -1,5 +1,7 @@
 using System.Text;
 using AlexWoW.Common.Network;
+using AlexWoW.Database.Abstractions;
+using AlexWoW.Database.Models;
 using AlexWoW.WorldServer.Handlers.Dev;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
@@ -15,9 +17,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Сейчас единственная команда — <c>menu</c>: сервер отдаёт каталог dev-меню (<see cref="DevMenuCatalog"/>).
 /// Не опкод-модуль (своих опкодов нет) — DI-сервис, инжектится в <see cref="ChatHandlers"/> (M7 #36).
 /// Команды: <c>menu</c> — каталог dev-меню (<see cref="DevMenuCatalog"/>); <c>stats</c> — кадр вторичных
-/// характеристик для окна-редактора (§178, <see cref="DevStatsCatalog"/>).
+/// характеристик для окна-редактора (§178, <see cref="DevStatsCatalog"/>); <c>itemsearch</c> — поиск
+/// предметов для окна «Добавить вещь» (переиспользует <see cref="IItemSearchRepository"/>).
 /// </summary>
-internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devStats)
+internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items)
 {
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
@@ -37,6 +40,12 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
         if (body == "stats")
         {
             await SendStatsAsync(session, ct);
+            return;
+        }
+
+        if (body.StartsWith("itemsearch", StringComparison.Ordinal))
+        {
+            await SendItemSearchAsync(session, body, ct);
             return;
         }
 
@@ -75,6 +84,70 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
             await SendLineAsync(session, line, ct);
         await SendLineAsync(session, "SEND", ct);
     }
+
+    /// <summary>
+    /// Окно «Добавить вещь»: поиск по item_template и ответ кадром <c>IBEGIN</c> … <c>I|id|quality|reqlvl|name</c>
+    /// … <c>IEND</c> (отдельные токены, чтобы не путать с меню/статами). Тело запроса:
+    /// <c>itemsearch|kind|lvlMin|lvlMax|qualityMin|showAll|name</c> (поля опускаемы). Без <c>showAll=1</c>
+    /// серверно фильтруем под класс/уровень персонажа (прячем непригодное). kind: weapon|armor|consumable|
+    /// gear(2,4)|иначе всё в объёме (расходники+экипировка, классы 0/2/4). Не-админу — ничего.
+    /// </summary>
+    private async Task SendItemSearchAsync(WorldSession session, string body, CancellationToken ct)
+    {
+        if (!session.IsAdmin)
+            return;
+
+        var p = body.Split('|');
+        var kind = Field(p, 1);
+        var lvlMin = ParseUInt(Field(p, 2));
+        var lvlMax = ParseUInt(Field(p, 3));
+        var qualityMin = ParseUInt(Field(p, 4));
+        var showAll = Field(p, 5) == "1";
+        var name = Field(p, 6);
+
+        uint[] classes = kind switch
+        {
+            "weapon" => [2],
+            "armor" => [4],
+            "consumable" => [0],
+            "gear" => [2, 4],
+            _ => [0, 2, 4], // объём фичи: экипировка (2,4) + расходники (0)
+        };
+
+        byte? playerClass = null;
+        if (!showAll && session.Character is { } ch)
+        {
+            playerClass = ch.Class;                       // подходящее этому классу (AllowableClass-маска)
+            lvlMax = lvlMax is { } lm ? Math.Min(lm, ch.Level) : ch.Level; // не выше уровня персонажа
+        }
+
+        var filter = new ItemSearchFilter
+        {
+            Classes = classes,
+            LevelMin = lvlMin,
+            LevelMax = lvlMax,
+            QualityMin = qualityMin,
+            PlayerClass = playerClass,
+            NameContains = string.IsNullOrWhiteSpace(name) ? null : name,
+            Limit = 100,
+        };
+
+        IReadOnlyList<ItemTemplateData> results;
+        try { results = await items.SearchAsync(filter, ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "ADDON itemsearch: БД мира недоступна ({Msg})", ex.Message);
+            results = [];
+        }
+
+        await SendLineAsync(session, "IBEGIN", ct);
+        foreach (var it in results)
+            await SendLineAsync(session, $"I|{it.Entry}|{it.Quality}|{it.RequiredLevel}|{it.Name.Replace('|', ' ')}", ct);
+        await SendLineAsync(session, "IEND", ct);
+    }
+
+    private static string Field(string[] parts, int i) => i < parts.Length ? parts[i] : "";
+    private static uint? ParseUInt(string s) => uint.TryParse(s, out var v) ? v : null;
 
     private static Task SendLineAsync(WorldSession session, string line, CancellationToken ct)
         => session.SendAsync(WorldOpcode.SmsgMessageChat, BuildAddonMessage((ulong)session.InWorldGuid, line), ct);

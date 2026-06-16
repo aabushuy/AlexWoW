@@ -2,9 +2,10 @@ using Dapper;
 
 namespace AlexWoW.Database.Models;
 
-/// <summary>Класс предмета для фильтра поиска: оружие (item_template.class=2) или доспех (class=4).</summary>
+/// <summary>Класс предмета для фильтра поиска (item_template.class): расходник (0), оружие (2), доспех (4).</summary>
 public enum ItemKind
 {
+    Consumable = 0,
     Weapon = 2,
     Armor = 4,
 }
@@ -25,8 +26,15 @@ public sealed record ItemSearchFilter
     /// <summary>Класс персонажа (WotLK id): показываем вещи, подходящие этому классу. null — любой.</summary>
     public byte? PlayerClass { get; init; }
 
-    /// <summary>Тип предмета (оружие/доспех). null — любой.</summary>
+    /// <summary>Тип предмета (расходник/оружие/доспех). null — любой. Игнорируется, если задан <see cref="Classes"/>.</summary>
     public ItemKind? Kind { get; init; }
+
+    /// <summary>Набор классов предмета (item_template.class) для <c>class IN (...)</c> — для «экипировка»
+    /// (2,4) и т.п. Имеет приоритет над <see cref="Kind"/>. null/пусто — без ограничения по классу.</summary>
+    public IReadOnlyCollection<uint>? Classes { get; init; }
+
+    /// <summary>Минимальное качество (item_template.Quality ≥). null — любое. 0 серый … 4 эпик …</summary>
+    public uint? QualityMin { get; init; }
 
     /// <summary>Подстрока названия. Пробелы трактуются как «%» (как в ручном LIKE '%a%b%').</summary>
     public string? NameContains { get; init; }
@@ -51,10 +59,20 @@ public sealed record ItemSearchFilter
             clauses.Add("RequiredLevel <= @lvlMax");
             parameters.Add("lvlMax", max);
         }
-        if (Kind is { } kind)
+        if (Classes is { Count: > 0 })
+        {
+            clauses.Add("class IN @classes");
+            parameters.Add("classes", Classes);
+        }
+        else if (Kind is { } kind)
         {
             clauses.Add("class = @class");
             parameters.Add("class", (uint)kind);
+        }
+        if (QualityMin is { } qmin)
+        {
+            clauses.Add("Quality >= @qmin");
+            parameters.Add("qmin", qmin);
         }
         if (PlayerClass is { } cls && cls is >= 1 and <= 11)
         {
