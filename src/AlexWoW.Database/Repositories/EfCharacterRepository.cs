@@ -200,5 +200,6 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
         Money = e.Money,
         ActionBars = e.ActionBars,
         TalentResetCost = e.TalentResetCost,
+        IsTester = e.IsTester,
     };
 }

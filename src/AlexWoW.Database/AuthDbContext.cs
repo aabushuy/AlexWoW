@@ -95,6 +95,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.Xp).HasColumnName("xp").HasDefaultValue(0u);
             e.Property(x => x.ActionBars).HasColumnName("action_bars").HasDefaultValue((byte)0);
             e.Property(x => x.TalentResetCost).HasColumnName("talent_reset_cost").HasDefaultValue(0u);
+            e.Property(x => x.IsTester).HasColumnName("is_tester").HasDefaultValue(false); // KB6: QA-тестировщик
             e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("uk_characters_name");
             e.HasIndex(x => x.AccountId).HasDatabaseName("ix_characters_account");
         });
