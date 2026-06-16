@@ -24,4 +24,5 @@ public sealed class Character
     public uint Money { get; init; }   // медь (M6.2)
     public byte ActionBars { get; set; } // M7 #17: маска видимых доп. панелей (PLAYER_FIELD_BYTES[2])
     public uint TalentResetCost { get; set; } // M9.8: последняя стоимость сброса талантов (медь)
+    public bool IsTester { get; set; }        // KB6: персонаж-тестировщик QA-доски
 }
