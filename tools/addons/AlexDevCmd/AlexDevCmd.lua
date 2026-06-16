@@ -19,6 +19,13 @@ local visible = {}            -- плоский список видимых ст
 local rows = {}
 local mainFrame, scroll
 
+-- §179 Редактор вторичных характеристик (Доработка А): отдельный кадр SBEGIN|S|key|label|value|SEND.
+local statsFrame
+local statsRows = {}
+local statsList = {}      -- [{ key, label, value }] в порядке прихода
+local statsBuilding = nil  -- временный список между SBEGIN и SEND
+local StatsRefresh         -- forward
+
 -- ---- Диалог ввода (свободный аргумент: .level / .additem / .learn / .buff) ----
 local function DialogEditBox(dialog)
   return dialog.editBox or _G[dialog:GetName() .. "EditBox"]
@@ -117,6 +124,17 @@ local function HandleAddonLine(line)
       wipe(expanded)
       if mainFrame then Rebuild(); Refresh() end
     end
+  elseif line == "SBEGIN" then          -- §179: начало кадра вторичных характеристик
+    statsBuilding = {}
+  elseif line == "SEND" then            -- §179: конец кадра — применить
+    if statsBuilding then
+      statsList = statsBuilding
+      statsBuilding = nil
+      if statsFrame and StatsRefresh then StatsRefresh() end
+    end
+  elseif statsBuilding and string.sub(line, 1, 2) == "S|" then
+    local _, key, label, value = strsplit("|", line)
+    if key then statsBuilding[#statsBuilding + 1] = { key = key, label = label or key, value = value or "" } end
   elseif building then
     ParseNode(line)
   end
@@ -176,6 +194,8 @@ local function OnRowClick(index)
     StaticPopup_Show("ALEXDEVCMD_INPUT", hint, nil, { prefix = prefix, label = hint })
   elseif node.kind == "tp" then
     StaticPopup_Show("ALEXDEVCMD_TELEPORT", node.label, nil, { cityId = node.payload[1], cityName = node.label })
+  elseif node.kind == "stats" then
+    AlexDevCmd_ToggleStats() -- §179: окно редактора вторичных характеристик (Доработка А)
   end
 end
 
@@ -237,6 +257,108 @@ local function BuildUI()
   end
 
   mainFrame = f
+end
+
+-- ---- §179 Окно редактора вторичных характеристик (Доработка А) ----
+local STATS_ROW_H, STATS_MAX = 26, 16
+
+local function RequestStats()
+  SendAddonMessage(PREFIX, "stats", "WHISPER", UnitName("player"))
+end
+
+local function StatsApplyRow(row)
+  local stat = statsList[row.index]
+  if not stat then return end
+  local v = row.edit:GetText()
+  if v and v ~= "" then
+    SendChatMessage(".setstat " .. stat.key .. " " .. v, "SAY") -- сервер пришлёт обновлённый кадр (StatsRefresh)
+  end
+  row.edit:ClearFocus()
+end
+
+StatsRefresh = function()
+  for i = 1, STATS_MAX do
+    local row, stat = statsRows[i], statsList[i]
+    if row and stat then
+      row.index = i
+      row.label:SetText(stat.label)
+      if not row.edit:HasFocus() then row.edit:SetText(stat.value or "") end -- не затирать ввод
+      row:Show()
+    elseif row then
+      row:Hide()
+    end
+  end
+end
+
+local function BuildStatsUI()
+  local f = CreateFrame("Frame", "AlexDevStatsFrame", UIParent)
+  f:SetWidth(330); f:SetHeight(86 + STATS_MAX * STATS_ROW_H)
+  f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -330, -200)
+  f:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", f.StartMoving)
+  f:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local p, _, rp, x, y = self:GetPoint()
+    AlexDevCmdDB.statsPos = { p, rp, x, y }
+  end)
+  f:SetClampedToScreen(true)
+  f:Hide()
+
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOP", 0, -16)
+  title:SetText("Вторичные характеристики")
+
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -6, -6)
+
+  local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  hint:SetPoint("TOP", 0, -40)
+  hint:SetText("Enter в поле — применить значение")
+
+  for i = 1, STATS_MAX do
+    local row = CreateFrame("Frame", nil, f)
+    row:SetHeight(STATS_ROW_H)
+    row:SetPoint("TOPLEFT", 18, -(58 + (i - 1) * STATS_ROW_H))
+    row:SetPoint("RIGHT", f, "RIGHT", -18, 0)
+
+    local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("LEFT", 2, 0); label:SetJustifyH("LEFT")
+    row.label = label
+
+    local edit = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+    edit:SetWidth(80); edit:SetHeight(20); edit:SetAutoFocus(false)
+    edit:SetPoint("RIGHT", -6, 0)
+    edit:SetScript("OnEnterPressed", function(self) StatsApplyRow(self:GetParent()) end)
+    edit:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    row.edit = edit
+
+    row:Hide()
+    statsRows[i] = row
+  end
+
+  if AlexDevCmdDB.statsPos then
+    local p, rp, x, y = unpack(AlexDevCmdDB.statsPos)
+    f:ClearAllPoints(); f:SetPoint(p, UIParent, rp, x, y)
+  end
+
+  statsFrame = f
+end
+
+function AlexDevCmd_ToggleStats()
+  if not statsFrame then BuildStatsUI() end
+  if statsFrame:IsShown() then
+    statsFrame:Hide()
+  else
+    RequestStats()      -- всегда тянем актуальные значения при открытии
+    statsFrame:Show()
+    StatsRefresh()      -- показать кэш сразу, до прихода свежего кадра
+  end
 end
 
 local function Toggle()
