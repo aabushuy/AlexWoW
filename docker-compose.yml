@@ -50,6 +50,8 @@ services:
       WorldServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # БД мира (дамп CMaNGOS): creature, creature_template …
       WorldServer__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # БД project (канбан-доска QA, KB7): задачи на тестирование для тестировщиков.
+      WorldServer__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # Рельеф: каталог с maps/*.map (экстрактор CMaNGOS). Пусто/нет каталога — без рельефа.
       WorldServer__MapsPath: "/data/maps"
       WorldServer__VmapsPath: "/data/vmaps"   # коллизии (LoS)
