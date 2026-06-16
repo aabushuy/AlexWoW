@@ -52,6 +52,7 @@ static string WorldConn(IServiceProvider sp)
 builder.Services.AddSingleton<ICreatureRepository>(sp => new CreatureRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IGameObjectRepository>(sp => new GameObjectRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IItemTemplateRepository>(sp => new ItemTemplateRepository(WorldConn(sp)));
+builder.Services.AddSingleton<IItemSearchRepository>(sp => new ItemSearchRepository(WorldConn(sp))); // окно «Добавить вещь»
 builder.Services.AddSingleton<IVendorRepository>(sp => new VendorRepository(WorldConn(sp)));
 builder.Services.AddSingleton<ITrainerRepository>(sp => new TrainerRepository(WorldConn(sp)));
 builder.Services.AddSingleton<ILootRepository>(sp => new LootRepository(WorldConn(sp)));
