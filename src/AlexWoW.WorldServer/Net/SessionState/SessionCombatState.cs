@@ -70,6 +70,12 @@ internal sealed class SessionCombatState
     /// (клиент сопоставляет с pending-кастом и снимает подсветку кнопки). MELEE.1.</summary>
     internal byte PendingNextSwingCastCount { get; set; }
 
+    /// <summary>§8 Активный яд на оружии (нанесён энчантом, НЕ баффом): spellId апплай-яда; 0 — нет.
+    /// On-hit прок читает его (PoisonService); свечение оружия — visible-item enchant. Эксклюзив — один яд.</summary>
+    internal uint ActivePoisonSpellId { get; set; }
+    /// <summary>Момент истечения активного яда (мс). По нему снимаем свечение оружия и сбрасываем яд.</summary>
+    internal long ActivePoisonExpiresMs { get; set; }
+
     // --- Очки серии (combo points: рога/друид-кошка) — Фаза 2 (CP.1) ---
     /// <summary>Очки серии (0..5), накопленные на <see cref="ComboTargetGuid"/>. Генераторы копят,
     /// финишеры расходуют. Привязаны к конкретной цели: смена комбо-цели обнуляет.</summary>

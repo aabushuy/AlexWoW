@@ -162,11 +162,15 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
             await auras.ApplyAsync(session, spellId, ImbueDurationMs, positive: true, form: 0, ct,
                 group: SpellCatalog.GroupShamanImbue);
 
-        // §8 Яд разбойника (нанесён на оружие через CMSG_USE_ITEM → спелл-применение, эффект 54): видимый
-        // бафф (эксклюзив — один активный яд); on-hit прок природного урона — PoisonService на свинге.
+        // §8 Яд разбойника (нанесён на оружие, эффект 54): теперь как ВРЕМЕННЫЙ ЭНЧАНТ ОРУЖИЯ (свечение), а не
+        // бафф. Активный яд храним в сессии (эксклюзив — один); on-hit прок читает его (PoisonService на свинге);
+        // свечение оружия — visible-item enchant. Истечение/снятие — PoisonService (тик + ленивая чистка).
         if (PoisonService.IsPoison(spellId))
-            await auras.ApplyAsync(session, spellId, ImbueDurationMs, positive: true, form: 0, ct,
-                group: SpellCatalog.GroupRoguePoison);
+        {
+            session.Combat.ActivePoisonSpellId = spellId;
+            session.Combat.ActivePoisonExpiresMs = now + ImbueDurationMs;
+            await PoisonService.SetWeaponGlowAsync(session, info.EnchantId, ct);
+        }
 
         // Фаза 2 CC: контроль (стан/рут/страх/немота/дезориентация). §4: по площади (Frost Nova/Psychic Scream)
         // — на всех враждебных рядом; иначе — на одну цель-существо.
