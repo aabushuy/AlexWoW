@@ -26,6 +26,13 @@ local statsList = {}      -- [{ key, label, value }] в порядке прих�
 local statsBuilding = nil  -- временный список между SBEGIN и SEND
 local StatsRefresh         -- forward
 
+-- §182 Окно «Добавить вещь»: отдельный кадр IBEGIN|I|id|quality|reqlvl|name|IEND.
+local itemsFrame
+local itemsRows = {}
+local itemsList = {}       -- [{ id, quality, reqlvl, name }] результат поиска
+local itemsBuilding = nil   -- временный список между IBEGIN и IEND
+local ItemsRefresh          -- forward
+
 -- ---- Диалог ввода (свободный аргумент: .level / .additem / .learn / .buff) ----
 local function DialogEditBox(dialog)
   return dialog.editBox or _G[dialog:GetName() .. "EditBox"]
@@ -64,6 +71,19 @@ StaticPopupDialogs["ALEXDEVCMD_TELEPORT"] = {
     local data = self.data
     if data and data.cityId then
       SendChatMessage(".tp " .. data.cityId, "SAY")
+    end
+  end,
+  timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+-- ---- Поп-ап подтверждения выдачи предмета (§182) ----
+StaticPopupDialogs["ALEXDEVCMD_ADDITEM"] = {
+  text = "Добавить «%s» в сумку?",
+  button1 = YES, button2 = NO,
+  OnAccept = function(self)
+    local data = self.data
+    if data and data.id then
+      SendChatMessage(".additem " .. data.id, "SAY")
     end
   end,
   timeout = 0, whileDead = true, hideOnEscape = true,
@@ -135,6 +155,21 @@ local function HandleAddonLine(line)
   elseif statsBuilding and string.sub(line, 1, 2) == "S|" then
     local _, key, label, value = strsplit("|", line)
     if key then statsBuilding[#statsBuilding + 1] = { key = key, label = label or key, value = value or "" } end
+  elseif line == "IBEGIN" then          -- §182: начало кадра результатов поиска предметов
+    itemsBuilding = {}
+  elseif line == "IEND" then            -- §182: конец кадра — применить
+    if itemsBuilding then
+      itemsList = itemsBuilding
+      itemsBuilding = nil
+      if itemsFrame and ItemsRefresh then ItemsRefresh() end
+    end
+  elseif itemsBuilding and string.sub(line, 1, 2) == "I|" then
+    local _, id, q, rl, nm = strsplit("|", line)
+    id = tonumber(id)
+    if id then
+      itemsBuilding[#itemsBuilding + 1] =
+        { id = id, quality = tonumber(q) or 1, reqlvl = tonumber(rl) or 0, name = nm or ("#" .. id) }
+    end
   elseif building then
     ParseNode(line)
   end
@@ -196,6 +231,8 @@ local function OnRowClick(index)
     StaticPopup_Show("ALEXDEVCMD_TELEPORT", node.label, nil, { cityId = node.payload[1], cityName = node.label })
   elseif node.kind == "stats" then
     AlexDevCmd_ToggleStats() -- §179: окно редактора вторичных характеристик (Доработка А)
+  elseif node.kind == "items" then
+    AlexDevCmd_ToggleItems() -- §182: окно «Добавить вещь» (поиск по БД)
   end
 end
 
@@ -358,6 +395,204 @@ function AlexDevCmd_ToggleStats()
     RequestStats()      -- всегда тянем актуальные значения при открытии
     statsFrame:Show()
     StatsRefresh()      -- показать кэш сразу, до прихода свежего кадра
+  end
+end
+
+-- ---- §182 Окно «Добавить вещь» (поиск по БД, иконки, AH-фильтры) ----
+local ITEMS_ROW_H, ITEMS_NUM_ROWS = 30, 10
+local itemsScroll, itemsScanTip
+local itemsFilter = { kind = "gear", quality = nil, lvlMin = "", lvlMax = "", name = "", showAll = false }
+local itemsKindIdx, itemsQualIdx = 1, 1
+
+local ITEM_KINDS = {
+  { v = "gear", t = "Экипировка" }, { v = "weapon", t = "Оружие" }, { v = "armor", t = "Доспех" },
+  { v = "consumable", t = "Расходники" }, { v = "all", t = "Всё" },
+}
+local ITEM_QUALITIES = {
+  { v = nil, t = "Качество: любое" }, { v = 1, t = "Качество: обычное+" }, { v = 2, t = "Качество: необычное+" },
+  { v = 3, t = "Качество: редкое+" }, { v = 4, t = "Качество: эпическое+" },
+}
+local QUALITY_HEX = { [0]="ff9d9d9d",[1]="ffffffff",[2]="ff1eff00",[3]="ff0070dd",[4]="ffa335ee",[5]="ffff8000",[6]="ffe6cc80",[7]="ffe6cc80" }
+
+local function ItemsSendQuery()
+  local f = itemsFilter
+  if itemsFrame then itemsFrame.tries = 0 end
+  local body = table.concat({
+    "itemsearch", f.kind, f.lvlMin or "", f.lvlMax or "", f.quality or "", f.showAll and "1" or "", f.name or "",
+  }, "|")
+  SendAddonMessage(PREFIX, body, "WHISPER", UnitName("player"))
+end
+
+ItemsRefresh = function()
+  FauxScrollFrame_Update(itemsScroll, #itemsList, ITEMS_NUM_ROWS, ITEMS_ROW_H)
+  local offset = FauxScrollFrame_GetOffset(itemsScroll)
+  local pending = false
+  for i = 1, ITEMS_NUM_ROWS do
+    local row = itemsRows[i]
+    local it = itemsList[i + offset]
+    if it then
+      row.item = it
+      local tex = GetItemIcon(it.id)
+      if tex then
+        row.icon:SetTexture(tex)
+      else
+        row.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+        if itemsScanTip then itemsScanTip:SetHyperlink("item:" .. it.id) end -- прайм кэша → ITEM_QUERY
+        pending = true
+      end
+      row.name:SetText("|c" .. (QUALITY_HEX[it.quality] or "ffffffff") .. it.name .. "|r")
+      row.lvl:SetText(it.reqlvl > 0 and ("ур. " .. it.reqlvl) or "")
+      row:Show()
+    else
+      row.item = nil
+      row:Hide()
+    end
+  end
+  if itemsFrame then itemsFrame.pendingIcons = pending end
+end
+
+local function ItemsDoSearch(box1, box2, nameBox, showAll)
+  itemsFilter.lvlMin = box1:GetText()
+  itemsFilter.lvlMax = box2:GetText()
+  itemsFilter.name = nameBox:GetText()
+  itemsFilter.showAll = showAll:GetChecked() and true or false
+  ItemsSendQuery()
+end
+
+local function BuildItemsUI()
+  local f = CreateFrame("Frame", "AlexDevItemsFrame", UIParent)
+  f:SetWidth(420); f:SetHeight(470)
+  f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -360, -200)
+  f:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
+  f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", f.StartMoving)
+  f:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    local p, _, rp, x, y = self:GetPoint()
+    AlexDevCmdDB.itemsPos = { p, rp, x, y }
+  end)
+  f:SetClampedToScreen(true)
+  f:Hide()
+
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOP", 0, -14); title:SetText("Добавить вещь")
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", -6, -6)
+
+  -- Фильтр-кнопки: тип и качество (циклические — клик переключает значение).
+  local kindBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  kindBtn:SetWidth(120); kindBtn:SetHeight(22); kindBtn:SetPoint("TOPLEFT", 16, -38)
+  kindBtn:SetText(ITEM_KINDS[itemsKindIdx].t)
+  kindBtn:SetScript("OnClick", function(self)
+    itemsKindIdx = itemsKindIdx % #ITEM_KINDS + 1
+    itemsFilter.kind = ITEM_KINDS[itemsKindIdx].v
+    self:SetText(ITEM_KINDS[itemsKindIdx].t)
+  end)
+  local qualBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  qualBtn:SetWidth(170); qualBtn:SetHeight(22); qualBtn:SetPoint("LEFT", kindBtn, "RIGHT", 8, 0)
+  qualBtn:SetText(ITEM_QUALITIES[itemsQualIdx].t)
+  qualBtn:SetScript("OnClick", function(self)
+    itemsQualIdx = itemsQualIdx % #ITEM_QUALITIES + 1
+    itemsFilter.quality = ITEM_QUALITIES[itemsQualIdx].v
+    self:SetText(ITEM_QUALITIES[itemsQualIdx].t)
+  end)
+
+  -- Уровень (мин–макс) и имя.
+  local lvlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  lvlLabel:SetPoint("TOPLEFT", 18, -70); lvlLabel:SetText("Ур.")
+  local lvlMin = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  lvlMin:SetWidth(32); lvlMin:SetHeight(18); lvlMin:SetAutoFocus(false); lvlMin:SetNumeric(true)
+  lvlMin:SetPoint("LEFT", lvlLabel, "RIGHT", 10, 0)
+  local dash = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  dash:SetPoint("LEFT", lvlMin, "RIGHT", 4, 0); dash:SetText("–")
+  local lvlMax = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  lvlMax:SetWidth(32); lvlMax:SetHeight(18); lvlMax:SetAutoFocus(false); lvlMax:SetNumeric(true)
+  lvlMax:SetPoint("LEFT", dash, "RIGHT", 8, 0)
+  local nameLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  nameLabel:SetPoint("LEFT", lvlMax, "RIGHT", 12, 0); nameLabel:SetText("Имя")
+  local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  nameBox:SetWidth(150); nameBox:SetHeight(18); nameBox:SetAutoFocus(false)
+  nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 10, 0)
+
+  -- «Показать всё» + «Искать».
+  local showAll = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+  showAll:SetWidth(24); showAll:SetHeight(24); showAll:SetPoint("TOPLEFT", 16, -94)
+  local showAllLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  showAllLabel:SetPoint("LEFT", showAll, "RIGHT", 2, 0); showAllLabel:SetText("Показать всё (без фильтра класса/уровня)")
+  local searchBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  searchBtn:SetWidth(90); searchBtn:SetHeight(22); searchBtn:SetPoint("TOPRIGHT", -16, -92); searchBtn:SetText("Искать")
+
+  local function doSearch() ItemsDoSearch(lvlMin, lvlMax, nameBox, showAll) end
+  searchBtn:SetScript("OnClick", doSearch)
+  local function enterSearch(self) self:ClearFocus(); doSearch() end
+  lvlMin:SetScript("OnEnterPressed", enterSearch)
+  lvlMax:SetScript("OnEnterPressed", enterSearch)
+  nameBox:SetScript("OnEnterPressed", enterSearch)
+
+  -- Список результатов.
+  itemsScroll = CreateFrame("ScrollFrame", "AlexDevItemsScrollFrame", f, "FauxScrollFrameTemplate")
+  itemsScroll:SetPoint("TOPLEFT", 16, -124)
+  itemsScroll:SetPoint("BOTTOMRIGHT", -34, 16)
+  itemsScroll:SetScript("OnVerticalScroll", function(self, offset)
+    FauxScrollFrame_OnVerticalScroll(self, offset, ITEMS_ROW_H, ItemsRefresh)
+  end)
+
+  for i = 1, ITEMS_NUM_ROWS do
+    local row = CreateFrame("Button", nil, f)
+    row:SetHeight(ITEMS_ROW_H)
+    if i == 1 then row:SetPoint("TOPLEFT", itemsScroll, "TOPLEFT", 0, 0)
+    else row:SetPoint("TOPLEFT", itemsRows[i - 1], "BOTTOMLEFT", 0, 0) end
+    row:SetPoint("RIGHT", itemsScroll, "RIGHT", 0, 0)
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetWidth(26); icon:SetHeight(26); icon:SetPoint("LEFT", 2, 0); icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    row.icon = icon
+    local nm = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    nm:SetPoint("LEFT", icon, "RIGHT", 6, 0); nm:SetJustifyH("LEFT"); nm:SetWidth(250); row.name = nm
+    local lvl = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    lvl:SetPoint("RIGHT", -6, 0); lvl:SetJustifyH("RIGHT"); row.lvl = lvl
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
+    row:SetScript("OnClick", function(self)
+      if self.item then StaticPopup_Show("ALEXDEVCMD_ADDITEM", self.item.name, nil, { id = self.item.id }) end
+    end)
+    itemsRows[i] = row
+  end
+
+  -- Скрытый тултип для прайминга кэша предметов (сервер ответит ITEM_QUERY → иконки станут доступны).
+  itemsScanTip = CreateFrame("GameTooltip", "AlexDevItemScanTooltip", nil, "GameTooltipTemplate")
+  itemsScanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+  -- Иконки/имена приходят с сервера асинхронно — дорисовываем, пока не подгрузятся (с лимитом попыток).
+  f:SetScript("OnUpdate", function(self, elapsed)
+    self.acc = (self.acc or 0) + elapsed
+    if self.acc < 0.3 then return end
+    self.acc = 0
+    if self.pendingIcons then
+      self.tries = (self.tries or 0) + 1
+      if self.tries > 30 then self.pendingIcons = false else ItemsRefresh() end
+    end
+  end)
+
+  if AlexDevCmdDB.itemsPos then
+    local p, rp, x, y = unpack(AlexDevCmdDB.itemsPos)
+    f:ClearAllPoints(); f:SetPoint(p, UIParent, rp, x, y)
+  end
+
+  itemsFrame = f
+end
+
+function AlexDevCmd_ToggleItems()
+  if not itemsFrame then BuildItemsUI() end
+  if itemsFrame:IsShown() then
+    itemsFrame:Hide()
+  else
+    itemsFrame:Show()
+    ItemsSendQuery() -- сразу искать с текущими фильтрами (по умолчанию — экипировка под класс/уровень)
   end
 end
 
