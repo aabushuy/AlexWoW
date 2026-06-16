@@ -53,6 +53,9 @@ public interface ICharacterRepository
     /// <summary>Помечает/снимает персонажа как тестировщика QA-доски (KB10).</summary>
     Task SetTesterAsync(uint guid, bool isTester, CancellationToken ct = default);
 
+    /// <summary>Персонажи-тестировщики (IsTester=1) — для авто-подбора под задачу (KB11).</summary>
+    Task<IReadOnlyList<Character>> GetTestersAsync(CancellationToken ct = default);
+
     /// <summary>Удаляет персонажа, принадлежащего аккаунту. Возвращает true, если строка удалена.</summary>
     Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default);
 }

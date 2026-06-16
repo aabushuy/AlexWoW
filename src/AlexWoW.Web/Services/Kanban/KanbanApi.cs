@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Web;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ public static class KanbanApi
     private sealed record MoveReq(string Status);
     private sealed record TesterReq(uint? TesterGuid, bool ClientCheck);
     private sealed record CommentReq(string? Author, string? Body);
+    private sealed record AssignReq(byte? Class, byte? Level, bool? ClientCheck);
 
     public static void MapKanbanApi(this WebApplication app)
     {
@@ -69,6 +71,37 @@ public static class KanbanApi
             if (!Authorized(ctx, o)) return Results.Unauthorized();
             try { return Results.Ok(new { id = await k.CommentAsync(id, body.Author ?? "claude", body.Body ?? "", ct) }); }
             catch (KanbanValidationException e) { return Results.BadRequest(new { error = e.Message }); }
+        });
+
+        // KB11: авто-подбор тестировщика под задачу + проставить client_check и перевести в Testing.
+        // Подсказки (class/level) опциональны — присылает ИИ, когда знает, что проверяет.
+        g.MapPost("/tickets/{id:int}/assign-tester", async (int id, AssignReq? body, KanbanService k,
+            ICharacterRepository chars, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
+        {
+            if (!Authorized(ctx, o)) return Results.Unauthorized();
+            var (ticket, _) = await k.GetAsync(id, ct);
+            if (ticket is null) return Results.NotFound();
+
+            var testers = await chars.GetTestersAsync(ct);
+            if (testers.Count == 0)
+                return Results.BadRequest(new { error = "Нет персонажей-тестировщиков (IsTester=1)" });
+
+            // Подбор: при подсказке класса — среди этого класса (если есть); по уровню — минимально
+            // подходящий (Level >= hint), иначе самый высокоуровневый.
+            var pool = testers.AsEnumerable();
+            if (body?.Class is { } cls && testers.Any(t => t.Class == cls))
+                pool = pool.Where(t => t.Class == cls);
+            var pick = (body?.Level is { } lvl && pool.Any(t => t.Level >= lvl))
+                ? pool.Where(t => t.Level >= lvl).OrderBy(t => t.Level).First()
+                : pool.OrderByDescending(t => t.Level).First();
+
+            await k.SetTesterAsync(id, pick.Guid, body?.ClientCheck ?? true, ct);
+            await k.MoveAsync(id, "Testing", ct);
+            return Results.Ok(new
+            {
+                id, testerGuid = pick.Guid, testerName = pick.Name, testerClass = pick.Class,
+                testerLevel = pick.Level, status = "Testing",
+            });
         });
     }
 
