@@ -1,0 +1,120 @@
+@page
+@using AlexWoW.Web.Services.Kanban
+@model AlexWoW.Web.Pages.BoardModel
+@{
+    ViewData["Title"] = "Доска QA";
+    Layout = "_AdminLayout";
+    string PrioColor(string p) => p switch { "Blocker" => "#e53935", "Major" => "#fb8c00", _ => "#8a929c" };
+    string TypeColor(string t) => t switch { "Project" => "#7e57c2", "Epic" => "#5c6bc0", "Bug" => "#e53935", _ => "#43a047" };
+}
+
+<style>
+    .kb-bar { display: flex; gap: 10px; align-items: flex-end; margin: 12px 0 16px; flex-wrap: wrap; }
+    .kb-bar label { font-size: .8rem; display: block; margin-bottom: 3px; opacity: .8; }
+    .kb-bar select, .kb-bar button { padding: 5px 8px; }
+    .kb-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+    .kb-col { flex: 1 0 220px; min-width: 220px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; }
+    .kb-col-h { padding: 10px 12px; font-weight: 700; font-size: .92rem; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; justify-content: space-between; }
+    .kb-col-h .cnt { opacity: .6; font-weight: 400; }
+    .kb-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+    .kb-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10); border-left-width: 4px; border-radius: 8px; padding: 9px 10px; }
+    .kb-card a.t { color: #e8e8e8; text-decoration: none; font-weight: 600; font-size: .9rem; }
+    .kb-card a.t:hover { text-decoration: underline; }
+    .kb-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; align-items: center; }
+    .kb-badge { font-size: .68rem; padding: 1px 6px; border-radius: 9px; color: #fff; }
+    .kb-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; font-size: .75rem; opacity: .85; }
+    .kb-move { display: inline; }
+    .kb-move button { background: none; border: 1px solid rgba(255,255,255,.2); color: #ddd; border-radius: 5px; cursor: pointer; padding: 0 6px; }
+    .kb-cc { color: #ffd54f; }
+</style>
+
+<h1>Доска QA</h1>
+
+@if (!Model.Configured)
+{
+    <div class="alert alert-warn">БД <code>project</code> не настроена (нет <code>Web:ProjectConnectionString</code>).</div>
+}
+else
+{
+    <form method="get" class="kb-bar">
+        <div>
+            <label>Проект</label>
+            <select name="project" onchange="this.form.submit()">
+                <option value="">— все —</option>
+                @foreach (var p in Model.Projects)
+                {
+                    <option value="@p.Id" selected="@(Model.Project == p.Id)">@p.Title</option>
+                }
+            </select>
+        </div>
+        @if (Model.Epics.Count > 0)
+        {
+            <div>
+                <label>Эпик</label>
+                <select name="epic" onchange="this.form.submit()">
+                    <option value="">— все —</option>
+                    @foreach (var e in Model.Epics)
+                    {
+                        <option value="@e.Id" selected="@(Model.Epic == e.Id)">@e.Title</option>
+                    }
+                </select>
+            </div>
+        }
+        <button type="submit">Применить</button>
+        <a class="btn" asp-page="/Ticket">+ Новый тикет</a>
+    </form>
+
+    <div class="kb-board">
+        @for (var ci = 0; ci < Model.Columns.Count; ci++)
+        {
+            var status = Model.Columns[ci];
+            var cards = Model.ByStatus[status];
+            var prev = ci > 0 ? Model.Columns[ci - 1] : null;
+            var next = ci < Model.Columns.Count - 1 ? Model.Columns[ci + 1] : null;
+            <div class="kb-col">
+                <div class="kb-col-h"><span>@status</span><span class="cnt">@cards.Count</span></div>
+                <div class="kb-cards">
+                    @foreach (var t in cards)
+                    {
+                        <div class="kb-card" style="border-left-color:@TypeColor(t.Type)">
+                            <a class="t" asp-page="/Ticket" asp-route-id="@t.Id">@t.Title</a>
+                            <div class="kb-meta">
+                                <span class="kb-badge" style="background:@TypeColor(t.Type)">@t.Type</span>
+                                <span class="kb-badge" style="background:@PrioColor(t.Priority)">@t.Priority</span>
+                                @if (t.ClientCheck)
+                                {
+                                    <span class="kb-cc" title="Проверка на клиенте">🎮</span>
+                                }
+                            </div>
+                            <div class="kb-foot">
+                                <span>@(string.IsNullOrEmpty(t.Assignee) ? "—" : t.Assignee)</span>
+                                <span>
+                                    @if (prev != null)
+                                    {
+                                        <form class="kb-move" method="post" asp-page-handler="Move">
+                                            <input type="hidden" name="id" value="@t.Id" />
+                                            <input type="hidden" name="status" value="@prev" />
+                                            <input type="hidden" name="project" value="@Model.Project" />
+                                            <input type="hidden" name="epic" value="@Model.Epic" />
+                                            <button type="submit" title="→ @prev">◀</button>
+                                        </form>
+                                    }
+                                    @if (next != null)
+                                    {
+                                        <form class="kb-move" method="post" asp-page-handler="Move">
+                                            <input type="hidden" name="id" value="@t.Id" />
+                                            <input type="hidden" name="status" value="@next" />
+                                            <input type="hidden" name="project" value="@Model.Project" />
+                                            <input type="hidden" name="epic" value="@Model.Epic" />
+                                            <button type="submit" title="→ @next">▶</button>
+                                        </form>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
