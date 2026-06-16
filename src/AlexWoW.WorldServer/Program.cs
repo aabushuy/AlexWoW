@@ -150,6 +150,7 @@ builder.Services.AddSingleton<TeleportService>();
 // байты — Protocol/ChatPackets), каталог dev-меню аддона — DevMenuCatalog (потребитель — AddonProtocol).
 builder.Services.AddSingleton<ChatNotifier>();
 builder.Services.AddSingleton<DevMenuCatalog>();
+builder.Services.AddSingleton<DevStatsCatalog>(); // §178: каталог вторичных статов для редактора аддона
 builder.Services.AddDevCommands();
 builder.Services.AddSingleton<WorldTick>(); // тик мира — DI-синглтон (S3 #5), драйвится WorldUpdateLoop
 builder.Services.AddSingleton<AuthChallengeSender>();
