@@ -21,7 +21,63 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
     {
         var b = new Builder();
 
-        var classes = b.Category("Тренеры классов");
+        // Порядок корней = порядок создания категорий ниже (CommitCatalog собирает roots по `order`).
+        // §175: новая структура меню (Персонаж → Баффы → Враги → Манекены → Телепорт → Тренеры → Крафт →
+        // Прочее → Spell QA), вложенные подкатегории, без многоточий в подписях.
+
+        // 1. Персонаж
+        var character = b.Category("Персонаж");
+        b.Prompt(character, "Уровень", ".level ", "Установить уровень (1–80):");
+        b.Prompt(character, "Опыт", ".xp ", "Добавить опыт:");
+        b.Prompt(character, "Выдать предмет", ".additem ", "ID предмета [кол-во]:");
+        b.Prompt(character, "Изучить спелл", ".learn ", "ID спелла:");
+        b.Cmd(character, "Выучить всё у тренера", ".learnall");
+
+        // 2. Баффы
+        var buffs = b.Category("Баффы");
+        var buffsApply = b.Sub(buffs, "Наложить");
+        b.Prompt(buffsApply, "Бафф", ".buff ", "ID спелла [секунды]:");
+        b.Prompt(buffsApply, "Дебафф", ".debuff ", "ID спелла [секунды] (стенд для диспела):");
+        var buffsRemove = b.Sub(buffs, "Снять");
+        b.Prompt(buffsRemove, "Снять по id", ".unbuff ", "ID спелла:");
+        // «Снять все» — §176; «Характеристики» (редактор вторичных статов) — §178/§179.
+        // «Шанс крита заклинаний» временно остаётся листом Баффов до Фазы 3 (переедет в редактор статов).
+        b.Prompt(buffs, "Шанс крита заклинаний", ".setcrit ", "Процент 0–100 (для проверки крита):");
+
+        // 3. Враги (.spawnenemy): по типу существа → prompt «уровень [кол-во]» (как «Выдать предмет»).
+        var enemies = b.Category("Враги");
+        b.Prompt(enemies, "Гуманоид", ".spawnenemy humanoid ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Животное", ".spawnenemy beast ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Демон", ".spawnenemy demon ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Нежить", ".spawnenemy undead ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Дракон", ".spawnenemy dragonkin ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Элементаль", ".spawnenemy elemental ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Великан", ".spawnenemy giant ", "Уровень [кол-во]:");
+        b.Prompt(enemies, "Механизм", ".spawnenemy mechanical ", "Уровень [кол-во]:");
+
+        // 4. Манекены
+        var dummies = b.Category("Манекены");
+        b.Cmd(dummies, "Тренировочный (урон)", ".dummy");
+        b.Cmd(dummies, "Лечебный", ".dummy heal");
+        b.Cmd(dummies, "Атакующий (защита)", ".dummy attack");
+        b.Cmd(dummies, "Кастующий (прерывание)", ".dummy caster");
+
+        // 5. Телепорт — динамическая ветка из БД (alexwow_auth.dev_teleport), сгруппирована по фракции.
+        var teleport = b.Category("Телепорт");
+        var locations = await teleports.GetAllAsync(ct);
+        var alliance = b.Sub(teleport, "Альянс");
+        var horde = b.Sub(teleport, "Орда");
+        var neutral = b.Sub(teleport, "Нейтральные");
+        foreach (var loc in locations)
+        {
+            var parent = loc.Faction switch { 1 => alliance, 2 => horde, _ => neutral };
+            b.Tp(parent, loc.Name, loc.Id);
+        }
+
+        // 6. Тренеры → Классы / Профессии
+        var trainers = b.Category("Тренеры");
+        var classes = b.Sub(trainers, "Классы");
+        b.Cmd(classes, "Разучить всё", ".trainer off");
         b.Cmd(classes, "Воин", ".trainer warrior");
         b.Cmd(classes, "Паладин", ".trainer paladin");
         b.Cmd(classes, "Охотник", ".trainer hunter");
@@ -32,9 +88,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Cmd(classes, "Маг", ".trainer mage");
         b.Cmd(classes, "Чернокнижник", ".trainer warlock");
         b.Cmd(classes, "Друид", ".trainer druid");
-        b.Cmd(classes, "Снять", ".trainer off");
-
-        var profs = b.Category("Тренеры профессий");
+        // Профессии: §177 переведёт на per-профессию «Выучить/Забыть»; пока — спавн тренера (.proftrainer).
+        var profs = b.Sub(trainers, "Профессии");
         b.Cmd(profs, "Портняжное", ".proftrainer tailoring");
         b.Cmd(profs, "Кузнечное", ".proftrainer blacksmithing");
         b.Cmd(profs, "Кожевничество", ".proftrainer leatherworking");
@@ -50,69 +105,29 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Cmd(profs, "Рыбная ловля", ".proftrainer fishing");
         b.Cmd(profs, "Снять", ".proftrainer off");
 
-        var craft = b.Category("Крафт-станки");
-        b.Cmd(craft, "Наковальня", ".craft anvil");
-        b.Cmd(craft, "Горн", ".craft forge");
-        b.Cmd(craft, "Костёр", ".craft cookfire");
-        b.Cmd(craft, "Почтовый ящик", ".craft mailbox");
-        b.Cmd(craft, "Убрать все", ".craft off");
-
-        var reagent = b.Category("Вендор реагентов");
+        // 7. Крафт → Станки / Реагенты
+        var craft = b.Category("Крафт");
+        var stations = b.Sub(craft, "Станки");
+        b.Cmd(stations, "Наковальня", ".craft anvil");
+        b.Cmd(stations, "Горн", ".craft forge");
+        b.Cmd(stations, "Костёр", ".craft cookfire");
+        b.Cmd(stations, "Почтовый ящик", ".craft mailbox");
+        b.Cmd(stations, "Убрать все", ".craft off");
+        var reagent = b.Sub(craft, "Реагенты");
         b.Cmd(reagent, "Поставить", ".reagentvendor");
         b.Cmd(reagent, "Снять", ".reagentvendor off");
 
-        var character = b.Category("Персонаж");
-        b.Prompt(character, "Уровень…", ".level ", "Установить уровень (1–80):");
-        b.Prompt(character, "Опыт…", ".xp ", "Добавить опыт:");
-        b.Prompt(character, "Выдать предмет…", ".additem ", "ID предмета [кол-во]:");
-        b.Prompt(character, "Изучить спелл…", ".learn ", "ID спелла:");
-        b.Cmd(character, "Выучить всё у тренера", ".learnall");
-
-        var buffs = b.Category("Баффы");
-        b.Prompt(buffs, "Наложить бафф…", ".buff ", "ID спелла [секунды]:");
-        b.Prompt(buffs, "Наложить дебафф…", ".debuff ", "ID спелла [секунды] (стенд для диспела):");
-        b.Prompt(buffs, "Снять бафф…", ".unbuff ", "ID спелла:");
-        b.Prompt(buffs, "Шанс крита заклинаний…", ".setcrit ", "Процент 0–100 (для проверки крита):");
-
-        // Враги (.spawnenemy): по типу существа → prompt «уровень [кол-во]» (как «Выдать предмет»).
-        var enemies = b.Category("Враги");
-        b.Prompt(enemies, "Гуманоид…", ".spawnenemy humanoid ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Животное…", ".spawnenemy beast ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Демон…", ".spawnenemy demon ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Нежить…", ".spawnenemy undead ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Дракон…", ".spawnenemy dragonkin ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Элементаль…", ".spawnenemy elemental ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Великан…", ".spawnenemy giant ", "Уровень [кол-во]:");
-        b.Prompt(enemies, "Механизм…", ".spawnenemy mechanical ", "Уровень [кол-во]:");
-
-        var dummies = b.Category("Манекены");
-        b.Cmd(dummies, "Тренировочный (урон)", ".dummy");
-        b.Cmd(dummies, "Лечебный", ".dummy heal");
-        b.Cmd(dummies, "Атакующий (защита)", ".dummy attack");
-        b.Cmd(dummies, "Кастующий (прерывание)", ".dummy caster");
-
+        // 8. Прочее
         var misc = b.Category("Прочее");
         b.Cmd(misc, "Снести dev-сущности", ".devclean");
 
-        // M12 Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.
+        // 9. Spell QA: захват проверки заклинаний (.spelltest) — ручной режим и авто-прогон.
         var spellTest = b.Category("Spell QA");
         b.Cmd(spellTest, "Старт захвата", ".spelltest start");
         b.Cmd(spellTest, "Стоп захвата", ".spelltest stop");
         b.Cmd(spellTest, "Статус", ".spelltest status");
         b.Cmd(spellTest, "Авто-прогон ×5", ".spelltest run");
-        b.Prompt(spellTest, "Авто-прогон ×N…", ".spelltest run ", "Повторов на спелл:");
-
-        // Динамическая ветка «Телепорт» из БД (alexwow_auth.dev_teleport), сгруппирована по фракции.
-        var teleport = b.Category("Телепорт");
-        var locations = await teleports.GetAllAsync(ct);
-        var alliance = b.Sub(teleport, "Альянс");
-        var horde = b.Sub(teleport, "Орда");
-        var neutral = b.Sub(teleport, "Нейтральные");
-        foreach (var loc in locations)
-        {
-            var parent = loc.Faction switch { 1 => alliance, 2 => horde, _ => neutral };
-            b.Tp(parent, loc.Name, loc.Id);
-        }
+        b.Prompt(spellTest, "Авто-прогон ×N", ".spelltest run ", "Повторов на спелл:");
 
         return b.Lines;
     }
