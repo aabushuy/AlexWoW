@@ -40,6 +40,8 @@ internal sealed class FakeCharacterRepository(Character character) : ICharacterR
     public Task SetTalentResetCostAsync(uint guid, uint cost, CancellationToken ct = default) => throw new NotImplementedException();
     public Task SetLevelXpAsync(uint guid, byte level, uint xp, CancellationToken ct = default) => throw new NotImplementedException();
     public Task SetActionBarsAsync(uint guid, byte actionBars, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task SetTesterAsync(uint guid, bool isTester, CancellationToken ct = default) => throw new NotImplementedException();
+    public Task<IReadOnlyList<Character>> GetTestersAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Character>>([]);
     public Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default) => throw new NotImplementedException();
 }
 

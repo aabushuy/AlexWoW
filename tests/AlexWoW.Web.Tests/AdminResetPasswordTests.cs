@@ -72,6 +72,7 @@ public sealed class AdminResetPasswordTests
         public Task<bool> EmailExistsAsync(string email, CancellationToken ct = default) => throw new NotImplementedException();
         public Task CreateAccountAsync(string username, byte[] salt, byte[] verifier, string? email = null, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<string>> GetAllUsernamesAsync(CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<string>> GetAdminUsernamesAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<AccountSummary>> GetAccountsWithCharCountsAsync(CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Account?> GetAccountByIdAsync(uint id, CancellationToken ct = default) => throw new NotImplementedException();
         public Task SetSessionKeyAsync(uint accountId, byte[] sessionKey, string? ip, CancellationToken ct = default) => throw new NotImplementedException();

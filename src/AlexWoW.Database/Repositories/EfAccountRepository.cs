@@ -62,6 +62,13 @@ public sealed class EfAccountRepository(IDbContextFactory<AuthDbContext> factory
         return await db.Accounts.AsNoTracking().Select(x => x.Username).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<string>> GetAdminUsernamesAsync(CancellationToken ct = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.Accounts.AsNoTracking().Where(x => x.IsAdmin != 0)
+            .OrderBy(x => x.Username).Select(x => x.Username).ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<AlexWoW.Database.Models.AccountSummary>> GetAccountsWithCharCountsAsync(
         CancellationToken ct = default)
     {

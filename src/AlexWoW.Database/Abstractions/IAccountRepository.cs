@@ -26,6 +26,9 @@ public interface IAccountRepository
     /// <summary>Все имена аккаунтов (для массовых операций, напр. сброса пароля).</summary>
     Task<IReadOnlyList<string>> GetAllUsernamesAsync(CancellationToken ct = default);
 
+    /// <summary>Имена админских аккаунтов (для дропдауна «Исполнитель» на доске, KB-фикс).</summary>
+    Task<IReadOnlyList<string>> GetAdminUsernamesAsync(CancellationToken ct = default);
+
     /// <summary>Сводка всех аккаунтов + число персонажей (админ-список, M8.9). Сортировка по имени.</summary>
     Task<IReadOnlyList<AccountSummary>> GetAccountsWithCharCountsAsync(CancellationToken ct = default);
 
