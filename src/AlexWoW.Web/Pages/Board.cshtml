@@ -60,7 +60,6 @@ else
                 <option value="@p.Id" selected="@(Model.Project == p.Id)">@p.Title</option>
             }
         </select>
-        <button type="submit" class="kb-act">Применить</button>
         @if (Model.Epics.Count > 0)
         {
             <span class="kb-lbl">Эпик</span>
@@ -72,6 +71,7 @@ else
                 }
             </select>
         }
+        <button type="submit" class="kb-act">Применить</button>
     </form>
 
     <div class="kb-board">
