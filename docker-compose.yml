@@ -80,6 +80,8 @@ services:
       Web__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
       # БД трекинга прогресса (дашборд, срез 1). Создаётся вручную: deploy/sql/project-schema.sql + project-seed.sql.
       Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      # KB5: токен REST API канбан-доски (/api/kanban/*, заголовок X-Api-Token). LAN-internal.
+      Web__ApiToken: "${WEB_API_TOKEN:-kb_REDACTED}"
       # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера; .env стирается деплоем, поэтому здесь.
       Web__Vikunja__BaseUrl: "https://tasks.home.srv"
       Web__Vikunja__Token: "tk_REDACTED"
