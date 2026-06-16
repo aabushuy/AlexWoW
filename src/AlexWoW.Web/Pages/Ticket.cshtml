@@ -3,7 +3,7 @@
 @model AlexWoW.Web.Pages.TicketModel
 @{
     ViewData["Title"] = Model.IsNew ? "Новый тикет" : $"Тикет #{Model.Input.Id}";
-    Layout = "_AdminLayout";
+    Layout = "_Layout"; // #2: без админ-сайдбара, но фиксированная ширина по центру (как обычные страницы)
     var projectsById = Model.Projects.ToDictionary(p => p.Id, p => p.Title);
 }
 
@@ -11,9 +11,15 @@
     .tk-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
     .tk-field { margin-bottom: 12px; }
     .tk-field label { display: block; font-size: .82rem; opacity: .8; margin-bottom: 3px; }
-    .tk-field input[type=text], .tk-field input[type=number], .tk-field select, .tk-field textarea {
-        width: 100%; padding: 6px 8px; box-sizing: border-box; }
-    .tk-field textarea { min-height: 80px; resize: vertical; }
+    /* #4: контролы в стиле доски (тёмные, .92rem). Скоуп .tk-grid — блок комментариев не трогаем. */
+    .tk-grid input[type=text], .tk-grid input[type=number], .tk-grid select, .tk-grid textarea {
+        width: 100%; padding: 6px 8px; box-sizing: border-box; font-size: .92rem;
+        background: #11151c; color: #e8e8e8; border: 1px solid #2a3550; border-radius: 4px; }
+    .tk-grid textarea { min-height: 80px; resize: vertical; }
+    .tk-save { height: 34px; padding: 0 18px; margin-top: 4px; border-radius: 4px; cursor: pointer;
+        font-weight: 700; font-size: .92rem; color: #1a160b;
+        background: linear-gradient(180deg, #ffe27a, #e8b73c 55%, #b07d1e); border: 1px solid #7a571a; }
+    .tk-save:hover { filter: brightness(1.1); }
     .tk-row { display: flex; gap: 10px; }
     .tk-row > div { flex: 1; }
     .tk-comments { margin-top: 8px; }
@@ -110,16 +116,27 @@ else
                 </div>
                 <div class="tk-field">
                     <label>Исполнитель</label>
-                    <input type="text" asp-for="Input.Assignee" />
+                    <select asp-for="Input.Assignee">
+                        @foreach (var a in Model.Assignees)
+                        {
+                            <option value="@a" selected="@(Model.Input.Assignee == a)">@a</option>
+                        }
+                    </select>
                 </div>
                 <div class="tk-field">
-                    <label>Тестировщик (guid персонажа)</label>
-                    <input type="number" asp-for="Input.TesterGuid" />
+                    <label>Тестировщик</label>
+                    <select asp-for="Input.TesterGuid">
+                        <option value="">—</option>
+                        @foreach (var t in Model.Testers)
+                        {
+                            <option value="@t.Guid" selected="@(Model.Input.TesterGuid == t.Guid)">@t.Name (ур. @t.Level)</option>
+                        }
+                    </select>
                 </div>
                 <div class="tk-field">
                     <label><input type="checkbox" asp-for="Input.ClientCheck" /> Проверка на клиенте</label>
                 </div>
-                <button type="submit">@(Model.IsNew ? "Создать" : "Сохранить")</button>
+                <button type="submit" class="tk-save">@(Model.IsNew ? "Создать" : "Сохранить")</button>
             </div>
         </div>
     </form>

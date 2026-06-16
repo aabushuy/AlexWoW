@@ -114,8 +114,8 @@ ShowDetail = function()
     return
   end
   D.title:SetText(t.title)
-  D.body:SetText("|cffffd100Шаги тестирования:|r\n" .. (t.steps ~= "" and t.steps or "—")
-    .. "\n\n|cffffd100Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—"))
+  D.body:SetText("|cff7a3000Шаги тестирования:|r\n" .. (t.steps ~= "" and t.steps or "—")
+    .. "\n\n|cff7a3000Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—"))
   D.child:SetHeight(D.body:GetStringHeight() + 4)
   D.check:SetChecked(false)
   D.comment:SetText("")
@@ -126,14 +126,8 @@ end
 -- ---- Окно ----
 local function Build()
   local f = CreateFrame("Frame", "AlexQATesterFrame", UIParent)
-  f:SetWidth(660); f:SetHeight(460)
+  f:SetWidth(768); f:SetHeight(512)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-  f:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true, tileSize = 32, edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 },
-  })
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", f.StartMoving)
   f:SetScript("OnDragStop", function(self)
@@ -144,25 +138,23 @@ local function Build()
   f:SetClampedToScreen(true)
   f:Hide()
 
-  -- Плотная подложка (DialogBox-фон полупрозрачный).
-  local bg = f:CreateTexture(nil, "BACKGROUND")
-  bg:SetTexture(0, 0, 0, 0.94)
-  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
+  -- Оформление как «Журнал заданий»: двухпанельные текстуры рамки квест-лога (лево 512 + право 256 = 768).
+  local texL = f:CreateTexture(nil, "BORDER")
+  texL:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Left")
+  texL:SetWidth(512); texL:SetHeight(512); texL:SetPoint("TOPLEFT", 0, 0)
+  local texR = f:CreateTexture(nil, "BORDER")
+  texR:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Right")
+  texR:SetWidth(256); texR:SetHeight(512); texR:SetPoint("TOPLEFT", texL, "TOPRIGHT", 0, 0)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOP", 0, -14); title:SetText("Задачи на тестирование")
+  title:SetPoint("TOP", 0, -18); title:SetText("Задачи на тестирование")
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -6, -6)
-
-  -- Разделитель колонок.
-  local sep = f:CreateTexture(nil, "ARTWORK")
-  sep:SetTexture(0.4, 0.4, 0.4, 0.6); sep:SetWidth(1)
-  sep:SetPoint("TOPLEFT", 250, -42); sep:SetPoint("BOTTOMLEFT", 250, 16)
+  close:SetPoint("TOPRIGHT", -36, -14)
 
   -- ЛЕВО: список задач (FauxScrollFrame).
   listScroll = CreateFrame("ScrollFrame", "AlexQAListScroll", f, "FauxScrollFrameTemplate")
-  listScroll:SetPoint("TOPLEFT", 16, -44)
-  listScroll:SetWidth(210); listScroll:SetHeight(LIST_NUM_ROWS * LIST_ROW_H)
+  listScroll:SetPoint("TOPLEFT", 26, -84)
+  listScroll:SetWidth(250); listScroll:SetHeight(LIST_NUM_ROWS * LIST_ROW_H)
   listScroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, LIST_ROW_H, ListRefresh)
   end)
@@ -176,7 +168,9 @@ local function Build()
     sel:SetAllPoints(); sel:SetTexture(0.9, 0.75, 0.1, 0.20); sel:Hide()
     row.sel = sel
     local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fs:SetPoint("LEFT", 4, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT"); row.text = fs
+    fs:SetPoint("LEFT", 4, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT")
+    fs:SetTextColor(0.15, 0.1, 0.05) -- тёмный текст на пергаменте
+    row.text = fs
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
     row:SetScript("OnClick", function(self) OnTaskClick(self.index) end)
@@ -184,26 +178,29 @@ local function Build()
   end
 
   -- ПРАВО: детализация.
-  local rx = 262
+  local rx = 310
   D.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  D.title:SetPoint("TOPLEFT", rx, -42); D.title:SetWidth(360); D.title:SetJustifyH("LEFT")
+  D.title:SetPoint("TOPLEFT", rx, -84); D.title:SetWidth(415); D.title:SetJustifyH("LEFT")
+  D.title:SetTextColor(0.2, 0.12, 0.04) -- тёмный текст на пергаменте
 
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
-  D.scroll:SetPoint("TOPLEFT", rx, -70); D.scroll:SetWidth(356); D.scroll:SetHeight(176)
-  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(356); D.child:SetHeight(10)
+  D.scroll:SetPoint("TOPLEFT", rx, -112); D.scroll:SetWidth(412); D.scroll:SetHeight(150)
+  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(412); D.child:SetHeight(10)
   D.scroll:SetScrollChild(D.child)
   D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  D.body:SetPoint("TOPLEFT", 0, 0); D.body:SetWidth(352); D.body:SetJustifyH("LEFT")
+  D.body:SetPoint("TOPLEFT", 0, 0); D.body:SetWidth(406); D.body:SetJustifyH("LEFT")
+  D.body:SetTextColor(0.2, 0.12, 0.04)
 
   D.check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-  D.check:SetWidth(24); D.check:SetHeight(24); D.check:SetPoint("TOPLEFT", rx - 2, -256)
+  D.check:SetWidth(24); D.check:SetHeight(24); D.check:SetPoint("TOPLEFT", rx - 2, -272)
   local checkLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); checkLabel:SetText("Соответствует ожидаемому результату")
+  checkLabel:SetTextColor(0.2, 0.12, 0.04)
 
   D.comLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.comLabel:SetPoint("TOPLEFT", rx, -288); D.comLabel:SetText("Комментарий:")
+  D.comLabel:SetPoint("TOPLEFT", rx, -302); D.comLabel:SetText("Комментарий:"); D.comLabel:SetTextColor(0.2, 0.12, 0.04)
   D.commentBg = CreateFrame("Frame", nil, f)
-  D.commentBg:SetPoint("TOPLEFT", rx, -304); D.commentBg:SetWidth(356); D.commentBg:SetHeight(54)
+  D.commentBg:SetPoint("TOPLEFT", rx, -318); D.commentBg:SetWidth(412); D.commentBg:SetHeight(54)
   D.commentBg:SetBackdrop({
     bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -216,12 +213,12 @@ local function Build()
   D.comment:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
   D.doneBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  D.doneBtn:SetWidth(110); D.doneBtn:SetHeight(24); D.doneBtn:SetPoint("TOPLEFT", rx, -368)
+  D.doneBtn:SetWidth(110); D.doneBtn:SetHeight(24); D.doneBtn:SetPoint("TOPLEFT", rx, -380)
   D.doneBtn:SetText("Готово")
   D.doneBtn:SetScript("OnClick", Submit)
 
   D.msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.msg:SetPoint("LEFT", D.doneBtn, "RIGHT", 12, 0); D.msg:SetWidth(220); D.msg:SetJustifyH("LEFT")
+  D.msg:SetPoint("LEFT", D.doneBtn, "RIGHT", 12, 0); D.msg:SetWidth(250); D.msg:SetJustifyH("LEFT")
 
   if AlexQATesterDB.pos then
     local p, rp, x, y = unpack(AlexQATesterDB.pos)

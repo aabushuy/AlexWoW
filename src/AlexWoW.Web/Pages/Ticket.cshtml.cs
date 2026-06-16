@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Web.Services;
 using AlexWoW.Web.Services.Kanban;
 using Microsoft.AspNetCore.Mvc;
@@ -9,8 +10,10 @@ namespace AlexWoW.Web.Pages;
 /// Карточка тикета канбан-доски (KB4): просмотр/создание/редактирование всех полей + лента комментариев.
 /// Дерево (Project→Epic→Task/Bug) валидируется сервисом. Только админам. /Ticket — создание, /Ticket?id= — правка.
 /// </summary>
-public sealed class TicketModel(KanbanService kanban) : PageModel
+public sealed class TicketModel(KanbanService kanban, ICharacterRepository characters, IAccountRepository accounts) : PageModel
 {
+    public const string AiAssignee = "Агент ИИ"; // #3.1: исполнитель — ИИ-агент (концептуальный id -1)
+
     public bool Configured => kanban.Configured;
     public bool IsNew => Input.Id == 0;
     public string? Error { get; private set; }
@@ -19,6 +22,8 @@ public sealed class TicketModel(KanbanService kanban) : PageModel
     public IReadOnlyList<KanbanTicket> Projects { get; private set; } = [];
     public IReadOnlyList<KanbanTicket> Epics { get; private set; } = [];
     public IReadOnlyList<KanbanComment> Comments { get; private set; } = [];
+    public IReadOnlyList<Database.Models.Character> Testers { get; private set; } = [];
+    public IReadOnlyList<string> Assignees { get; private set; } = [];
 
     public sealed class InputModel
     {
@@ -97,5 +102,9 @@ public sealed class TicketModel(KanbanService kanban) : PageModel
     {
         Projects = await kanban.ProjectsAsync(ct);
         Epics = await kanban.AllEpicsAsync(ct);
+        Testers = await characters.GetTestersAsync(ct);
+        // Исполнители: «Агент ИИ» сверху + все админ-аккаунты.
+        var admins = await accounts.GetAdminUsernamesAsync(ct);
+        Assignees = [AiAssignee, .. admins];
     }
 }
