@@ -23,6 +23,18 @@ local function ulen(s)
 end
 local TITLE_MAX = 84 -- порог «двух строк» по символам для ширины заголовка
 
+-- Обрезать строку до maxChars UTF-8 символов (+ «…»), без разрыва многобайтовых символов.
+local function utrunc(s, maxChars)
+  if ulen(s) <= maxChars then return s end
+  local i, n = 1, 0
+  while i <= #s and n < maxChars do
+    local b = string.byte(s, i)
+    local clen = (b < 128 and 1) or (b < 224 and 2) or (b < 240 and 3) or 4
+    i = i + clen; n = n + 1
+  end
+  return string.sub(s, 1, i - 1) .. "…"
+end
+
 -- ---- Запрос/отправка ----
 local function RequestTasks()
   SendAddonMessage(PREFIX, "qatasks", "WHISPER", UnitName("player"))
@@ -123,8 +135,8 @@ ShowDetail = function()
     SetMsg("", false)
     return
   end
-  D.title:SetText(t.title)
-  -- #3: если заголовок обрезается (≤2 строк), дублируем его полностью в теле обычным шрифтом.
+  D.title:SetText(utrunc(t.title, TITLE_MAX)) -- #2: заголовок ≤2 строк (обрезка строкой)
+  -- #3: если заголовок обрезан, дублируем его полностью в теле обычным шрифтом.
   local header = ulen(t.title) > TITLE_MAX and (t.title .. "\n\n") or ""
   D.body:SetText(header .. "|cff8a5a00Шаги тестирования:|r\n" .. (t.steps ~= "" and t.steps or "—")
     .. "\n\n|cff8a5a00Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—"))
@@ -195,7 +207,7 @@ local function Build()
 
   D.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   D.title:SetPoint("TOPLEFT", rx, -82); D.title:SetWidth(415); D.title:SetJustifyH("LEFT")
-  D.title:SetFont(QFONT, 17); D.title:SetTextColor(0.55, 0.40, 0.13); D.title:SetMaxLines(2) -- #2: не более 2 строк
+  D.title:SetFont(QFONT, 17); D.title:SetTextColor(0.55, 0.40, 0.13) -- #2: обрезаем строкой (SetMaxLines нет в 3.3.5)
 
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
   D.scroll:SetPoint("TOPLEFT", rx, -126); D.scroll:SetWidth(412); D.scroll:SetHeight(108)
