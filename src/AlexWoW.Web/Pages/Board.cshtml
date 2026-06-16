@@ -11,9 +11,20 @@
 <style>
     /* Выход за центрированный .page-frame (max-width 1040) — доска во всю ширину окна. */
     .kb-full { width: 100vw; margin-left: calc(50% - 50vw); padding: 0 24px; box-sizing: border-box; }
-    .kb-bar { display: flex; gap: 10px; align-items: flex-end; margin: 12px 0 16px; flex-wrap: wrap; }
-    .kb-bar label { font-size: .8rem; display: block; margin-bottom: 3px; opacity: .8; }
-    .kb-bar select, .kb-bar button { padding: 5px 8px; }
+    .kb-title { text-align: left; margin: 6px 0 14px; }
+    .kb-bar { display: flex; gap: 10px; align-items: center; margin: 0 0 16px; flex-wrap: wrap; }
+    .kb-lbl { font-size: .92rem; font-weight: 700; color: #cfd3da; }
+    /* Все контролы фильтра — одной высоты и шрифта (как заголовок колонки «Backlog»). */
+    .kb-bar select, .kb-bar .kb-act {
+        height: 34px; box-sizing: border-box; display: inline-flex; align-items: center;
+        font-size: .92rem; font-family: inherit; line-height: 1; border-radius: 4px; padding: 0 14px;
+    }
+    .kb-bar select { background: #11151c; color: #e8e8e8; border: 1px solid #2a3550; }
+    .kb-act { /* золотой стиль как «Новый тикет», уменьшенный */
+        color: #1a160b; font-weight: 700; cursor: pointer; text-decoration: none;
+        background: linear-gradient(180deg, #ffe27a, #e8b73c 55%, #b07d1e); border: 1px solid #7a571a;
+    }
+    .kb-act:hover { filter: brightness(1.1); color: #1a160b; }
     .kb-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
     .kb-col { flex: 1 0 220px; min-width: 220px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; }
     .kb-col-h { padding: 10px 12px; font-weight: 700; font-size: .92rem; border-bottom: 1px solid rgba(255,255,255,.08); display: flex; justify-content: space-between; }
@@ -30,7 +41,8 @@
     .kb-cc { color: #ffd54f; }
 </style>
 
-<h1>Доска QA</h1>
+<div class="kb-full">
+<h1 class="kb-title">Доска QA</h1>
 
 @if (!Model.Configured)
 {
@@ -38,33 +50,28 @@
 }
 else
 {
-    <div class="kb-full">
     <form method="get" class="kb-bar">
-        <div>
-            <label>Проект</label>
-            <select name="project" onchange="this.form.submit()">
-                <option value="">— все —</option>
-                @foreach (var p in Model.Projects)
-                {
-                    <option value="@p.Id" selected="@(Model.Project == p.Id)">@p.Title</option>
-                }
-            </select>
-        </div>
+        <a class="kb-act" asp-page="/Ticket">+ Новый тикет</a>
+        <span class="kb-lbl">Проект</span>
+        <select name="project" onchange="this.form.submit()">
+            <option value="">— все —</option>
+            @foreach (var p in Model.Projects)
+            {
+                <option value="@p.Id" selected="@(Model.Project == p.Id)">@p.Title</option>
+            }
+        </select>
+        <button type="submit" class="kb-act">Применить</button>
         @if (Model.Epics.Count > 0)
         {
-            <div>
-                <label>Эпик</label>
-                <select name="epic" onchange="this.form.submit()">
-                    <option value="">— все —</option>
-                    @foreach (var e in Model.Epics)
-                    {
-                        <option value="@e.Id" selected="@(Model.Epic == e.Id)">@e.Title</option>
-                    }
-                </select>
-            </div>
+            <span class="kb-lbl">Эпик</span>
+            <select name="epic" onchange="this.form.submit()">
+                <option value="">— все —</option>
+                @foreach (var e in Model.Epics)
+                {
+                    <option value="@e.Id" selected="@(Model.Epic == e.Id)">@e.Title</option>
+                }
+            </select>
         }
-        <button type="submit">Применить</button>
-        <a class="btn" asp-page="/Ticket">+ Новый тикет</a>
     </form>
 
     <div class="kb-board">
@@ -120,5 +127,6 @@ else
             </div>
         }
     </div>
-    </div>
 }
+</div>
+
