@@ -53,7 +53,8 @@ local function HandleLine(line)
     building = {}
   elseif line == "QEND" then
     if building then
-      tasks = building; building = nil; selected = nil
+      tasks = building; building = nil
+      selected = (#tasks > 0) and 1 or nil -- по умолчанию выбран первый таск
       if mainFrame then ListRefresh(); ShowDetail() end
     end
   elseif building and string.sub(line, 1, 2) == "Q|" then
@@ -180,26 +181,32 @@ local function Build()
 
   -- ПРАВО: детализация.
   local rx = 310
+  -- Увеличить шрифт fontstring/editbox в k раз (текст правой половины крупнее в 1.5×).
+  local function bigger(fs, k)
+    local fn, sz, fl = fs:GetFont()
+    if fn then fs:SetFont(fn, math.floor(sz * (k or 1.5) + 0.5), fl) end
+  end
+
   D.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  D.title:SetPoint("TOPLEFT", rx, -84); D.title:SetWidth(415); D.title:SetJustifyH("LEFT")
-  D.title:SetTextColor(0.2, 0.12, 0.04) -- тёмный текст на пергаменте
+  D.title:SetPoint("TOPLEFT", rx, -82); D.title:SetWidth(415); D.title:SetJustifyH("LEFT")
+  D.title:SetTextColor(0.2, 0.12, 0.04); bigger(D.title) -- тёмный текст на пергаменте, крупнее
 
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
-  D.scroll:SetPoint("TOPLEFT", rx, -112); D.scroll:SetWidth(412); D.scroll:SetHeight(150)
+  D.scroll:SetPoint("TOPLEFT", rx, -126); D.scroll:SetWidth(412); D.scroll:SetHeight(150)
   D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(412); D.child:SetHeight(10)
   D.scroll:SetScrollChild(D.child)
   D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   D.body:SetPoint("TOPLEFT", 0, 0); D.body:SetWidth(406); D.body:SetJustifyH("LEFT")
-  D.body:SetTextColor(0.2, 0.12, 0.04)
+  D.body:SetTextColor(0.2, 0.12, 0.04); bigger(D.body)
 
   D.check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
   D.check:SetWidth(24); D.check:SetHeight(24); D.check:SetPoint("TOPLEFT", rx - 2, -272)
   D.checkLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   D.checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); D.checkLabel:SetText("Соответствует ожидаемому результату")
-  D.checkLabel:SetTextColor(0.2, 0.12, 0.04)
+  D.checkLabel:SetTextColor(0.2, 0.12, 0.04); bigger(D.checkLabel)
 
   D.comLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.comLabel:SetPoint("TOPLEFT", rx, -302); D.comLabel:SetText("Комментарий:"); D.comLabel:SetTextColor(0.2, 0.12, 0.04)
+  D.comLabel:SetPoint("TOPLEFT", rx, -302); D.comLabel:SetText("Комментарий:"); D.comLabel:SetTextColor(0.2, 0.12, 0.04); bigger(D.comLabel)
   D.commentBg = CreateFrame("Frame", nil, f)
   D.commentBg:SetPoint("TOPLEFT", rx, -318); D.commentBg:SetWidth(412); D.commentBg:SetHeight(54)
   D.commentBg:SetBackdrop({
@@ -209,17 +216,18 @@ local function Build()
   })
   D.commentBg:SetBackdropColor(0, 0, 0, 0.6)
   D.comment = CreateFrame("EditBox", nil, D.commentBg)
-  D.comment:SetMultiLine(true); D.comment:SetAutoFocus(false); D.comment:SetFontObject(ChatFontNormal)
+  D.comment:SetMultiLine(true); D.comment:SetAutoFocus(false); D.comment:SetFontObject(ChatFontNormal); bigger(D.comment)
   D.comment:SetPoint("TOPLEFT", 6, -6); D.comment:SetPoint("BOTTOMRIGHT", -6, 6)
   D.comment:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
   D.doneBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  D.doneBtn:SetWidth(110); D.doneBtn:SetHeight(24); D.doneBtn:SetPoint("TOPLEFT", rx, -380)
+  D.doneBtn:SetWidth(120); D.doneBtn:SetHeight(26)
+  D.doneBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -45, 42) -- спец. слот в правом нижнем углу квест-рамки
   D.doneBtn:SetText("Готово")
   D.doneBtn:SetScript("OnClick", Submit)
 
   D.msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.msg:SetPoint("LEFT", D.doneBtn, "RIGHT", 12, 0); D.msg:SetWidth(250); D.msg:SetJustifyH("LEFT")
+  D.msg:SetPoint("RIGHT", D.doneBtn, "LEFT", -10, 0); D.msg:SetWidth(260); D.msg:SetJustifyH("RIGHT"); bigger(D.msg)
 
   if AlexQATesterDB.pos then
     local p, rp, x, y = unpack(AlexQATesterDB.pos)
