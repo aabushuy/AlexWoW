@@ -30,6 +30,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         b.Prompt(character, "Уровень", ".level ", "Установить уровень (1–80):");
         b.Prompt(character, "Опыт", ".xp ", "Добавить опыт:");
         b.Prompt(character, "Выдать предмет", ".additem ", "ID предмета [кол-во]:");
+        b.ItemBrowser(character, "Добавить вещь"); // §182: окно-аукцион (поиск по БД, иконки)
         b.Prompt(character, "Изучить спелл", ".learn ", "ID спелла:");
         b.Cmd(character, "Выучить всё у тренера", ".learnall");
 
@@ -150,7 +151,8 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
     /// (в метках/командах его нет). kind: <c>cat</c> (категория/подкатегория, parentId 0 = корень),
     /// <c>cmd</c> (лист-команда, payload = команда для SAY), <c>prompt</c> (лист-ввод, payload =
     /// префикс|подсказка), <c>tp</c> (лист-телепорт, payload = id города; метка = имя города),
-    /// <c>stats</c> (§178, лист-открывашка окна редактора вторичных характеристик, без payload).
+    /// <c>stats</c> (§178, лист-открывашка окна редактора вторичных характеристик, без payload),
+    /// <c>items</c> (§182, лист-открывашка окна «Добавить вещь», без payload).
     /// </summary>
     private sealed class Builder
     {
@@ -161,6 +163,7 @@ internal sealed class DevMenuCatalog(ITeleportRepository teleports)
         public int Sub(int parent, string label) => Node(parent, "cat", label);
         public void Cmd(int parent, string label, string command) => Node(parent, "cmd", label, command);
         public void StatsEditor(int parent, string label) => Node(parent, "stats", label); // §178: лист-открывашка окна редактора статов
+        public void ItemBrowser(int parent, string label) => Node(parent, "items", label); // §182: лист-открывашка окна «Добавить вещь»
         public void Prompt(int parent, string label, string prefix, string hint) => Node(parent, "prompt", label, prefix, hint);
         public void Tp(int parent, string cityName, uint cityId)
             => Node(parent, "tp", cityName, cityId.ToString(System.Globalization.CultureInfo.InvariantCulture));
