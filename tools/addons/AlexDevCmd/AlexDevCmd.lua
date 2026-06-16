@@ -597,6 +597,11 @@ local function BuildItemsUI()
   f:SetClampedToScreen(true)
   f:Hide()
 
+  -- Плотная тёмная подложка — DialogBox-фон полупрозрачный, на ярком фоне плохо читается.
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 0.94)
+  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
+
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   title:SetPoint("TOP", 0, -12); title:SetText("Просмотр товаров")
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -613,16 +618,18 @@ local function BuildItemsUI()
   itemsNameBox:SetScript("OnEnterPressed", enterSearch)
 
   local lvlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  lvlLabel:SetPoint("LEFT", itemsNameBox, "RIGHT", 22, 0); lvlLabel:SetText("Уровни")
+  lvlLabel:SetPoint("LEFT", itemsNameBox, "RIGHT", 24, 0); lvlLabel:SetText("Уровни")
+  -- InputBoxTemplate имеет «крышки» по краям (~6px), поэтому даём поле пошире и зазоры побольше,
+  -- иначе узкое поле визуально «рвётся» текстурами краёв.
   itemsLvlMin = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-  itemsLvlMin:SetWidth(30); itemsLvlMin:SetHeight(18); itemsLvlMin:SetAutoFocus(false); itemsLvlMin:SetNumeric(true)
-  itemsLvlMin:SetPoint("LEFT", lvlLabel, "RIGHT", 12, 0)
+  itemsLvlMin:SetWidth(40); itemsLvlMin:SetHeight(18); itemsLvlMin:SetAutoFocus(false); itemsLvlMin:SetNumeric(true)
+  itemsLvlMin:SetPoint("LEFT", lvlLabel, "RIGHT", 16, 0)
   itemsLvlMin:SetScript("OnEnterPressed", enterSearch)
   local dash = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  dash:SetPoint("LEFT", itemsLvlMin, "RIGHT", 4, 0); dash:SetText("–")
+  dash:SetPoint("LEFT", itemsLvlMin, "RIGHT", 8, 0); dash:SetText("–")
   itemsLvlMax = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-  itemsLvlMax:SetWidth(30); itemsLvlMax:SetHeight(18); itemsLvlMax:SetAutoFocus(false); itemsLvlMax:SetNumeric(true)
-  itemsLvlMax:SetPoint("LEFT", dash, "RIGHT", 8, 0)
+  itemsLvlMax:SetWidth(40); itemsLvlMax:SetHeight(18); itemsLvlMax:SetAutoFocus(false); itemsLvlMax:SetNumeric(true)
+  itemsLvlMax:SetPoint("LEFT", dash, "RIGHT", 12, 0)
   itemsLvlMax:SetScript("OnEnterPressed", enterSearch)
 
   local qualLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
