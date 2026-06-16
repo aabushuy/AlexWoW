@@ -15,9 +15,10 @@ public sealed class ItemSearchRepository(string connectionString)
         var where = filter.BuildWhere(parameters);
         parameters.Add("limit", Math.Clamp(filter.Limit, 1, 500));
 
+        var order = filter.OrderByItemLevel ? "ItemLevel DESC, name" : "RequiredLevel, name";
         await using var db = await OpenAsync(ct);
         var rows = await db.QueryAsync(new CommandDefinition(
-            $"SELECT * FROM item_template WHERE {where} ORDER BY RequiredLevel, name LIMIT @limit;",
+            $"SELECT * FROM item_template WHERE {where} ORDER BY {order} LIMIT @limit;",
             parameters, cancellationToken: ct));
 
         var result = new List<ItemTemplateData>();

@@ -86,11 +86,12 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
     }
 
     /// <summary>
-    /// Окно «Добавить вещь»: поиск по item_template и ответ кадром <c>IBEGIN</c> … <c>I|id|quality|reqlvl|name</c>
-    /// … <c>IEND</c> (отдельные токены, чтобы не путать с меню/статами). Тело запроса:
-    /// <c>itemsearch|kind|lvlMin|lvlMax|qualityMin|showAll|name</c> (поля опускаемы). Без <c>showAll=1</c>
-    /// серверно фильтруем под класс/уровень персонажа (прячем непригодное). kind: weapon|armor|consumable|
-    /// gear(2,4)|иначе всё в объёме (расходники+экипировка, классы 0/2/4). Не-админу — ничего.
+    /// Окно «Добавить вещь» (§182/§183): поиск по item_template и ответ кадром <c>IBEGIN</c> …
+    /// <c>I|id|quality|itemlevel|reqlvl|name</c> … <c>IEND</c> (отдельные токены, чтобы не путать с меню/статами).
+    /// Тело запроса: <c>itemsearch|class|sub|lvlMin|lvlMax|qualityMin|showAll|name</c> (поля опускаемы):
+    /// class — один item-класс (0/2/4) либо пусто (= объём 0,2,4); sub — список подклассов через запятую
+    /// (напр. «7,8» — мечи). Без <c>showAll=1</c> серверно фильтруем под класс+уровень персонажа. Сортировка —
+    /// по уровню предмета. Не-админу — ничего.
     /// </summary>
     private async Task SendItemSearchAsync(WorldSession session, string body, CancellationToken ct)
     {
@@ -98,21 +99,19 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
             return;
 
         var p = body.Split('|');
-        var kind = Field(p, 1);
-        var lvlMin = ParseUInt(Field(p, 2));
-        var lvlMax = ParseUInt(Field(p, 3));
-        var qualityMin = ParseUInt(Field(p, 4));
-        var showAll = Field(p, 5) == "1";
-        var name = Field(p, 6);
+        var classField = Field(p, 1);
+        var subField = Field(p, 2);
+        var lvlMin = ParseUInt(Field(p, 3));
+        var lvlMax = ParseUInt(Field(p, 4));
+        var qualityMin = ParseUInt(Field(p, 5));
+        var showAll = Field(p, 6) == "1";
+        var name = Field(p, 7);
 
-        uint[] classes = kind switch
-        {
-            "weapon" => [2],
-            "armor" => [4],
-            "consumable" => [0],
-            "gear" => [2, 4],
-            _ => [0, 2, 4], // объём фичи: экипировка (2,4) + расходники (0)
-        };
+        // class пусто → объём фичи (экипировка 2,4 + расходники 0); иначе один указанный класс.
+        uint[] classes = ParseUInt(classField) is { } c ? [c] : [0, 2, 4];
+        var subClasses = subField
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => ParseUInt(s)).Where(v => v is not null).Select(v => v!.Value).ToArray();
 
         byte? playerClass = null;
         if (!showAll && session.Character is { } ch)
@@ -124,11 +123,13 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
         var filter = new ItemSearchFilter
         {
             Classes = classes,
+            SubClasses = subClasses,
             LevelMin = lvlMin,
             LevelMax = lvlMax,
             QualityMin = qualityMin,
             PlayerClass = playerClass,
             NameContains = string.IsNullOrWhiteSpace(name) ? null : name,
+            OrderByItemLevel = true, // §183: сортировка по уровню предмета по умолчанию
             Limit = 100,
         };
 
@@ -142,7 +143,7 @@ internal sealed class AddonProtocol(DevMenuCatalog devMenu, DevStatsCatalog devS
 
         await SendLineAsync(session, "IBEGIN", ct);
         foreach (var it in results)
-            await SendLineAsync(session, $"I|{it.Entry}|{it.Quality}|{it.RequiredLevel}|{it.Name.Replace('|', ' ')}", ct);
+            await SendLineAsync(session, $"I|{it.Entry}|{it.Quality}|{it.ItemLevel}|{it.RequiredLevel}|{it.Name.Replace('|', ' ')}", ct);
         await SendLineAsync(session, "IEND", ct);
     }
 

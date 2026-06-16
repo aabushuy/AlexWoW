@@ -164,11 +164,11 @@ local function HandleAddonLine(line)
       if itemsFrame and ItemsRefresh then ItemsRefresh() end
     end
   elseif itemsBuilding and string.sub(line, 1, 2) == "I|" then
-    local _, id, q, rl, nm = strsplit("|", line)
+    local _, id, q, il, rl, nm = strsplit("|", line)
     id = tonumber(id)
     if id then
-      itemsBuilding[#itemsBuilding + 1] =
-        { id = id, quality = tonumber(q) or 1, reqlvl = tonumber(rl) or 0, name = nm or ("#" .. id) }
+      itemsBuilding[#itemsBuilding + 1] = { id = id, quality = tonumber(q) or 1,
+        ilvl = tonumber(il) or 0, reqlvl = tonumber(rl) or 0, name = nm or ("#" .. id) }
     end
   elseif building then
     ParseNode(line)
@@ -398,28 +398,81 @@ function AlexDevCmd_ToggleStats()
   end
 end
 
--- ---- §182 Окно «Добавить вещь» (поиск по БД, иконки, AH-фильтры) ----
-local ITEMS_ROW_H, ITEMS_NUM_ROWS = 30, 10
-local itemsScroll, itemsScanTip
-local itemsFilter = { kind = "gear", quality = nil, lvlMin = "", lvlMax = "", name = "", showAll = false }
-local itemsKindIdx, itemsQualIdx = 1, 1
+-- ---- §183 Окно «Добавить вещь» (аукционное: слева дерево фильтров, справа фильтр + таблица) ----
+local ITEMS_ROW_H, ITEMS_NUM_ROWS = 26, 12
+local TREE_ROW_H, TREE_NUM_ROWS = 20, 18
+local itemsScroll, itemsScanTip, itemsTreeScroll
+local itemsTypeFS, itemsQualFS, itemsClassFS          -- лейблы верхней секции (сводка фильтра)
+local itemsLvlMin, itemsLvlMax, itemsNameBox, itemsShowAll  -- контролы верхней секции
+local itemsFilter = { classId = nil, sub = nil, quality = nil, typeLabel = nil, qualLabel = nil }
 
-local ITEM_KINDS = {
-  { v = "gear", t = "Экипировка" }, { v = "weapon", t = "Оружие" }, { v = "armor", t = "Доспех" },
-  { v = "consumable", t = "Расходники" }, { v = "all", t = "Всё" },
-}
-local ITEM_QUALITIES = {
-  { v = nil, t = "Качество: любое" }, { v = 1, t = "Качество: обычное+" }, { v = 2, t = "Качество: необычное+" },
-  { v = 3, t = "Качество: редкое+" }, { v = 4, t = "Качество: эпическое+" },
-}
+local itemTreeRows = {}
+local itemTreeExpanded = {}   -- [node] = true (узел развёрнут)
+local itemTreeVisible = {}    -- плоский DFS-список { node, depth, parent }
+local ItemTreeRefresh         -- forward
+
 local QUALITY_HEX = { [0]="ff9d9d9d",[1]="ffffffff",[2]="ff1eff00",[3]="ff0070dd",[4]="ffa335ee",[5]="ffff8000",[6]="ffe6cc80",[7]="ffe6cc80" }
 
+-- Дерево фильтров. Категории (с children) сворачиваются; листья несут kind="type" (class[+sub]) или
+-- kind="quality" (q: -1 любое … 4 эпик). «Мечи»=подклассы 7,8 и т.п. (1H/2H в один пункт).
+local ITEM_TREE = {
+  { label = "Тип предмета", children = {
+    { label = "Оружие", children = {
+      { label = "Все оружие", kind = "type", class = 2 },
+      { label = "Мечи", kind = "type", class = 2, sub = {7, 8} },
+      { label = "Топоры", kind = "type", class = 2, sub = {0, 1} },
+      { label = "Дробящее", kind = "type", class = 2, sub = {4, 5} },
+      { label = "Кинжалы", kind = "type", class = 2, sub = {15} },
+      { label = "Древковое", kind = "type", class = 2, sub = {6} },
+      { label = "Посохи", kind = "type", class = 2, sub = {10} },
+      { label = "Кистевое", kind = "type", class = 2, sub = {13} },
+      { label = "Луки", kind = "type", class = 2, sub = {2} },
+      { label = "Арбалеты", kind = "type", class = 2, sub = {18} },
+      { label = "Ружья", kind = "type", class = 2, sub = {3} },
+      { label = "Жезлы", kind = "type", class = 2, sub = {19} },
+      { label = "Метательное", kind = "type", class = 2, sub = {16} },
+    } },
+    { label = "Доспех", children = {
+      { label = "Весь доспех", kind = "type", class = 4 },
+      { label = "Тканевая", kind = "type", class = 4, sub = {1} },
+      { label = "Кожаная", kind = "type", class = 4, sub = {2} },
+      { label = "Кольчуга", kind = "type", class = 4, sub = {3} },
+      { label = "Латная", kind = "type", class = 4, sub = {4} },
+      { label = "Щиты", kind = "type", class = 4, sub = {6} },
+      { label = "Реликвии", kind = "type", class = 4, sub = {7, 8, 9, 10} },
+    } },
+    { label = "Расходники", children = {
+      { label = "Все расходники", kind = "type", class = 0 },
+      { label = "Зелья", kind = "type", class = 0, sub = {1} },
+      { label = "Эликсиры", kind = "type", class = 0, sub = {2} },
+      { label = "Фляги", kind = "type", class = 0, sub = {3} },
+      { label = "Свитки", kind = "type", class = 0, sub = {4} },
+      { label = "Еда и напитки", kind = "type", class = 0, sub = {5} },
+      { label = "Бинты", kind = "type", class = 0, sub = {7} },
+    } },
+    { label = "Любой тип", kind = "type" },
+  } },
+  { label = "Качество", children = {
+    { label = "Любое", kind = "quality", q = -1 },
+    { label = "Обычное и выше", kind = "quality", q = 1 },
+    { label = "Необычное и выше", kind = "quality", q = 2 },
+    { label = "Редкое и выше", kind = "quality", q = 3 },
+    { label = "Эпическое и выше", kind = "quality", q = 4 },
+  } },
+}
+
 local function ItemsSendQuery()
-  local f = itemsFilter
   if itemsFrame then itemsFrame.tries = 0 end
-  local body = table.concat({
-    "itemsearch", f.kind, f.lvlMin or "", f.lvlMax or "", f.quality or "", f.showAll and "1" or "", f.name or "",
-  }, "|")
+  local f = itemsFilter
+  local showAll = (itemsShowAll and itemsShowAll:GetChecked()) and true or false
+  local cls = f.classId ~= nil and tostring(f.classId) or ""
+  local sub = (f.sub and #f.sub > 0) and table.concat(f.sub, ",") or ""
+  local qual = (f.quality and f.quality >= 0) and tostring(f.quality) or ""
+  -- «Показать всё» снимает и серверный фильтр класса/уровня, и явные границы уровня (показываем всё).
+  local lvlMin = (not showAll and itemsLvlMin) and itemsLvlMin:GetText() or ""
+  local lvlMax = (not showAll and itemsLvlMax) and itemsLvlMax:GetText() or ""
+  local name = itemsNameBox and itemsNameBox:GetText() or ""
+  local body = table.concat({ "itemsearch", cls, sub, lvlMin, lvlMax, qual, showAll and "1" or "", name }, "|")
   SendAddonMessage(PREFIX, body, "WHISPER", UnitName("player"))
 end
 
@@ -441,7 +494,8 @@ ItemsRefresh = function()
         pending = true
       end
       row.name:SetText("|c" .. (QUALITY_HEX[it.quality] or "ffffffff") .. it.name .. "|r")
-      row.lvl:SetText(it.reqlvl > 0 and ("ур. " .. it.reqlvl) or "")
+      row.ilvl:SetText((it.ilvl and it.ilvl > 0) and tostring(it.ilvl) or "—")
+      row.lvl:SetText(it.reqlvl > 0 and tostring(it.reqlvl) or "—")
       row:Show()
     else
       row.item = nil
@@ -451,18 +505,75 @@ ItemsRefresh = function()
   if itemsFrame then itemsFrame.pendingIcons = pending end
 end
 
-local function ItemsDoSearch(box1, box2, nameBox, showAll)
-  itemsFilter.lvlMin = box1:GetText()
-  itemsFilter.lvlMax = box2:GetText()
-  itemsFilter.name = nameBox:GetText()
-  itemsFilter.showAll = showAll:GetChecked() and true or false
-  ItemsSendQuery()
+-- Плоский DFS-список видимых узлов дерева (по развёрнутым).
+local function ItemTreeRebuild()
+  wipe(itemTreeVisible)
+  local function walk(node, depth, parent)
+    itemTreeVisible[#itemTreeVisible + 1] = { node = node, depth = depth, parent = parent }
+    if node.children and itemTreeExpanded[node] then
+      for _, ch in ipairs(node.children) do walk(ch, depth + 1, node) end
+    end
+  end
+  for _, root in ipairs(ITEM_TREE) do walk(root, 0, nil) end
+end
+
+local function UpdateFilterLabels()
+  if itemsTypeFS then itemsTypeFS:SetText("Тип: " .. (itemsFilter.typeLabel or "любой")) end
+  if itemsQualFS then itemsQualFS:SetText("Качество: " .. (itemsFilter.qualLabel or "любое")) end
+end
+
+-- Выбор листа дерева: подставляет фильтр в верхнюю секцию (тип/качество).
+local function ItemTreeSelect(entry)
+  local node = entry.node
+  if node.kind == "type" then
+    itemsFilter.classId = node.class -- nil = любой тип (объём 0,2,4 на сервере)
+    itemsFilter.sub = node.sub
+    itemsFilter.typeLabel = (entry.parent and entry.parent.label)
+      and (entry.parent.label .. " — " .. node.label) or node.label
+  elseif node.kind == "quality" then
+    itemsFilter.quality = node.q
+    itemsFilter.qualLabel = node.label
+  end
+  UpdateFilterLabels()
+end
+
+ItemTreeRefresh = function()
+  FauxScrollFrame_Update(itemsTreeScroll, #itemTreeVisible, TREE_NUM_ROWS, TREE_ROW_H)
+  local offset = FauxScrollFrame_GetOffset(itemsTreeScroll)
+  for i = 1, TREE_NUM_ROWS do
+    local row = itemTreeRows[i]
+    local entry = itemTreeVisible[i + offset]
+    if entry then
+      row.entry = entry
+      local node, indent = entry.node, string.rep("  ", entry.depth)
+      if node.children then
+        row.text:SetText(indent .. "|cffffd100" .. (itemTreeExpanded[node] and "- " or "+ ") .. node.label .. "|r")
+      else
+        row.text:SetText(indent .. "  |cffd0d0d0" .. node.label .. "|r")
+      end
+      row:Show()
+    else
+      row.entry = nil
+      row:Hide()
+    end
+  end
+end
+
+local function ItemTreeRowClick(row)
+  local entry = row.entry
+  if not entry then return end
+  if entry.node.children then
+    itemTreeExpanded[entry.node] = not itemTreeExpanded[entry.node]
+    ItemTreeRebuild(); ItemTreeRefresh()
+  else
+    ItemTreeSelect(entry)
+  end
 end
 
 local function BuildItemsUI()
   local f = CreateFrame("Frame", "AlexDevItemsFrame", UIParent)
-  f:SetWidth(420); f:SetHeight(470)
-  f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -360, -200)
+  f:SetWidth(660); f:SetHeight(520)
+  f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -120, -120)
   f:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -484,63 +595,86 @@ local function BuildItemsUI()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -6, -6)
 
-  -- Фильтр-кнопки: тип и качество (циклические — клик переключает значение).
-  local kindBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  kindBtn:SetWidth(120); kindBtn:SetHeight(22); kindBtn:SetPoint("TOPLEFT", 16, -38)
-  kindBtn:SetText(ITEM_KINDS[itemsKindIdx].t)
-  kindBtn:SetScript("OnClick", function(self)
-    itemsKindIdx = itemsKindIdx % #ITEM_KINDS + 1
-    itemsFilter.kind = ITEM_KINDS[itemsKindIdx].v
-    self:SetText(ITEM_KINDS[itemsKindIdx].t)
+  -- ===== ЛЕВАЯ КОЛОНКА: дерево фильтров =====
+  local treeHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  treeHdr:SetPoint("TOPLEFT", 20, -40); treeHdr:SetText("Фильтры")
+  itemsTreeScroll = CreateFrame("ScrollFrame", "AlexDevItemsTreeScroll", f, "FauxScrollFrameTemplate")
+  itemsTreeScroll:SetPoint("TOPLEFT", 16, -60)
+  itemsTreeScroll:SetWidth(170); itemsTreeScroll:SetHeight(TREE_NUM_ROWS * TREE_ROW_H)
+  itemsTreeScroll:SetScript("OnVerticalScroll", function(self, offset)
+    FauxScrollFrame_OnVerticalScroll(self, offset, TREE_ROW_H, ItemTreeRefresh)
   end)
-  local qualBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  qualBtn:SetWidth(170); qualBtn:SetHeight(22); qualBtn:SetPoint("LEFT", kindBtn, "RIGHT", 8, 0)
-  qualBtn:SetText(ITEM_QUALITIES[itemsQualIdx].t)
-  qualBtn:SetScript("OnClick", function(self)
-    itemsQualIdx = itemsQualIdx % #ITEM_QUALITIES + 1
-    itemsFilter.quality = ITEM_QUALITIES[itemsQualIdx].v
-    self:SetText(ITEM_QUALITIES[itemsQualIdx].t)
-  end)
+  for i = 1, TREE_NUM_ROWS do
+    local row = CreateFrame("Button", nil, f)
+    row:SetHeight(TREE_ROW_H)
+    if i == 1 then row:SetPoint("TOPLEFT", itemsTreeScroll, "TOPLEFT", 0, 0)
+    else row:SetPoint("TOPLEFT", itemTreeRows[i - 1], "BOTTOMLEFT", 0, 0) end
+    row:SetPoint("RIGHT", itemsTreeScroll, "RIGHT", 0, 0)
+    local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("LEFT", 4, 0); fs:SetJustifyH("LEFT"); row.text = fs
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
+    row:SetScript("OnClick", function(self) ItemTreeRowClick(self) end)
+    itemTreeRows[i] = row
+  end
 
-  -- Уровень (мин–макс) и имя.
+  -- Разделитель колонок.
+  local sep = f:CreateTexture(nil, "ARTWORK")
+  sep:SetTexture(0.4, 0.4, 0.4, 0.6); sep:SetWidth(1)
+  sep:SetPoint("TOPLEFT", 200, -38); sep:SetPoint("BOTTOMLEFT", 200, 16)
+
+  -- ===== ПРАВАЯ КОЛОНКА, ВЕРХНЯЯ СЕКЦИЯ: сводка фильтра + контролы =====
+  local rx = 212
+  itemsClassFS = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  itemsClassFS:SetPoint("TOPLEFT", rx, -40); itemsClassFS:SetText("Класс: ?")
+  itemsTypeFS = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  itemsTypeFS:SetPoint("TOPLEFT", rx, -58); itemsTypeFS:SetText("Тип: любой")
+  itemsQualFS = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  itemsQualFS:SetPoint("TOPLEFT", rx, -76); itemsQualFS:SetText("Качество: любое")
+
   local lvlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  lvlLabel:SetPoint("TOPLEFT", 18, -70); lvlLabel:SetText("Ур.")
-  local lvlMin = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-  lvlMin:SetWidth(32); lvlMin:SetHeight(18); lvlMin:SetAutoFocus(false); lvlMin:SetNumeric(true)
-  lvlMin:SetPoint("LEFT", lvlLabel, "RIGHT", 10, 0)
+  lvlLabel:SetPoint("TOPLEFT", rx, -100); lvlLabel:SetText("Ур.")
+  itemsLvlMin = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  itemsLvlMin:SetWidth(32); itemsLvlMin:SetHeight(18); itemsLvlMin:SetAutoFocus(false); itemsLvlMin:SetNumeric(true)
+  itemsLvlMin:SetPoint("LEFT", lvlLabel, "RIGHT", 12, 0)
   local dash = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  dash:SetPoint("LEFT", lvlMin, "RIGHT", 4, 0); dash:SetText("–")
-  local lvlMax = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-  lvlMax:SetWidth(32); lvlMax:SetHeight(18); lvlMax:SetAutoFocus(false); lvlMax:SetNumeric(true)
-  lvlMax:SetPoint("LEFT", dash, "RIGHT", 8, 0)
+  dash:SetPoint("LEFT", itemsLvlMin, "RIGHT", 4, 0); dash:SetText("–")
+  itemsLvlMax = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  itemsLvlMax:SetWidth(32); itemsLvlMax:SetHeight(18); itemsLvlMax:SetAutoFocus(false); itemsLvlMax:SetNumeric(true)
+  itemsLvlMax:SetPoint("LEFT", dash, "RIGHT", 8, 0)
   local nameLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  nameLabel:SetPoint("LEFT", lvlMax, "RIGHT", 12, 0); nameLabel:SetText("Имя")
-  local nameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
-  nameBox:SetWidth(150); nameBox:SetHeight(18); nameBox:SetAutoFocus(false)
-  nameBox:SetPoint("LEFT", nameLabel, "RIGHT", 10, 0)
+  nameLabel:SetPoint("LEFT", itemsLvlMax, "RIGHT", 14, 0); nameLabel:SetText("Имя")
+  itemsNameBox = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+  itemsNameBox:SetWidth(150); itemsNameBox:SetHeight(18); itemsNameBox:SetAutoFocus(false)
+  itemsNameBox:SetPoint("LEFT", nameLabel, "RIGHT", 10, 0)
 
-  -- «Показать всё» + «Искать».
-  local showAll = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-  showAll:SetWidth(24); showAll:SetHeight(24); showAll:SetPoint("TOPLEFT", 16, -94)
+  itemsShowAll = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+  itemsShowAll:SetWidth(24); itemsShowAll:SetHeight(24); itemsShowAll:SetPoint("TOPLEFT", rx - 2, -122)
   local showAllLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  showAllLabel:SetPoint("LEFT", showAll, "RIGHT", 2, 0); showAllLabel:SetText("Показать всё (без фильтра класса/уровня)")
+  showAllLabel:SetPoint("LEFT", itemsShowAll, "RIGHT", 2, 0)
+  showAllLabel:SetText("Показать всё (без фильтра класса/уровня)")
   local searchBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  searchBtn:SetWidth(90); searchBtn:SetHeight(22); searchBtn:SetPoint("TOPRIGHT", -16, -92); searchBtn:SetText("Искать")
+  searchBtn:SetWidth(100); searchBtn:SetHeight(22); searchBtn:SetPoint("TOPRIGHT", -16, -148); searchBtn:SetText("Поиск")
+  searchBtn:SetScript("OnClick", ItemsSendQuery)
+  local function enterSearch(self) self:ClearFocus(); ItemsSendQuery() end
+  itemsLvlMin:SetScript("OnEnterPressed", enterSearch)
+  itemsLvlMax:SetScript("OnEnterPressed", enterSearch)
+  itemsNameBox:SetScript("OnEnterPressed", enterSearch)
 
-  local function doSearch() ItemsDoSearch(lvlMin, lvlMax, nameBox, showAll) end
-  searchBtn:SetScript("OnClick", doSearch)
-  local function enterSearch(self) self:ClearFocus(); doSearch() end
-  lvlMin:SetScript("OnEnterPressed", enterSearch)
-  lvlMax:SetScript("OnEnterPressed", enterSearch)
-  nameBox:SetScript("OnEnterPressed", enterSearch)
-
-  -- Список результатов.
+  -- ===== ПРАВАЯ КОЛОНКА, НИЖНЯЯ СЕКЦИЯ: таблица результатов =====
   itemsScroll = CreateFrame("ScrollFrame", "AlexDevItemsScrollFrame", f, "FauxScrollFrameTemplate")
-  itemsScroll:SetPoint("TOPLEFT", 16, -124)
+  itemsScroll:SetPoint("TOPLEFT", rx, -196)
   itemsScroll:SetPoint("BOTTOMRIGHT", -34, 16)
   itemsScroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, ITEMS_ROW_H, ItemsRefresh)
   end)
+  -- Заголовки столбцов (над таблицей, выровнены по столбцам строк).
+  local hName = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  hName:SetPoint("BOTTOMLEFT", itemsScroll, "TOPLEFT", 32, 4); hName:SetText("Предмет")
+  local hIlvl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  hIlvl:SetPoint("BOTTOMLEFT", itemsScroll, "TOPLEFT", 262, 4); hIlvl:SetText("Ур.пред")
+  local hReq = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  hReq:SetPoint("BOTTOMRIGHT", itemsScroll, "TOPRIGHT", -10, 4); hReq:SetText("Ур.перс")
 
   for i = 1, ITEMS_NUM_ROWS do
     local row = CreateFrame("Button", nil, f)
@@ -549,14 +683,24 @@ local function BuildItemsUI()
     else row:SetPoint("TOPLEFT", itemsRows[i - 1], "BOTTOMLEFT", 0, 0) end
     row:SetPoint("RIGHT", itemsScroll, "RIGHT", 0, 0)
     local icon = row:CreateTexture(nil, "ARTWORK")
-    icon:SetWidth(26); icon:SetHeight(26); icon:SetPoint("LEFT", 2, 0); icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    icon:SetWidth(24); icon:SetHeight(24); icon:SetPoint("LEFT", 2, 0); icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     row.icon = icon
     local nm = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    nm:SetPoint("LEFT", icon, "RIGHT", 6, 0); nm:SetJustifyH("LEFT"); nm:SetWidth(250); row.name = nm
+    nm:SetPoint("LEFT", icon, "RIGHT", 6, 0); nm:SetJustifyH("LEFT"); nm:SetWidth(220); row.name = nm
+    local il = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    il:SetPoint("LEFT", row, "LEFT", 262, 0); il:SetWidth(50); il:SetJustifyH("LEFT"); row.ilvl = il
     local lvl = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    lvl:SetPoint("RIGHT", -6, 0); lvl:SetJustifyH("RIGHT"); row.lvl = lvl
+    lvl:SetPoint("RIGHT", -10, 0); lvl:SetJustifyH("RIGHT"); row.lvl = lvl
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
+    row:SetScript("OnEnter", function(self)
+      if self.item then
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink("item:" .. self.item.id) -- нативный тултип предмета (как в вебе)
+        GameTooltip:Show()
+      end
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row:SetScript("OnClick", function(self)
       if self.item then StaticPopup_Show("ALEXDEVCMD_ADDITEM", self.item.name, nil, { id = self.item.id }) end
     end)
@@ -567,7 +711,7 @@ local function BuildItemsUI()
   itemsScanTip = CreateFrame("GameTooltip", "AlexDevItemScanTooltip", nil, "GameTooltipTemplate")
   itemsScanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
 
-  -- Иконки/имена приходят с сервера асинхронно — дорисовываем, пока не подгрузятся (с лимитом попыток).
+  -- Иконки приходят с сервера асинхронно — дорисовываем, пока не подгрузятся (с лимитом попыток).
   f:SetScript("OnUpdate", function(self, elapsed)
     self.acc = (self.acc or 0) + elapsed
     if self.acc < 0.3 then return end
@@ -582,6 +726,16 @@ local function BuildItemsUI()
     local p, rp, x, y = unpack(AlexDevCmdDB.itemsPos)
     f:ClearAllPoints(); f:SetPoint(p, UIParent, rp, x, y)
   end
+
+  -- Предзаполнение: класс персонажа (инфо) и верхняя граница уровня = уровень персонажа.
+  itemsClassFS:SetText("Класс: " .. (UnitClass("player") or "?"))
+  itemsLvlMax:SetText(tostring(UnitLevel("player") or ""))
+  UpdateFilterLabels()
+
+  -- По умолчанию раскрыты корни «Тип предмета» и «Качество».
+  itemTreeExpanded[ITEM_TREE[1]] = true
+  itemTreeExpanded[ITEM_TREE[2]] = true
+  ItemTreeRebuild(); ItemTreeRefresh()
 
   itemsFrame = f
 end
