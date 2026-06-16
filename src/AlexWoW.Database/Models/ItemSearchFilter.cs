@@ -43,6 +43,9 @@ public sealed record ItemSearchFilter
     /// <summary>Сортировать по уровню предмета (ItemLevel DESC) вместо требуемого уровня. §183.</summary>
     public bool OrderByItemLevel { get; init; }
 
+    /// <summary>Прятать служебные/тестовые предметы дампа (QA*, zzOLD, TEST, Monster -, [PH], …). §183.</summary>
+    public bool ExcludeTestItems { get; init; }
+
     /// <summary>Подстрока названия. Пробелы трактуются как «%» (как в ручном LIKE '%a%b%').</summary>
     public string? NameContains { get; init; }
 
@@ -85,6 +88,15 @@ public sealed record ItemSearchFilter
         {
             clauses.Add("Quality >= @qmin");
             parameters.Add("qmin", qmin);
+        }
+        if (ExcludeTestItems)
+        {
+            // Стандартные служебные/тестовые предметы дампа (MySQL LIKE: % — wildcard, [ — литерал).
+            clauses.Add(
+                "name NOT LIKE 'QA%' AND name NOT LIKE 'zzOLD%' AND name NOT LIKE 'OLD - %' "
+                + "AND name NOT LIKE 'TEST%' AND name NOT LIKE 'Test %' AND name NOT LIKE '%(test)%' "
+                + "AND name NOT LIKE 'Monster -%' AND name NOT LIKE '[PH]%' AND name NOT LIKE 'Deprecated%' "
+                + "AND name NOT LIKE 'UNUSED%' AND name NOT LIKE 'Internal%'");
         }
         if (PlayerClass is { } cls && cls is >= 1 and <= 11)
         {

@@ -261,6 +261,11 @@ local function BuildUI()
   f:SetClampedToScreen(true)
   f:Hide()
 
+  -- Плотная тёмная подложка — DialogBox-фон полупрозрачный, на ярком фоне плохо читается.
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 0.94)
+  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
+
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   title:SetPoint("TOP", 0, -16)
   title:SetText("Dev-команды")
@@ -348,6 +353,11 @@ local function BuildStatsUI()
   end)
   f:SetClampedToScreen(true)
   f:Hide()
+
+  -- Плотная тёмная подложка — DialogBox-фон полупрозрачный, на ярком фоне плохо читается.
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 0.94)
+  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   title:SetPoint("TOP", 0, -16)
