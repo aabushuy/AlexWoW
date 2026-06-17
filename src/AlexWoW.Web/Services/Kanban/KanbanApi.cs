@@ -14,7 +14,7 @@ public static class KanbanApi
     private sealed record MoveReq(string Status);
     private sealed record TesterReq(uint? TesterGuid, bool ClientCheck);
     private sealed record CommentReq(string? Author, string? Body);
-    private sealed record AssignReq(byte? Class, byte? Level, bool? ClientCheck);
+    private sealed record AssignReq(byte? Class, byte? Race, byte? Level, bool? ClientCheck);
 
     public static void MapKanbanApi(this WebApplication app)
     {
@@ -86,10 +86,13 @@ public static class KanbanApi
             if (testers.Count == 0)
                 return Results.BadRequest(new { error = "Нет персонажей-тестировщиков (IsTester=1)" });
 
-            // Подбор: при подсказке класса — среди этого класса (если есть); по уровню — минимально
-            // подходящий (Level >= hint), иначе самый высокоуровневый.
+            // Подбор: race-фильтр сильнее class-фильтра (для эпика «Расовые абилки» нужна КОНКРЕТНАЯ раса).
+            // Каждый фильтр применяется, только если в пуле есть совпадение (иначе игнорим — нет смысла
+            // отбрасывать всех). По уровню — минимально подходящий (Level >= hint), иначе самый прокачанный.
             var pool = testers.AsEnumerable();
-            if (body?.Class is { } cls && testers.Any(t => t.Class == cls))
+            if (body?.Race is { } race && testers.Any(t => t.Race == race))
+                pool = pool.Where(t => t.Race == race);
+            if (body?.Class is { } cls && pool.Any(t => t.Class == cls))
                 pool = pool.Where(t => t.Class == cls);
             var pick = (body?.Level is { } lvl && pool.Any(t => t.Level >= lvl))
                 ? pool.Where(t => t.Level >= lvl).OrderBy(t => t.Level).First()
@@ -99,8 +102,9 @@ public static class KanbanApi
             await k.MoveAsync(id, "Testing", ct);
             return Results.Ok(new
             {
-                id, testerGuid = pick.Guid, testerName = pick.Name, testerClass = pick.Class,
-                testerLevel = pick.Level, status = "Testing",
+                id, testerGuid = pick.Guid, testerName = pick.Name,
+                testerClass = pick.Class, testerRace = pick.Race, testerLevel = pick.Level,
+                status = "Testing",
             });
         });
     }
