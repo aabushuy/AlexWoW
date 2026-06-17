@@ -63,4 +63,20 @@ public static class MovementPackets
         PackedGuid.Write(w, guid);
         return w.UInt32(counter).ToArray();
     }
+
+    /// <summary>
+    /// SMSG_FORCE_*_SPEED_CHANGE: задать абсолютную скорость движения юнита (Sprint/Ghost Wolf и т.п.).
+    /// 3.3.5a: PackedGuid + uint32 counter + (только Run — uint8 unknown=0) + float new_speed.
+    /// Шлём ТОЛЬКО кастеру (его клиент); другим наблюдателям — отдельный пакет MOVE_SET_RUN_SPEED (TODO).
+    /// </summary>
+    public static byte[] BuildForceSpeedChange(ulong guid, uint counter, float newSpeed, bool runMode)
+    {
+        var w = new ByteWriter(20);
+        PackedGuid.Write(w, guid);
+        w.UInt32(counter);
+        if (runMode)
+            w.UInt8(0); // unknown — только для SMSG_FORCE_RUN_SPEED_CHANGE
+        w.Single(newSpeed);
+        return w.ToArray();
+    }
 }

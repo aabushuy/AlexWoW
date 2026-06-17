@@ -56,6 +56,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
     private const int AuraMechanicImmunity = 77;         // иммунитет к механике (Ярость берсерка: страх/sap/incapacitate)
     private const int AuraModStat = 29;                  // +стат (Stamina/Intellect/Spirit/Strength/Agility) — PW:Fortitude, Divine Spirit и т.п.
+    private const int AuraModIncreaseSpeed = 31;         // +% скорости бега (Sprint, Ghost Wolf, Travel Form, Cheetah)
     private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
@@ -167,7 +168,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // MOD_STAT (аура 29): +N к одному стату по индексу. StatIndex: 0=Сила, 1=Ловкость, 2=Выносливость,
         // 3=Интеллект, 4=Дух. Величина = BasePoints+1. Применяется через PeriodicsService.SendStatsAsync;
         // Stamina/Intellect доп. поднимают MaxHealth/MaxMana.
-        int StatBonus = 0, byte StatIndex = 0);
+        int StatBonus = 0, byte StatIndex = 0,
+        // MOD_INCREASE_SPEED (аура 31): +% скорости бега (Sprint +50%, Ghost Wolf/Travel Form +40%). Применяется
+        // через AuraService.SendSpeedAsync (SMSG_FORCE_RUN_SPEED_CHANGE: base × (1 + сумма% / 100)).
+        int SpeedPctBonus = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -323,6 +327,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, 2 => t.EffectMiscValue3, _ => 0,
         };
         var statIndex = statIdx >= 0 ? (byte)Math.Clamp(statMisc, 0, 4) : (byte)0;
+        // MOD_INCREASE_SPEED (аура 31): +% скорости бега. Sprint (2983): Bp=49 → +50%. Ghost Wolf (2645): Bp=39 → +40%.
+        // Применяется через AuraService.SendSpeedAsync (SMSG_FORCE_RUN_SPEED_CHANGE).
+        var speedAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseSpeed);
+        var speedPctBonus = speedAura.Eff == EffectApplyAura ? speedAura.Bp + 1 : 0;
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — абилка не бьёт мгновенно,
         // а замещает следующую автоатаку (бросок оружия + флэт-бонус). Распознаём по атрибуту.
         var onNextSwing = (t.Attributes & (SpellAttrOnNextSwing1 | SpellAttrOnNextSwing2)) != 0;
@@ -548,7 +556,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
             shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId,
             attackPowerBonus, rangedAttackPowerBonus,
-            statBonus, statIndex);
+            statBonus, statIndex,
+            speedPctBonus);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

@@ -34,6 +34,16 @@ public enum WorldOpcode : uint
     CmsgForceMoveRootAck = 0x0E9,
     SmsgForceMoveUnroot = 0x0EA,
     CmsgForceMoveUnrootAck = 0x0EB,
+    // Изменение скорости движения юнита (MOD_INCREASE_SPEED/MOD_DECREASE_SPEED — Sprint/Ghost Wolf/Hamstring).
+    // 3.3.5a opcodes (CMaNGOS Opcodes.cpp). Шлём только себе (FORCE_*); чужим — MOVE_SET_RUN_SPEED.
+    SmsgForceRunSpeedChange = 0x0E2,
+    SmsgForceRunBackSpeedChange = 0x0E4,
+    SmsgForceSwimSpeedChange = 0x0E6,
+    SmsgForceWalkSpeedChange = 0x0F1,
+    SmsgForceSwimBackSpeedChange = 0x0F3,
+    SmsgForceTurnRateChange = 0x0F5,
+    SmsgForceFlightSpeedChange = 0x381,
+    SmsgForceFlightBackSpeedChange = 0x383,
 
     // Логаут (M4)
     CmsgLogoutRequest = 0x04B,
