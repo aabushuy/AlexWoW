@@ -96,7 +96,11 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.ActionBars).HasColumnName("action_bars").HasDefaultValue((byte)0);
             e.Property(x => x.TalentResetCost).HasColumnName("talent_reset_cost").HasDefaultValue(0u);
             e.Property(x => x.IsTester).HasColumnName("is_tester").HasDefaultValue(false); // KB6: QA-тестировщик
-            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("uk_characters_name");
+            // KB#87: soft-delete. NULL = живой персонаж, DateTime = момент удаления.
+            e.Property(x => x.DeletedAt).HasColumnName("deleted_at").HasColumnType("timestamp");
+            // Composite UNIQUE (name, deleted_at): MySQL трактует NULL в unique-индексе как distinct,
+            // поэтому один живой «Опал» сосуществует с N удалёнными «Опал» с разными timestamp.
+            e.HasIndex(x => new { x.Name, x.DeletedAt }).IsUnique().HasDatabaseName("uk_characters_name");
             e.HasIndex(x => x.AccountId).HasDatabaseName("ix_characters_account");
         });
 

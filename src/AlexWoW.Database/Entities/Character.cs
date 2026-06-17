@@ -26,4 +26,9 @@ public sealed class Character
     public byte ActionBars { get; set; }      // DEFAULT 0
     public uint TalentResetCost { get; set; } // последняя стоимость сброса талантов (медь); DEFAULT 0. M9.8
     public bool IsTester { get; set; }        // KB6: персонаж-тестировщик QA-доски; DEFAULT 0
+
+    // KB#87: soft-delete. Никогда не удаляем row физически — иначе AUTO_INCREMENT
+    // может вернуть тот же guid, и клиент по своему WDB-кэшу подтянет данные старого
+    // персонажа → access violation в рендере на char-select.
+    public DateTime? DeletedAt { get; set; }
 }
