@@ -36,6 +36,7 @@ public sealed class KanbanService(KanbanRepository repo)
         if (await repo.GetAsync(t.Id, ct) is null)
             throw new KanbanValidationException($"Тикет #{t.Id} не найден");
         t = await NormalizeTreeAsync(t, ct);
+        EnsureTesterReady(t.TesterGuid, t.TestSteps, t.ExpectedResult); // нельзя назначить тестера без шагов/ожидаемого
         await repo.UpdateAsync(t, ct);
     }
 
@@ -46,8 +47,25 @@ public sealed class KanbanService(KanbanRepository repo)
         await repo.SetStatusAsync(id, status, ct);
     }
 
-    public Task SetTesterAsync(int id, uint? testerGuid, bool clientCheck, CancellationToken ct) =>
-        repo.SetTesterAsync(id, testerGuid, clientCheck, ct);
+    public async Task SetTesterAsync(int id, uint? testerGuid, bool clientCheck, CancellationToken ct)
+    {
+        if (testerGuid is not null)
+        {
+            var t = await repo.GetAsync(id, ct) ?? throw new KanbanValidationException($"Тикет #{id} не найден");
+            EnsureTesterReady(testerGuid, t.TestSteps, t.ExpectedResult);
+        }
+        await repo.SetTesterAsync(id, testerGuid, clientCheck, ct);
+    }
+
+    /// <summary>Нельзя назначить тестировщика, если не заполнены «Шаги тестирования» и «Ожидаемый результат».</summary>
+    private static void EnsureTesterReady(uint? testerGuid, string? testSteps, string? expectedResult)
+    {
+        if (testerGuid is null) return;
+        if (string.IsNullOrWhiteSpace(testSteps))
+            throw new KanbanValidationException("Перед назначением тестировщика заполните «Шаги тестирования»");
+        if (string.IsNullOrWhiteSpace(expectedResult))
+            throw new KanbanValidationException("Перед назначением тестировщика заполните «Ожидаемый результат»");
+    }
 
     public async Task<int> CommentAsync(int id, string author, string body, CancellationToken ct)
     {

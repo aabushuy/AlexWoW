@@ -62,8 +62,8 @@ public static class KanbanApi
         g.MapPost("/tickets/{id:int}/tester", async (int id, TesterReq body, KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
         {
             if (!Authorized(ctx, o)) return Results.Unauthorized();
-            await k.SetTesterAsync(id, body.TesterGuid, body.ClientCheck, ct);
-            return Results.Ok(new { id });
+            try { await k.SetTesterAsync(id, body.TesterGuid, body.ClientCheck, ct); return Results.Ok(new { id }); }
+            catch (KanbanValidationException e) { return Results.BadRequest(new { error = e.Message }); }
         });
 
         g.MapPost("/tickets/{id:int}/comments", async (int id, CommentReq body, KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
@@ -98,7 +98,8 @@ public static class KanbanApi
                 ? pool.Where(t => t.Level >= lvl).OrderBy(t => t.Level).First()
                 : pool.OrderByDescending(t => t.Level).First();
 
-            await k.SetTesterAsync(id, pick.Guid, body?.ClientCheck ?? true, ct);
+            try { await k.SetTesterAsync(id, pick.Guid, body?.ClientCheck ?? true, ct); }
+            catch (KanbanValidationException e) { return Results.BadRequest(new { error = e.Message }); }
             await k.MoveAsync(id, "Testing", ct);
             return Results.Ok(new
             {
