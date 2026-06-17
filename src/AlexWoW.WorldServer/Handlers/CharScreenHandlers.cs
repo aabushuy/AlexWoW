@@ -304,11 +304,15 @@ internal sealed class CharScreenHandlers(
             catch (Exception ex) { session.Logger.LogDebug(ex, "REQUEST_ACCOUNT_DATA type={Type}: {Msg}", dataType, ex.Message); }
         }
 
-        // SMSG_UPDATE_ACCOUNT_DATA (3.3.5, формат CMaNGOS — он эталон против клиента; wow_messages
-        // пропускает guid и time): PackedGuid игрока + u32 type + u32 time + (blob = decompressed_size+zlib).
-        // Пусто → decompressed_size = 0. ⚠️ Без guid/time клиент читает раскладку как мусор → панели ломаются.
-        var w = new ByteWriter(16 + blob.Length);
-        PackedGuid.Write(w, (ulong)session.InWorldGuid); // 0 вне мира → одиночный байт 0x00
+        // SMSG_UPDATE_ACCOUNT_DATA (3.3.5, формат CMaNGOS, MiscHandler.cpp:881):
+        //   data << (_player ? _player->GetObjectGuid() : ObjectGuid()); // FULL u64, НЕ packed!
+        //   data << uint32(type) << uint32(time) << uint32(decompressed_size) << zlib;
+        // Раньше тут был PackedGuid → для guid=0 уходил 1 байт вместо 8, клиент сдвигался на 7
+        // байт в потоке, читал мусор как decompressed_size, пытался выделить буфер этого размера
+        // и валился в access violation (KB#87). При пустом блобе крах не проявлялся, т.к. клиент
+        // при decompressed_size=0 ничего не распаковывал.
+        var w = new ByteWriter(20 + blob.Length);
+        w.UInt64((ulong)session.InWorldGuid); // 0 вне мира → 8 байт нулей
         w.UInt32(dataType);
         w.UInt32(time);
         if (blob.Length > 0)
