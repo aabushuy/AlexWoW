@@ -19,11 +19,15 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
             throw new InvalidOperationException("БД alexwow_auth недоступна");
     }
 
+    // KB#87: GetByAccount/Count/NameExists/GetTesters работают только с живыми персонажами
+    // (DeletedAt IS NULL). GetByGuid и declined-lookup без фильтра — внутренние ссылки на
+    // guid (квесты, инвентарь, NameQuery от чужого клиента) должны разрешаться и после удаления.
     public async Task<IReadOnlyList<ModelCharacter>> GetByAccountAsync(uint accountId, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.Characters.AsNoTracking()
-            .Where(x => x.AccountId == accountId).OrderBy(x => x.Guid).ToListAsync(ct);
+            .Where(x => x.AccountId == accountId && x.DeletedAt == null)
+            .OrderBy(x => x.Guid).ToListAsync(ct);
         return [.. rows.Select(ToModel)];
     }
 
@@ -37,13 +41,14 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
     public async Task<bool> NameExistsAsync(string name, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await db.Characters.AsNoTracking().AnyAsync(x => x.Name == name, ct);
+        return await db.Characters.AsNoTracking().AnyAsync(x => x.Name == name && x.DeletedAt == null, ct);
     }
 
     public async Task<int> CountByAccountAsync(uint accountId, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await db.Characters.AsNoTracking().CountAsync(x => x.AccountId == accountId, ct);
+        return await db.Characters.AsNoTracking()
+            .CountAsync(x => x.AccountId == accountId && x.DeletedAt == null, ct);
     }
 
     public async Task<uint> CreateAsync(ModelCharacter character, CancellationToken ct = default)
@@ -170,26 +175,24 @@ public sealed class EfCharacterRepository(IDbContextFactory<AuthDbContext> facto
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var rows = await db.Characters.AsNoTracking()
-            .Where(x => x.IsTester).OrderByDescending(x => x.Level).ToListAsync(ct);
+            .Where(x => x.IsTester && x.DeletedAt == null)
+            .OrderByDescending(x => x.Level).ToListAsync(ct);
         return [.. rows.Select(ToModel)];
     }
 
     public async Task<bool> DeleteAsync(uint guid, uint accountId, CancellationToken ct = default)
     {
+        // KB#87: soft-delete. Помечаем DeletedAt, чтобы guid НИКОГДА не переиспользовался
+        // (AUTO_INCREMENT в InnoDB при рестарте пересчитывается из MAX(guid)+1; если удалить
+        // последний row физически — следующий create вернёт тот же guid, и клиентский WDB-кэш
+        // на другой машине отдаст данные старого персонажа → access violation в рендере).
+        // Связанные данные (инвентарь, квесты, спеллы, скиллы, ауры, per-char account_data) НЕ
+        // зачищаем — пригодятся для будущей команды restore-character.
         await using var db = await factory.CreateDbContextAsync(ct);
-        var affected = await db.Characters.Where(c => c.Guid == guid && c.AccountId == accountId)
-            .ExecuteDeleteAsync(ct);
-        if (affected == 0)
-            return false;
-        // Зачистка связанных строк (FK-каскадов в схеме нет) — часть жизненного цикла персонажа.
-        await db.CharacterItems.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        await db.DeclinedNames.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        await db.QuestStatuses.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        await db.CharacterSpells.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        await db.AccountDataBlobs.Where(x => x.OwnerId == guid && x.IsChar == 1).ExecuteDeleteAsync(ct);
-        await db.CharacterAuras.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        await db.CharacterSkills.Where(x => x.OwnerGuid == guid).ExecuteDeleteAsync(ct);
-        return true;
+        var affected = await db.Characters
+            .Where(c => c.Guid == guid && c.AccountId == accountId && c.DeletedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.DeletedAt, DateTime.UtcNow), ct);
+        return affected > 0;
     }
 
     private static ModelCharacter ToModel(Character e) => new()
