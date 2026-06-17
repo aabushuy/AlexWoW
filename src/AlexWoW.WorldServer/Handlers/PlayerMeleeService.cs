@@ -107,7 +107,7 @@ internal sealed class PlayerMeleeService(
         session.Combat.PendingNextSwingSpellId = 0;
 
         var school = pendingInfo is { School: > 0 } ? pendingInfo.School : (byte)1; // физ. (1)
-        var rawDamage = (int)ComputeMeleeDamage(level)
+        var rawDamage = (int)ComputeMeleeDamage(session)
             + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
         // Фаза 2: % наносимого урона по школе (Divine Shield −50% и т.п.) — для автоатаки/абилки.
         var damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, school, rawDamage));
@@ -195,12 +195,18 @@ internal sealed class PlayerMeleeService(
         return dx * dx + dy * dy + dz * dz <= MeleeRangeYards * MeleeRangeYards;
     }
 
-    /// <summary>Мили-урон игрока (упрощённо по уровню; точные статы/оружие — позже).</summary>
-    private static uint ComputeMeleeDamage(byte level)
+    /// <summary>Мили-урон игрока: упрощённый бросок по уровню + вклад силы атаки. Каждые 14 AP дают +1 DPS;
+    /// в урон за свинг это (AP / 14) × (длительность свинга, сек.). Так Боевой клич и прочие AP-баффы
+    /// реально подкручивают урон автоатаки (UI «Сила атаки» уже обновляется в PeriodicsService).</summary>
+    private static uint ComputeMeleeDamage(WorldSession session)
     {
-        var lvl = Math.Max((byte)1, level);
+        var lvl = Math.Max((byte)1, session.Character?.Level ?? 1);
         var min = 8 + lvl;
         var max = 14 + lvl * 2;
-        return (uint)Random.Shared.Next(min, max + 1);
+        var roll = Random.Shared.Next(min, max + 1);
+        var totalAp = (int)session.Combat.BaseMeleeAttackPower + session.Combat.AttackPowerBonus;
+        if (totalAp > 0)
+            roll += totalAp * (int)SwingIntervalMs / (14 * 1000);
+        return (uint)Math.Max(1, roll);
     }
 }

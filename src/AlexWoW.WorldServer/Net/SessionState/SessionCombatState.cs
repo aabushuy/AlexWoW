@@ -59,6 +59,16 @@ internal sealed class SessionCombatState
     /// <summary>Шанс мили-крита (%) из статов (кэш RefreshMeleeAsync) — ролл крита автоатаки/мили-абилки. CRIT.2.</summary>
     internal float MeleeCritPct { get; set; }
     internal uint ArmorValue { get; set; }
+    /// <summary>Базовая сила атаки (мили) из статов/класса — кэш RefreshMeleeAsync. Используется в формуле
+    /// автоатаки игрока и при отдельной пересылке поля UNIT_FIELD_ATTACK_POWER (PeriodicsService.SendAttackPowerAsync).</summary>
+    internal uint BaseMeleeAttackPower { get; set; }
+    /// <summary>Базовая сила атаки (дальний бой) — кэш RefreshMeleeAsync (значима для охотника).</summary>
+    internal uint BaseRangedAttackPower { get; set; }
+    /// <summary>Сумма аур-бонусов мили-AP (Боевой клич / Благословение Могущества) — обновляется в
+    /// PeriodicsService при apply/remove ауры. Учитывается в формуле автоатаки.</summary>
+    internal int AttackPowerBonus { get; set; }
+    /// <summary>Сумма аур-бонусов AP дальнего боя (вторая аура Боевого клича) — для охотника.</summary>
+    internal int RangedAttackPowerBonus { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
     /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
