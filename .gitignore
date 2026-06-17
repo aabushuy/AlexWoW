@@ -41,6 +41,9 @@ charstartoutfit.sql
 # MCP-конфиг проекта содержит API-токен Vikunja — в репозиторий не кладём
 .mcp.json
 
+# Конфиг Codex CLI — локальный, не коммитим
+.codex/
+
 # Локальный справочник протокола (gtker/wow_messages .wowm) — не в репозиторий
 reference/
 
