@@ -29,4 +29,8 @@ public sealed class ActiveAura
     /// <summary>% получаемого урона (отрицательный = снижение): Frost Presence −9% и т.п. на перманентной
     /// ауре-переключателе. Суммируется в резолвере входящего мили-удара. 0 — нет. §1.</summary>
     public int DamageTakenPct { get; init; }
+
+    /// <summary>+% к скорости бега (MOD_INCREASE_SPEED, аура 31): Sprint +50%, Ghost Wolf/Travel Form +40%,
+    /// Aspect of the Cheetah +30%. Суммируется во всех активных аурах и шлёт SMSG_FORCE_RUN_SPEED_CHANGE.</summary>
+    public int SpeedPctBonus { get; init; }
 }

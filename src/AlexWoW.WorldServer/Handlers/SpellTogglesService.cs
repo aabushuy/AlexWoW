@@ -33,12 +33,14 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
             return true;
         }
 
-        // Стат-эффект формы-переключателя (Shadowform +15% Shadow): несём % урона по школе на ауре.
+        // Стат-эффект формы-переключателя (Shadowform +15% Shadow / Ghost Wolf/Travel Form +40% скорости):
+        // несём % урона по школе и % скорости на ауре.
         var info = await spellCatalog.GetAsync(spellId, ct);
         await auras.ApplyAsync(session, spellId, durationMs: 0, positive: true, toggle.Form, ct,
             group: toggle.Group, persist: true,
             damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
-            damageTakenPct: info?.DamageTakenPct ?? 0); // смена ресурса формы — централизованно в AuraService
+            damageTakenPct: info?.DamageTakenPct ?? 0,
+            speedPctBonus: info?.SpeedPctBonus ?? 0); // смена ресурса формы — централизованно в AuraService
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
             session.Account, spellId, toggle.Form, toggle.Group);
         return true;

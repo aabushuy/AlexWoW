@@ -184,7 +184,8 @@ internal sealed class PeriodicsService(
             // (Metamorphosis ЧК: форма 22 → демон-модель). По истечении баффа AuraService снимет форму (resetForm).
             var exclusiveGroup = SpellCatalog.ExclusiveAuraGroup(spellId);
             await auras.ApplyAsync(session, spellId, dur, positive: true, form: info.ShapeshiftForm, ct, group: exclusiveGroup,
-                damageDonePct: info.DamageDonePct, damageDoneSchool: info.DamageDoneSchoolMask);
+                damageDonePct: info.DamageDonePct, damageDoneSchool: info.DamageDoneSchoolMask,
+                speedPctBonus: info.SpeedPctBonus);
             if (info.HealthBonus > 0)
             {
                 session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);

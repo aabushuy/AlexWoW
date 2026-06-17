@@ -25,7 +25,7 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
     /// </summary>
     internal async Task ApplyAsync(WorldSession session, uint spellId, int durationMs,
         bool positive, byte form, CancellationToken ct, byte group = 0, bool persist = false,
-        int damageDonePct = 0, byte damageDoneSchool = 0, int damageTakenPct = 0)
+        int damageDonePct = 0, byte damageDoneSchool = 0, int damageTakenPct = 0, int speedPctBonus = 0)
     {
         if (session.InWorldGuid == 0)
             return;
@@ -63,8 +63,13 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
             DamageDonePct = damageDonePct,
             DamageDoneSchool = damageDoneSchool,
             DamageTakenPct = damageTakenPct,
+            SpeedPctBonus = speedPctBonus,
         };
         session.Progression.Auras.Add(aura);
+
+        // Скорость: апдейтим, если у этой ауры есть SpeedPctBonus (Sprint/Ghost Wolf и т.п.).
+        if (speedPctBonus != 0)
+            await SendSpeedAsync(session, ct);
 
         // Сначала аура (SMSG_AURA_UPDATE), затем форма (UNIT_FIELD_BYTES_2) — порядок как в CMaNGOS,
         // чтобы клиент сразу подсветил активную стойку (M7 #21).
@@ -139,6 +144,29 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
         if (resetForm && aura.ShapeshiftForm != 0)
             await session.SendAsync(WorldOpcode.SmsgCooldownEvent,
                 SpellPackets.BuildCooldownEvent((ulong)session.InWorldGuid, aura.SpellId), ct);
+
+        // Скорость: пересчитать без снятой ауры (вернуть к базе или к меньшему бонусу).
+        if (aura.SpeedPctBonus != 0)
+            await SendSpeedAsync(session, ct);
+    }
+
+    /// <summary>Базовая скорость бега (ярд/с), CMaNGOS PLAYER_BASE_RUN_SPEED.</summary>
+    private const float BaseRunSpeed = 7.0f;
+
+    /// <summary>Шлёт SMSG_FORCE_RUN_SPEED_CHANGE с актуальной скоростью бега =
+    /// <see cref="BaseRunSpeed"/> × (1 + сумма SpeedPctBonus всех активных аур / 100). Только себе —
+    /// движение видно по обычным MSG_MOVE_*. Для наблюдателей TODO: MOVE_SET_RUN_SPEED. KB#160/#400.</summary>
+    private Task SendSpeedAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        var totalPct = session.Progression.Auras.Sum(a => a.SpeedPctBonus);
+        var rate = 1f + totalPct / 100f;
+        if (rate < 0.1f) rate = 0.1f;
+        var newSpeed = BaseRunSpeed * rate;
+        var counter = session.NextTeleportCounter(); // переиспользуем монотонный счётчик движения
+        return session.SendAsync(WorldOpcode.SmsgForceRunSpeedChange,
+            MovementPackets.BuildForceSpeedChange((ulong)session.InWorldGuid, counter, newSpeed, runMode: true), ct);
     }
 
     /// <summary>VALUES-апдейт UNIT_FIELD_BYTES_2 (байт 3 = форма) себе и наблюдателям. M6.11.
