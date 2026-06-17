@@ -237,9 +237,25 @@ internal sealed class ProgressionService(
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(c.Race, c.Class, c.Level);
         var oldMaxHp = session.Combat.MaxHealth;
-        session.Combat.MaxHealth = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(c.Level);
+        var baseMaxHp = stats?.MaxHealth ?? DisplayData.MaxHealthForLevel(c.Level);
+        var baseMaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(c.Class, c.Level);
+        session.Combat.BaseMaxHealth = baseMaxHp;
+        session.Cast.BaseMaxMana = baseMaxMana;
+        // Кэш базовых статов (для PeriodicsService.SendStatsAsync) + базовый HP/Mana бонус от Stamina/Int.
+        if (stats is { } st)
+        {
+            session.Combat.BaseStr = st.Str;
+            session.Combat.BaseAgi = st.Agi;
+            session.Combat.BaseSta = st.Sta;
+            session.Combat.BaseInt = st.Int;
+            session.Combat.BaseSpi = st.Spi;
+        }
+        // Учитываем активные аура-бонусы MOD_STAT (если бафф/HoT уже висел перед recalc — не должен теряться).
+        var staBonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0 && p.StatIndex == 2).Sum(p => p.StatBonus);
+        var intBonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0 && p.StatIndex == 3).Sum(p => p.StatBonus);
+        session.Combat.MaxHealth = (uint)Math.Max(1, (int)baseMaxHp + staBonus * 10);
         session.Combat.Health = session.Combat.MaxHealth;                 // фулл-хил
-        session.Cast.MaxMana = stats?.MaxMana ?? DisplayData.MaxManaForClass(c.Class, c.Level);
+        session.Cast.MaxMana = (uint)Math.Max(0, (int)baseMaxMana + intBonus * 15);
         session.Cast.Mana = session.Cast.MaxMana;
         var hpDiff = session.Combat.MaxHealth > oldMaxHp ? session.Combat.MaxHealth - oldMaxHp : 0;
         var powerType = DisplayData.PowerTypeForClass(c.Class);
@@ -268,11 +284,16 @@ internal sealed class ProgressionService(
                 }
                 if (stats is { } s)
                 {
-                    m.SetUInt32(UpdateField.UnitStat0, s.Str);
-                    m.SetUInt32(UpdateField.UnitStat1, s.Agi);
-                    m.SetUInt32(UpdateField.UnitStat2, s.Sta);
-                    m.SetUInt32(UpdateField.UnitStat3, s.Int);
-                    m.SetUInt32(UpdateField.UnitStat4, s.Spi);
+                    // Стат-поля шлём с учётом активных MOD_STAT-аур: иначе вход в мир (после восстановления
+                    // персистнутых аур) сбрасывает прибавки до следующего рефреша от SendStatsAsync.
+                    var bonus = new int[5];
+                    foreach (var p in session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0))
+                        bonus[p.StatIndex] += p.StatBonus;
+                    m.SetUInt32(UpdateField.UnitStat0, (uint)Math.Max(0, (int)s.Str + bonus[0]));
+                    m.SetUInt32(UpdateField.UnitStat1, (uint)Math.Max(0, (int)s.Agi + bonus[1]));
+                    m.SetUInt32(UpdateField.UnitStat2, (uint)Math.Max(0, (int)s.Sta + bonus[2]));
+                    m.SetUInt32(UpdateField.UnitStat3, (uint)Math.Max(0, (int)s.Int + bonus[3]));
+                    m.SetUInt32(UpdateField.UnitStat4, (uint)Math.Max(0, (int)s.Spi + bonus[4]));
                     m.SetUInt32(UpdateField.UnitBaseHealth, s.MaxHealth);
                     m.SetUInt32(UpdateField.UnitBaseMana, s.MaxMana);
                 }

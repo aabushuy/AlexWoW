@@ -24,6 +24,8 @@ internal sealed class SessionCastState
     /// расход не применяется. Инициализируется при входе в мир. M6.4 инкремент 2.</summary>
     internal uint Mana { get; set; }
     internal uint MaxMana { get; set; }
+    /// <summary>Базовый MaxMana (без аур-бонуса от Intellect MOD_STAT) — для пересчёта в PeriodicsService.</summary>
+    internal uint BaseMaxMana { get; set; }
     /// <summary>Время последнего успешного каста — «правило 5 секунд» (реген маны паузится). M6.4.</summary>
     internal long LastSpellCastMs { get; set; }
     /// <summary>Время последнего тика регена маны (кадэнс 1 с). M6.4.</summary>

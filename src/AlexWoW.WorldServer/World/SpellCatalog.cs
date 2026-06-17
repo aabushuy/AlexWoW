@@ -55,6 +55,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModAttackPower = 99;           // +AP мили (Боевой клич / Благословение Могущества)
     private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
     private const int AuraMechanicImmunity = 77;         // иммунитет к механике (Ярость берсерка: страх/sap/incapacitate)
+    private const int AuraModStat = 29;                  // +стат (Stamina/Intellect/Spirit/Strength/Agility) — PW:Fortitude, Divine Spirit и т.п.
     private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
@@ -162,7 +163,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Бонусы силы атаки от ауры (Боевой клич / Благословение Могущества и т.п.): +AP мили (ауру 99)
         // и/или +AP дальнего боя (аура 124). Величина = BasePoints+1. Учитываются в RefreshMeleeAsync и
         // PeriodicsService.SendAttackPowerAsync; влияют на UI «Сила атаки» и формулу автоатаки игрока.
-        int AttackPowerBonus = 0, int RangedAttackPowerBonus = 0);
+        int AttackPowerBonus = 0, int RangedAttackPowerBonus = 0,
+        // MOD_STAT (аура 29): +N к одному стату по индексу. StatIndex: 0=Сила, 1=Ловкость, 2=Выносливость,
+        // 3=Интеллект, 4=Дух. Величина = BasePoints+1. Применяется через PeriodicsService.SendStatsAsync;
+        // Stamina/Intellect доп. поднимают MaxHealth/MaxMana.
+        int StatBonus = 0, byte StatIndex = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -308,6 +313,16 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var attackPowerBonus = apAura.Eff == EffectApplyAura ? apAura.Bp + 1 : 0;
         var rapAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModRangedAttackPower);
         var rangedAttackPowerBonus = rapAura.Eff == EffectApplyAura ? rapAura.Bp + 1 : 0;
+        // MOD_STAT (аура 29): +N к стату по индексу EffectMiscValue. PW:Fortitude (1243): MiscValue=2 → Stamina;
+        // Divine Spirit (14752): MiscValue=4 → Spirit. Bp+1 — величина. Дополнительный эффект на тот же стат
+        // в одной касте редок → берём первый match.
+        var statIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModStat);
+        var statBonus = statIdx >= 0 ? effects[statIdx].Bp + 1 : 0;
+        var statMisc = statIdx switch
+        {
+            0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, 2 => t.EffectMiscValue3, _ => 0,
+        };
+        var statIndex = statIdx >= 0 ? (byte)Math.Clamp(statMisc, 0, 4) : (byte)0;
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — абилка не бьёт мгновенно,
         // а замещает следующую автоатаку (бросок оружия + флэт-бонус). Распознаём по атрибуту.
         var onNextSwing = (t.Attributes & (SpellAttrOnNextSwing1 | SpellAttrOnNextSwing2)) != 0;
@@ -532,7 +547,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             procTriggerSpellId, procFlags, procChance,
             immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
             shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId,
-            attackPowerBonus, rangedAttackPowerBonus);
+            attackPowerBonus, rangedAttackPowerBonus,
+            statBonus, statIndex);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
