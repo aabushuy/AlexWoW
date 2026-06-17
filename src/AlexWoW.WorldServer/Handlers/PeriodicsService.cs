@@ -15,6 +15,8 @@ public sealed class PeriodicEffect
     public long NextTickMs;
     public long ExpiresAtMs;
     public bool IsHeal;
+    public bool IsEnergize; // тик ресурса (Кровавая ярость 29131): Amount → +PowerType ресурс игроку.
+    public byte PowerType;  // тип ресурса для IsEnergize: 0=мана, 1=ярость, 3=энергия, 6=сила рун.
     public byte Slot;          // слот ауры на цели (для DoT/дебафф-визуала)
     public bool OwnsVisual;    // true — мы шлём AURA_UPDATE на цель; визуал на себе — в системе аур игрока
     public bool DoesTick = true; // false — непериодический бафф/дебафф (только визуал + истечение). M10.4c
@@ -49,7 +51,8 @@ internal sealed class PeriodicsService(
     CreatureCombatAI creatureAi,
     SpellTestCaptureService spellTestCapture,
     KillRewardService killReward,
-    CrowdControlService crowdControl)
+    CrowdControlService crowdControl,
+    CombatResourcesService combatResources)
 {
     /// <summary>Накладывает периодический эффект каста (после применения прямого эффекта). M10.4b.
     /// <paramref name="durationOverrideMs"/>&gt;0 — взять вместо полной длительности (восстановление с остатком, M10.5).</summary>
@@ -90,6 +93,27 @@ internal sealed class PeriodicsService(
                 NextTickMs = now + interval,
                 ExpiresAtMs = expires,
                 IsHeal = true,
+            });
+            return;
+        }
+
+        if (info.PeriodicEnergize)
+        {
+            // Тик ресурса на себя (Кровавая ярость 29131: +1 ярости/с 10с). Бафф-иконка — через систему
+            // аур; накопление в Combat.Rage/Energy/RunicPower + апдейт полоски делает CombatResourcesService.
+            session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0);
+            await auras.ApplyAsync(session, spellId, dur, positive: true, form: 0, ct);
+            session.Progression.Periodics.Add(new PeriodicEffect
+            {
+                SpellId = spellId,
+                TargetGuid = 0,
+                SchoolMask = info.School,
+                Amount = tickAmount,
+                IntervalMs = interval,
+                NextTickMs = now + interval,
+                ExpiresAtMs = expires,
+                IsEnergize = true,
+                PowerType = info.PeriodicPower,
             });
             return;
         }
@@ -365,7 +389,9 @@ internal sealed class PeriodicsService(
             if (p.DoesTick && p.NextTickMs <= now && now < p.ExpiresAtMs + p.IntervalMs)
             {
                 p.NextTickMs += p.IntervalMs;
-                if (p.IsHeal)
+                if (p.IsEnergize)
+                    await TickEnergizeAsync(session, p, ct);
+                else if (p.IsHeal)
                     await TickHealAsync(session, p, caster, ct);
                 else
                     await TickDamageAsync(session, p, caster, now, ct);
@@ -405,6 +431,16 @@ internal sealed class PeriodicsService(
             await crowdControl.TryBreakOnDamageAsync(session.World, creature, now, ct);
             await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: false, ct);
         }
+    }
+
+    /// <summary>Тик energize-ауры: +Amount ресурса PowerType игроку (Кровавая ярость 29131 — +1 ярости/с).
+    /// Без лога периодики — клиент сам анимирует прирост ресурса. Мана — фолбэк через прямое поле/пакет
+    /// (не реализуем здесь: периодик-мана-ауры в WotLK редки и для воина не актуальны).</summary>
+    private async Task TickEnergizeAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
+    {
+        if (p.Amount <= 0)
+            return;
+        await combatResources.GainPowerAsync(session, p.PowerType, (uint)p.Amount, ct);
     }
 
     private async Task TickHealAsync(WorldSession session, PeriodicEffect p, ulong caster, CancellationToken ct)

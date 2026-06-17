@@ -246,6 +246,10 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
                     else if (trig.IsInterrupt && trigTarget.CastingSpellId != 0)
                         await InterruptCreatureCastAsync(session, trigTarget, trig, now, ct);
                 }
+                // Кровавая ярость 2687 → 29131 (PERIODIC_ENERGIZE +1 ярости/с 10с): триггер — само-периодик.
+                // Накладываем на себя через общий путь периодических аур; иконка + тик ресурса.
+                if (trig.Periodic)
+                    await periodics.ApplyAsync(session, info.TriggerSpellId, trig, targetCreatureGuid: 0, ct);
             }
         }
     }
