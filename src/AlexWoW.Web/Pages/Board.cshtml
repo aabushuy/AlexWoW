@@ -2,7 +2,7 @@
 @using AlexWoW.Web.Services.Kanban
 @model AlexWoW.Web.Pages.BoardModel
 @{
-    ViewData["Title"] = "Доска QA";
+    ViewData["Title"] = "Канбан";
     Layout = "_Layout"; // KB3-fix: без админ-сайдбара, доска на всю ширину (колонки не умещались)
     string PrioColor(string p) => p switch { "Blocker" => "#e53935", "Major" => "#fb8c00", _ => "#8a929c" };
     string TypeColor(string t) => t switch { "Project" => "#7e57c2", "Epic" => "#5c6bc0", "Bug" => "#e53935", _ => "#43a047" };
@@ -42,7 +42,7 @@
 </style>
 
 <div class="kb-full">
-<h1 class="kb-title">Доска QA</h1>
+<h1 class="kb-title">Канбан</h1>
 
 @if (!Model.Configured)
 {
