@@ -21,7 +21,7 @@ local function ulen(s)
   for i = 1, #s do local b = string.byte(s, i); if b < 128 or b >= 192 then n = n + 1 end end
   return n
 end
-local TITLE_MAX = 84 -- порог «двух строк» по символам для ширины заголовка
+local TITLE_MAX = 60 -- порог «двух строк» по символам для ширины заголовка
 
 -- Обрезать строку до maxChars UTF-8 символов (+ «…»), без разрыва многобайтовых символов.
 local function utrunc(s, maxChars)
@@ -97,7 +97,8 @@ end
 
 -- ---- Список (левая панель) ----
 ListRefresh = function()
-  FauxScrollFrame_Update(listScroll, #tasks, LIST_NUM_ROWS, LIST_ROW_H)
+  -- alwaysShowScrollBar=1: скроллбар всегда виден (а не появляется только при переполнении).
+  FauxScrollFrame_Update(listScroll, #tasks, LIST_NUM_ROWS, LIST_ROW_H, nil, nil, nil, nil, nil, nil, 1)
   local offset = FauxScrollFrame_GetOffset(listScroll)
   for i = 1, LIST_NUM_ROWS do
     local row = listRows[i]
@@ -140,7 +141,8 @@ ShowDetail = function()
   local header = ulen(t.title) > TITLE_MAX and (t.title .. "\n\n") or ""
   D.body:SetText(header .. "|cff8a5a00Шаги тестирования:|r\n" .. (t.steps ~= "" and t.steps or "—")
     .. "\n\n|cff8a5a00Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—"))
-  D.child:SetHeight(D.body:GetStringHeight() + 4)
+  -- Полная высота скролл-контента: заголовок + отступ + тело + отступ + чекбокс(24) + отступ + лейбл(16) + отступ + поле(80) + низ.
+  D.child:SetHeight(D.title:GetStringHeight() + 12 + D.body:GetStringHeight() + 18 + 24 + 12 + 16 + 4 + 80 + 10)
   D.check:SetChecked(false)
   D.comment:SetText("")
   D.check:Show(); D.checkLabel:Show(); D.commentBg:Show(); D.comLabel:Show(); D.doneBtn:Show()
@@ -162,6 +164,13 @@ local function Build()
   f:SetClampedToScreen(true)
   f:Hide()
 
+  -- Иконка-книга в круглом медальоне сверху-слева (декор).
+  local emblem = f:CreateTexture(nil, "BACKGROUND")
+  emblem:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+  emblem:SetWidth(48); emblem:SetHeight(48)
+  emblem:SetPoint("TOPLEFT", 12, -12)
+  emblem:SetTexCoord(0.07, 0.93, 0.07, 0.93) -- срезать стандартную «рамку» иконки, чтобы видеть только арт
+  
   -- Оформление как «Журнал заданий»: двухпанельные текстуры рамки квест-лога (лево 512 + право 256 = 768).
   local texL = f:CreateTexture(nil, "BORDER")
   texL:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Left")
@@ -170,15 +179,21 @@ local function Build()
   texR:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Right")
   texR:SetWidth(256); texR:SetHeight(512); texR:SetPoint("TOPLEFT", texL, "TOPRIGHT", 0, 0)
 
-  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOP", 0, -18); title:SetText("Задачи на тестирование")
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("TOP", -32, -18); title:SetText("Задачи на тестирование")
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -36, -14)
+  close:SetPoint("TOPLEFT", 652, -8)
+
+  -- Кнопка «Обновить» — перезапрашивает список задач у сервера (слот в нижней рамке слева).
+  local refreshBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  refreshBtn:SetWidth(110); refreshBtn:SetHeight(24); refreshBtn:SetPoint("BOTTOMLEFT", 18, 78)
+  refreshBtn:SetText("Обновить")
+  refreshBtn:SetScript("OnClick", function() RequestTasks() end)
 
   -- ЛЕВО: список задач (FauxScrollFrame).
   listScroll = CreateFrame("ScrollFrame", "AlexQAListScroll", f, "FauxScrollFrameTemplate")
-  listScroll:SetPoint("TOPLEFT", 26, -84)
-  listScroll:SetWidth(250); listScroll:SetHeight(LIST_NUM_ROWS * LIST_ROW_H)
+  listScroll:SetPoint("TOPLEFT", 26, -74)
+  listScroll:SetWidth(294); listScroll:SetHeight(LIST_NUM_ROWS * LIST_ROW_H + 28)
   listScroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, LIST_ROW_H, ListRefresh)
   end)
@@ -202,46 +217,66 @@ local function Build()
   end
 
   -- ПРАВО: детализация.
-  local rx = 310
+  local rx = 360
+  -- Friz Quadrata TT (FRIZQT__.TTF): Default text for tooltips, menus, and item names.
+  -- Morpheus (MORPHEUS.TTF): Used for quest text and some in-game mail windows.
+  -- Arial Narrow (ARIALN.TTF): Default chat font.
+  local QFONTHEADER = "Fonts\\MORPHEUS.TTF"
   local QFONT = "Fonts\\FRIZQT__.TTF" -- шрифт как в квест-окне; тёмные тона на пергаменте
 
-  D.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  D.title:SetPoint("TOPLEFT", rx, -82); D.title:SetWidth(415); D.title:SetJustifyH("LEFT")
-  D.title:SetFont(QFONT, 17); D.title:SetTextColor(0.55, 0.40, 0.13) -- #2: обрезаем строкой (SetMaxLines нет в 3.3.5)
-
+  -- Единый скролл правой панели: внутри заголовок + тело + чекбокс + комментарий. «Готово» — в углу.
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
-  D.scroll:SetPoint("TOPLEFT", rx, -126); D.scroll:SetWidth(412); D.scroll:SetHeight(108)
-  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(412); D.child:SetHeight(10)
+  D.scroll:SetPoint("TOPLEFT", rx, -74); D.scroll:SetWidth(290); D.scroll:SetHeight(336)
+  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(280); D.child:SetHeight(10)
   D.scroll:SetScrollChild(D.child)
-  D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  D.body:SetPoint("TOPLEFT", 0, 0); D.body:SetWidth(406); D.body:SetJustifyH("LEFT")
-  D.body:SetFont(QFONT, 14); D.body:SetTextColor(0.13, 0.10, 0.06)
 
-  D.check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-  D.check:SetWidth(24); D.check:SetHeight(24); D.check:SetPoint("TOPLEFT", rx - 2, -246)
-  D.checkLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  D.checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); D.checkLabel:SetText("Соответствует ожидаемому результату")
-  D.checkLabel:SetFont(QFONT, 14); D.checkLabel:SetTextColor(0.13, 0.10, 0.06)
+  D.title = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  D.title:SetPoint("TOPLEFT", 0, -10); D.title:SetWidth(280); D.title:SetJustifyH("LEFT")
+  D.title:SetFont(QFONTHEADER, 16); D.title:SetTextColor(0.30, 0.20, 0.10) -- #2: обрезаем строкой (SetMaxLines нет в 3.3.5)
 
-  D.comLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.comLabel:SetPoint("TOPLEFT", rx, -278); D.comLabel:SetText("Комментарий:")
-  D.comLabel:SetFont(QFONT, 14); D.comLabel:SetTextColor(0.13, 0.10, 0.06)
-  D.commentBg = CreateFrame("Frame", nil, f)
-  D.commentBg:SetPoint("TOPLEFT", rx, -294); D.commentBg:SetWidth(412); D.commentBg:SetHeight(54)
+  D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.body:SetPoint("TOPLEFT", D.title, "BOTTOMLEFT", 0, -12); D.body:SetWidth(280); D.body:SetJustifyH("LEFT")
+  D.body:SetFont(QFONT, 12); D.body:SetTextColor(0.30, 0.20, 0.10)
+
+  -- Контролы — дети D.child, поэтому скроллятся вместе с телом. Якорятся друг к другу сверху вниз.
+  D.check = CreateFrame("CheckButton", nil, D.child, "UICheckButtonTemplate")
+  D.check:SetWidth(24); D.check:SetHeight(24)
+  D.check:SetPoint("TOPLEFT", D.body, "BOTTOMLEFT", -2, -18)
+  D.checkLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.checkLabel:SetPoint("TOPLEFT", D.check, "TOPRIGHT", 4, -4); D.checkLabel:SetWidth(252); D.checkLabel:SetJustifyH("LEFT")
+  D.checkLabel:SetText("Соответствует ожидаемому результату")
+  D.checkLabel:SetFont(QFONT, 13); D.checkLabel:SetTextColor(0.30, 0.20, 0.10)
+
+  D.comLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.comLabel:SetPoint("TOPLEFT", D.check, "BOTTOMLEFT", 2, -12); D.comLabel:SetText("Комментарий:")
+  D.comLabel:SetFont(QFONT, 14); D.comLabel:SetTextColor(0.30, 0.20, 0.10)
+  D.commentBg = CreateFrame("Frame", nil, D.child)
+  D.commentBg:SetPoint("TOPLEFT", D.comLabel, "BOTTOMLEFT", 0, -4); D.commentBg:SetWidth(280); D.commentBg:SetHeight(120)
   D.commentBg:SetBackdrop({
     bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 },
   })
-  D.commentBg:SetBackdropColor(0, 0, 0, 0.6)
-  D.comment = CreateFrame("EditBox", nil, D.commentBg)
+  D.commentBg:SetBackdropColor(0, 0, 0, 0.4)
+  -- ScrollFrame внутри bg → EditBox растёт по высоте, скроллим к нему.
+  D.commentScroll = CreateFrame("ScrollFrame", "AlexQACommentScroll", D.commentBg, "UIPanelScrollFrameTemplate")
+  D.commentScroll:SetPoint("TOPLEFT", 8, -8); D.commentScroll:SetPoint("BOTTOMRIGHT", -28, 8) -- место под скроллбар
+  D.comment = CreateFrame("EditBox", nil, D.commentScroll)
   D.comment:SetMultiLine(true); D.comment:SetAutoFocus(false); D.comment:SetFontObject(ChatFontNormal)
-  D.comment:SetPoint("TOPLEFT", 6, -6); D.comment:SetPoint("BOTTOMRIGHT", -6, 6)
+  D.comment:SetWidth(238); D.comment:SetHeight(1) -- авто-рост по содержимому
   D.comment:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+  -- Автоскролл к курсору при наборе/перемещении (стандартный паттерн 3.3.5).
+  D.comment:SetScript("OnCursorChanged", function(self, x, y, w, h)
+    local sf = self:GetParent()
+    local height, offset = sf:GetHeight(), sf:GetVerticalScroll()
+    if -y < offset then sf:SetVerticalScroll(-y)
+    elseif -y + h > offset + height then sf:SetVerticalScroll(-y + h - height) end
+  end)
+  D.commentScroll:SetScrollChild(D.comment)
 
   D.doneBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  D.doneBtn:SetWidth(120); D.doneBtn:SetHeight(26)
-  D.doneBtn:SetPoint("TOPLEFT", rx + 286, -402) -- правый нижний угол пергамента (фикс. позиция в рамках арта)
+  D.doneBtn:SetWidth(80); D.doneBtn:SetHeight(26)
+  D.doneBtn:SetPoint("TOPLEFT", rx + 236, -410) -- правый нижний угол пергамента (фикс. позиция в рамках арта)
   D.doneBtn:SetText("Готово")
   D.doneBtn:SetScript("OnClick", Submit)
 
