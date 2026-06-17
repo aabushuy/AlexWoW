@@ -122,8 +122,19 @@ internal sealed class ProgressionService(
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(c.Race, c.Class, c.Level);
         uint str = stats?.Str ?? 0, agi = stats?.Agi ?? 0;
-        var meleeAp = MeleeAttackPower(c.Class, c.Level, str, agi);
-        var rangedAp = RangedAttackPower(c.Class, c.Level, agi);
+        var baseMeleeAp = MeleeAttackPower(c.Class, c.Level, str, agi);
+        var baseRangedAp = RangedAttackPower(c.Class, c.Level, agi);
+        // Кэшируем базу — её использует PeriodicsService.SendAttackPowerAsync при apply/remove аур-баффов AP,
+        // и PlayerMeleeService — в формуле AP-вклада в автоатаку (база + Combat.AttackPowerBonus от аур).
+        session.Combat.BaseMeleeAttackPower = baseMeleeAp;
+        session.Combat.BaseRangedAttackPower = baseRangedAp;
+        // Итоговое поле = база + аур-бонусы (Боевой клич и т.п.).
+        var apBonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.AttackPowerBonus);
+        var rapBonus = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.RangedAttackPowerBonus);
+        session.Combat.AttackPowerBonus = apBonus;
+        session.Combat.RangedAttackPowerBonus = rapBonus;
+        var meleeAp = (uint)Math.Max(0, (int)baseMeleeAp + apBonus);
+        var rangedAp = (uint)Math.Max(0, (int)baseRangedAp + rapBonus);
 
         // Защитные статы (срез M-защита): броня предметов + флаги оружия/щита.
         uint itemArmor = 0;

@@ -21,6 +21,8 @@ public sealed class PeriodicEffect
     public int HealthBonus;    // +макс. HP от баффа (MOD_INCREASE_HEALTH) — снять при истечении. M10.4c
     public int BlockBonus;     // +% блока от баффа (MOD_BLOCK_PERCENT, напр. «Блок щитом») — снять при истечении.
     public int DodgeBonus;     // +% уклонения от баффа (MOD_DODGE_PERCENT, Evasion рога) — снять при истечении. DODGE.1
+    public int AttackPowerBonus;        // +AP мили от баффа (MOD_ATTACK_POWER, Боевой клич) — снять при истечении.
+    public int RangedAttackPowerBonus;  // +AP дальнего боя от баффа (MOD_RANGED_ATTACK_POWER, второй эффект Боевого клича).
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
@@ -200,6 +202,23 @@ internal sealed class PeriodicsService(
                     DodgeBonus = info.DodgePct,
                 });
                 await SendDodgeAsync(session, ct);
+            }
+            if (info.AttackPowerBonus > 0 || info.RangedAttackPowerBonus > 0)
+            {
+                // +AP мили/дальний бой (Боевой клич): записываем эффект и обновляем UNIT_FIELD_ATTACK_POWER
+                // / UNIT_FIELD_RANGED_ATTACK_POWER. По истечении/cancel — пересчёт в RemoveAsync.
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0
+                    && (p.AttackPowerBonus != 0 || p.RangedAttackPowerBonus != 0));
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    AttackPowerBonus = info.AttackPowerBonus,
+                    RangedAttackPowerBonus = info.RangedAttackPowerBonus,
+                });
+                await SendAttackPowerAsync(session, ct);
             }
             if (info.DamageTakenPct != 0)
             {
@@ -434,6 +453,27 @@ internal sealed class PeriodicsService(
                 m => m.SetFloat(UpdateField.PlayerDodgePercentage, dodge)), ct);
     }
 
+    /// <summary>+AP/RAP от ауры (Боевой клич): сумма бонусов аур → UNIT_FIELD_ATTACK_POWER /
+    /// UNIT_FIELD_RANGED_ATTACK_POWER (UI «Сила атаки»). Кэшируем бонус в <see cref="SessionCombatState"/>,
+    /// чтобы PlayerMeleeService использовал актуальное значение в формуле автоатаки без повторного суммирования.</summary>
+    private Task SendAttackPowerAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        var ap = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.AttackPowerBonus);
+        var rap = session.Progression.Periodics.Where(p => p.TargetGuid == 0).Sum(p => p.RangedAttackPowerBonus);
+        session.Combat.AttackPowerBonus = ap;
+        session.Combat.RangedAttackPowerBonus = rap;
+        var meleeAp = (uint)Math.Max(0, (int)session.Combat.BaseMeleeAttackPower + ap);
+        var rangedAp = (uint)Math.Max(0, (int)session.Combat.BaseRangedAttackPower + rap);
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.UnitAttackPower, meleeAp);
+                m.SetUInt32(UpdateField.UnitRangedAttackPower, rangedAp);
+            }), ct);
+    }
+
     private async Task RemoveAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
     {
         session.Progression.Periodics.Remove(p);
@@ -454,6 +494,10 @@ internal sealed class PeriodicsService(
         // DODGE.1: снять +% уклонения (Evasion) — пересчитать без истёкшего эффекта.
         if (p.DodgeBonus != 0)
             await SendDodgeAsync(session, ct);
+
+        // Снять +AP/RAP (Боевой клич) — пересчитать без истёкшего эффекта (UI «Сила атаки» вернётся к базе).
+        if (p.AttackPowerBonus != 0 || p.RangedAttackPowerBonus != 0)
+            await SendAttackPowerAsync(session, ct);
 
         // IMMUNITY.1: снять обездвиживание Ice Block (по истечении/отмене пузыря) — вернуть управление движением.
         if (p.SelfRoot && session.InWorldGuid != 0)

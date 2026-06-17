@@ -51,6 +51,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
+    private const int AuraModAttackPower = 99;           // +AP мили (Боевой клич / Благословение Могущества)
+    private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
     private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
@@ -152,7 +154,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // CurseSchoolMask — маска школ (EffectMiscValue, 126 = вся магия). Применяется в уроне по проклятой цели.
         int CurseDamageTakenPct = 0, byte CurseSchoolMask = 0,
         // §8 Временный энчант оружия (эффект 54): SpellItemEnchantment id для свечения оружия (яды/имбу). 0 — нет.
-        uint EnchantId = 0);
+        uint EnchantId = 0,
+        // Бонусы силы атаки от ауры (Боевой клич / Благословение Могущества и т.п.): +AP мили (ауру 99)
+        // и/или +AP дальнего боя (аура 124). Величина = BasePoints+1. Учитываются в RefreshMeleeAsync и
+        // PeriodicsService.SendAttackPowerAsync; влияют на UI «Сила атаки» и формулу автоатаки игрока.
+        int AttackPowerBonus = 0, int RangedAttackPowerBonus = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -284,6 +290,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // в резолвере входящего мили-удара (avoidance до митигейшна).
         var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
         var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
+        // +AP (мили / дальний бой): ауры 99/124. Боевой клич (6673/47436) даёт обе одной длительностью.
+        // Битый знак BasePoints — это «Деморализующий клич» (дебафф −AP), его пока трактуем как визуал.
+        var apAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModAttackPower);
+        var attackPowerBonus = apAura.Eff == EffectApplyAura ? apAura.Bp + 1 : 0;
+        var rapAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModRangedAttackPower);
+        var rangedAttackPowerBonus = rapAura.Eff == EffectApplyAura ? rapAura.Bp + 1 : 0;
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — абилка не бьёт мгновенно,
         // а замещает следующую автоатаку (бросок оружия + флэт-бонус). Распознаём по атрибуту.
         var onNextSwing = (t.Attributes & (SpellAttrOnNextSwing1 | SpellAttrOnNextSwing2)) != 0;
@@ -501,7 +513,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             dispelType, dispelMask, isSpellsteal,
             procTriggerSpellId, procFlags, procChance,
             immuneSchoolMask, immuneSelfRoot, dodgeBonus, blockReflect, onNextSwing, isAreaCrowdControl,
-            shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId);
+            shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId,
+            attackPowerBonus, rangedAttackPowerBonus);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
