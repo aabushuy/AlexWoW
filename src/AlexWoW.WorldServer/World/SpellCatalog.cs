@@ -48,6 +48,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
+    private const int AuraPeriodicEnergize = 24;         // тик ресурса (Кровавая ярость 29131: +1 ярости/с)
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
@@ -90,6 +91,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int CooldownMs, bool IsHeal = false, uint ManaCostPct = 0, uint GcdMs = 0,
         byte PowerType = 0, bool WeaponDamage = false, uint WeaponPercent = 0,
         bool Periodic = false, bool PeriodicHeal = false, int TickAmount = 0, int TickIntervalMs = 0,
+        // Periodic Energize (Кровавая ярость 29131): тик +ресурс игроку (тип PeriodicPower: 0=мана,1=ярость,3=энергия,6=РП).
+        bool PeriodicEnergize = false, byte PeriodicPower = 0,
         int AuraDurationMs = 0,
         bool AuraBuff = false, bool AuraPositive = false, int HealthBonus = 0, int BlockBonus = 0,
         int DamageTakenPct = 0,
@@ -259,14 +262,21 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var powerType = (byte)Math.Max(0, t.PowerType);
         var manaPct = powerType == 0 ? t.ManaCostPercentage : 0;
 
-        // Периодическая аура (DoT/HoT, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL → тик во времени.
+        // Периодическая аура (DoT/HoT/Energize, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL/ENERGIZE
+        // → тик во времени. Energize (24) тикает ресурс (Кровавая ярость 29131: +1 ярости/с 10с).
         var periodicIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura
-            && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal);
+            && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize);
         var periodic = periodicIdx >= 0 ? effects[periodicIdx] : default;
         var isPeriodic = periodic.Eff == EffectApplyAura;
         var periodicHeal = periodic.Aura == AuraPeriodicHeal;
+        var periodicEnergize = periodic.Aura == AuraPeriodicEnergize;
         var tickAmount = isPeriodic ? periodic.Bp + 1 : 0;          // CMaNGOS: BasePoints+1 за тик
         var tickInterval = isPeriodic ? periodic.Amp : 0;
+        // Тип ресурса energize-тика (EffectMiscValue: 0=мана, 1=ярость, 3=энергия, 6=сила рун).
+        var periodicPower = periodicEnergize ? (byte)Math.Max(0, periodicIdx switch
+        {
+            0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, _ => t.EffectMiscValue3,
+        }) : (byte)0;
 
         // CP.3: финишер (расходует очки серии) — биты AttributesEx. Бонус за очко берём с PointsPerComboPoint
         // соответствующего эффекта: прямой урон (Eviscerate) — с chosen, тик DoT (Rupture) — с periodic.
@@ -278,8 +288,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Непериодическая аура (бафф/дебафф, M10.4c): прочий APPLY_AURA. Бафф/дебафф различаем по знаку
         // BasePoints (>=0 — бафф на себя; <0 — дебафф на цель-существо) — надёжнее enum-целей. Простой
         // механический эффект — только MOD_INCREASE_HEALTH (+макс. HP); прочие стат-моды пока визуальны.
+        // PERIODIC_ENERGIZE (24) — тоже периодика, в buff-ветку не должна попадать (иначе наложится дважды).
         var auraBuffEff = Array.Find(effects, e => e.Eff == EffectApplyAura
-            && e.Aura is not (AuraPeriodicDamage or AuraPeriodicHeal) && e.Aura != 0);
+            && e.Aura is not (AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize) && e.Aura != 0);
         var auraBuff = auraBuffEff.Eff == EffectApplyAura;
         var hpAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseHealth);
         var healthBonus = hpAura.Eff == EffectApplyAura ? hpAura.Bp + 1 : 0;
@@ -498,7 +509,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
 
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
-            isPeriodic, periodicHeal, tickAmount, tickInterval, auraDuration, auraBuff, auraPositive, healthBonus,
+            isPeriodic, periodicHeal, tickAmount, tickInterval, periodicEnergize, periodicPower,
+            auraDuration, auraBuff, auraPositive, healthBonus,
             blockBonus, damageTakenPct, movement, triggerSpell, createItemId, createItemCount, reagents,
             t.SpellFamilyName, t.SpellFamilyFlags, t.SpellFamilyFlags2,
             (byte)(chosenIdx + 1), (byte)(periodicIdx + 1),
