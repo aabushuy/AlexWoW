@@ -69,8 +69,8 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { id: { type: 'integer' }, status: { type: 'string' } }, required: ['id', 'status'] } },
   { name: 'kanban_comment', description: 'Добавить комментарий к тикету.',
     inputSchema: { type: 'object', properties: { id: { type: 'integer' }, body: { type: 'string' }, author: { type: 'string' } }, required: ['id', 'body'] } },
-  { name: 'kanban_assign_tester', description: 'Авто-подбор персонажа-тестировщика под задачу: ставит tester + client_check и переводит в Testing. Подсказки class/level опциональны.',
-    inputSchema: { type: 'object', properties: { id: { type: 'integer' }, class: { type: 'integer' }, level: { type: 'integer' }, clientCheck: { type: 'boolean' } }, required: ['id'] } },
+  { name: 'kanban_assign_tester', description: 'Авто-подбор персонажа-тестировщика под задачу: ставит tester + client_check и переводит в Testing. Подсказки race/class/level опциональны (race сильнее class — для расовых абилок).',
+    inputSchema: { type: 'object', properties: { id: { type: 'integer' }, race: { type: 'integer' }, class: { type: 'integer' }, level: { type: 'integer' }, clientCheck: { type: 'boolean' } }, required: ['id'] } },
 ];
 
 function pickTicketBody(a) {
@@ -93,7 +93,7 @@ async function callTool(name, a) {
     case 'kanban_move': return api('POST', `/api/kanban/tickets/${a.id}/move`, { status: a.status });
     case 'kanban_comment': return api('POST', `/api/kanban/tickets/${a.id}/comments`, { author: a.author, body: a.body });
     case 'kanban_assign_tester': return api('POST', `/api/kanban/tickets/${a.id}/assign-tester`,
-      { class: a.class, level: a.level, clientCheck: a.clientCheck });
+      { race: a.race, class: a.class, level: a.level, clientCheck: a.clientCheck });
     default: throw new Error('Неизвестный инструмент: ' + name);
   }
 }
