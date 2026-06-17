@@ -25,6 +25,8 @@ public sealed class PeriodicEffect
     public int DodgeBonus;     // +% уклонения от баффа (MOD_DODGE_PERCENT, Evasion рога) — снять при истечении. DODGE.1
     public int AttackPowerBonus;        // +AP мили от баффа (MOD_ATTACK_POWER, Боевой клич) — снять при истечении.
     public int RangedAttackPowerBonus;  // +AP дальнего боя от баффа (MOD_RANGED_ATTACK_POWER, второй эффект Боевого клича).
+    public int StatBonus;               // MOD_STAT (29): величина бонуса к стату.
+    public byte StatIndex;              // MOD_STAT (29): индекс стата (0=Str,1=Agi,2=Sta,3=Int,4=Spi).
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
@@ -243,6 +245,23 @@ internal sealed class PeriodicsService(
                     RangedAttackPowerBonus = info.RangedAttackPowerBonus,
                 });
                 await SendAttackPowerAsync(session, ct);
+            }
+            if (info.StatBonus != 0)
+            {
+                // MOD_STAT (PW:Fortitude/Divine Spirit и т.п.): записываем эффект и обновляем UnitStat0..4 +
+                // MaxHealth (Stamina) / MaxMana (Intellect).
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0
+                    && p.StatBonus != 0 && p.StatIndex == info.StatIndex);
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    StatBonus = info.StatBonus,
+                    StatIndex = info.StatIndex,
+                });
+                await SendStatsAsync(session, ct);
             }
             if (info.DamageTakenPct != 0)
             {
@@ -489,6 +508,59 @@ internal sealed class PeriodicsService(
                 m => m.SetFloat(UpdateField.PlayerDodgePercentage, dodge)), ct);
     }
 
+    /// <summary>MOD_STAT (29): применяет сумму активных аур-бонусов статов к UnitStat0..4. Stamina даёт
+    /// +10 MaxHealth/единицу, Intellect — +15 MaxMana/единицу (упрощённые формулы CMaNGOS). Без аур-бонуса —
+    /// возвращает к базе из <see cref="SessionCombatState.BaseStr"/>… и <see cref="SessionCombatState.BaseMaxHealth"/>.</summary>
+    private Task SendStatsAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        var bonus = new int[5];
+        foreach (var p in session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0))
+            bonus[p.StatIndex] += p.StatBonus;
+        var s0 = (uint)Math.Max(0, (int)session.Combat.BaseStr + bonus[0]);
+        var s1 = (uint)Math.Max(0, (int)session.Combat.BaseAgi + bonus[1]);
+        var s2 = (uint)Math.Max(0, (int)session.Combat.BaseSta + bonus[2]);
+        var s3 = (uint)Math.Max(0, (int)session.Combat.BaseInt + bonus[3]);
+        var s4 = (uint)Math.Max(0, (int)session.Combat.BaseSpi + bonus[4]);
+        // Stamina/Intellect → HP/Mana. Используем простую CMaNGOS-формулу ×10/×15.
+        var hpBonus = bonus[2] * 10;
+        var manaBonus = bonus[3] * 15;
+        var maxHp = (uint)Math.Max(1, (int)session.Combat.BaseMaxHealth + hpBonus);
+        var maxMana = (uint)Math.Max(0, (int)session.Cast.BaseMaxMana + manaBonus);
+        var oldMaxHp = session.Combat.MaxHealth;
+        session.Combat.MaxHealth = maxHp;
+        if (hpBonus > 0 && maxHp > oldMaxHp)
+            session.Combat.Health += maxHp - oldMaxHp; // прирост HP при наложении баффа выносливости
+        else if (hpBonus < 0 && session.Combat.Health > maxHp)
+            session.Combat.Health = maxHp;            // если бафф снят и HP больше нового максимума — обрезать
+        if (session.Cast.MaxMana > 0)
+        {
+            var oldMaxMana = session.Cast.MaxMana;
+            session.Cast.MaxMana = maxMana;
+            if (manaBonus > 0 && maxMana > oldMaxMana)
+                session.Cast.Mana += maxMana - oldMaxMana;
+            else if (manaBonus < 0 && session.Cast.Mana > maxMana)
+                session.Cast.Mana = maxMana;
+        }
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.UnitStat0, s0);
+                m.SetUInt32(UpdateField.UnitStat1, s1);
+                m.SetUInt32(UpdateField.UnitStat2, s2);
+                m.SetUInt32(UpdateField.UnitStat3, s3);
+                m.SetUInt32(UpdateField.UnitStat4, s4);
+                m.SetUInt32(UpdateField.UnitMaxHealth, session.Combat.MaxHealth);
+                m.SetUInt32(UpdateField.UnitHealth, session.Combat.Health);
+                if (session.Cast.MaxMana > 0)
+                {
+                    m.SetUInt32(UpdateField.UnitMaxPower1, session.Cast.MaxMana);
+                    m.SetUInt32(UpdateField.UnitPower1, session.Cast.Mana);
+                }
+            }), ct);
+    }
+
     /// <summary>+AP/RAP от ауры (Боевой клич): сумма бонусов аур → UNIT_FIELD_ATTACK_POWER /
     /// UNIT_FIELD_RANGED_ATTACK_POWER (UI «Сила атаки»). Кэшируем бонус в <see cref="SessionCombatState"/>,
     /// чтобы PlayerMeleeService использовал актуальное значение в формуле автоатаки без повторного суммирования.</summary>
@@ -534,6 +606,10 @@ internal sealed class PeriodicsService(
         // Снять +AP/RAP (Боевой клич) — пересчитать без истёкшего эффекта (UI «Сила атаки» вернётся к базе).
         if (p.AttackPowerBonus != 0 || p.RangedAttackPowerBonus != 0)
             await SendAttackPowerAsync(session, ct);
+
+        // Снять +Stat (PW:Fortitude и т.п.) — пересчитать без истёкшего эффекта (статы + MaxHealth/MaxMana).
+        if (p.StatBonus != 0)
+            await SendStatsAsync(session, ct);
 
         // IMMUNITY.1: снять обездвиживание Ice Block (по истечении/отмене пузыря) — вернуть управление движением.
         if (p.SelfRoot && session.InWorldGuid != 0)

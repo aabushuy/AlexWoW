@@ -69,6 +69,15 @@ internal sealed class SessionCombatState
     internal int AttackPowerBonus { get; set; }
     /// <summary>Сумма аур-бонусов AP дальнего боя (вторая аура Боевого клича) — для охотника.</summary>
     internal int RangedAttackPowerBonus { get; set; }
+    /// <summary>База статов (Сила/Ловкость/Выносливость/Интеллект/Дух) из StatsStore — кэш RecalcStatsAsync.
+    /// PeriodicsService.SendStatsAsync суммирует базу с активными аурами MOD_STAT (29) и шлёт UnitStat0..4.</summary>
+    internal uint BaseStr { get; set; }
+    internal uint BaseAgi { get; set; }
+    internal uint BaseSta { get; set; }
+    internal uint BaseInt { get; set; }
+    internal uint BaseSpi { get; set; }
+    /// <summary>Базовый MaxHealth (без аур-бонуса от Stamina) — для пересчёта в SendStatsAsync.</summary>
+    internal uint BaseMaxHealth { get; set; }
     /// <summary>Время последнего тика ресурса (реген энергии / распад ярости, кадэнс 1 с). M6.12.</summary>
     internal long LastResourceTickMs { get; set; }
     /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
