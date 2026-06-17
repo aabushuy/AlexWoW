@@ -166,9 +166,9 @@ local function Build()
 
   -- Иконка-книга в круглом медальоне сверху-слева (декор).
   local emblem = f:CreateTexture(nil, "BACKGROUND")
-  emblem:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
-  emblem:SetWidth(48); emblem:SetHeight(48)
-  emblem:SetPoint("TOPLEFT", 12, -12)
+  emblem:SetTexture("Interface\\MailFrame\\Mail-Icon")
+  emblem:SetWidth(54); emblem:SetHeight(54)
+  emblem:SetPoint("TOPLEFT", 10, -8)
   emblem:SetTexCoord(0.07, 0.93, 0.07, 0.93) -- срезать стандартную «рамку» иконки, чтобы видеть только арт
   
   -- Оформление как «Журнал заданий»: двухпанельные текстуры рамки квест-лога (лево 512 + право 256 = 768).
