@@ -54,6 +54,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
     private const int AuraModAttackPower = 99;           // +AP мили (Боевой клич / Благословение Могущества)
     private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
+    private const int AuraMechanicImmunity = 77;         // иммунитет к механике (Ярость берсерка: страх/sap/incapacitate)
     private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
@@ -408,6 +409,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // §1 Шейпшифт-форма (Metamorphosis 47241 и др.) — положительный само-бафф, хотя BasePoints ауры 36
         // отрицателен (−1): это номер формы в EffectMiscValue, не «магнитуда» → иначе движок счёл бы дебаффом.
         if (auraBuff && !auraPositive && shapeshiftForm != 0)
+            auraPositive = true;
+        // Иммунитет к механике (аура 77, Ярость берсерка 18499): тоже само-бафф, BasePoints=−1 — это маркер,
+        // а не магнитуда; реальный смысл — EffectMiscValue (MECHANIC_FEAR и т.п.). Без override движок счёл
+        // бы дебаффом и не наложил бы на себя. Механика иммунитета — отдельная задача.
+        if (auraBuff && !auraPositive && effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraMechanicImmunity))
             auraPositive = true;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
