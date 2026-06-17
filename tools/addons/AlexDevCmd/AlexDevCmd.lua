@@ -263,7 +263,7 @@ local function BuildUI()
 
   -- Плотная тёмная подложка — DialogBox-фон полупрозрачный, на ярком фоне плохо читается.
   local bg = f:CreateTexture(nil, "BACKGROUND")
-  bg:SetTexture(0, 0, 0, 0.94)
+  bg:SetTexture(0, 0, 0, 0.6)
   bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -609,7 +609,7 @@ local function BuildItemsUI()
 
   -- Плотная тёмная подложка — DialogBox-фон полупрозрачный, на ярком фоне плохо читается.
   local bg = f:CreateTexture(nil, "BACKGROUND")
-  bg:SetTexture(0, 0, 0, 0.94)
+  bg:SetTexture(0, 0, 0, 0.6)
   bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
