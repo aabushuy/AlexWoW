@@ -62,6 +62,16 @@ if (args.Length >= 5 && args[0].Equals("iconmap", StringComparison.OrdinalIgnore
     return;
 }
 
+// Иконки спеллов: spell-iconmap <dataDir> <iconsOutDir> <map.tsv> —
+//   SpellIcon.dbc → PNG (новые в общую папку с item-иконками) + карта SpellIconID→иконка
+//   для preview-блока на /Ticket. Фильтр used-ids не нужен: иконок спеллов всего ~5k.
+if (args.Length >= 4 && args[0].Equals("spell-iconmap", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqSi = new MpqChain(args[1]);
+    SpellIconMapDump.Extract(mpqSi, args[2], args[3]);
+    return;
+}
+
 // Боевые рейтинги: combatratings <dataDir> <out.json> — gtChanceToMeleeCrit(+Base).dbc → JSON (защитные статы).
 if (args.Length >= 3 && args[0].Equals("combatratings", StringComparison.OrdinalIgnoreCase))
 {

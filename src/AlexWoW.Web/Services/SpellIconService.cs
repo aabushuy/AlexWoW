@@ -3,10 +3,10 @@ using System.Globalization;
 namespace AlexWoW.Web.Services;
 
 /// <summary>
-/// Карта SpellIconID → имя иконки спелла (планируется извлечь офлайн из клиента 3.3.5a:
-/// SpellIcon.dbc + BLP→PNG, по аналогии с <see cref="ItemIconService"/> и tools/MapExtractor iconmap).
-/// PNG лежат в <c>wwwroot/icons/spells/</c>, карта — <c>wwwroot/icons/spells/_map.tsv</c>.
-/// Пока (Phase E плана) карта может отсутствовать — в этом случае <see cref="IconUrl"/> возвращает
+/// Карта SpellIconID → имя иконки спелла (офлайн из клиента 3.3.5a:
+/// SpellIcon.dbc + BLP→PNG, см. <c>tools/MapExtractor spell-iconmap</c>).
+/// PNG лежат в общей <c>wwwroot/icons/</c> (та же, что у предметов — много иконок переиспользуется),
+/// карта — <c>wwwroot/icons/_spell-map.tsv</c>. Если карты нет — <see cref="IconUrl"/> отдаёт
 /// заглушку, preview-блок отрисуется без иконки.
 /// </summary>
 public sealed class SpellIconService
@@ -17,7 +17,7 @@ public sealed class SpellIconService
 
     public SpellIconService(IWebHostEnvironment env, ILogger<SpellIconService> log)
     {
-        var path = Path.Combine(env.WebRootPath ?? "wwwroot", "icons", "spells", "_map.tsv");
+        var path = Path.Combine(env.WebRootPath ?? "wwwroot", "icons", "_spell-map.tsv");
         if (!File.Exists(path))
         {
             log.LogInformation("Карта иконок спеллов не найдена: {Path} — будут заглушки (это нормально до офлайн-экстракции)", path);
@@ -33,7 +33,7 @@ public sealed class SpellIconService
         log.LogInformation("Загружено иконок спеллов: {Count}", _byIconId.Count);
     }
 
-    /// <summary>URL иконки для SpellIconID (PNG в wwwroot/icons/spells); заглушка, если соответствия нет.</summary>
+    /// <summary>URL иконки для SpellIconID (PNG в общей wwwroot/icons); заглушка, если соответствия нет.</summary>
     public string IconUrl(uint iconId) =>
-        $"/icons/spells/{(_byIconId.TryGetValue(iconId, out var name) ? name : FallbackIcon)}.png";
+        $"/icons/{(_byIconId.TryGetValue(iconId, out var name) ? name : FallbackIcon)}.png";
 }
