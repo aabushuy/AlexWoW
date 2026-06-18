@@ -36,7 +36,8 @@ public sealed class BoardModel(KanbanService kanban) : PageModel
         if (!Configured)
             return;
 
-        SelectedLabels = LabelsRaw
+        SelectedLabels = (LabelsRaw ?? [])
+            .Where(static x => !string.IsNullOrWhiteSpace(x))
             .SelectMany(static x => x.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Where(static x => x.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
