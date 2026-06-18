@@ -60,3 +60,4 @@ reference/
 
 # Промежуточный список displayid для извлечения иконок (регенерится из БД, см. iconmap)
 tools/MapExtractor/used-displayids.txt
+tools/regression-import/__pycache__/

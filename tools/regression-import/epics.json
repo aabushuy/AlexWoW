@@ -1,0 +1,29 @@
+{
+  "project_id": 650,
+  "epics": {
+    "warrior": 651,
+    "paladin": 652,
+    "hunter": 653,
+    "rogue": 654,
+    "priest": 655,
+    "shaman": 656,
+    "mage": 657,
+    "warlock": 658,
+    "druid": 659,
+    "deathknight": 660,
+    "generic": 661
+  },
+  "family_to_epic": {
+    "4": "warrior",
+    "10": "paladin",
+    "9": "hunter",
+    "8": "rogue",
+    "6": "priest",
+    "11": "shaman",
+    "3": "mage",
+    "5": "warlock",
+    "7": "druid",
+    "15": "deathknight",
+    "0": "generic"
+  }
+}
