@@ -122,7 +122,8 @@ internal sealed class ProgressionService(
         await session.World.Stats.EnsureLoadedAsync(ct);
         var stats = session.World.Stats.Compute(c.Race, c.Class, c.Level);
         uint str = stats?.Str ?? 0, agi = stats?.Agi ?? 0;
-        var baseMeleeAp = MeleeAttackPower(c.Class, c.Level, str, agi);
+        // KB#220: AP друида зависит от активной формы (Cat: +Agi; Bear/Dire Bear: +Str; Moonkin/обычная: −AP).
+        var baseMeleeAp = MeleeAttackPower(c.Class, c.Level, str, agi, session.Progression.ShapeshiftForm);
         var baseRangedAp = RangedAttackPower(c.Class, c.Level, agi);
         // Кэшируем базу — её использует PeriodicsService.SendAttackPowerAsync при apply/remove аур-баффов AP,
         // и PlayerMeleeService — в формуле AP-вклада в автоатаку (база + Combat.AttackPowerBonus от аур).
@@ -200,14 +201,25 @@ internal sealed class ProgressionService(
             await skills.GrantAsync(session, DefenseSkillId, def, def, ct);
     }
 
-    /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS. M7 #16. (Чистая математика — static.)</summary>
-    private static uint MeleeAttackPower(byte cls, byte level, uint str, uint agi)
+    /// <summary>Сила атаки (мили) по классу/уровню/статам — формула CMaNGOS Player::UpdateAttackPowerAndDamage.
+    /// M7 #16; KB#220: формы друида (Cat/Bear/Dire Bear/Moonkin) — отдельные формулы AP.</summary>
+    private static uint MeleeAttackPower(byte cls, byte level, uint str, uint agi, byte druidForm = 0)
     {
         float ap = cls switch
         {
             1 or 2 or 6 => level * 3f + str * 2f - 20f,                 // воин/паладин/DK
             4 or 3 or 7 => level * 2f + str + agi - 20f,                // разбойник/охотник/шаман
-            11 => level * 3f + str * 2f - 20f,                          // друид (форма-бонусы — позже)
+            11 => druidForm switch
+            {
+                // KB#220 Cat Form (1): 2*level + Str + Agi − 20 — даёт AP-бонус от ловкости (≈ rogue).
+                1 => level * 2f + str + agi - 20f,
+                // Bear (5) / Dire Bear (8): 3*level + Str − 20 — танковая формула (≈ warrior).
+                5 or 8 => level * 3f + str - 20f,
+                // Moonkin (31): 1.5*level + (Str − 10) — слабый AP, ауто-атак не подразумевается.
+                31 => level * 1.5f + (str - 10f),
+                // Обычная (caster) форма: Str − 10 — как у магов/жрецов, мили-AP почти нет.
+                _ => str - 10f,
+            },
             _ => str - 10f,                                            // маг/жрец/чернокнижник
         };
         return (uint)Math.Max(0f, ap);
