@@ -19,7 +19,7 @@ jobs:
     runs-on: [self-hosted, dotnet]   # любой runner с .NET 10 SDK (homeserver или windows)
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -60,7 +60,7 @@ jobs:
     runs-on: [self-hosted, linux, deploy]  # ТОЛЬКО homeserver-runner — у него есть bind-mount /data/docker/alexwow
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
