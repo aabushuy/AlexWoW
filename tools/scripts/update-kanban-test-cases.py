@@ -239,7 +239,8 @@ def parse_meta(description: str) -> dict[str, Any]:
     """Извлекает: spell_id, kind ('абилка'/'талант'/'расовая'), label (класс или раса), spec."""
     out: dict[str, Any] = {}
 
-    m = re.search(r"Spell ID:\s*`(\d+)`", description)
+    # Multi-id (Magic Conjure: `5504/587/759`, race silence: `28730/25046/50613`) — берём первый.
+    m = re.search(r"Spell ID:\s*`(\d+)(?:\s*/\s*\d+)*`", description)
     if m:
         out["spell_id"] = int(m.group(1))
 
@@ -425,9 +426,19 @@ def main() -> None:
             print("--- labels ---", new_labels)
             ok += 1
         else:
+            # KanbanApi PATCH = полная замена (`body with { Id = id }`). Незаполненные поля → null.
+            # Передаём ВСЕ поля из текущего тикета, поверх — только новые testSteps/expectedResult/labels.
             payload = {
                 "title": t["title"],
+                "description": t.get("description"),
+                "priority": t.get("priority", "Minor"),
+                "type": t.get("type", "Task"),
+                "status": t.get("status"),
                 "epicId": t.get("epicId"),
+                "projectId": t.get("projectId"),
+                "assignee": t.get("assignee", ""),
+                "testerGuid": t.get("testerGuid"),
+                "clientCheck": t.get("clientCheck", False),
                 "testSteps": new_steps,
                 "expectedResult": new_expected,
                 "labels": new_labels,
