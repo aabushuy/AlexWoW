@@ -72,6 +72,16 @@ if (args.Length >= 4 && args[0].Equals("spell-iconmap", StringComparison.Ordinal
     return;
 }
 
+// Маппинг спелл → линии навыков: skill-line-ability <dataDir> <out.json> —
+//   SkillLineAbility.dbc → JSON { spell_id: [skill_line_id, ...] }. Нужен для tools/regression-import/
+//   определять, к какой профессии относится спелл (см. migrate-professions.py).
+if (args.Length >= 3 && args[0].Equals("skill-line-ability", StringComparison.OrdinalIgnoreCase))
+{
+    using var mpqSla = new MpqChain(args[1]);
+    SkillLineAbilityDump.Extract(mpqSla, args[2]);
+    return;
+}
+
 // Боевые рейтинги: combatratings <dataDir> <out.json> — gtChanceToMeleeCrit(+Base).dbc → JSON (защитные статы).
 if (args.Length >= 3 && args[0].Equals("combatratings", StringComparison.OrdinalIgnoreCase))
 {
