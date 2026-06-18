@@ -10,7 +10,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// эксклюзивная в группе. Делегирует наложение в <see cref="AuraService"/>; отделено от обычного каста
 /// (<see cref="SpellCastService"/>) по SRP. GO шлёт <see cref="SpellGoSender"/> (разрыв цикла с кастом).
 /// </summary>
-internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService auras, SpellCatalog spellCatalog)
+internal sealed class SpellTogglesService(
+    SpellGoSender spellGo, AuraService auras, SpellCatalog spellCatalog, ProgressionService progression)
 {
     /// <summary>
     /// Если spell — переключатель: завершить каст у клиента (SPELL_GO) и наложить перманентную ауру-форму.
@@ -29,6 +30,9 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
             && session.Progression.Auras.FirstOrDefault(a => a.ShapeshiftForm == toggle.Form) is { } active)
         {
             await auras.RemoveAsync(session, active.SpellId, ct); // смена ресурса формы — централизованно в AuraService
+            // KB#220: выход из формы у друида — пересчитать AP (Cat/Bear-формула снимается, остаётся «обычная»).
+            if (session.Character?.Class == 11)
+                await progression.RefreshMeleeAsync(session, ct);
             session.Logger.LogDebug("TOGGLE-OFF '{User}': spell={Spell} форма={Form}", session.Account, active.SpellId, toggle.Form);
             return true;
         }
@@ -41,6 +45,10 @@ internal sealed class SpellTogglesService(SpellGoSender spellGo, AuraService aur
             damageDonePct: info?.DamageDonePct ?? 0, damageDoneSchool: info?.DamageDoneSchoolMask ?? 0,
             damageTakenPct: info?.DamageTakenPct ?? 0,
             speedPctBonus: info?.SpeedPctBonus ?? 0); // смена ресурса формы — централизованно в AuraService
+        // KB#220: вход в форму у друида — пересчитать AP по формуле формы (Cat: +Agi; Bear/Dire Bear: +Str).
+        // RefreshMeleeAsync читает session.Progression.ShapeshiftForm, который AuraService уже выставил.
+        if (toggle.Form != 0 && session.Character?.Class == 11)
+            await progression.RefreshMeleeAsync(session, ct);
         session.Logger.LogDebug("TOGGLE '{User}': spell={Spell} форма={Form} группа={Group}",
             session.Account, spellId, toggle.Form, toggle.Group);
         return true;
