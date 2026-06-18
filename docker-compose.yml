@@ -1,21 +1,28 @@
 # AlexWoW — стек для домашнего сервера (homeserver, 192.168.2.210).
-# Сборка ЛОКАЛЬНАЯ (см. deploy/deploy.ps1): образы только COPY готовых бинарников.
+# Сборка ЛОКАЛЬНАЯ (см. deploy/deploy-manual.ps1 или CI .github/workflows/ci.yml):
+# образы только COPY готовых бинарников.
+#
+# СЕКРЕТЫ: все ключи берутся из /data/docker/alexwow-config/.env (вне /data/docker/alexwow/,
+# чтобы deploy не стёр их `rm -rf`). Запуск ОБЯЗАТЕЛЬНО с явным флагом:
+#   docker compose --env-file /data/docker/alexwow-config/.env up -d --build
+# Без флага compose попытается прочитать .env рядом с этим файлом → переменные не найдёт →
+# `${VAR:?}` упадёт с сообщением «required». См. deploy/SECRETS.md.
 services:
   alexwow-mysql:
     image: mysql:8.4
     container_name: alexwow-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-<rotate-me>}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD required (see deploy/SECRETS.md)}
       MYSQL_DATABASE: alexwow_auth
-      MYSQL_USER: ${MYSQL_USER:-alexwow}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-alexwow}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD required}
     ports:
       - "3306:3306"   # MySQL наружу — подключение с LAN (DBeaver/Workbench и т.п.)
     volumes:
       - alexwow-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-<rotate-me>}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -29,7 +36,7 @@ services:
     container_name: alexwow-auth
     restart: unless-stopped
     environment:
-      AuthServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      AuthServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # IP world-сервера, который увидит клиент (LAN-адрес homeserver).
       AuthServer__DefaultRealm__Address: ${REALM_ADDRESS:-192.168.2.210}
     ports:
@@ -47,11 +54,11 @@ services:
     container_name: alexwow-world
     restart: unless-stopped
     environment:
-      WorldServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      WorldServer__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # БД мира (дамп CMaNGOS): creature, creature_template …
-      WorldServer__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      WorldServer__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # БД project (канбан-доска QA, KB7): задачи на тестирование для тестировщиков.
-      WorldServer__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      WorldServer__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # Рельеф: каталог с maps/*.map (экстрактор CMaNGOS). Пусто/нет каталога — без рельефа.
       WorldServer__MapsPath: "/data/maps"
       WorldServer__VmapsPath: "/data/vmaps"   # коллизии (LoS)
@@ -59,7 +66,7 @@ services:
     ports:
       - "8085:8085"   # сырой TCP world-протокола
     volumes:
-      # Данные мира на хосте, ВНЕ каталога деплоя (deploy.ps1 делает rm -rf деплой-каталога!).
+      # Данные мира на хосте, ВНЕ каталога деплоя (deploy делает rm -rf деплой-каталога!).
       - /data/docker/alexwow-maps:/data/maps:ro
       - /data/docker/alexwow-vmaps:/data/vmaps:ro
       - /data/docker/alexwow-mmaps:/data/mmaps:ro
@@ -77,18 +84,18 @@ services:
     restart: unless-stopped
     environment:
       # Та же БД alexwow_auth, что и у игровых серверов (общие аккаунты/персонажи).
-      Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      Web__ConnectionString: "Server=alexwow-mysql;Port=3306;Database=alexwow_auth;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # БД мира (дамп CMaNGOS): item_template — поиск предметов в админке.
-      Web__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      Web__WorldConnectionString: "Server=alexwow-mysql;Port=3306;Database=mangos;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # БД трекинга прогресса (дашборд, срез 1). Создаётся вручную: deploy/sql/project-schema.sql + project-seed.sql.
-      Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER:-alexwow};Password=${MYSQL_PASSWORD:-alexwow};"
+      Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # KB5: токен REST API канбан-доски (/api/kanban/*, заголовок X-Api-Token). LAN-internal.
-      Web__ApiToken: "${WEB_API_TOKEN:-kb_REDACTED}"
-      # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера; .env стирается деплоем, поэтому здесь.
-      Web__Vikunja__BaseUrl: "https://tasks.home.srv"
-      Web__Vikunja__Token: "tk_REDACTED"
-      Web__Vikunja__ProjectId: "11"
-      Web__Vikunja__VerifySsl: "false"
+      Web__ApiToken: ${WEB_API_TOKEN:?WEB_API_TOKEN required}
+      # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера.
+      Web__Vikunja__BaseUrl: ${WEB_VIKUNJA_BASE_URL:-https://tasks.home.srv}
+      Web__Vikunja__Token: ${WEB_VIKUNJA_TOKEN:?WEB_VIKUNJA_TOKEN required}
+      Web__Vikunja__ProjectId: ${WEB_VIKUNJA_PROJECT_ID:-11}
+      Web__Vikunja__VerifySsl: ${WEB_VIKUNJA_VERIFY_SSL:-false}
     ports:
       - "8090:8080"   # HTTP; наружу (alexwow.home.srv) проксирует Caddy на 192.168.2.210:8090
     volumes:
