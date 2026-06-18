@@ -171,7 +171,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int StatBonus = 0, byte StatIndex = 0,
         // MOD_INCREASE_SPEED (аура 31): +% скорости бега (Sprint +50%, Ghost Wolf/Travel Form +40%). Применяется
         // через AuraService.SendSpeedAsync (SMSG_FORCE_RUN_SPEED_CHANGE: base × (1 + сумма% / 100)).
-        int SpeedPctBonus = 0);
+        int SpeedPctBonus = 0,
+        // KB#224: AllStats=true (EffectMiscValue=−1 у MOD_STAT) — бонус ко ВСЕМ 5 статам (Mark of the Wild,
+        // Blessing of Kings и т.п.). StatIndex в этом случае игнорируется.
+        bool AllStats = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -320,13 +323,16 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // MOD_STAT (аура 29): +N к стату по индексу EffectMiscValue. PW:Fortitude (1243): MiscValue=2 → Stamina;
         // Divine Spirit (14752): MiscValue=4 → Spirit. Bp+1 — величина. Дополнительный эффект на тот же стат
         // в одной касте редок → берём первый match.
+        // KB#224: MiscValue=−1 — бонус ко ВСЕМ 5 статам (Mark of the Wild, Blessing of Kings, Embrace of the
+        // Shale Spider и т.п.). Помечаем флагом AllStats; StatIndex в этом случае не используется.
         var statIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModStat);
         var statBonus = statIdx >= 0 ? effects[statIdx].Bp + 1 : 0;
         var statMisc = statIdx switch
         {
             0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, 2 => t.EffectMiscValue3, _ => 0,
         };
-        var statIndex = statIdx >= 0 ? (byte)Math.Clamp(statMisc, 0, 4) : (byte)0;
+        var allStats = statIdx >= 0 && statMisc == -1;
+        var statIndex = statIdx >= 0 && !allStats ? (byte)Math.Clamp(statMisc, 0, 4) : (byte)0;
         // MOD_INCREASE_SPEED (аура 31): +% скорости бега. Sprint (2983): Bp=49 → +50%. Ghost Wolf (2645): Bp=39 → +40%.
         // Применяется через AuraService.SendSpeedAsync (SMSG_FORCE_RUN_SPEED_CHANGE).
         var speedAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseSpeed);
@@ -557,7 +563,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             shapeshiftForm, isCurse, curseDamageTakenPct, curseSchoolMask, enchantId,
             attackPowerBonus, rangedAttackPowerBonus,
             statBonus, statIndex,
-            speedPctBonus);
+            speedPctBonus,
+            allStats);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
