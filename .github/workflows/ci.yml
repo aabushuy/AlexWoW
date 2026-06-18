@@ -9,6 +9,14 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    # На Windows-runner'е дефолтный powershell имеет ExecutionPolicy=Restricted у юзера gh-runner
+    # (admin'a нет, через Set-ExecutionPolicy не правится без admin). Bash работает на обоих:
+    # на Linux нативно, на Windows через git-bash (git у разработчика установлен, иначе репо не
+    # клонировался бы). Даёт единообразное поведение шелл-команд (`sleep`, `grep` и т.п.).
+    shell: bash
+
 concurrency:
   group: deploy-test
   cancel-in-progress: false  # деплой не отменяем mid-way — оставит compose в полу-собранном состоянии
