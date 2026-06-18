@@ -52,6 +52,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
+    private const int AuraModAttackerMeleeHitChance = 184; // KB#612: −% к шансу попадания атакующих по нам
+                                                          // (NE Quickness 20582 BP=−3 → −2% hit ≡ +2% наш «proxy-dodge»).
     private const int AuraModAttackPower = 99;           // +AP мили (Боевой клич / Благословение Могущества)
     private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
     private const int AuraMechanicImmunity = 77;         // иммунитет к механике (Ярость берсерка: страх/sap/incapacitate)
@@ -79,6 +81,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const uint SpellAttrCooldownOnEvent = 0x02000000; // бит 25: кулдаун стартует при СНЯТИИ ауры (Shadowform/Stealth)
     private const uint SpellAttrOnNextSwing1 = 0x00000004;    // бит 2: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — MELEE.1
     private const uint SpellAttrOnNextSwing2 = 0x00000040;    // бит 6: «на следующий замах» (второй вариант атрибута) — MELEE.1
+    private const uint SpellAttrPassive = 0x00000040;         // KB#612: бит 6, SPELL_ATTR_PASSIVE — пассивный спелл (расовые/класс. пассивы)
     // AttributesEx: финишеры рога/друида-кошки — расходуют очки серии (combo points). CP.3.
     private const uint SpellAttrExFinishingMoveDamage = 0x00100000;   // бит 20: урон/эффект скалируется очками (Eviscerate/Rupture/Envenom)
     private const uint SpellAttrExFinishingMoveDuration = 0x00400000; // бит 22: длительность скалируется очками (Slice and Dice/Kidney Shot)
@@ -174,7 +177,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         int SpeedPctBonus = 0,
         // KB#224: AllStats=true (EffectMiscValue=−1 у MOD_STAT) — бонус ко ВСЕМ 5 статам (Mark of the Wild,
         // Blessing of Kings и т.п.). StatIndex в этом случае игнорируется.
-        bool AllStats = false);
+        bool AllStats = false,
+        // KB#612: SPELL_ATTR_PASSIVE (Attributes бит 6, 0x40) — пассивный спелл (расовые/класс. пассивы,
+        // напр. NE Quickness 20582 +2% dodge). Применяется автоматически при логине без активного каста;
+        // длительность — «навсегда» (пока персонаж в мире). LoginSequenceService применяет такие ауры
+        // через PeriodicsService.ApplyAuraEffectAsync после SendInitialSpellsAsync.
+        bool IsPassive = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -312,8 +320,18 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var blockBonus = blockAura.Eff == EffectApplyAura ? blockAura.Bp + 1 : 0;
         // DODGE.1: +% уклонения (MOD_DODGE_PERCENT, Evasion рога): величина = BasePoints+1. Учитывается
         // в резолвере входящего мили-удара (avoidance до митигейшна).
+        // KB#612: Aura 184 MOD_ATTACKER_MELEE_HIT_CHANCE (NE Quickness 20582 BP=−3, BP+1=−2) — −2% к шансу
+        // попадания атакующих по нам ≡ +2% наш «proxy-dodge». Мапим в DodgePct с инвертированным знаком,
+        // только если нет уже MOD_DODGE_PERCENT (тот первичнее, точнее семантически).
         var dodgeAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModDodgePercent);
         var dodgeBonus = dodgeAura.Eff == EffectApplyAura ? dodgeAura.Bp + 1 : 0;
+        if (dodgeBonus == 0)
+        {
+            var attackerMissAura = Array.Find(effects,
+                e => e.Eff == EffectApplyAura && e.Aura == AuraModAttackerMeleeHitChance);
+            if (attackerMissAura.Eff == EffectApplyAura)
+                dodgeBonus = -(attackerMissAura.Bp + 1); // BP=−3 → BP+1=−2 → dodgeBonus=+2
+        }
         // +AP (мили / дальний бой): ауры 99/124. Боевой клич (6673/47436) даёт обе одной длительностью.
         // Битый знак BasePoints — это «Деморализующий клич» (дебафф −AP), его пока трактуем как визуал.
         var apAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModAttackPower);
@@ -444,8 +462,20 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // бы дебаффом и не наложил бы на себя. Механика иммунитета — отдельная задача.
         if (auraBuff && !auraPositive && effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraMechanicImmunity))
             auraPositive = true;
+        // KB#612: aura 184 MOD_ATTACKER_MELEE_HIT_CHANCE с BP<0 (NE Quickness 20582 BP=−3) — это «−2% к шансу
+        // попадания атакующих по нам», т.е. положительный само-бафф (защитный). Без override движок счёл
+        // бы дебаффом по знаку Bp и не наложил бы.
+        if (auraBuff && !auraPositive
+            && effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraModAttackerMeleeHitChance))
+            auraPositive = true;
 
         var auraDuration = isPeriodic || auraBuff ? SpellDurations.Get(t.DurationIndex) : 0;
+        // KB#612: пассивный спелл (SPELL_ATTR_PASSIVE) — применяется при логине без активного каста.
+        // Для passive aura с длительностью 0 (типично для расовых пассивов) ставим «навсегда» (int.MaxValue),
+        // чтобы прошла проверка `info.AuraDurationMs > 0` в PeriodicsService.ApplyAuraEffectAsync.
+        var isPassive = (t.Attributes & SpellAttrPassive) != 0;
+        if (isPassive && auraBuff && auraDuration <= 0)
+            auraDuration = int.MaxValue;
 
         // Фаза 2: % наносимого урона по школе (MOD_DAMAGE_PERCENT_DONE, aura 79): Shadowform +15% Shadow,
         // Arcane Power/Avenging Wrath +урон. Величина = BasePoints+1, маска школ = EffectMiscValue (0 — все школы).
@@ -564,7 +594,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             attackPowerBonus, rangedAttackPowerBonus,
             statBonus, statIndex,
             speedPctBonus,
-            allStats);
+            allStats,
+            isPassive);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

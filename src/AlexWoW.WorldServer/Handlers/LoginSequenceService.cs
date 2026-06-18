@@ -32,7 +32,9 @@ internal sealed class LoginSequenceService(
     TalentHandlers talents,
     SpellModifierService spellMods,
     ProgressionService progression,
-    RuneService runes)
+    RuneService runes,
+    World.SpellCatalog spellCatalog,
+    PeriodicsService periodics)
 {
     /// <summary>Вход персонажа в мир по CMSG_PLAYER_LOGIN (валидация владения + вся последовательность).</summary>
     internal async Task LoginAsync(WorldSession session, uint guid, CancellationToken ct)
@@ -193,6 +195,12 @@ internal sealed class LoginSequenceService(
         // M7 #21: восстановить сохранённые переключатели (стойка воина/аура паладина/аспект охотника).
         await auraPersistence.ReapplyPersistedAsync(session, ct);
 
+        // KB#612: применить пассивные ауры расовых/класс. пассивов (SPELL_ATTR_PASSIVE) из KnownSpells.
+        // Расовые: NE Quickness (+2% уклонения), Tauren War Stomp passive, и т.п. — должны висеть с момента
+        // входа в мир до выхода (длительность int.MaxValue в SpellCatalog). Зовём ПОСЛЕ RefreshMeleeAsync,
+        // чтобы базовые статы уже были посчитаны, и SendDodgeAsync/SendStatsAsync применили бонусы поверх.
+        await ApplyPassiveSpellsAsync(session, ct);
+
         // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
         // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).
         _ = Task.Run(async () =>
@@ -209,6 +217,29 @@ internal sealed class LoginSequenceService(
                 session.Logger.LogDebug(ex, "Повторная досылка соседей '{User}': {Msg}", session.Account, ex.Message);
             }
         }, ct);
+    }
+
+    /// <summary>
+    /// KB#612: применяет пассивные ауры (SPELL_ATTR_PASSIVE) из KnownSpells игрока — расовые/класс. пассивы,
+    /// типа NE Quickness (+2% уклонения). Длительность таких аур установлена в int.MaxValue в SpellCatalog,
+    /// чтобы прошла проверка `info.AuraDurationMs > 0` в PeriodicsService.ApplyAuraEffectAsync. Скипает
+    /// перидоические/CC/movement/heal/direct-damage эффекты — только чистый passive-buff на себя.
+    /// </summary>
+    private async Task ApplyPassiveSpellsAsync(WorldSession session, CancellationToken ct)
+    {
+        foreach (var spellId in session.Progression.KnownSpells.ToList())
+        {
+            World.SpellCatalog.SpellInfo? info;
+            try { info = await spellCatalog.GetAsync(spellId, ct); }
+            catch { continue; }
+            if (info is null || !info.IsPassive || !info.AuraBuff)
+                continue;
+            // Пропускаем passive с побочкой (DoT/movement/CC и т.п.) — это не «чистый бафф на себя».
+            if (info.Periodic || info.CrowdControl != World.SpellCatalog.CrowdControlKind.None
+                || info.Movement != World.SpellCatalog.SpellMovement.None || info.IsHeal)
+                continue;
+            await periodics.ApplyAuraEffectAsync(session, spellId, info, targetCreatureGuid: 0, ct);
+        }
     }
 
     /// <summary>
