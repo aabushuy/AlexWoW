@@ -1,19 +1,22 @@
 <#
 .SYNOPSIS
-    Local publish of AuthServer + WorldServer and deploy of prebuilt binaries.
+    EMERGENCY-FALLBACK manual deploy. Normal path is `git push` (CI/CD plan, see
+    .github/workflows/ci.yml). Use this only when CI/runner is down.
 
 .DESCRIPTION
     Compilation runs LOCALLY (dotnet publish). Only the published binaries
-    (./publish/auth, ./publish/world) plus the Dockerfiles and docker-compose.yml
-    are copied to the server. The server has no SDK, no restore, no compilation -
-    the runtime images just COPY the published output. This avoids slow/fragile
-    server-side Docker builds.
+    (./publish/auth, ./publish/world, ./publish/web) plus the Dockerfiles and
+    docker-compose.yml are copied to the server. The server has no SDK, no
+    restore, no compilation - the runtime images just COPY the published output.
+
+    Secrets are read from /data/docker/alexwow-config/.env on the server (NOT
+    from the deploy dir, which this script wipes). See deploy/SECRETS.md.
 
     NOTE: ASCII-only on purpose. Windows PowerShell 5.1 reads BOM-less .ps1 as
     ANSI, so non-ASCII comments would corrupt parsing.
 
 .EXAMPLE
-    ./deploy/deploy.ps1
+    ./deploy/deploy-manual.ps1
 #>
 [CmdletBinding()]
 param(
@@ -59,7 +62,9 @@ Write-Host '==> 4/4 Starting on server (build = COPY only)...' -ForegroundColor 
 # Merge docker's stderr (build progress) into stdout ON THE REMOTE side. Windows PowerShell 5.1
 # with ErrorActionPreference=Stop otherwise treats that stderr as a terminating NativeCommandError
 # even when docker exits 0.
-ssh $RemoteHost "cd $RemoteDir && docker compose up -d --build 2>&1"
+# Phase 3 (CI/CD plan): secrets are NOT in the deploy dir (it gets wiped). They live in
+# /data/docker/alexwow-config/.env. Without --env-file, ${VAR:?} in compose will fail.
+ssh $RemoteHost "cd $RemoteDir && docker compose --env-file /data/docker/alexwow-config/.env up -d --build 2>&1"
 if ($LASTEXITCODE -ne 0) { throw 'docker compose up failed.' }
 
 Write-Host 'Deploy complete.' -ForegroundColor Green

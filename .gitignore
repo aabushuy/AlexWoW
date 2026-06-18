@@ -17,6 +17,17 @@ UpgradeLog.htm
 appsettings.*.Local.json
 .claude/settings.local.json
 
+# CI/CD plan Phase 3: publish-каталоги от dotnet publish (создаются deploy-manual.ps1 и CI)
+publish/
+
+# CI/CD plan Phase 2: реальный runner .env с PAT (шаблон — runner/.env.example)
+runner/.env
+
+# Клиент 3.3.5a и его данные — НЕ в git (Blizzard copyright, см. deploy/SECRETS.md)
+client/
+*.MPQ
+*.wtf
+
 # Данные клиента (НЕ коммитим — генерируются игроком из своей копии WoW)
 client/
 dbc/
