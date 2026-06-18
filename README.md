@@ -1,7 +1,11 @@
 # AlexWoW
 
+[![CI](https://github.com/aabushuy/AlexWoW/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/aabushuy/AlexWoW/actions/workflows/ci.yml)
+
 Самописный сервер **World of Warcraft** на **.NET 10** + **MySQL**.
 Цель — играбельный сервер под **WotLK 3.3.5a (build 12340)**. Эталон — CMaNGOS-WotLK.
+
+**Новый разработчик?** Смотри `\\homeserver\WowProject\dev\START_HERE.md` (SMB) или клон + `docs/onboarding/`.
 
 **Статус:** ✅ M1–M5 + большая часть M6 — **проверено живым клиентом 3.3.5a**.
 Готово: логин, экран персонажей, вход в мир, движение/чат (с кириллицей), видимость

@@ -1,0 +1,10 @@
+# ~/.ssh/config — sample для AlexWoW devs.
+# Alias `homeserver` подразумевается во всех скриптах деплоя/CI и в CLAUDE.md.
+
+Host homeserver
+    HostName 192.168.2.210
+    User alex
+    # IdentityFile ~/.ssh/id_ed25519        # раскомментируй и укажи свой ключ
+    # ForwardAgent yes                       # если нужен agent-forwarding для git ops на homeserver
+    ServerAliveInterval 60
+    ServerAliveCountMax 3

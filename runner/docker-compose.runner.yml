@@ -1,0 +1,46 @@
+# GitHub Actions self-hosted runner — homeserver, в Docker.
+# Запускается ОТДЕЛЬНО от основного стека AlexWoW (`/data/docker/alexwow/`),
+# чтобы CI не пересобирал сам себя в процессе деплоя (классический "snake eats tail").
+#
+# Расположение на homeserver:
+#   /data/docker/alexwow-runner/
+#     ├── docker-compose.yml   # этот файл (rename'нутый)
+#     └── .env                 # секреты (PAT) — не в git, см. docs/onboarding/runner-setup.md
+#
+# Запуск:
+#   ssh homeserver "cd /data/docker/alexwow-runner && docker compose up -d"
+
+services:
+  alexwow-runner-homeserver:
+    # myoung34/github-runner — community fork, активный maintenance, авто-перерегистрация
+    # через PAT (long-lived). Pin по дайджесту чтобы runner не апдейтнулся mid-job.
+    # При апдейте — заменить тег на новый дайджест (см. https://hub.docker.com/r/myoung34/github-runner/tags).
+    image: myoung34/github-runner:2.328.0-ubuntu-noble
+    container_name: alexwow-runner-homeserver
+    restart: unless-stopped
+    environment:
+      # Из .env (см. .env.example):
+      REPO_URL: ${REPO_URL:?REPO_URL required (https://github.com/aabushuy/AlexWoW)}
+      ACCESS_TOKEN: ${ACCESS_TOKEN:?ACCESS_TOKEN required (GitHub PAT, see docs/onboarding/runner-setup.md)}
+      RUNNER_NAME: ${RUNNER_NAME:-homeserver}
+      RUNNER_SCOPE: ${RUNNER_SCOPE:-repo}
+      LABELS: ${LABELS:-self-hosted,linux,docker,homeserver,deploy,dotnet}
+      RUNNER_WORKDIR: /tmp/runner/work
+      # Авто-ставить .NET 10 SDK через apt-get внутри runner'а при первом запуске.
+      EXTRA_PACKAGES: "dotnet-sdk-10.0 rsync"
+      # Принудительно использовать репозитории Microsoft для dotnet-пакетов.
+      # Если падает — добавь шаг setup-dotnet в workflow.yml (тогда EXTRA_PACKAGES можно сократить).
+    volumes:
+      # Docker socket — для `docker compose up` в deploy-job. Это даёт runner-root на хосте;
+      # privileged НЕ нужен и НЕ ставится (privileged ничего поверх не добавляет, только риск).
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Bind-mount каталога деплоя — runner пишет туда publish/ и compose.yml без SCP.
+      - /data/docker/alexwow:/data/docker/alexwow
+      # Bind-mount .env с секретами — для `docker compose --env-file`.
+      - /data/docker/alexwow-config:/data/docker/alexwow-config:ro
+      # Workdir runner'а (где будет _work/ с checkout'ом репо). На /tmp чтобы /data не засорять.
+      - alexwow-runner-work:/tmp/runner
+    # Default network — нужно только для исходящего HTTPS (GitHub API, NuGet, Microsoft packages).
+
+volumes:
+  alexwow-runner-work:
