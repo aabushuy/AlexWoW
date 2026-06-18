@@ -180,7 +180,9 @@ internal sealed class AddonProtocol(
                 tasks = [];
             }
             foreach (var t in tasks)
-                await SendLineAsync(session, $"Q|{t.Id}|{Clean(t.Title)}|{Clean(t.TestSteps)}|{Clean(t.ExpectedResult)}", ct);
+                // Title с префиксом #id — клиентский Lua показывает только заголовок (второе поле),
+                // номер тикета в отдельном поле не использует. Префикс помогает тестеру писать «по #209…» в чат.
+                await SendLineAsync(session, $"Q|{t.Id}|{Clean($"#{t.Id} · {t.Title}")}|{Clean(t.TestSteps)}|{Clean(t.ExpectedResult)}", ct);
         }
         await SendLineAsync(session, "QEND", ct);
     }

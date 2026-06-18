@@ -11,20 +11,31 @@
     .tk-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
     .tk-field { margin-bottom: 12px; }
     .tk-field label { display: block; font-size: .82rem; opacity: .8; margin-bottom: 3px; }
-    /* #4: контролы в стиле доски (тёмные, .92rem). Скоуп .tk-grid — блок комментариев не трогаем. */
-    .tk-grid input[type=text], .tk-grid input[type=number], .tk-grid select, .tk-grid textarea {
+    /* Контролы в стиле доски — применяем не только в tk-grid, но и в форме комментариев (.tk-cf). */
+    .tk-grid input[type=text], .tk-grid input[type=number], .tk-grid select, .tk-grid textarea,
+    .tk-cf textarea {
         width: 100%; padding: 6px 8px; box-sizing: border-box; font-size: .92rem;
         background: #11151c; color: #e8e8e8; border: 1px solid #2a3550; border-radius: 4px; }
-    .tk-grid textarea { min-height: 80px; resize: vertical; }
+    .tk-grid textarea, .tk-cf textarea { min-height: 80px; resize: vertical; }
+    /* Косметика: главные текстовые поля заметно выше — описание и шаги читать без скролла. */
+    textarea.tk-ta-desc  { min-height: 320px; }
+    textarea.tk-ta-steps { min-height: 240px; }
     .tk-save { height: 34px; padding: 0 18px; margin-top: 4px; border-radius: 4px; cursor: pointer;
         font-weight: 700; font-size: .92rem; color: #1a160b;
         background: linear-gradient(180deg, #ffe27a, #e8b73c 55%, #b07d1e); border: 1px solid #7a571a; }
     .tk-save:hover { filter: brightness(1.1); }
+    /* Вторичная кнопка (Архивировать/Расхоронить) — тёмная, рядом с золотой Сохранить. */
+    .tk-save--secondary {
+        color: #e8e8e8;
+        background: linear-gradient(180deg, #5d6b85, #3d4d6e 55%, #2a3550);
+        border-color: #2a3550; }
+    .tk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
     .tk-row { display: flex; gap: 10px; }
     .tk-row > div { flex: 1; }
     .tk-comments { margin-top: 8px; }
     .tk-comment { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
     .tk-comment .meta { font-size: .75rem; opacity: .6; margin-bottom: 3px; }
+    .tk-cf { margin-top: 10px; }
     .tk-err { color: #ff6b6b; margin: 8px 0; }
     .tk-panel { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px; }
     .tk-arch-badge { display: inline-block; margin-left: 10px; font-size: .72rem; padding: 2px 8px;
@@ -62,11 +73,11 @@ else
                 </div>
                 <div class="tk-field">
                     <label>Описание</label>
-                    <textarea asp-for="Input.Description"></textarea>
+                    <textarea asp-for="Input.Description" class="tk-ta-desc"></textarea>
                 </div>
                 <div class="tk-field">
                     <label>Шаги тестирования</label>
-                    <textarea asp-for="Input.TestSteps"></textarea>
+                    <textarea asp-for="Input.TestSteps" class="tk-ta-steps"></textarea>
                 </div>
                 <div class="tk-field">
                     <label>Ожидаемый результат</label>
@@ -154,19 +165,27 @@ else
                         @foreach (var l in Model.AllLabels) { <option value="@l"></option> }
                     </datalist>
                 </div>
-                <button type="submit" class="tk-save">@(Model.IsNew ? "Создать" : "Сохранить")</button>
+                <div class="tk-actions">
+                    <button type="submit" class="tk-save">@(Model.IsNew ? "Создать" : "Сохранить")</button>
+                    @if (!Model.IsNew)
+                    {
+                        @* Кнопка относится к скрытой Archive-форме (form="tk-archive-form") — submit отдельный,
+                           но визуально стоит рядом с Сохранить. HTML5 атрибут form позволяет элементу
+                           принадлежать не оборачивающей форме. *@
+                        <button type="submit" form="tk-archive-form" class="tk-save tk-save--secondary">
+                            @(Model.IsArchive ? "Расхоронить" : "Архивировать")
+                        </button>
+                    }
+                </div>
             </div>
         </div>
     </form>
 
     @if (!Model.IsNew)
     {
-        <form method="post" asp-page-handler="Archive" style="margin-top:10px">
+        <form id="tk-archive-form" method="post" asp-page-handler="Archive" style="display:none">
             <input type="hidden" name="id" value="@Model.Input.Id" />
             <input type="hidden" name="archive" value="@((!Model.IsArchive).ToString().ToLowerInvariant())" />
-            <button type="submit" class="tk-save" style="background:linear-gradient(180deg,#5d6b85,#3d4d6e 55%,#2a3550); color:#e8e8e8; border-color:#2a3550">
-                @(Model.IsArchive ? "Расхоронить" : "Архивировать")
-            </button>
         </form>
     }
 
@@ -186,12 +205,12 @@ else
                 <p style="opacity:.6">Пока нет комментариев.</p>
             }
         </div>
-        <form method="post" asp-page-handler="Comment">
+        <form method="post" asp-page-handler="Comment" class="tk-cf">
             <input type="hidden" name="id" value="@Model.Input.Id" />
             <div class="tk-field">
                 <textarea name="body" placeholder="Добавить комментарий…"></textarea>
             </div>
-            <button type="submit">Добавить комментарий</button>
+            <button type="submit" class="tk-save">Добавить комментарий</button>
         </form>
     }
 }
