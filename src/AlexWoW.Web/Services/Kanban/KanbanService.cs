@@ -8,27 +8,36 @@ public sealed class KanbanService(KanbanRepository repo)
 {
     public bool Configured => repo.Configured;
 
-    public Task<IReadOnlyList<KanbanTicket>> ListAsync(KanbanFilter f, CancellationToken ct) => repo.ListAsync(f, ct);
+    public async Task<IReadOnlyList<KanbanTicket>> ListAsync(KanbanFilter f, CancellationToken ct)
+    {
+        var rows = await repo.ListAsync(f, ct);
+        return await AttachLabelsAsync(rows, ct);
+    }
 
+    /// <summary>Проекты — это «оглавление», их архивный фильтр не касается (по умолчанию всегда все).</summary>
     public Task<IReadOnlyList<KanbanTicket>> ProjectsAsync(CancellationToken ct) =>
-        repo.ListAsync(new KanbanFilter { Type = "Project" }, ct);
+        repo.ListAsync(new KanbanFilter { Type = "Project", IncludeArchived = true }, ct);
 
     public Task<IReadOnlyList<KanbanTicket>> EpicsAsync(int projectId, CancellationToken ct) =>
-        repo.ListAsync(new KanbanFilter { Type = "Epic", ProjectId = projectId }, ct);
+        repo.ListAsync(new KanbanFilter { Type = "Epic", ProjectId = projectId, IncludeArchived = true }, ct);
 
     public Task<IReadOnlyList<KanbanTicket>> AllEpicsAsync(CancellationToken ct) =>
-        repo.ListAsync(new KanbanFilter { Type = "Epic" }, ct);
+        repo.ListAsync(new KanbanFilter { Type = "Epic", IncludeArchived = true }, ct);
 
     public async Task<(KanbanTicket? Ticket, IReadOnlyList<KanbanComment> Comments)> GetAsync(int id, CancellationToken ct)
     {
         var t = await repo.GetAsync(id, ct);
-        return t is null ? (null, []) : (t, await repo.CommentsAsync(id, ct));
+        if (t is null) return (null, []);
+        var labels = await repo.LabelsForAsync(id, ct);
+        return (t with { Labels = labels }, await repo.CommentsAsync(id, ct));
     }
 
     public async Task<int> CreateAsync(KanbanTicket t, CancellationToken ct)
     {
         t = await NormalizeTreeAsync(t, ct);
-        return await repo.CreateAsync(t, ct);
+        var id = await repo.CreateAsync(t, ct);
+        await repo.SetLabelsAsync(id, t.Labels, ct);
+        return id;
     }
 
     public async Task UpdateAsync(KanbanTicket t, CancellationToken ct)
@@ -38,6 +47,23 @@ public sealed class KanbanService(KanbanRepository repo)
         t = await NormalizeTreeAsync(t, ct);
         EnsureTesterReady(t.TesterGuid, t.TestSteps, t.ExpectedResult); // нельзя назначить тестера без шагов/ожидаемого
         await repo.UpdateAsync(t, ct);
+        await repo.SetLabelsAsync(t.Id, t.Labels, ct);
+    }
+
+    public Task SetArchiveAsync(int id, bool archive, CancellationToken ct) => repo.SetArchiveAsync(id, archive, ct);
+
+    public Task<IReadOnlyList<string>> AllLabelsAsync(CancellationToken ct) => repo.AllLabelsAsync(ct);
+
+    /// <summary>Подгрузить метки одной пачкой и положить их в Labels каждого тикета.</summary>
+    private async Task<IReadOnlyList<KanbanTicket>> AttachLabelsAsync(IReadOnlyList<KanbanTicket> rows, CancellationToken ct)
+    {
+        if (rows.Count == 0) return rows;
+        var ids = rows.Select(static r => r.Id).ToList();
+        var labels = await repo.LabelsByTicketAsync(ids, ct);
+        var result = new List<KanbanTicket>(rows.Count);
+        foreach (var t in rows)
+            result.Add(labels.TryGetValue(t.Id, out var ls) ? t with { Labels = ls } : t);
+        return result;
     }
 
     public async Task MoveAsync(int id, string status, CancellationToken ct)

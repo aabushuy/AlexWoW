@@ -1,154 +1,115 @@
 @page
 @model AlexWoW.Web.Pages.DashboardModel
 @{
-    ViewData["Title"] = "Дашборд прогресса";
-    Layout = "_AdminLayout";
-}
-@functions {
-    static string Pct(int part, int total) => total == 0 ? "0%" : $"{Math.Round(100.0 * part / total)}%";
+    ViewData["Title"] = "Дашборд";
+    Layout = "_Layout";
+    string PrioColor(string p) => p switch { "Blocker" => "#e53935", "Major" => "#fb8c00", _ => "#8a929c" };
+    int Pct(int done, int total) => total == 0 ? 0 : (int)Math.Round(100.0 * done / total);
 }
 
 <style>
-    .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin: 16px 0 28px; }
-    .dash-card { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 16px; }
-    .dash-card h3 { margin: 0 0 4px; font-size: 1rem; }
-    .dash-pct { font-size: 1.8rem; font-weight: 700; }
-    .dash-sub { font-size: .85rem; }
-    .bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; margin: 10px 0 6px; background: rgba(255,255,255,.08); }
-    .bar > i { display: block; height: 100%; }
-    .seg-done { background: #4caf50; } .seg-impl { background: #ffb300; } .seg-todo { background: #555c66; } .seg-na { background: #2e333a; }
-    .legend span { display: inline-flex; align-items: center; gap: 5px; margin-right: 14px; font-size: .82rem; }
-    .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
-    .mini-bar { width: 120px; height: 8px; border-radius: 4px; overflow: hidden; display: inline-flex; background: rgba(255,255,255,.08); vertical-align: middle; }
-    .mini-bar > i { height: 100%; } .nowrap { white-space: nowrap; }
+    .db-full { width: 100vw; margin-left: calc(50% - 50vw); padding: 0 24px; box-sizing: border-box; }
+    .db-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 14px 0 22px; }
+    .db-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10); border-radius: 10px; padding: 14px; }
+    .db-card .lbl { font-size: .82rem; opacity: .65; }
+    .db-card .val { font-size: 1.8rem; font-weight: 700; margin-top: 4px; }
+    .db-card.accent .val { color: #ffd54f; }
+    .db-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+    .db-section { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px; }
+    .db-section h2 { margin: 0 0 12px; font-size: 1.05rem; }
+    .db-proj { margin-bottom: 14px; }
+    .db-proj > summary { cursor: pointer; padding: 6px 0; font-weight: 600; list-style: none; }
+    .db-proj > summary::-webkit-details-marker { display: none; }
+    .db-proj > summary::before { content: "▸ "; opacity: .6; transition: transform .15s; display: inline-block; }
+    .db-proj[open] > summary::before { content: "▾ "; }
+    .db-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: .92rem; }
+    .db-row .name { flex: 0 0 36%; opacity: .92; }
+    .db-row .name a { color: #d6e6ff; text-decoration: none; }
+    .db-row .name a:hover { text-decoration: underline; }
+    .db-bar { flex: 1; height: 10px; background: rgba(255,255,255,.06); border-radius: 6px; overflow: hidden; }
+    .db-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #43a047, #66bb6a); }
+    .db-num { flex: 0 0 100px; text-align: right; font-variant-numeric: tabular-nums; opacity: .85; font-size: .85rem; }
+    .db-epic { padding-left: 18px; opacity: .92; }
+    .db-tester { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,.06); }
+    .db-tester:last-child { border-bottom: none; }
+    .db-tester .cnt { color: #ffd54f; font-weight: 600; }
 </style>
 
-<h1>Дашборд прогресса</h1>
-<p class="lead muted">Два среза: трекинг по БД <code>project</code> (перенос из docs) и сводка по трекеру Vikunja.</p>
+<div class="db-full">
+<h1>Дашборд</h1>
 
-<div class="legend" style="margin-bottom:6px">
-    <span><i class="seg-done"></i> готово (✅)</span>
-    <span><i class="seg-impl"></i> реализовано (🟡)</span>
-    <span><i class="seg-todo"></i> не сделано (⬜)</span>
-    <span><i class="seg-na"></i> вне этапа (➖)</span>
-</div>
-
-@functions {
-    string Bar(ProjectDashboardService.StatusCounts c)
-    {
-        int t = c.Total == 0 ? 1 : c.Total;
-        return $"<i class='seg-done' style='width:{100.0 * c.Done / t}%'></i>" +
-               $"<i class='seg-impl' style='width:{100.0 * c.Impl / t}%'></i>" +
-               $"<i class='seg-todo' style='width:{100.0 * c.Todo / t}%'></i>" +
-               $"<i class='seg-na' style='width:{100.0 * c.Na / t}%'></i>";
-    }
-}
-
-<h2>1. Трекинг (БД project)</h2>
-@if (!Model.DbConfigured)
+@if (!Model.Configured)
 {
-    <div class="alert alert-warn">БД <code>project</code> не настроена (нет <code>Web:ProjectConnectionString</code>).</div>
-}
-else if (Model.Db is null)
-{
-    <div class="alert alert-error">Не удалось прочитать БД <code>project</code>.</div>
+    <div class="alert alert-warn">БД <code>project</code> не настроена.</div>
 }
 else
 {
-    <div class="dash-cards">
-        @foreach (var d in Model.Db.Domains)
-        {
-            <div class="dash-card">
-                <h3>@d.Title</h3>
-                <div class="dash-pct">@d.Counts.Percent%</div>
-                <div class="dash-sub muted">@d.Counts.Done ✅ · @d.Counts.Impl 🟡 · @d.Counts.Todo ⬜ · @d.Counts.Na ➖ &nbsp;(@d.Counts.Total)</div>
-                <div class="bar">@Html.Raw(Bar(d.Counts))</div>
-            </div>
-        }
+    var s = Model.Data.Summary;
+    <div class="db-cards">
+        <div class="db-card accent"><div class="lbl">Готовность</div><div class="val">@((int)Math.Round(s.PercentDone * 100))%</div></div>
+        <div class="db-card"><div class="lbl">Открытых тикетов</div><div class="val">@s.OpenTotal</div></div>
+        <div class="db-card"><div class="lbl">Blocker</div><div class="val" style="color:@PrioColor("Blocker")">@s.OpenBlocker</div></div>
+        <div class="db-card"><div class="lbl">Major</div><div class="val" style="color:@PrioColor("Major")">@s.OpenMajor</div></div>
+        <div class="db-card"><div class="lbl">Minor</div><div class="val" style="color:@PrioColor("Minor")">@s.OpenMinor</div></div>
+        <div class="db-card"><div class="lbl">Багов</div><div class="val" style="color:#e53935">@s.OpenBugs</div></div>
+        <div class="db-card"><div class="lbl">Задач</div><div class="val" style="color:#43a047">@s.OpenTasks</div></div>
     </div>
 
-    @foreach (var d in Model.Db.Domains)
-    {
-        <details>
-            <summary><strong>@d.Title</strong> — разбивка (@d.Groups.Count)</summary>
-            <table class="data-table" style="margin:10px 0 22px">
-                <thead><tr><th>@d.Key</th><th class="nowrap">Прогресс</th><th>✅</th><th>🟡</th><th>⬜</th><th>➖</th><th>%</th></tr></thead>
-                <tbody>
-                @foreach (var g in d.Groups)
+    <div class="db-grid">
+        <section class="db-section">
+            <h2>Прогресс по проектам</h2>
+            @if (Model.Data.Projects.Count == 0)
+            {
+                <p style="opacity:.6">Проектов нет.</p>
+            }
+            else
+            {
+                @foreach (var p in Model.Data.Projects)
                 {
-                    <tr>
-                        <td>@g.Name</td>
-                        <td><span class="mini-bar">@Html.Raw(Bar(g.Counts))</span></td>
-                        <td>@g.Counts.Done</td><td>@g.Counts.Impl</td><td>@g.Counts.Todo</td><td>@g.Counts.Na</td>
-                        <td class="nowrap"><strong>@g.Counts.Percent%</strong></td>
-                    </tr>
+                    var pTotal = p.Done + p.Open;
+                    <details class="db-proj" open>
+                        <summary>
+                            <div class="db-row">
+                                <span class="name"><a asp-page="/Board" asp-route-Project="@p.Id">@p.Title</a></span>
+                                <span class="db-bar"><i style="width:@(Pct(p.Done, pTotal))%"></i></span>
+                                <span class="db-num">@p.Done / @pTotal · @(Pct(p.Done, pTotal))%</span>
+                            </div>
+                        </summary>
+                        @foreach (var e in p.Epics)
+                        {
+                            var eTotal = e.Done + e.Open;
+                            <div class="db-row db-epic">
+                                <span class="name"><a asp-page="/Board" asp-route-Project="@p.Id" asp-route-Epic="@e.Id">@e.Title</a></span>
+                                <span class="db-bar"><i style="width:@(Pct(e.Done, eTotal))%"></i></span>
+                                <span class="db-num">@e.Done / @eTotal · @(Pct(e.Done, eTotal))%</span>
+                            </div>
+                        }
+                        @if (p.Epics.Count == 0)
+                        {
+                            <div class="db-row db-epic" style="opacity:.5">Эпиков нет.</div>
+                        }
+                    </details>
                 }
-                </tbody>
-            </table>
-        </details>
-    }
-}
+            }
+        </section>
 
-<h2 style="margin-top:30px">2. Трекер Vikunja (домены P01–P40)</h2>
-@if (!Model.TrackerConfigured)
-{
-    <div class="alert alert-warn">Vikunja не настроена (нет <code>Web:Vikunja</code>).</div>
+        <section class="db-section">
+            <h2>Тестеры (в Testing)</h2>
+            @if (Model.Data.Testers.Count == 0)
+            {
+                <p style="opacity:.6">Все тестеры свободны.</p>
+            }
+            else
+            {
+                @foreach (var t in Model.Data.Testers)
+                {
+                    <div class="db-tester">
+                        <span>@t.Name</span>
+                        <span class="cnt">@t.InTesting</span>
+                    </div>
+                }
+            }
+        </section>
+    </div>
 }
-else if (Model.Tracker is null)
-{
-    <div class="alert alert-error">Не удалось получить данные из Vikunja.</div>
-}
-else
-{
-    <table class="data-table sortable" id="tracker-table">
-        <thead><tr>
-            <th data-type="text">Проект</th>
-            <th data-type="num">Опкоды</th>
-            <th data-type="text">Вес</th>
-            <th class="nowrap" data-type="num">Задач (готово)</th>
-            <th data-type="text">Статус</th>
-        </tr></thead>
-        <tbody>
-        @foreach (var p in Model.Tracker)
-        {
-            <tr>
-                <td><a href="@p.Url" target="_blank" rel="noopener">@p.Name</a></td>
-                <td class="nowrap" data-sort="@p.Opcodes">@p.Opcodes</td>
-                <td>@p.Weight</td>
-                <td class="nowrap" data-sort="@p.Tasks">@p.Tasks @(p.Done > 0 ? $"({p.Done})" : "")</td>
-                <td>@p.Status</td>
-            </tr>
-        }
-        </tbody>
-    </table>
-    <p class="muted" style="font-size:.82rem;margin-top:8px">Данные трекера кэшируются ~60с. Клик по заголовку — сортировка. Источник: <a href="@(Model.Tracker.Count > 0 ? Model.Tracker[0].Url.Split("/projects")[0] : "#")" target="_blank" rel="noopener">tasks.home.srv</a>.</p>
-
-    <script>
-        (function () {
-            const table = document.getElementById('tracker-table');
-            if (!table || !table.tHead) return;
-            const tbody = table.tBodies[0];
-            const ths = table.tHead.rows[0].cells;
-            const getVal = (row, i, type) => {
-                const cell = row.cells[i];
-                const v = cell.getAttribute('data-sort') ?? cell.innerText.trim();
-                if (type === 'num') { const m = String(v).match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : -Infinity; }
-                return String(v).toLowerCase();
-            };
-            Array.from(ths).forEach((th, i) => {
-                th.style.cursor = 'pointer';
-                th.title = 'Сортировать';
-                th.addEventListener('click', () => {
-                    const type = th.getAttribute('data-type') || 'text';
-                    const asc = th.getAttribute('data-dir') !== 'asc';
-                    Array.from(ths).forEach(h => { h.removeAttribute('data-dir'); const s = h.querySelector('.sort-ind'); if (s) s.remove(); });
-                    th.setAttribute('data-dir', asc ? 'asc' : 'desc');
-                    const ind = document.createElement('span'); ind.className = 'sort-ind'; ind.textContent = asc ? ' ▲' : ' ▼'; th.appendChild(ind);
-                    Array.from(tbody.rows)
-                        .sort((a, b) => { const va = getVal(a, i, type), vb = getVal(b, i, type); return (va < vb ? -1 : va > vb ? 1 : 0) * (asc ? 1 : -1); })
-                        .forEach(r => tbody.appendChild(r));
-                });
-            });
-        })();
-    </script>
-}
+</div>

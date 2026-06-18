@@ -11,7 +11,7 @@ public sealed class WebOptions
     /// <summary>Строка подключения к БД мира (<c>mangos</c>, дамп CMaNGOS) — поиск предметов в админке.</summary>
     public string WorldConnectionString { get; set; } = string.Empty;
 
-    /// <summary>Строка подключения к БД <c>project</c> (трекинг прогресса для дашборда). Пусто — срез БД скрыт.</summary>
+    /// <summary>Строка подключения к БД <c>project</c> (канбан-доска + новый дашборд). Пусто — функционал скрыт.</summary>
     public string ProjectConnectionString { get; set; } = string.Empty;
 
     /// <summary>Токен REST API канбан-доски (KB5, заголовок <c>X-Api-Token</c>). Пусто — API отключён.</summary>

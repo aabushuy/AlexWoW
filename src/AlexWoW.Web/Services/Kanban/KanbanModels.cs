@@ -16,8 +16,13 @@ public sealed record KanbanTicket
     public string Assignee { get; init; } = "";
     public uint? TesterGuid { get; init; }
     public bool ClientCheck { get; init; }
+    public bool IsArchive { get; init; }
+    public DateTime? DoneAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; init; }
+
+    /// <summary>Метки тикета (Jira-style). Заполняется сервисом из таблицы kanban_ticket_label.</summary>
+    public IReadOnlyList<string> Labels { get; init; } = [];
 }
 
 /// <summary>Комментарий тикета (лента сортируется по CreatedAt ASC).</summary>
@@ -39,6 +44,12 @@ public sealed record KanbanFilter
     public string? Type { get; init; }
     public uint? TesterGuid { get; init; }
     public bool? ClientCheck { get; init; }
+
+    /// <summary>true — отдавать и архивные тикеты (is_archive=1) вперемешку. По умолчанию архив скрыт.</summary>
+    public bool IncludeArchived { get; init; }
+
+    /// <summary>Имена меток (AND-семантика, как в Jira). null/пусто — фильтр не применяется.</summary>
+    public IReadOnlyList<string>? Labels { get; init; }
 }
 
 /// <summary>Допустимые значения перечислений (совпадают со строками ENUM в БД и подписями в UI).</summary>

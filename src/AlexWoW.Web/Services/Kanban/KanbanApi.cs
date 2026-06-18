@@ -15,20 +15,33 @@ public static class KanbanApi
     private sealed record TesterReq(uint? TesterGuid, bool ClientCheck);
     private sealed record CommentReq(string? Author, string? Body);
     private sealed record AssignReq(byte? Class, byte? Race, byte? Level, bool? ClientCheck);
+    private sealed record ArchiveReq(bool Archive);
 
     public static void MapKanbanApi(this WebApplication app)
     {
         var g = app.MapGroup("/api/kanban");
 
         g.MapGet("/tickets", async (KanbanService k, IOptions<WebOptions> o, HttpContext ctx,
-            int? project, int? epic, string? status, string? type, uint? tester, CancellationToken ct) =>
+            int? project, int? epic, string? status, string? type, uint? tester, bool? archived,
+            string? labels, CancellationToken ct) =>
         {
             if (!Authorized(ctx, o)) return Results.Unauthorized();
+            // labels=foo,bar | labels=foo&labels=bar — оба варианта обрабатываются на уровне query-string биндинга
+            // (string? принимает первое). Для надёжности парсим и через QueryString напрямую.
+            var lbl = ParseLabels(ctx, labels);
             var list = await k.ListAsync(new KanbanFilter
             {
                 ProjectId = project, EpicId = epic, Status = status, Type = type, TesterGuid = tester,
+                IncludeArchived = archived == true,
+                Labels = lbl.Count > 0 ? lbl : null,
             }, ct);
             return Results.Ok(list);
+        });
+
+        g.MapGet("/labels", async (KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
+        {
+            if (!Authorized(ctx, o)) return Results.Unauthorized();
+            return Results.Ok(await k.AllLabelsAsync(ct));
         });
 
         g.MapGet("/tickets/{id:int}", async (int id, KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
@@ -64,6 +77,13 @@ public static class KanbanApi
             if (!Authorized(ctx, o)) return Results.Unauthorized();
             try { await k.SetTesterAsync(id, body.TesterGuid, body.ClientCheck, ct); return Results.Ok(new { id }); }
             catch (KanbanValidationException e) { return Results.BadRequest(new { error = e.Message }); }
+        });
+
+        g.MapPost("/tickets/{id:int}/archive", async (int id, ArchiveReq body, KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
+        {
+            if (!Authorized(ctx, o)) return Results.Unauthorized();
+            await k.SetArchiveAsync(id, body.Archive, ct);
+            return Results.Ok(new { id, archive = body.Archive });
         });
 
         g.MapPost("/tickets/{id:int}/comments", async (int id, CommentReq body, KanbanService k, IOptions<WebOptions> o, HttpContext ctx, CancellationToken ct) =>
@@ -115,5 +135,17 @@ public static class KanbanApi
         var token = o.Value.ApiToken;
         return !string.IsNullOrEmpty(token)
             && string.Equals(ctx.Request.Headers["X-Api-Token"].ToString(), token, StringComparison.Ordinal);
+    }
+
+    /// <summary>Принимает и <c>labels=foo,bar</c>, и повтор <c>labels=foo&amp;labels=bar</c>.</summary>
+    private static List<string> ParseLabels(HttpContext ctx, string? raw)
+    {
+        var result = new List<string>();
+        var all = ctx.Request.Query["labels"];
+        foreach (var entry in all)
+            if (!string.IsNullOrWhiteSpace(entry))
+                foreach (var token in entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    if (token.Length > 0) result.Add(token);
+        return result;
     }
 }

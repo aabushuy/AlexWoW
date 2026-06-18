@@ -27,10 +27,20 @@
     .tk-comment .meta { font-size: .75rem; opacity: .6; margin-bottom: 3px; }
     .tk-err { color: #ff6b6b; margin: 8px 0; }
     .tk-panel { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px; }
+    .tk-arch-badge { display: inline-block; margin-left: 10px; font-size: .72rem; padding: 2px 8px;
+                     border-radius: 10px; background: #455; color: #fff; vertical-align: middle; }
+    .tk-meta-row { font-size: .78rem; opacity: .65; margin-top: 4px; }
 </style>
 
 <p><a asp-page="/Board">← К доске</a></p>
-<h1>@(Model.IsNew ? "Новый тикет" : $"#{Model.Input.Id} · {Model.Input.Title}")</h1>
+<h1>
+    @(Model.IsNew ? "Новый тикет" : $"#{Model.Input.Id} · {Model.Input.Title}")
+    @if (Model.IsArchive) { <span class="tk-arch-badge">в архиве</span> }
+</h1>
+@if (!Model.IsNew && Model.DoneAt is { } da)
+{
+    <div class="tk-meta-row">Закрыт: @da.ToString("yyyy-MM-dd HH:mm")</div>
+}
 
 @if (!Model.Configured)
 {
@@ -136,10 +146,29 @@ else
                 <div class="tk-field">
                     <label><input type="checkbox" asp-for="Input.ClientCheck" /> Проверка на клиенте</label>
                 </div>
+                <div class="tk-field">
+                    <label>Метки (через запятую)</label>
+                    <input type="text" asp-for="Input.LabelsCsv" list="tk-all-labels"
+                           placeholder="напр. dk, blocker, regression" />
+                    <datalist id="tk-all-labels">
+                        @foreach (var l in Model.AllLabels) { <option value="@l"></option> }
+                    </datalist>
+                </div>
                 <button type="submit" class="tk-save">@(Model.IsNew ? "Создать" : "Сохранить")</button>
             </div>
         </div>
     </form>
+
+    @if (!Model.IsNew)
+    {
+        <form method="post" asp-page-handler="Archive" style="margin-top:10px">
+            <input type="hidden" name="id" value="@Model.Input.Id" />
+            <input type="hidden" name="archive" value="@((!Model.IsArchive).ToString().ToLowerInvariant())" />
+            <button type="submit" class="tk-save" style="background:linear-gradient(180deg,#5d6b85,#3d4d6e 55%,#2a3550); color:#e8e8e8; border-color:#2a3550">
+                @(Model.IsArchive ? "Расхоронить" : "Архивировать")
+            </button>
+        </form>
+    }
 
     @if (!Model.IsNew)
     {

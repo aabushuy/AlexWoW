@@ -24,6 +24,9 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
     public IReadOnlyList<KanbanComment> Comments { get; private set; } = [];
     public IReadOnlyList<Database.Models.Character> Testers { get; private set; } = [];
     public IReadOnlyList<string> Assignees { get; private set; } = [];
+    public IReadOnlyList<string> AllLabels { get; private set; } = [];
+    public bool IsArchive { get; private set; }
+    public DateTime? DoneAt { get; private set; }
 
     public sealed class InputModel
     {
@@ -40,6 +43,8 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
         public string? Description { get; set; }
         public string? TestSteps { get; set; }
         public string? ExpectedResult { get; set; }
+        /// <summary>Метки: одна строка с разделителями «запятая/перевод строки» (Jira-style tag-input).</summary>
+        public string? LabelsCsv { get; set; }
     }
 
     public async Task<IActionResult> OnGetAsync(int? id, CancellationToken ct)
@@ -53,11 +58,14 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
             if (t is null)
                 return NotFound();
             Comments = comments;
+            IsArchive = t.IsArchive;
+            DoneAt = t.DoneAt;
             Input = new InputModel
             {
                 Id = t.Id, Title = t.Title, Type = t.Type, Priority = t.Priority, Status = t.Status,
                 ProjectId = t.ProjectId, EpicId = t.EpicId, Assignee = t.Assignee, TesterGuid = t.TesterGuid,
                 ClientCheck = t.ClientCheck, Description = t.Description, TestSteps = t.TestSteps, ExpectedResult = t.ExpectedResult,
+                LabelsCsv = string.Join(", ", t.Labels),
             };
         }
         return Page();
@@ -66,11 +74,14 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
     public async Task<IActionResult> OnPostSaveAsync(CancellationToken ct)
     {
         await LoadListsAsync(ct);
+        var labels = (Input.LabelsCsv ?? "")
+            .Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var t = new KanbanTicket
         {
             Id = Input.Id, Title = Input.Title ?? "", Type = Input.Type, Priority = Input.Priority, Status = Input.Status,
             ProjectId = Input.ProjectId, EpicId = Input.EpicId, Assignee = Input.Assignee ?? "", TesterGuid = Input.TesterGuid,
             ClientCheck = Input.ClientCheck, Description = Input.Description, TestSteps = Input.TestSteps, ExpectedResult = Input.ExpectedResult,
+            Labels = labels,
         };
         try
         {
@@ -91,6 +102,12 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
         }
     }
 
+    public async Task<IActionResult> OnPostArchiveAsync(int id, bool archive, CancellationToken ct)
+    {
+        await kanban.SetArchiveAsync(id, archive, ct);
+        return RedirectToPage(new { id });
+    }
+
     public async Task<IActionResult> OnPostCommentAsync(int id, string? body, CancellationToken ct)
     {
         try { await kanban.CommentAsync(id, User.GameAccount(), body ?? "", ct); }
@@ -103,6 +120,7 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
         Projects = await kanban.ProjectsAsync(ct);
         Epics = await kanban.AllEpicsAsync(ct);
         Testers = await characters.GetTestersAsync(ct);
+        AllLabels = await kanban.AllLabelsAsync(ct);
         // Исполнители: «Агент ИИ» сверху + все админ-аккаунты.
         var admins = await accounts.GetAdminUsernamesAsync(ct);
         Assignees = [AiAssignee, .. admins];

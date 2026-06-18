@@ -39,6 +39,17 @@
     .kb-move { display: inline; }
     .kb-move button { background: none; border: 1px solid rgba(255,255,255,.2); color: #ddd; border-radius: 5px; cursor: pointer; padding: 0 6px; }
     .kb-cc { color: #ffd54f; }
+    /* Архив: приглушённая карточка + бейдж */
+    .kb-card.kb-arch { opacity: .55; }
+    .kb-arch-badge { font-size: .68rem; padding: 1px 6px; border-radius: 9px; background: #455; color: #fff; }
+    /* Метки */
+    .kb-lab { font-size: .7rem; padding: 1px 7px; border-radius: 10px; background: #2a3550; color: #d6e6ff;
+              border: 1px solid #3d4d6e; text-decoration: none; cursor: pointer; }
+    .kb-lab:hover { background: #3d4d6e; }
+    .kb-lab.sel { background: #ffd54f; color: #1a160b; border-color: #c9a02d; font-weight: 600; }
+    .kb-bar .kb-chk { display: inline-flex; align-items: center; gap: 6px; color: #cfd3da; font-size: .92rem; }
+    .kb-selected { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+    .kb-selected a { background: #ffd54f; color: #1a160b; border-radius: 10px; font-size: .72rem; padding: 1px 8px; text-decoration: none; }
 </style>
 
 <div class="kb-full">
@@ -71,6 +82,31 @@ else
                 }
             </select>
         }
+
+        <span class="kb-lbl">Метки</span>
+        <input type="text" name="labels" list="kb-all-labels" placeholder="напр. dk, blocker — через запятую"
+               value="@string.Join(", ", Model.SelectedLabels)"
+               style="height:34px; box-sizing:border-box; font-size:.92rem; font-family:inherit; line-height:1; border-radius:4px; padding:0 10px; background:#11151c; color:#e8e8e8; border:1px solid #2a3550; min-width:260px;" />
+        <datalist id="kb-all-labels">
+            @foreach (var l in Model.AllLabels) { <option value="@l"></option> }
+        </datalist>
+
+        <label class="kb-chk">
+            <input type="checkbox" name="archived" value="true" @(Model.Archived ? "checked" : null)
+                   onchange="this.form.submit()" />
+            Показывать архивные
+        </label>
+
+        <button class="kb-act" type="submit">Применить</button>
+        @if (Model.SelectedLabels.Count > 0)
+        {
+            <span class="kb-selected">
+                @foreach (var l in Model.SelectedLabels)
+                {
+                    <a href="@Model.LinkWithoutLabel(l)" title="Убрать метку">@l ✕</a>
+                }
+            </span>
+        }
     </form>
 
     <div class="kb-board">
@@ -85,14 +121,23 @@ else
                 <div class="kb-cards">
                     @foreach (var t in cards)
                     {
-                        <div class="kb-card" style="border-left-color:@TypeColor(t.Type)">
+                        <div class="kb-card @(t.IsArchive ? "kb-arch" : null)" style="border-left-color:@TypeColor(t.Type)">
                             <a class="t" asp-page="/Ticket" asp-route-id="@t.Id">@t.Title</a>
                             <div class="kb-meta">
                                 <span class="kb-badge" style="background:@TypeColor(t.Type)">@t.Type</span>
                                 <span class="kb-badge" style="background:@PrioColor(t.Priority)">@t.Priority</span>
+                                @if (t.IsArchive)
+                                {
+                                    <span class="kb-arch-badge" title="В архиве">архив</span>
+                                }
                                 @if (t.ClientCheck)
                                 {
                                     <span class="kb-cc" title="Проверка на клиенте">🎮</span>
+                                }
+                                @foreach (var l in t.Labels)
+                                {
+                                    var sel = Model.SelectedLabels.Any(s => string.Equals(s, l, StringComparison.OrdinalIgnoreCase));
+                                    <a class="kb-lab @(sel ? "sel" : null)" href="@Model.LinkWithLabelToggle(l)" title="@(sel ? "Убрать фильтр по метке" : "Фильтровать по метке")">@l</a>
                                 }
                             </div>
                             <div class="kb-foot">

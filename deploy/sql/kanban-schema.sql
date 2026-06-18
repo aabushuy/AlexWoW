@@ -44,3 +44,30 @@ CREATE TABLE IF NOT EXISTS project.kanban_comment (
     INDEX idx_kc_ticket (ticket_id, created_at),
     CONSTRAINT fk_kc_ticket FOREIGN KEY (ticket_id) REFERENCES project.kanban_ticket(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Архивация (KB12). is_archive=1 — тикет скрыт с доски по умолчанию (фильтр «показывать архивные» в UI/API
+-- его раскрывает). done_at ставится при переходе в Done, сбрасывается при выходе. Авто-архивация:
+-- KanbanArchiveBackgroundService раз в час делает UPDATE WHERE status='Done' AND done_at < NOW()-INTERVAL 2 DAY.
+-- ALTER ... IF NOT EXISTS работает с MySQL 8.0.29+, у нас 8.4 — ОК.
+ALTER TABLE project.kanban_ticket
+    ADD COLUMN IF NOT EXISTS is_archive TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS done_at    TIMESTAMP NULL DEFAULT NULL,
+    ADD INDEX  IF NOT EXISTS idx_kt_archive (is_archive),
+    ADD INDEX  IF NOT EXISTS idx_kt_done_at (done_at);
+
+-- Метки (KB13). Глобальный словарь имён (нормализация по LOWER в сервис-слое) + many-to-many.
+-- Фильтр по нескольким меткам — AND (как в Jira): пересечение тикетов.
+CREATE TABLE IF NOT EXISTS project.kanban_label (
+    id   INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    UNIQUE KEY uk_kl_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS project.kanban_ticket_label (
+    ticket_id INT NOT NULL,
+    label_id  INT NOT NULL,
+    PRIMARY KEY (ticket_id, label_id),
+    INDEX idx_ktl_label (label_id),
+    CONSTRAINT fk_ktl_ticket FOREIGN KEY (ticket_id) REFERENCES project.kanban_ticket(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ktl_label  FOREIGN KEY (label_id)  REFERENCES project.kanban_label(id)  ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

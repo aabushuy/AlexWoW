@@ -40,10 +40,10 @@ builder.Services.AddSingleton<IItemSearchRepository>(sp => new ItemSearchReposit
 builder.Services.AddSingleton<ItemIconService>(); // карта displayid→иконка (офлайн из клиента)
 builder.Services.AddSingleton<VikunjaTicketService>(); // M12 Spell QA: заведение тикета по аномалиям
 builder.Services.AddSingleton<ServerSettingsService>(); // M8.6: типизированный доступ к стоимостям
-builder.Services.AddSingleton<ProjectDashboardService>();  // Дашборд: срез 1 — БД project (прогресс)
 builder.Services.AddSingleton<AlexWoW.Web.Services.Kanban.KanbanRepository>(); // KB2: канбан-доска (БД project)
 builder.Services.AddSingleton<AlexWoW.Web.Services.Kanban.KanbanService>();
-builder.Services.AddSingleton<VikunjaDashboardService>();  // Дашборд: срез 2 — трекер Vikunja (P01..P40)
+builder.Services.AddSingleton<AlexWoW.Web.Services.Kanban.KanbanDashboardService>(); // Дашборд по канбан-доске
+builder.Services.AddHostedService<AlexWoW.Web.Services.Kanban.KanbanArchiveBackgroundService>(); // авто-архив тикетов 2 дня после Done
 builder.Services.AddScoped<IAccountService, AccountService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
