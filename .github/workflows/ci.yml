@@ -23,6 +23,10 @@ jobs:
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
+        env:
+          # Self-hosted runners (Windows: gh-runner юзер без admin, Linux: container не root к /usr/share/dotnet)
+          # — ставим SDK в runner.tool_cache, который у обоих writable.
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           dotnet-version: '10.0.x'
           cache: true
@@ -60,6 +64,10 @@ jobs:
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
+        env:
+          # Self-hosted runners (Windows: gh-runner юзер без admin, Linux: container не root к /usr/share/dotnet)
+          # — ставим SDK в runner.tool_cache, который у обоих writable.
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           dotnet-version: '10.0.x'
           cache: true
