@@ -244,7 +244,11 @@ internal sealed class AddonProtocol(
         await SendLineAsync(session, $"QDONE|{ticketId}|{newStatus}", ct);
     }
 
-    private static string Clean(string s) => s.Replace('|', '/');
+    // Заменяем U+00B7 middle dot на ASCII '-' — клиентский WoW-фонт в списке тикетов аддона
+    // не содержит этого глифа и рисует '?'. На пергаменте detail-панели другой фонт показывает
+    // правильно, но единый ASCII убирает разницу. БД/Web этим не затрагивается.
+    // Нельзя заменить на '|' — это разделитель полей Q-протокола ниже.
+    private static string Clean(string s) => s.Replace('|', '/').Replace('·', '-');
 
     private static string Field(string[] parts, int i) => i < parts.Length ? parts[i] : "";
     private static uint? ParseUInt(string s) => uint.TryParse(s, out var v) ? v : null;
