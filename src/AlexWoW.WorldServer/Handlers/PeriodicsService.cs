@@ -27,6 +27,7 @@ public sealed class PeriodicEffect
     public int RangedAttackPowerBonus;  // +AP дальнего боя от баффа (MOD_RANGED_ATTACK_POWER, второй эффект Боевого клича).
     public int StatBonus;               // MOD_STAT (29): величина бонуса к стату.
     public byte StatIndex;              // MOD_STAT (29): индекс стата (0=Str,1=Agi,2=Sta,3=Int,4=Spi).
+    public bool AllStats;               // KB#224: MOD_STAT с MiscValue=−1 — бонус ко всем 5 статам (Mark of the Wild).
     public int DamageTakenPct; // % получаемого урона (MOD_DAMAGE_PERCENT_TAKEN, «Глухая оборона»; <0 — снижение).
     public int AbsorbRemaining; // ABS.1: остаток пула absorb-щита (SCHOOL_ABSORB/Mana Shield); 0 — не щит.
     public byte AbsorbSchoolMask; // ABS.1: маска школ, которые щит поглощает (127 — все; 4 — огонь Fire Ward).
@@ -249,10 +250,13 @@ internal sealed class PeriodicsService(
             }
             if (info.StatBonus != 0)
             {
-                // MOD_STAT (PW:Fortitude/Divine Spirit и т.п.): записываем эффект и обновляем UnitStat0..4 +
-                // MaxHealth (Stamina) / MaxMana (Intellect).
+                // MOD_STAT (PW:Fortitude/Divine Spirit/Mark of the Wild и т.п.): записываем эффект и обновляем
+                // UnitStat0..4 + MaxHealth (Stamina) / MaxMana (Intellect).
+                // KB#224: AllStats=true (MiscValue=−1) — бонус ко всем 5 статам сразу. При дедупе таких эффектов
+                // снимаем все all-stats записи того же спелла, чтобы не дублировать бонус при повторном касте.
                 session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0
-                    && p.StatBonus != 0 && p.StatIndex == info.StatIndex);
+                    && p.StatBonus != 0
+                    && (info.AllStats ? p.AllStats : !p.AllStats && p.StatIndex == info.StatIndex));
                 session.Progression.Periodics.Add(new PeriodicEffect
                 {
                     SpellId = spellId,
@@ -261,6 +265,7 @@ internal sealed class PeriodicsService(
                     DoesTick = false,
                     StatBonus = info.StatBonus,
                     StatIndex = info.StatIndex,
+                    AllStats = info.AllStats,
                 });
                 await SendStatsAsync(session, ct);
             }
@@ -518,7 +523,18 @@ internal sealed class PeriodicsService(
             return Task.CompletedTask;
         var bonus = new int[5];
         foreach (var p in session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0))
-            bonus[p.StatIndex] += p.StatBonus;
+        {
+            if (p.AllStats)
+            {
+                // KB#224: бонус ко всем 5 статам сразу (Mark of the Wild и т.п.).
+                for (var i = 0; i < 5; i++)
+                    bonus[i] += p.StatBonus;
+            }
+            else
+            {
+                bonus[p.StatIndex] += p.StatBonus;
+            }
+        }
         var s0 = (uint)Math.Max(0, (int)session.Combat.BaseStr + bonus[0]);
         var s1 = (uint)Math.Max(0, (int)session.Combat.BaseAgi + bonus[1]);
         var s2 = (uint)Math.Max(0, (int)session.Combat.BaseSta + bonus[2]);
