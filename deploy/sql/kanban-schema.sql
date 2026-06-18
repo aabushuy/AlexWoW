@@ -48,12 +48,33 @@ CREATE TABLE IF NOT EXISTS project.kanban_comment (
 -- Архивация (KB12). is_archive=1 — тикет скрыт с доски по умолчанию (фильтр «показывать архивные» в UI/API
 -- его раскрывает). done_at ставится при переходе в Done, сбрасывается при выходе. Авто-архивация:
 -- KanbanArchiveBackgroundService раз в час делает UPDATE WHERE status='Done' AND done_at < NOW()-INTERVAL 2 DAY.
--- ALTER ... IF NOT EXISTS работает с MySQL 8.0.29+, у нас 8.4 — ОК.
-ALTER TABLE project.kanban_ticket
-    ADD COLUMN IF NOT EXISTS is_archive TINYINT(1) NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS done_at    TIMESTAMP NULL DEFAULT NULL,
-    ADD INDEX  IF NOT EXISTS idx_kt_archive (is_archive),
-    ADD INDEX  IF NOT EXISTS idx_kt_done_at (done_at);
+--
+-- MySQL 8.4 не поддерживает ALTER … ADD COLUMN IF NOT EXISTS (это MariaDB). Поэтому каждое изменение
+-- оборачиваем в проверку INFORMATION_SCHEMA + динамический SQL — повторный прогон не падает.
+DROP PROCEDURE IF EXISTS project.__kanban_apply_migrations;
+DELIMITER $$
+CREATE PROCEDURE project.__kanban_apply_migrations()
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                   WHERE TABLE_SCHEMA='project' AND TABLE_NAME='kanban_ticket' AND COLUMN_NAME='is_archive') THEN
+        ALTER TABLE project.kanban_ticket ADD COLUMN is_archive TINYINT(1) NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                   WHERE TABLE_SCHEMA='project' AND TABLE_NAME='kanban_ticket' AND COLUMN_NAME='done_at') THEN
+        ALTER TABLE project.kanban_ticket ADD COLUMN done_at TIMESTAMP NULL DEFAULT NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                   WHERE TABLE_SCHEMA='project' AND TABLE_NAME='kanban_ticket' AND INDEX_NAME='idx_kt_archive') THEN
+        ALTER TABLE project.kanban_ticket ADD INDEX idx_kt_archive (is_archive);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+                   WHERE TABLE_SCHEMA='project' AND TABLE_NAME='kanban_ticket' AND INDEX_NAME='idx_kt_done_at') THEN
+        ALTER TABLE project.kanban_ticket ADD INDEX idx_kt_done_at (done_at);
+    END IF;
+END$$
+DELIMITER ;
+CALL project.__kanban_apply_migrations();
+DROP PROCEDURE project.__kanban_apply_migrations;
 
 -- Метки (KB13). Глобальный словарь имён (нормализация по LOWER в сервис-слое) + many-to-many.
 -- Фильтр по нескольким меткам — AND (как в Jira): пересечение тикетов.
