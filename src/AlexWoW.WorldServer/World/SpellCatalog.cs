@@ -49,6 +49,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
     private const int AuraPeriodicEnergize = 24;         // тик ресурса (Кровавая ярость 29131: +1 ярости/с)
+    // KB#371: PERIODIC_LEECH (53) — DoT + лечение кастера на ту же величину (Devouring Plague, Drain Life).
+    // Пока обрабатываем как PERIODIC_DAMAGE — DoT-тик уходит цели; leech-компонент на кастере опционально.
+    private const int AuraPeriodicLeech = 53;
     private const int AuraModIncreaseHealth = 34;        // +макс. HP (простой эффект баффа, M10.4c)
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
@@ -283,10 +286,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var powerType = (byte)Math.Max(0, t.PowerType);
         var manaPct = powerType == 0 ? t.ManaCostPercentage : 0;
 
-        // Периодическая аура (DoT/HoT/Energize, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL/ENERGIZE
-        // → тик во времени. Energize (24) тикает ресурс (Кровавая ярость 29131: +1 ярости/с 10с).
+        // Периодическая аура (DoT/HoT/Energize/Leech, M10.4b): APPLY_AURA с типом PERIODIC_DAMAGE/HEAL/ENERGIZE.
+        // Energize (24) тикает ресурс (Кровавая ярость 29131). KB#371: Leech (53) — DoT с leech-эффектом на
+        // кастере (Devouring Plague, Drain Life); пока обрабатываем как обычный PERIODIC_DAMAGE — урон цели
+        // идёт, leech-компонент на кастере опционально (нужен отдельный hook на тике).
         var periodicIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura
-            && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize);
+            && e.Aura is AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize or AuraPeriodicLeech);
         var periodic = periodicIdx >= 0 ? effects[periodicIdx] : default;
         var isPeriodic = periodic.Eff == EffectApplyAura;
         var periodicHeal = periodic.Aura == AuraPeriodicHeal;
@@ -310,8 +315,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // BasePoints (>=0 — бафф на себя; <0 — дебафф на цель-существо) — надёжнее enum-целей. Простой
         // механический эффект — только MOD_INCREASE_HEALTH (+макс. HP); прочие стат-моды пока визуальны.
         // PERIODIC_ENERGIZE (24) — тоже периодика, в buff-ветку не должна попадать (иначе наложится дважды).
+        // KB#371: PERIODIC_LEECH (53) — аналогично, идёт в periodic-ветку.
         var auraBuffEff = Array.Find(effects, e => e.Eff == EffectApplyAura
-            && e.Aura is not (AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize) && e.Aura != 0);
+            && e.Aura is not (AuraPeriodicDamage or AuraPeriodicHeal or AuraPeriodicEnergize or AuraPeriodicLeech)
+            && e.Aura != 0);
         var auraBuff = auraBuffEff.Eff == EffectApplyAura;
         var hpAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModIncreaseHealth);
         var healthBonus = hpAura.Eff == EffectApplyAura ? hpAura.Bp + 1 : 0;
