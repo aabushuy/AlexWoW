@@ -143,6 +143,41 @@ def ensure_skeleton(token: str) -> tuple[int, dict[int, int]]:
 
 # ─── Tester lookup ─────────────────────────────────────────────────────────
 
+def fetch_skill_via_effects(spell_ids: list[int]) -> dict[int, int]:
+    """Fallback: для проф-обучателей тиров (Expert Cook и т.п.) skill-линию даёт
+    Effect1/2/3 == 44 (SKILL_STEP) / 118 (SKILL), EffectMiscValueN = SkillLine id.
+    Эти спеллы не входят в SkillLineAbility.dbc, поэтому без второго источника
+    они уезжают в generic. Возвращает spell_id → skill_line из нашего вайтлиста."""
+    if not spell_ids:
+        return {}
+    ids_csv = ",".join(str(i) for i in spell_ids)
+    sql = (
+        "SELECT Id, "
+        "  CASE WHEN Effect1 IN (44,118) THEN EffectMiscValue1 "
+        "       WHEN Effect2 IN (44,118) THEN EffectMiscValue2 "
+        "       WHEN Effect3 IN (44,118) THEN EffectMiscValue3 "
+        "       ELSE 0 END AS skill "
+        f"FROM mangos.spell_template WHERE Id IN ({ids_csv});"
+    )
+    cmd = (
+        "docker exec -i alexwow-mysql mysql -ualexwow -palexwow "
+        "--default-character-set=utf8mb4 --batch --skip-column-names"
+    )
+    out = ssh_run(cmd, input_data=sql, timeout=120)
+    result = {}
+    for raw in out.splitlines():
+        if not raw or raw.startswith("mysql:"): continue
+        parts = raw.split("\t")
+        if len(parts) < 2: continue
+        try:
+            sid, skill = int(parts[0]), int(parts[1])
+            if skill in PROFESSIONS:
+                result[sid] = skill
+        except ValueError:
+            continue
+    return result
+
+
 def fetch_testers_by_name() -> dict[str, int]:
     """Имя персонажа-тестера → guid (для PATCH testerGuid)."""
     sql = (
@@ -196,9 +231,9 @@ def main() -> int:
     generic_tickets = api_get(token, f"/tickets?epic={SOURCE_GENERIC_EPIC_ID}&archived=true")
     print(f"    {len(generic_tickets)} тикетов в исходном эпике")
 
-    # Определяем какие из них профа.
-    to_migrate: list[tuple[dict, int, int]] = []   # (ticket, skill_id, target_epic_id)
-    skipped_no_spell = skipped_no_skill = skipped_unknown_skill = 0
+    # Собираем spell_id всех задач, чтобы потом одним SELECT подтянуть Effect-fallback.
+    ticket_by_spell: dict[int, dict] = {}
+    skipped_no_spell = 0
     for t in generic_tickets:
         if t.get("type") != "Task":
             continue
@@ -206,15 +241,32 @@ def main() -> int:
         if not m:
             skipped_no_spell += 1
             continue
-        sid = int(m.group(1))
+        ticket_by_spell[int(m.group(1))] = t
+
+    # Fallback: тир-апгрейды профы (Expert Cook и т.п.) НЕ в SkillLineAbility.dbc, но
+    # их Effect == 44 (SKILL_STEP), EffectMiscValue = SkillLine id.
+    spell_ids_for_fallback = [sid for sid in ticket_by_spell if sid not in skill_map]
+    if spell_ids_for_fallback:
+        print(f"[*] Fallback по Effect/EffectMiscValue для {len(spell_ids_for_fallback)} спеллов без DBC-привязки...")
+        eff_map = fetch_skill_via_effects(spell_ids_for_fallback)
+        print(f"    подобрано через эффекты: {len(eff_map)}")
+    else:
+        eff_map = {}
+
+    to_migrate: list[tuple[dict, int, int]] = []   # (ticket, skill_id, target_epic_id)
+    skipped_no_skill = skipped_unknown_skill = 0
+    for sid, t in ticket_by_spell.items():
+        # 1) Прямая запись в SkillLineAbility.dbc
         skills = skill_map.get(sid)
-        if not skills:
-            skipped_no_skill += 1
-            continue
-        # Из всех привязок берём ту, что входит в наш проф-вайтлист.
-        chosen = next((s for s in skills if s in PROFESSIONS), None)
+        chosen = next((s for s in (skills or []) if s in PROFESSIONS), None)
+        # 2) Fallback по Effect/EffectMiscValue
         if chosen is None:
-            skipped_unknown_skill += 1
+            chosen = eff_map.get(sid)
+        if chosen is None:
+            if skills:
+                skipped_unknown_skill += 1
+            else:
+                skipped_no_skill += 1
             continue
         to_migrate.append((t, chosen, epic_by_skill[chosen]))
 
