@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false  # деплой не отменяем mid-way — оставит compose в полу-собранном состоянии
+
+jobs:
+  build-test:
+    name: Build + Test
+    runs-on: [self-hosted, dotnet]   # любой runner с .NET 10 SDK (homeserver или windows)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore AlexWoW.slnx
+
+      - name: Build (Release, warnings=errors via Directory.Build.props)
+        run: dotnet build AlexWoW.slnx -c Release --no-restore -nologo
+
+      - name: Test
+        run: >
+          dotnet test AlexWoW.slnx
+          -c Release --no-build --nologo
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          retention-days: 7
+
+  deploy-test:
+    name: Deploy to test (homeserver)
+    needs: build-test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, deploy]  # ТОЛЬКО homeserver-runner — у него есть bind-mount /data/docker/alexwow
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Publish (Auth, World, Web)
+        run: |
+          dotnet publish src/AlexWoW.AuthServer/AlexWoW.AuthServer.csproj  -c Release -o publish/auth  --nologo
+          dotnet publish src/AlexWoW.WorldServer/AlexWoW.WorldServer.csproj -c Release -o publish/world --nologo
+          dotnet publish src/AlexWoW.Web/AlexWoW.Web.csproj                 -c Release -o publish/web   --nologo
+
+      - name: Sync to /data/docker/alexwow/ (bind-mount, без SCP)
+        run: |
+          # Homeserver-runner монтирует /data/docker/alexwow/ как том — пишем напрямую.
+          # rsync с --delete чтобы не оставлять старые DLL'ки от удалённых файлов в репо.
+          rm -rf /data/docker/alexwow/publish
+          mkdir -p /data/docker/alexwow/publish
+          rsync -a publish/ /data/docker/alexwow/publish/
+          cp Dockerfile.auth Dockerfile.world Dockerfile.web docker-compose.yml /data/docker/alexwow/
+
+      - name: docker compose up
+        run: |
+          cd /data/docker/alexwow
+          docker compose --env-file /data/docker/alexwow-config/.env up -d --build
+
+      - name: Smoke
+        run: |
+          # Дать контейнерам 15 секунд на старт после --build, потом проверить ps + tail логов world.
+          sleep 15
+          docker compose --env-file /data/docker/alexwow-config/.env -f /data/docker/alexwow/docker-compose.yml ps
+          docker logs alexwow-world --tail 8
+          # Простой grep на «WorldServer слушает» — если стартанул чисто, в последних 8 строках будет.
+          docker logs alexwow-world --tail 20 | grep -q "WorldServer слушает" || (echo "World did not start cleanly" >&2; exit 1)

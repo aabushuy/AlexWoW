@@ -1,0 +1,18 @@
+{
+  "_comment": "Sample .mcp.json для нового разработчика. Скопировать в D:\\Projects\\AlexWoW\\.mcp.json (он в .gitignore). KANBAN_TOKEN взять из deploy/SECRETS.md (поле WEB_API_TOKEN) или у админа. kanban_mcp.py живёт в Seafile-shared каталоге.",
+  "mcpServers": {
+    "kanban": {
+      "command": "C:\\Users\\<USERNAME>\\.local\\bin\\uv.exe",
+      "args": [
+        "run",
+        "--quiet",
+        "D:\\Seafile\\Home Library\\Claude files\\HomeServer\\mcp-servers\\kanban\\kanban_mcp.py"
+      ],
+      "env": {
+        "KANBAN_URL": "https://alexwow.home.srv",
+        "KANBAN_TOKEN": "<see deploy/SECRETS.md WEB_API_TOKEN>",
+        "KANBAN_VERIFY_SSL": "false"
+      }
+    }
+  }
+}

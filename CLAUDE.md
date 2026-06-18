@@ -29,3 +29,20 @@ AlexWoW контейнеры: `/data/docker/alexwow/`
 - Данные клиента (DBC/maps/vmaps/mmaps) в репозиторий не коммитятся.
 - Язык проекта: C# / .NET 10, комментарии на русском.
 - Code style: см. `docs/code-style.md`.
+
+## External resources (shared storage)
+
+SMB-шара `\\homeserver\WowProject` (юзер `wowshare`) содержит:
+- `repos/` — read-only зеркала `mangos-wotlk` и `TrinityCore` (fetch по cron'у)
+- `client/WoW335/` — клиент 3.3.5a с аддонами и `realmlist.wtf`
+- `claude/` — shared промпты/инструкции для AI-агентов
+- `dev/START_HERE.md` — onboarding для нового разработчика
+
+Конфиги (sample): `docs/onboarding/{ssh-config.sample,mcp-config.sample.json,runner-setup.md}` — source of truth в репо, на шаре — копии.
+
+## CI/CD
+
+- Деплой: автоматический при push в `main` через `.github/workflows/ci.yml` (build → test → deploy-test на homeserver).
+- Emergency-fallback: `deploy/deploy-manual.ps1`.
+- Секреты: `/data/docker/alexwow-config/.env` на homeserver, см. `deploy/SECRETS.md`.
+- Self-hosted runners: `deploy/RUNNERS.md` + `docs/onboarding/runner-setup.md`.
