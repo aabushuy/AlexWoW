@@ -61,3 +61,8 @@ reference/
 # Промежуточный список displayid для извлечения иконок (регенерится из БД, см. iconmap)
 tools/MapExtractor/used-displayids.txt
 tools/regression-import/__pycache__/
+
+# C++ launcher build artifacts (CMake + MSVC). Исходники в репо, бинари — нет.
+tools/WowLauncher/build/
+tools/WowLauncher/out/
+tools/WowLauncher/.vs/
