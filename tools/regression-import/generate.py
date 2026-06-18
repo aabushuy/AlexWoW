@@ -58,40 +58,55 @@ WITH src AS (
            s.Effect1, s.EffectBasePoints1, s.EffectDieSides1, s.EffectApplyAuraName1 AS EffectAura1,
            s.Effect2, s.EffectBasePoints2,
            s.Effect3, s.EffectBasePoints3,
-           s.RecoveryTime, s.DurationIndex
+           s.RecoveryTime, s.DurationIndex,
+           0 AS IsRacial
     FROM mangos.spell_template s
     JOIN mangos.npc_trainer nt ON nt.spell = s.Id
+    WHERE s.SpellName <> ''
+    UNION
+    -- Стартовые спеллы по race+class (расовые активки, базовые проф.навыки, языки) — учатся
+    -- автоматически при создании персонажа, не через тренера. IsRacial=1 — флаг для роутинга
+    -- в эпик «Расовые», если SpellFamilyName=0 (т.е. это не класс-абилка, а расовая/общая).
+    SELECT s.Id, s.SpellName, s.SpellLevel, s.SpellFamilyName,
+           s.SchoolMask, s.ManaCost, s.PowerType,
+           s.Effect1, s.EffectBasePoints1, s.EffectDieSides1, s.EffectApplyAuraName1 AS EffectAura1,
+           s.Effect2, s.EffectBasePoints2,
+           s.Effect3, s.EffectBasePoints3,
+           s.RecoveryTime, s.DurationIndex,
+           1 AS IsRacial
+    FROM mangos.spell_template s
+    JOIN mangos.playercreateinfo_spell ps ON ps.Spell = s.Id
     WHERE s.SpellName <> ''
 ),
 ranked AS (
     SELECT *,
            ROW_NUMBER() OVER (PARTITION BY SpellName, SpellFamilyName
-                              ORDER BY SpellLevel DESC, Id DESC) AS rn
+                              ORDER BY SpellLevel DESC, Id DESC, IsRacial ASC) AS rn
     FROM src
 )
 SELECT Id, SpellName, SpellLevel, SpellFamilyName, SchoolMask, ManaCost, PowerType,
        Effect1, EffectBasePoints1, EffectDieSides1, EffectAura1,
        Effect2, EffectBasePoints2, Effect3, EffectBasePoints3,
-       RecoveryTime, DurationIndex
+       RecoveryTime, DurationIndex, IsRacial
 FROM ranked WHERE rn = 1
 ORDER BY SpellFamilyName, SpellLevel, Id;
 """
 
 
 def fetch_spells() -> list[SpellRow]:
-    """Выполнить SQL на homeserver, распарсить TSV-выход."""
-    sql = SQL_TRAINER_SPELLS.replace("\n", " ")
+    """Выполнить SQL на homeserver, распарсить TSV-выход. SQL прокидывается через stdin —
+    длинный CTE+UNION не помещается в командной строке как `-e "..."`."""
     cmd = (
-        f"docker exec -i alexwow-mysql mysql -ualexwow -palexwow "
-        f"--default-character-set=utf8mb4 --batch --skip-column-names -e \"{sql}\""
+        "docker exec -i alexwow-mysql mysql -ualexwow -palexwow "
+        "--default-character-set=utf8mb4 --batch --skip-column-names"
     )
-    out = ssh_run(cmd, timeout=120)
+    out = ssh_run(cmd, input_data=SQL_TRAINER_SPELLS, timeout=120)
     rows: list[SpellRow] = []
     for raw_line in out.splitlines():
         if not raw_line or raw_line.startswith("mysql:"):
             continue
         parts = raw_line.split("\t")
-        if len(parts) < 17:
+        if len(parts) < 18:
             continue
         try:
             rows.append(SpellRow(
@@ -112,6 +127,7 @@ def fetch_spells() -> list[SpellRow]:
                 EffectBasePoints3=int(parts[14]),
                 RecoveryTime=int(parts[15]),
                 DurationIndex=int(parts[16]),
+                IsRacial=int(parts[17]) == 1,
             ))
         except ValueError:
             # Какая-нибудь экзотическая строка с NULL вместо числа — пропускаем.
@@ -125,10 +141,13 @@ TITLE_SPELL_RE = re.compile(r"^#(\d+)\s*[·•]")
 
 
 def fetch_existing_spell_ids(token: str, project_id: int) -> set[int]:
-    """Все уже созданные regression-тикеты — собираем spell_id из title."""
+    """Все уже созданные regression-тикеты — собираем spell_id из title по метке regression
+    БЕЗ фильтра по проекту: регрессионные тикеты живут в нескольких проектах (650 «Регрессия абилок»,
+    2431 «Регрессия профессий») после ручных миграций. Фильтр по project дал бы false-negative
+    для перенесённых тикетов, и генератор создал бы их повторно."""
     cmd = (
         f"curl -s -H 'X-Api-Token: {token}' "
-        f"'{API_BASE}/tickets?project={project_id}&labels=regression&archived=true'"
+        f"'{API_BASE}/tickets?labels=regression&archived=true'"
     )
     out = ssh_run(cmd)
     try:
@@ -176,8 +195,13 @@ def main() -> int:
     family_to_epic_key = epics["family_to_epic"]
     epic_id_by_key = epics["epics"]
 
-    def epic_for(family: int) -> int:
-        key = family_to_epic_key.get(str(family), "generic")
+    racial_epic = epic_id_by_key.get("racial")
+
+    def epic_for(row: "SpellRow") -> int:
+        # Расовые/стартовые без класс-семейства → отдельный эпик «Расовые».
+        if row.IsRacial and row.SpellFamilyName == 0 and racial_epic is not None:
+            return racial_epic
+        key = family_to_epic_key.get(str(row.SpellFamilyName), "generic")
         return epic_id_by_key[key]
 
     print(f"[*] Загружаю абилки из spell_template (через ssh {SSH_HOST})...")
@@ -204,7 +228,12 @@ def main() -> int:
     created, skipped, errors = 0, 0, 0
     for r in todo:
         try:
-            payload = build_ticket(r, epic_for(r.SpellFamilyName))
+            payload = build_ticket(r, epic_for(r))
+            # Для расовых добавим метку, чтобы было видно в фильтре.
+            if r.IsRacial and r.SpellFamilyName == 0:
+                labels = payload.get("labels", [])
+                if "racial" not in labels:
+                    payload["labels"] = list(dict.fromkeys(labels + ["racial"]))
             if args.dry_run:
                 print(f"\n--- DRY id={r.Id} fam={r.SpellFamilyName} pri={payload['priority']} ---")
                 print(json.dumps(payload, ensure_ascii=False, indent=2))

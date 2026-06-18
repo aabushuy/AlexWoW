@@ -114,6 +114,7 @@ class SpellRow:
     EffectBasePoints3: int
     RecoveryTime: int
     DurationIndex: int
+    IsRacial: bool = False  # стартовый из playercreateinfo_spell (расовая активка/пассив)
 
 
 def school_name(mask: int) -> str:

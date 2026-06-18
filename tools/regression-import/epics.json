@@ -11,7 +11,9 @@
     "warlock": 658,
     "druid": 659,
     "deathknight": 660,
-    "generic": 661
+    "generic": 661,
+    "mounts": 2446,
+    "racial": 2447
   },
   "family_to_epic": {
     "4": "warrior",
