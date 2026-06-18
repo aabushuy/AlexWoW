@@ -144,13 +144,23 @@ public sealed class KanbanRepository(IOptions<WebOptions> options)
             new { id, a = archive ? 1 : 0 }, cancellationToken: ct));
     }
 
-    /// <summary>Авто-архивация (KanbanArchiveBackgroundService): закрытое больше двух суток → в архив.</summary>
+    /// <summary>
+    /// Авто-архивация (KanbanArchiveBackgroundService): закрытое больше двух суток → в архив.
+    /// Исключение — тикеты с меткой <c>regression</c>: это регрессионные кейсы, которые должны
+    /// оставаться видимыми на доске, чтобы их можно было ручно перевести обратно в Backlog.
+    /// </summary>
     public async Task<int> ArchiveStaleDoneAsync(CancellationToken ct)
     {
         await using var c = await OpenAsync(ct);
         return await c.ExecuteAsync(new CommandDefinition(
             "UPDATE project.kanban_ticket SET is_archive=1 " +
-            "WHERE status='Done' AND is_archive=0 AND done_at IS NOT NULL AND done_at < (NOW() - INTERVAL 2 DAY)",
+            "WHERE status='Done' AND is_archive=0 AND done_at IS NOT NULL " +
+            "  AND done_at < (NOW() - INTERVAL 2 DAY) " +
+            "  AND id NOT IN ( " +
+            "    SELECT tl.ticket_id FROM project.kanban_ticket_label tl " +
+            "    JOIN project.kanban_label l ON l.id = tl.label_id " +
+            "    WHERE LOWER(l.name) = 'regression' " +
+            "  )",
             cancellationToken: ct));
     }
 
