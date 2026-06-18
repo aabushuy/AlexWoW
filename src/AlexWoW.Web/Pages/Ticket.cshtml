@@ -41,6 +41,23 @@
     .tk-arch-badge { display: inline-block; margin-left: 10px; font-size: .72rem; padding: 2px 8px;
                      border-radius: 10px; background: #455; color: #fff; vertical-align: middle; }
     .tk-meta-row { font-size: .78rem; opacity: .65; margin-top: 4px; }
+
+    /* Spell preview-блок (Phase E): стиль ближе к WoW-тултипу — тёмный фон, жёлтое название. */
+    .tk-spell { margin-top: 14px; padding: 12px; border-radius: 8px;
+                background: #0c0f15; border: 1px solid #2a3550; }
+    .tk-spell-head { display: flex; gap: 10px; align-items: center; }
+    .tk-spell-ico { width: 56px; height: 56px; border-radius: 6px; border: 1px solid #2a3550;
+                    background: #11151c; object-fit: cover; }
+    .tk-spell-title { line-height: 1.2; }
+    .tk-spell-name { color: #ffd54f; font-weight: 700; font-size: 1.05rem; }
+    .tk-spell-sub  { color: #cfd3da; opacity: .7; font-size: .78rem; margin-top: 2px; }
+    .tk-spell-grid { display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 4px;
+                     margin: 10px 0 6px; font-size: .85rem; }
+    .tk-spell-grid dt { color: #8a929c; }
+    .tk-spell-grid dd { margin: 0; color: #e8e8e8; }
+    .tk-spell-link { display: inline-block; margin-top: 6px; font-size: .8rem;
+                     color: #6ec1ff; text-decoration: none; }
+    .tk-spell-link:hover { text-decoration: underline; }
 </style>
 
 <p><a asp-page="/Board">← К доске</a></p>
@@ -177,6 +194,51 @@ else
                         </button>
                     }
                 </div>
+
+                @* Phase E: блок-тултип спелла, если в заголовке тикета распознан spell_id. *@
+                @if (Model.Spell is { } sp)
+                {
+                    <div class="tk-spell">
+                        <div class="tk-spell-head">
+                            <img src="@sp.IconUrl" alt="" class="tk-spell-ico" onerror="this.style.display='none'" />
+                            <div class="tk-spell-title">
+                                <div class="tk-spell-name">@sp.Name</div>
+                                <div class="tk-spell-sub">@sp.FamilyName · уровень @sp.Level · id @sp.Id</div>
+                            </div>
+                        </div>
+                        <dl class="tk-spell-grid">
+                            <dt>Школа</dt><dd>@sp.School</dd>
+                            <dt>Стоимость</dt><dd>@sp.ManaCost @sp.PowerType</dd>
+                            @if (sp.RecoveryMs > 0)
+                            {
+                                <dt>Восстановление</dt><dd>@(sp.RecoveryMs / 1000.0)с</dd>
+                            }
+                            @if (sp.DurationIndex > 0)
+                            {
+                                <dt>Длительность</dt><dd>SpellDuration.dbc[@sp.DurationIndex]</dd>
+                            }
+                            <dt>Эффект 1</dt>
+                            <dd>
+                                @sp.Effect1
+                                @if (sp.EffectAura1 is not null) { <text> · @sp.EffectAura1</text> }
+                            </dd>
+                            <dt>Величина</dt>
+                            <dd>
+                                @if (sp.DieSides1 > 1)
+                                {
+                                    @($"{sp.BasePoints1}–{sp.BasePoints1 + sp.DieSides1 - 1}")
+                                }
+                                else
+                                {
+                                    @sp.BasePoints1
+                                }
+                            </dd>
+                            @if (sp.Effect2 is not null) { <dt>Эффект 2</dt><dd>@sp.Effect2</dd> }
+                            @if (sp.Effect3 is not null) { <dt>Эффект 3</dt><dd>@sp.Effect3</dd> }
+                        </dl>
+                        <a class="tk-spell-link" href="https://wotlkdb.com/?spell=@sp.Id" target="_blank" rel="noreferrer">Wowhead WotLK ↗</a>
+                    </div>
+                }
             </div>
         </div>
     </form>

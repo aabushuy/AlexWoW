@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Web.Services;
 using AlexWoW.Web.Services.Kanban;
@@ -10,9 +11,17 @@ namespace AlexWoW.Web.Pages;
 /// Карточка тикета канбан-доски (KB4): просмотр/создание/редактирование всех полей + лента комментариев.
 /// Дерево (Project→Epic→Task/Bug) валидируется сервисом. Только админам. /Ticket — создание, /Ticket?id= — правка.
 /// </summary>
-public sealed class TicketModel(KanbanService kanban, ICharacterRepository characters, IAccountRepository accounts) : PageModel
+public sealed partial class TicketModel(
+    KanbanService kanban,
+    ICharacterRepository characters,
+    IAccountRepository accounts,
+    SpellPreviewService spellPreview) : PageModel
 {
     public const string AiAssignee = "Агент ИИ"; // #3.1: исполнитель — ИИ-агент (концептуальный id -1)
+
+    /// <summary>Парсит spell_id из «#<num> · …» в title (генератор регрессии в template.py использует тот же формат).</summary>
+    [GeneratedRegex(@"^#(\d+)\s*·")]
+    private static partial Regex SpellIdInTitleRegex();
 
     public bool Configured => kanban.Configured;
     public bool IsNew => Input.Id == 0;
@@ -27,6 +36,9 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
     public IReadOnlyList<string> AllLabels { get; private set; } = [];
     public bool IsArchive { get; private set; }
     public DateTime? DoneAt { get; private set; }
+
+    /// <summary>Preview-блок (Phase E) — заполняется, если в title распознан spell_id и mangos.spell_template нашёл запись.</summary>
+    public SpellPreview? Spell { get; private set; }
 
     public sealed class InputModel
     {
@@ -67,6 +79,12 @@ public sealed class TicketModel(KanbanService kanban, ICharacterRepository chara
                 ClientCheck = t.ClientCheck, Description = t.Description, TestSteps = t.TestSteps, ExpectedResult = t.ExpectedResult,
                 LabelsCsv = string.Join(", ", t.Labels),
             };
+
+            // Phase E: если в title распознан spell_id — подтянуть тултип-блок из spell_template.
+            // Доступно для всех тикетов, не только regression — title типа «#11366 · …» бывают и в M10 эпиках.
+            var m = SpellIdInTitleRegex().Match(t.Title);
+            if (m.Success && uint.TryParse(m.Groups[1].Value, out var spellId))
+                Spell = await spellPreview.GetAsync(spellId, ct);
         }
         return Page();
     }
