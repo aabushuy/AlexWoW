@@ -40,6 +40,10 @@ internal sealed class SessionProgressionState
     /// <summary>Текущая форма шейпшифта (стойка воина/форма друида); 0 — нет формы. UNIT_FIELD_BYTES_2 байт 3. M6.11.</summary>
     internal byte ShapeshiftForm { get; set; }
 
+    /// <summary>ICD (skin cooldown) прок-аур: spellId прок-ауры → Environment.TickCount64 момента последнего срабатывания.
+    /// CMaNGOS spell_proc_event.cooldown — блокирует повторный прок до истечения cooldown_ms. PROC.T3.</summary>
+    internal Dictionary<uint, long> ProcLastFiredMs { get; } = [];
+
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (Xp/TalentPoints переживают выход by design — переинициализируются при входе).</summary>
     internal void Reset()
@@ -53,5 +57,6 @@ internal sealed class SessionProgressionState
         Auras.Clear();        // M6.11: ауры сбрасываются при выходе (клиент пересоздаст при входе)
         Periodics.Clear();    // M10.4b: периодические эффекты (DoT/HoT)
         ShapeshiftForm = 0;
+        ProcLastFiredMs.Clear(); // PROC.T3: ICD прок-аур
     }
 }

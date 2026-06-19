@@ -45,8 +45,12 @@ internal sealed class SpellEffectsService(
         // M12 Spell QA: захват прямого урона (если активна сессия захвата — иначе no-op).
         await spellTestCapture.RecordDamageAsync(session, spellId, info, damage, overkill, ct);
 
-        // PROC.1/PROC.2: прок на вредный спелл — здесь известны крит и школа (для крит-проков типа Elemental Focus).
-        await procs.TryProcAsync(session, ProcFlag.DealHarmfulSpell, ct, wasCrit: crit, spellSchoolMask: info.School);
+        // PROC.1/PROC.2/T5: прок на вредный спелл — здесь известны крит, школа, и source spellId
+        // (для family-фильтра, напр. Sword and Board → только Devastate/Revenge SPELLFAMILY_WARRIOR).
+        await procs.TryProcAsync(session, ProcFlag.DealHarmfulSpell, ct,
+            procEx: crit ? ProcFlagEx.CriticalHit : ProcFlagEx.NormalHit,
+            spellSchoolMask: info.School,
+            sourceSpellId: spellId);
 
         if (died)
         {

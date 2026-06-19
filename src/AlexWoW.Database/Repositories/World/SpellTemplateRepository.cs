@@ -45,7 +45,10 @@ public sealed class SpellTemplateRepository(string connectionString)
     {
         await using var db = await OpenAsync(ct);
         return await db.QuerySingleOrDefaultAsync<SpellProcEventData>(new CommandDefinition(
-            "SELECT entry AS Entry, SchoolMask, procFlags AS ProcFlags, procEx AS ProcEx FROM spell_proc_event WHERE entry = @id;",
+            "SELECT entry AS Entry, SchoolMask, procFlags AS ProcFlags, procEx AS ProcEx, " +
+            "SpellFamilyName, SpellFamilyMaskA0, SpellFamilyMaskA1, SpellFamilyMaskA2, " +
+            "ppmRate AS PpmRate, CustomChance, Cooldown " +
+            "FROM spell_proc_event WHERE entry = @id;",
             new { id }, cancellationToken: ct));
     }
 

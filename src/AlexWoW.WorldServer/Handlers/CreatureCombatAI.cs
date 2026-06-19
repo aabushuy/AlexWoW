@@ -226,13 +226,24 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             if (damage > 0)
                 await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
 
-            // PROC.T1 (порт CMaNGOS UnitAuraProcHandler): victim-side проки на ауры игрока.
+            // PROC.T1/T2 (порт CMaNGOS UnitAuraProcHandler): victim-side проки на ауры игрока.
             // TakeMeleeSwing — авто-удар по нему; TakeAnyDamage — любой урон прошёл (после ABS/блока).
-            // Включает Natural Reaction (talent 57878) когда T5/family-фильтр будет готов.
+            // procEx из outcome: Hit/Crit + avoid-биты (Dodge/Parry/Block) — Natural Reaction (talent 57878,
+            // rage on dodge), Improved Hamstring (proc on hit) и т.п. опираются на эти биты.
             var victimFlags = ProcFlag.TakeMeleeSwing;
             if (damage > 0)
                 victimFlags |= ProcFlag.TakeAnyDamage;
-            await procs.TryProcAsync(player.Session, victimFlags, ct, wasCrit: crit, spellSchoolMask: SchoolMaskPhysical);
+            var victimEx = outcome switch
+            {
+                CombatStats.MeleeOutcome.Dodge => ProcFlagEx.Dodge,
+                CombatStats.MeleeOutcome.Parry => ProcFlagEx.Parry,
+                _ => crit ? ProcFlagEx.CriticalHit : ProcFlagEx.NormalHit,
+            };
+            if (blocked > 0)
+                victimEx |= ProcFlagEx.Block;
+            await procs.TryProcAsync(player.Session, victimFlags, ct,
+                procEx: victimEx, spellSchoolMask: SchoolMaskPhysical,
+                weaponAttackSpeedMs: (uint)PlayerMeleeService.SwingIntervalMs);
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
                 CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed, crit), ct);

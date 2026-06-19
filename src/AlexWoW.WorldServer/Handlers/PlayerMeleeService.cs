@@ -152,8 +152,11 @@ internal sealed class PlayerMeleeService(
         // CRIT.2: передаём флаг крита — теперь работают и мили-крит-проки (procEx PROC_EX_CRITICAL_HIT).
         // CMaNGOS Unit::ProcDamageAndSpell: успешный мили-свинг = DealMeleeSwing + MainHandWeaponSwing.
         // OffHandWeaponSwing — отдельно (Dual Wield), пока считаем все авто-удары main-hand.
+        // PROC.T4: weaponAttackSpeedMs нужен для PPM-проков (Crusader, Mongoose Bite).
         await procs.TryProcAsync(session, ProcFlag.DealMeleeSwing | ProcFlag.MainHandWeaponSwing, ct,
-            wasCrit: crit, spellSchoolMask: 1);
+            procEx: crit ? ProcFlagEx.CriticalHit : ProcFlagEx.NormalHit,
+            spellSchoolMask: 1,
+            weaponAttackSpeedMs: (uint)SwingIntervalMs);
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))
