@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace launcher::process {
 
