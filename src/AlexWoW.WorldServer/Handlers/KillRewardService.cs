@@ -17,6 +17,7 @@ internal sealed class KillRewardService(
     ProgressionService progression,
     ComboPointService comboPoints,
     InventoryGrantService inventoryGrant,
+    ProcService procs,
     IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
@@ -30,6 +31,10 @@ internal sealed class KillRewardService(
     {
         // CP.2: очки серии теряются со смертью комбо-цели (no-op, если копились на другой/уже расходованы).
         await comboPoints.ClearForTargetAsync(session, creature.Guid, ct);
+
+        // PROC.T1 (порт CMaNGOS UnitAuraProcHandler): Kill — на ауры убийцы при убийстве существа.
+        // Покрывает Bloodthirst-like эффекты и пассивки на kill (Vampiric Touch и т.п. — когда ауры подключим).
+        await procs.TryProcAsync(session, ProcFlag.Kill, ct);
 
         // §2 Drain Soul (ЧК): убито существо, помеченное Drain Soul → игрок получает осколок души (item 6265).
         if (session.Combat.DrainSoulTargetGuid == creature.Guid)

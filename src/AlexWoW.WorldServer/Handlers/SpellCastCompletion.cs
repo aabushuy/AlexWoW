@@ -216,7 +216,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // PROC.1/PROC.2: прок на вредный спелл фактически шлётся из SpellEffectsService.ApplyDamageAsync
         // (там известны крит и школа для крит-проков). Чистый DoT без прямого урона: шлём событие здесь (без крита).
         if (info.MaxAmount == 0 && info.Periodic && !info.PeriodicHeal)
-            await procs.TryProcAsync(session, ProcService.ProcFlagDealHarmfulSpell, ct, wasCrit: false, spellSchoolMask: info.School);
+            await procs.TryProcAsync(session, ProcFlag.DealHarmfulSpell, ct, wasCrit: false, spellSchoolMask: info.School);
 
         // §2/M11.3: расход реагентов — для ЛЮБОГО спелла с реагентами (осколок души 6265 у призывов/Soulstone/
         // Healthstone/Soul Fire; травы/порошки крафта и буффов). Гейт «есть ли реагент» — на старте каста.

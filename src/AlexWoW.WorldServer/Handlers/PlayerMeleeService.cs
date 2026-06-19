@@ -150,7 +150,10 @@ internal sealed class PlayerMeleeService(
         // Фаза 2 PROC.1: проки на успешный мили-свинг (Sudden Death и т.п.). Школа удара — физическая (1),
         // чтобы прок с SchoolMask (напр. Omen of Clarity, маска 127) проходил фильтр школы (PROC.2).
         // CRIT.2: передаём флаг крита — теперь работают и мили-крит-проки (procEx PROC_EX_CRITICAL_HIT).
-        await procs.TryProcAsync(session, ProcService.ProcFlagDealMeleeSwing, ct, wasCrit: crit, spellSchoolMask: 1);
+        // CMaNGOS Unit::ProcDamageAndSpell: успешный мили-свинг = DealMeleeSwing + MainHandWeaponSwing.
+        // OffHandWeaponSwing — отдельно (Dual Wield), пока считаем все авто-удары main-hand.
+        await procs.TryProcAsync(session, ProcFlag.DealMeleeSwing | ProcFlag.MainHandWeaponSwing, ct,
+            wasCrit: crit, spellSchoolMask: 1);
 
         // Фаза 2: on-hit прок активной печати паладина (holy-урон / хил / мана). Может добить цель.
         if (await seals.OnMeleeHitAsync(session, creature, now, ct))

@@ -12,7 +12,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Мили игрока — <see cref="PlayerMeleeService"/>, байты пакетов — <see cref="Protocol.CombatPackets"/>.
 /// </summary>
 internal sealed class CreatureCombatAI(CombatResourcesService combatResources, AbsorbShieldService absorbShields,
-    SpellCatalog spellCatalog, KillRewardService killReward, AuraStateService auraState)
+    SpellCatalog spellCatalog, KillRewardService killReward, AuraStateService auraState, ProcService procs)
 {
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
@@ -225,6 +225,14 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             player.Session.Combat.LastCombatMs = now; // M6.7: получил урон → пауза регена
             if (damage > 0)
                 await combatResources.GainRageAsync(player.Session, damage, attacker: false, ct); // M6.12: ярость за полученный урон
+
+            // PROC.T1 (порт CMaNGOS UnitAuraProcHandler): victim-side проки на ауры игрока.
+            // TakeMeleeSwing — авто-удар по нему; TakeAnyDamage — любой урон прошёл (после ABS/блока).
+            // Включает Natural Reaction (talent 57878) когда T5/family-фильтр будет готов.
+            var victimFlags = ProcFlag.TakeMeleeSwing;
+            if (damage > 0)
+                victimFlags |= ProcFlag.TakeAnyDamage;
+            await procs.TryProcAsync(player.Session, victimFlags, ct, wasCrit: crit, spellSchoolMask: SchoolMaskPhysical);
 
             await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgAttackerStateUpdate,
                 CombatPackets.BuildAttackerStateUpdate(creature.Guid, player.Guid, damage, 0, (byte)outcome, blocked, absorbed, crit), ct);
