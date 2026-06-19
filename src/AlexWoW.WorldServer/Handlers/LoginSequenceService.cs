@@ -34,7 +34,8 @@ internal sealed class LoginSequenceService(
     ProgressionService progression,
     RuneService runes,
     World.SpellCatalog spellCatalog,
-    PeriodicsService periodics)
+    PeriodicsService periodics,
+    Group.GroupSyncService groupSync)
 {
     /// <summary>Вход персонажа в мир по CMSG_PLAYER_LOGIN (валидация владения + вся последовательность).</summary>
     internal async Task LoginAsync(WorldSession session, uint guid, CancellationToken ct)
@@ -200,6 +201,10 @@ internal sealed class LoginSequenceService(
         // входа в мир до выхода (длительность int.MaxValue в SpellCatalog). Зовём ПОСЛЕ RefreshMeleeAsync,
         // чтобы базовые статы уже были посчитаны, и SendDodgeAsync/SendStatsAsync применили бонусы поверх.
         await ApplyPassiveSpellsAsync(session, ct);
+
+        // GROUP.T2: пометить онлайн в группе и переcинхронизировать состав/статы (если игрок в группе).
+        try { await groupSync.MarkOnlineAsync(player, ct); }
+        catch (Exception ex) { session.Logger.LogDebug(ex, "GROUP MarkOnline '{User}': {Msg}", session.Account, ex.Message); }
 
         // Клиент теряет экипировку соседей, если их create приходит во время загрузочного экрана.
         // Досылаем create соседей повторно, когда загрузка точно завершена (две попытки).

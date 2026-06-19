@@ -10,13 +10,15 @@ internal enum GroupType : byte
     Raid = 1,
 }
 
-/// <summary>Член группы: GUID, имя, sub-group (для рейда T5), статус ассистента.</summary>
+/// <summary>Член группы: GUID, имя, sub-group (для рейда T5), статус ассистента и online-флаг (T2).</summary>
 internal sealed class GroupMember
 {
     public ulong Guid { get; init; }
     public required string Name { get; init; }
     public byte SubGroup { get; set; }      // T5: 0–7 для рейда; всегда 0 для партии
     public bool IsAssistant { get; set; }   // T5
+    /// <summary>T2: онлайн ли член. Лидер при создании — true; при logout/login обновляется регистром.</summary>
+    public bool IsOnline { get; set; } = true;
 }
 
 /// <summary>
@@ -49,6 +51,13 @@ internal sealed class Group
 
     public bool IsFull => _members.Count >= MaxSize;
     public bool IsLeader(ulong guid) => LeaderGuid == guid;
+
+    /// <summary>
+    /// Счётчик SMSG_GROUP_LIST (CMaNGOS Group::m_counter, 3.3+). Растёт при каждой посылке —
+    /// клиент использует для де-дупа. Расходуется через NextCounter().
+    /// </summary>
+    public uint NextCounter() => ++_counter;
+    private uint _counter;
 
     public bool ContainsMember(ulong guid) => _members.Exists(m => m.Guid == guid);
 

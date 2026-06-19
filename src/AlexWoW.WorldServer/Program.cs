@@ -90,6 +90,7 @@ builder.Services.AddSingleton<StatStore>();
 builder.Services.AddSingleton<AlexWoW.DataStores.CombatRatings>(); // защитные статы (gt-геймтейблы)
 builder.Services.AddSingleton<WorldState>();
 builder.Services.AddSingleton<GroupRegistry>(); // GROUP.T1: реестр групп (порт CMaNGOS ObjectMgr)
+builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Group.GroupSyncService>(); // GROUP.T2: SMSG_GROUP_LIST + PARTY_MEMBER_STATS
 // Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();

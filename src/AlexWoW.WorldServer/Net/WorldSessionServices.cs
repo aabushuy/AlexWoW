@@ -19,6 +19,7 @@ internal sealed class WorldSessionServices(
     AuthChallengeSender authChallenge,
     AuraPersistenceService auraPersistence,
     SpellTestCaptureService spellTestCapture,
+    AlexWoW.WorldServer.Handlers.Group.GroupSyncService groupSync,
     ILogger<WorldSession> logger)
 {
     public WorldServerOptions Options { get; } = options.Value;
@@ -31,5 +32,7 @@ internal sealed class WorldSessionServices(
     public AuraPersistenceService AuraPersistence { get; } = auraPersistence;
     // Нужно самой сессии: закрыть осиротевшую сессию захвата проверки заклинаний при логауте (M12 Spell QA).
     public SpellTestCaptureService SpellTestCapture { get; } = spellTestCapture;
+    // Нужно самой сессии: пометить offline для группы при логауте + online при логине. GROUP.T2.
+    public AlexWoW.WorldServer.Handlers.Group.GroupSyncService GroupSync { get; } = groupSync;
     public ILogger<WorldSession> Logger { get; } = logger;
 }

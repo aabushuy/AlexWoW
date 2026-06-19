@@ -92,7 +92,7 @@
 
 | CMaNGOS файл(ы) | Назначение | Куда ляжет | Статус |
 |---|---|---|---|
-| `src/game/Groups/Group.cpp` + `GroupHandler.cpp` | Партии/рейды (препрек для подземелий) | [`World/Group.cs`](../src/AlexWoW.WorldServer/World/Group.cs) + [`GroupRegistry.cs`](../src/AlexWoW.WorldServer/World/GroupRegistry.cs) + [`Handlers/Group/GroupHandlers.cs`](../src/AlexWoW.WorldServer/Handlers/Group/GroupHandlers.cs) + [`Protocol/GroupPackets.cs`](../src/AlexWoW.WorldServer/Protocol/GroupPackets.cs) — T1✅ (invite/accept/decline/uninvite, 8 unit-тестов). T2 sync, T3 leader/disband, T4 XP/loot, T5 raid, T6 БД-перс. | 🟡 |
+| `src/game/Groups/Group.cpp` + `GroupHandler.cpp` | Партии/рейды (препрек для подземелий) | [`World/Group.cs`](../src/AlexWoW.WorldServer/World/Group.cs) + [`GroupRegistry.cs`](../src/AlexWoW.WorldServer/World/GroupRegistry.cs) + [`Handlers/Group/`](../src/AlexWoW.WorldServer/Handlers/Group/) (GroupHandlers + GroupSyncService) + [`Protocol/GroupPackets.cs`](../src/AlexWoW.WorldServer/Protocol/GroupPackets.cs) — T1✅ (invite/accept/decline/uninvite), T2✅ (SMSG_GROUP_LIST + PARTY_MEMBER_STATS + login/logout hooks). T3 leader/disband, T4 XP/loot, T5 raid, T6 БД-перс. | 🟡 |
 | `src/game/Guild/Guild.cpp` + `GuildMgr.cpp` | Гильдии (~47 опкодов) | `Handlers/Guild/*` | ⬜ |
 | `src/game/Pet/Pet.cpp` + `PetAI.cpp` | Хантер/локер питомцы | `Handlers/Pet/*` | ⬜ |
 | `src/game/Mail/Mail.cpp` + `MailMgr.cpp` | Почта (12 опкодов) | `Handlers/Mail/*` | ⬜ |

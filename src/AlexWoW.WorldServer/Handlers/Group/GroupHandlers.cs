@@ -16,7 +16,7 @@ namespace AlexWoW.WorldServer.Handlers.Group;
 /// Тесты на CMaNGOS не дают пройти, если попытка пригласить себя/уже-приглашённого/мертвого.
 /// SMSG_GROUP_LIST sync — в T2; смена лидера/disband — в T3; XP/loot — в T4; raid — в T5.
 /// </remarks>
-internal sealed class GroupHandlers(GroupRegistry registry) : IOpcodeHandlerModule
+internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService sync) : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgGroupInvite)]
     public async Task OnGroupInvite(WorldSession session, IncomingPacket packet, CancellationToken ct)
@@ -136,7 +136,9 @@ internal sealed class GroupHandlers(GroupRegistry registry) : IOpcodeHandlerModu
         session.Logger.LogInformation("GROUP '{User}' принял приглашение в группу {Group} (членов {N})",
             session.Account, group.Id, group.MemberCount);
 
-        // SMSG_GROUP_LIST broadcast — в T2. Пока хватит того, что состояние Group в реестре.
+        // T2: SMSG_GROUP_LIST + PARTY_MEMBER_STATS всем членам — клиенты видят панель партии.
+        await sync.SendGroupListAsync(group, session.World, ct);
+        await sync.SendAllStatsAsync(group, session.World, ct);
     }
 
     [WorldOpcodeHandler(WorldOpcode.CmsgGroupDecline)]
@@ -195,7 +197,9 @@ internal sealed class GroupHandlers(GroupRegistry registry) : IOpcodeHandlerModu
         registry.DetachChar(targetGuid);
         session.Logger.LogInformation("GROUP '{User}' выкинул {Guid} из группы {Group}",
             session.Account, targetGuid, group.Id);
-        // SMSG_GROUP_LIST broadcast — T2.
+
+        // T2: пересинхронизировать оставшимся; выкинутому послать «вы покинули» — отдельно T3.
+        await sync.SendGroupListAsync(group, session.World, ct);
     }
 
     // --- helpers ---

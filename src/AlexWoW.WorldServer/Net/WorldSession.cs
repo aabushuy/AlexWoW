@@ -133,6 +133,9 @@ public sealed class WorldSession
         await _services.AuraPersistence.SaveTimedAurasAsync(this, InWorldGuid, ct);
         // M12 Spell QA: закрыть незавершённую сессию захвата (тестировщик вышел, не нажав .spelltest stop).
         await _services.SpellTestCapture.StopAsync(this, ct);
+        // GROUP.T2: пометить offline в группе (если в ней) + разослать PARTY_MEMBER_STATS.
+        try { await _services.GroupSync.MarkOfflineAsync(player, ct); }
+        catch (Exception ex) { Logger.LogDebug(ex, "GroupSync MarkOffline '{User}': {Msg}", Account, ex.Message); }
         Player = null;
         InWorldGuid = 0;
         // M7 S9 #43: пер-полевые сбросы перенесены в Reset() компонентов (семантика сохранена 1:1).
