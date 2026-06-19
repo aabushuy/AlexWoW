@@ -93,6 +93,27 @@ internal sealed class GroupSyncService(GroupRegistry registry, ILogger<GroupSync
             return;
         member.IsOnline = false;
 
+        // T3: если ушёл лидер — promote первого онлайн-наследника. Если он один остался — оффлайн-лидер
+        // остаётся, всё распадётся по таймеру в T6. Пока: безусловный promote если есть онлайн-наследник.
+        if (group.IsLeader(player.Guid))
+        {
+            var heir = group.PickOnlineHeirExceptLeader();
+            if (heir is not null && group.ChangeLeader(heir.Guid) is { } newName)
+            {
+                var pkt = GroupPackets.BuildGroupSetLeader(newName);
+                foreach (var m in group.Members)
+                {
+                    if (!m.IsOnline)
+                        continue;
+                    var p = player.Session.World.FindPlayer(m.Guid);
+                    if (p is not null)
+                        await p.Session.SendAsync(WorldOpcode.SmsgGroupSetLeader, pkt, ct);
+                }
+                await SendGroupListAsync(group, player.Session.World, ct);
+                logger.LogInformation("GROUP leader {OldGuid} offline → promote {NewGuid}", player.Guid, heir.Guid);
+            }
+        }
+
         // Off-line stats: только status=Offline + HP/MP=0.
         var bytes = GroupPackets.BuildPartyMemberStats(player.Guid,
             GroupPackets.GroupUpdateFlag.Status | GroupPackets.GroupUpdateFlag.CurHp,

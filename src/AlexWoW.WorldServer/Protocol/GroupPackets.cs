@@ -67,6 +67,30 @@ internal static class GroupPackets
             .ToArray();
     }
 
+    /// <summary>SMSG_GROUP_SET_LEADER (0x079) — уведомление о смене лидера: только имя нового лидера.</summary>
+    public static byte[] BuildGroupSetLeader(string newLeaderName)
+    {
+        var nameBytes = Encoding.UTF8.GetBytes(newLeaderName);
+        return new ByteWriter(nameBytes.Length + 1).Bytes(nameBytes).UInt8(0).ToArray();
+    }
+
+    /// <summary>SMSG_GROUP_DESTROYED (0x07C) — без тела, говорит клиенту скрыть UI партии.</summary>
+    public static byte[] BuildGroupDestroyed() => [];
+
+    /// <summary>
+    /// «Пустой» SMSG_GROUP_LIST с GROUP_FLAG_DESTROYED (0x10) — CMaNGOS использует после
+    /// disband, чтобы клиент сбросил state партии (наряду с SMSG_GROUP_DESTROYED).
+    /// </summary>
+    public static byte[] BuildEmptyGroupList()
+        => new ByteWriter(28)
+            .UInt8(0x10)           // GROUP_FLAG_DESTROYED
+            .UInt8(0).UInt8(0).UInt8(0)
+            .UInt64(0)             // group guid
+            .UInt32(0)             // counter
+            .UInt32(0)             // member count
+            .UInt64(0)             // leader guid
+            .ToArray();
+
     /// <summary>SMSG_GROUP_DECLINE — уведомление инициатору о том, что получатель отказался.</summary>
     public static byte[] BuildGroupDecline(string declinerName)
     {

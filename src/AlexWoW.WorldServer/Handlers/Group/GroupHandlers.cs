@@ -202,6 +202,334 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         await sync.SendGroupListAsync(group, session.World, ct);
     }
 
+    [WorldOpcodeHandler(WorldOpcode.CmsgGroupSetLeader)]
+    public async Task OnGroupSetLeader(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var newLeaderGuid = reader.UInt64();
+
+        var initiatorGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(initiatorGuid);
+        if (group is null || !group.IsLeader(initiatorGuid))
+            return; // не лидер / не в группе — молча игнор (как CMaNGOS)
+        if (!group.ContainsMember(newLeaderGuid))
+            return; // нельзя сделать лидером не-члена
+
+        var newName = group.ChangeLeader(newLeaderGuid);
+        if (newName is null)
+            return;
+
+        // Broadcast SMSG_GROUP_SET_LEADER + пересинхрон состава (новая шапка для каждого).
+        var pkt = GroupPackets.BuildGroupSetLeader(newName);
+        foreach (var m in group.Members)
+        {
+            if (!m.IsOnline)
+                continue;
+            var p = session.World.FindPlayer(m.Guid);
+            if (p is null)
+                continue;
+            await p.Session.SendAsync(WorldOpcode.SmsgGroupSetLeader, pkt, ct);
+        }
+        await sync.SendGroupListAsync(group, session.World, ct);
+
+        session.Logger.LogInformation("GROUP '{User}' назначил лидером {Name} (group {Id})",
+            session.Account, newName, group.Id);
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgGroupDisband)]
+    public async Task OnGroupDisband(WorldSession session, IncomingPacket _, CancellationToken ct)
+    {
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null)
+            return;
+
+        // CMSG_GROUP_DISBAND — это «уйти из группы». Если лидер — распускаем всю; иначе только себя.
+        if (group.IsLeader(charGuid))
+        {
+            await DisbandAsync(group, session.World, ct);
+            session.Logger.LogInformation("GROUP '{User}' распустил группу {Id}", session.Account, group.Id);
+        }
+        else
+        {
+            await LeaveGroupAsync(group, charGuid, session.World, ct);
+            session.Logger.LogInformation("GROUP '{User}' покинул группу {Id}", session.Account, group.Id);
+        }
+    }
+
+    /// <summary>T3: полный disband — SMSG_GROUP_DESTROYED + empty SMSG_GROUP_LIST каждому, registry.Remove.</summary>
+    internal async Task DisbandAsync(World.Group group, WorldState world, CancellationToken ct)
+    {
+        var destroyed = GroupPackets.BuildGroupDestroyed();
+        var empty = GroupPackets.BuildEmptyGroupList();
+        foreach (var m in group.Members.ToList())
+        {
+            if (m.IsOnline)
+            {
+                var p = world.FindPlayer(m.Guid);
+                if (p is not null)
+                {
+                    await p.Session.SendAsync(WorldOpcode.SmsgGroupDestroyed, destroyed, ct);
+                    await p.Session.SendAsync(WorldOpcode.SmsgGroupList, empty, ct);
+                }
+            }
+            registry.DetachChar(m.Guid);
+        }
+        foreach (var iv in group.Invites.ToList())
+            registry.DetachChar(iv);
+        registry.Remove(group);
+    }
+
+    /// <summary>
+    /// T3: один уходит. Если осталось ≤1 — auto-disband. Если уходил лидер — promote первого онлайн.
+    /// </summary>
+    internal async Task LeaveGroupAsync(World.Group group, ulong charGuid, WorldState world, CancellationToken ct)
+    {
+        var wasLeader = group.IsLeader(charGuid);
+        group.RemoveMember(charGuid);
+        registry.DetachChar(charGuid);
+
+        // Уведомить ушедшего, если он онлайн (empty list — клиент скроет UI партии).
+        var leaver = world.FindPlayer(charGuid);
+        if (leaver is not null)
+        {
+            await leaver.Session.SendAsync(WorldOpcode.SmsgGroupList, GroupPackets.BuildEmptyGroupList(), ct);
+        }
+
+        // Если осталось ≤ 1 — auto-disband (одиночка не группа).
+        if (group.MemberCount <= 1)
+        {
+            await DisbandAsync(group, world, ct);
+            return;
+        }
+
+        if (wasLeader)
+        {
+            var heir = group.PickOnlineHeirExceptLeader() ?? group.Members.FirstOrDefault();
+            if (heir is not null && group.ChangeLeader(heir.Guid) is { } heirName)
+            {
+                var pkt = GroupPackets.BuildGroupSetLeader(heirName);
+                foreach (var m in group.Members)
+                {
+                    if (!m.IsOnline)
+                        continue;
+                    var p = world.FindPlayer(m.Guid);
+                    if (p is not null)
+                        await p.Session.SendAsync(WorldOpcode.SmsgGroupSetLeader, pkt, ct);
+                }
+            }
+        }
+
+        await sync.SendGroupListAsync(group, world, ct);
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgLootMethod)]
+    public async Task OnLootMethod(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var lootMethod = reader.UInt32();
+        var lootMaster = reader.UInt64();
+        var lootThreshold = reader.UInt32();
+        _ = lootThreshold; // T4 — храним только method + masterGuid; threshold через GROUP_LIST если > 1
+
+        var initiatorGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(initiatorGuid);
+        if (group is null || !group.IsLeader(initiatorGuid))
+            return;
+        // Валидное значение: 0-3 (FFA/RR/Master/Group).
+        if (lootMethod > 3)
+            return;
+
+        group.LootMethod = (byte)lootMethod;
+        group.LootMasterGuid = lootMaster;
+        await sync.SendGroupListAsync(group, session.World, ct);
+
+        session.Logger.LogInformation("GROUP '{User}' loot method → {Method} (master {Master})",
+            session.Account, lootMethod, lootMaster);
+    }
+
+    // ============================================================
+    // GROUP.T5: raid / sub-groups / assistant / ready check / target icons
+    // ============================================================
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgGroupRaidConvert)]
+    public async Task OnGroupRaidConvert(WorldSession session, IncomingPacket _, CancellationToken ct)
+    {
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null || !group.IsLeader(charGuid))
+            return;
+        if (group.Type == World.GroupType.Raid)
+            return; // уже рейд
+
+        group.Type = World.GroupType.Raid;
+        await sync.SendGroupListAsync(group, session.World, ct);
+        session.Logger.LogInformation("GROUP '{User}' party → RAID (group {Id})", session.Account, group.Id);
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgGroupChangeSubGroup)]
+    public async Task OnGroupChangeSubGroup(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var targetName = reader.CString();
+        var newGroupIdx = reader.UInt8();
+
+        var initiatorGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(initiatorGuid);
+        if (group is null)
+            return;
+        // По CMaNGOS: лидер ИЛИ ассистент могут менять subgroup'ы. Sub-groups валидны 0..7.
+        var initiator = group.Members.FirstOrDefault(m => m.Guid == initiatorGuid);
+        if (initiator is null || (!group.IsLeader(initiatorGuid) && !initiator.IsAssistant))
+            return;
+        if (newGroupIdx > 7)
+            return;
+
+        var target = group.Members.FirstOrDefault(m =>
+            string.Equals(m.Name, targetName, System.StringComparison.OrdinalIgnoreCase));
+        if (target is null)
+            return;
+
+        target.SubGroup = newGroupIdx;
+        await sync.SendGroupListAsync(group, session.World, ct);
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.CmsgGroupAssistantLeader)]
+    public async Task OnGroupAssistantLeader(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        var targetGuid = reader.UInt64();
+        var apply = reader.UInt8() != 0;
+
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null || !group.IsLeader(charGuid))
+            return;
+
+        var target = group.Members.FirstOrDefault(m => m.Guid == targetGuid);
+        if (target is null)
+            return;
+        target.IsAssistant = apply;
+        await sync.SendGroupListAsync(group, session.World, ct);
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.MsgRaidReadyCheck)]
+    public async Task OnRaidReadyCheck(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null)
+            return;
+
+        var initiator = group.Members.FirstOrDefault(m => m.Guid == charGuid);
+        if (initiator is null)
+            return;
+
+        // CMaNGOS: ready check может стартовать лидер ИЛИ ассистент.
+        var startedReadyCheck = !group.IsLeader(charGuid) ? initiator.IsAssistant : true;
+
+        var reader = packet.Reader();
+        // Если payload пустой — это «лидер начал ready check». Иначе — клиент отвечает (статус).
+        if (reader.Remaining == 0)
+        {
+            if (!startedReadyCheck)
+                return;
+            // Broadcast всем в группе: MSG_RAID_READY_CHECK + senderGuid (8) — клиент откроет диалог.
+            var pkt = new AlexWoW.Common.Network.ByteWriter(8).UInt64(charGuid).ToArray();
+            foreach (var m in group.Members)
+            {
+                if (!m.IsOnline)
+                    continue;
+                var p = session.World.FindPlayer(m.Guid);
+                if (p is not null)
+                    await p.Session.SendAsync(WorldOpcode.MsgRaidReadyCheck, pkt, ct);
+            }
+            session.Logger.LogInformation("GROUP ready check started by '{User}' (group {Id})",
+                session.Account, group.Id);
+            return;
+        }
+
+        // Иначе клиент шлёт свой ответ (uint8 status: 0/1). Перенаправляем всем — клиент сам агрегирует.
+        var status = reader.UInt8();
+        var ack = new AlexWoW.Common.Network.ByteWriter(9).UInt64(charGuid).UInt8(status).ToArray();
+        foreach (var m in group.Members)
+        {
+            if (!m.IsOnline)
+                continue;
+            var p = session.World.FindPlayer(m.Guid);
+            if (p is not null)
+                await p.Session.SendAsync(WorldOpcode.MsgRaidReadyCheckConfirm, ack, ct);
+        }
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.MsgRaidReadyCheckFinished)]
+    public async Task OnRaidReadyCheckFinished(WorldSession session, IncomingPacket _, CancellationToken ct)
+    {
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null || !group.IsLeader(charGuid))
+            return;
+        // Транслируем «завершено» всем (пустое тело).
+        foreach (var m in group.Members)
+        {
+            if (!m.IsOnline)
+                continue;
+            var p = session.World.FindPlayer(m.Guid);
+            if (p is not null)
+                await p.Session.SendAsync(WorldOpcode.MsgRaidReadyCheckFinished, [], ct);
+        }
+    }
+
+    [WorldOpcodeHandler(WorldOpcode.MsgRaidTargetUpdate)]
+    public async Task OnRaidTargetUpdate(WorldSession session, IncomingPacket packet, CancellationToken ct)
+    {
+        var reader = packet.Reader();
+        // Формат CMaNGOS: uint8 op (0 — list, 1 — set). При set: uint8 idx (0..7), packed/full guid.
+        if (reader.Remaining == 0)
+            return;
+        var op = reader.UInt8();
+
+        var charGuid = (ulong)session.InWorldGuid;
+        var group = registry.GetByChar(charGuid);
+        if (group is null)
+            return;
+
+        if (op == 0)
+        {
+            // Запрос текущего списка: отправить «list» обратно (T5.1 — упростим, шлём всё подряд).
+            for (var i = 0; i < group.TargetIcons.Length; i++)
+            {
+                var pkt = new AlexWoW.Common.Network.ByteWriter(10)
+                    .UInt8(1).UInt8((byte)i).UInt64(group.TargetIcons[i]).ToArray();
+                await session.SendAsync(WorldOpcode.MsgRaidTargetUpdate, pkt, ct);
+            }
+            return;
+        }
+
+        // op == 1: set. Лидер/ассистент могут менять icons (CMaNGOS).
+        var initiator = group.Members.FirstOrDefault(m => m.Guid == charGuid);
+        if (initiator is null || (!group.IsLeader(charGuid) && !initiator.IsAssistant))
+            return;
+        if (reader.Remaining < 1)
+            return;
+        var idx = reader.UInt8();
+        if (idx >= group.TargetIcons.Length)
+            return;
+        var guid = reader.UInt64();
+        group.TargetIcons[idx] = guid;
+
+        // Broadcast set всем.
+        var setPkt = new AlexWoW.Common.Network.ByteWriter(10).UInt8(1).UInt8(idx).UInt64(guid).ToArray();
+        foreach (var m in group.Members)
+        {
+            if (!m.IsOnline)
+                continue;
+            var p = session.World.FindPlayer(m.Guid);
+            if (p is not null)
+                await p.Session.SendAsync(WorldOpcode.MsgRaidTargetUpdate, setPkt, ct);
+        }
+    }
+
     // --- helpers ---
 
     private static Task SendPartyResultAsync(WorldSession session, GroupPackets.PartyOperation op,

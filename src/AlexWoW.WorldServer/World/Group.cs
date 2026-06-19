@@ -49,6 +49,9 @@ internal sealed class Group
     /// <summary>Limit по типу. CMaNGOS MAX_GROUP_SIZE=5, MAX_RAID_SIZE=40.</summary>
     public int MaxSize => Type == GroupType.Raid ? 40 : 5;
 
+    /// <summary>T5: 8 raid target icons (skull/x/square/moon/triangle/diamond/circle/star) — guid 0 если не назначен.</summary>
+    public readonly ulong[] TargetIcons = new ulong[8];
+
     public bool IsFull => _members.Count >= MaxSize;
     public bool IsLeader(ulong guid) => LeaderGuid == guid;
 
@@ -97,4 +100,25 @@ internal sealed class Group
         _members.RemoveAt(idx);
         return true;
     }
+
+    /// <summary>
+    /// T3: смена лидера на указанного члена. Возвращает имя нового лидера для SMSG_GROUP_SET_LEADER или null,
+    /// если новый лидер не в группе.
+    /// </summary>
+    public string? ChangeLeader(ulong newLeaderGuid)
+    {
+        var m = _members.Find(x => x.Guid == newLeaderGuid);
+        if (m is null)
+            return null;
+        LeaderGuid = newLeaderGuid;
+        LeaderName = m.Name;
+        return m.Name;
+    }
+
+    /// <summary>
+    /// T3 при leader logout: вернуть первого ОНЛАЙН-члена, отличного от текущего лидера —
+    /// кандидат на promote. null — нет онлайн-наследников (группа распускается).
+    /// </summary>
+    public GroupMember? PickOnlineHeirExceptLeader()
+        => _members.FirstOrDefault(m => m.IsOnline && m.Guid != LeaderGuid);
 }

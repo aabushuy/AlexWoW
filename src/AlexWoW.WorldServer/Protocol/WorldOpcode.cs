@@ -264,6 +264,17 @@ public enum WorldOpcode : uint
     SmsgGroupList = 0x07D,                       // полный состав группы (T2)
     SmsgPartyMemberStats = 0x07E,                // статус члена (HP/MP/позиция) (T2)
     SmsgPartyCommandResult = 0x07F,              // ответ на CMSG_GROUP_* (OK/ошибка)
+
+    // Расширения для рейда (GROUP.T5).
+    CmsgGroupChangeSubGroup = 0x27E,             // смена subgroup'ы члена (рейд)
+    CmsgGroupSwapSubGroup = 0x280,
+    CmsgGroupRaidConvert = 0x28E,                // party → raid (40 cap)
+    CmsgGroupAssistantLeader = 0x28F,            // флаг ассистента
+    MsgRaidTargetUpdate = 0x321,                 // target icons (☠⭐❌◇▲) — bidir MSG
+    MsgRaidReadyCheck = 0x322,                   // ready check — bidir
+    MsgPartyAssignment = 0x38E,                  // main tank / main assist
+    MsgRaidReadyCheckConfirm = 0x3AE,            // ответы клиентов на ready check
+    MsgRaidReadyCheckFinished = 0x3C6,           // лидер завершил ready check
 }
 
 /// <summary>Код ответа SMSG_AUTH_RESPONSE.</summary>

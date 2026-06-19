@@ -18,10 +18,25 @@ internal sealed class KillRewardService(
     ComboPointService comboPoints,
     InventoryGrantService inventoryGrant,
     ProcService procs,
+    GroupRegistry groupRegistry,
     IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
     private const uint DynFlagLootable = 0x1;
+
+    /// <summary>
+    /// GROUP.T4: групповой XP-rate (CMaNGOS XP::xp_in_group_rate). Сумма rate близка к 1 — XP делится
+    /// между членами + small-group bonus 3-5 человек.
+    /// </summary>
+    internal static float GroupXpRate(int memberCount) => memberCount switch
+    {
+        <= 1 => 1.0f,
+        2 => 1.0f,
+        3 => 1.166f,
+        4 => 1.3f,
+        5 => 1.4f,
+        _ => 0.5f,    // рейд — половина (CMaNGOS xp_in_group_rate raid branch)
+    };
 
     /// <summary>
     /// Существо убито: роллим лут и помечаем труп lootable (для наблюдателей). При недоступности БД/пустом
@@ -48,12 +63,36 @@ internal sealed class KillRewardService(
         // M6.5: зачёт убийства в цели активных квестов.
         await questProgress.CreditCreatureAsync(session, creature.Template.Entry, creature.Guid, ct);
 
-        // M9.1: опыт за убийство (убийце).
+        // M9.1 + GROUP.T4: опыт за убийство. Если убийца в группе — XP делится между онлайн-членами
+        // (упрощённо — все онлайн считаются «в радиусе»; уточнение по дистанции в T5/raid).
+        // CMaNGOS Group::RewardGroupAtKill + XP::xp_in_group_rate: 1=1.0, 2=1.0, 3=1.166, 4=1.3, 5=1.4.
         if (session.Character is { } pc && pc.Level < World.LevelStore.MaxLevel)
         {
-            var xp = session.World.Levels.KillXp(pc.Level, creature.Template.Level);
-            if (xp > 0)
-                await progression.GiveXpAsync(session, xp, ct);
+            var baseXp = session.World.Levels.KillXp(pc.Level, creature.Template.Level);
+            if (baseXp > 0)
+            {
+                var killerGuid = (ulong)session.InWorldGuid;
+                var group = groupRegistry.GetByChar(killerGuid);
+                if (group is not null && group.IsCreated)
+                {
+                    var onlineMembers = group.Members.Where(m => m.IsOnline).ToList();
+                    var count = onlineMembers.Count;
+                    var rate = GroupXpRate(count);
+                    var perMember = (uint)(baseXp * rate / count);
+                    foreach (var m in onlineMembers)
+                    {
+                        var target = session.World.FindPlayer(m.Guid);
+                        if (target is null || target.Character.Level >= World.LevelStore.MaxLevel)
+                            continue;
+                        if (perMember > 0)
+                            await progression.GiveXpAsync(target.Session, perMember, ct);
+                    }
+                }
+                else
+                {
+                    await progression.GiveXpAsync(session, baseXp, ct);
+                }
+            }
         }
 
         Database.Models.CreatureLootData? data;
