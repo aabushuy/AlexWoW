@@ -95,7 +95,7 @@ port(cmangos): Proc-flag система из UnitAuraProcHandler.cpp
 
 ## Лицензия и upstream
 
-Проект под **GPL-2.0** (см. `LICENSE` — будет добавлен в Phase 1). Контрибьюции принимаются на тех же условиях. При портировании файла из CMaNGOS-WoTLK сохраняй атрибуцию в header-комментарии:
+Проект под **GPL-2.0** — см. [LICENSE](LICENSE) и [NOTICE.md](NOTICE.md). Контрибьюции принимаются на тех же условиях. При портировании файла из CMaNGOS-WoTLK сохраняй атрибуцию в header-комментарии:
 
 ```csharp
 // Порт CMaNGOS-WoTLK: src/game/Spells/SpellMgr.cpp

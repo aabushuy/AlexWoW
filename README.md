@@ -70,7 +70,7 @@ dotnet test
 
 ## Лицензия
 
-GPL-2.0 (планируется в Phase 1 — добавление файла `LICENSE` и атрибуции `NOTICE.md`). Порт CMaNGOS-WoTLK считается derivative work, поэтому совместимость с upstream-лицензией обязательна.
+**GPL-2.0** — см. [LICENSE](LICENSE) и [NOTICE.md](NOTICE.md) (upstream-атрибуция). Порт CMaNGOS-WoTLK считается derivative work, поэтому совместимость с upstream-лицензией обязательна.
 
 ## Upstream / эталоны
 
