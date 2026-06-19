@@ -18,7 +18,8 @@ namespace AlexWoW.WorldServer.Handlers.Group;
 /// Периодическая рассылка stats в T2.1 (CMaNGOS Group::UpdatePlayerOutOfRange) — пока шлём
 /// один раз вместе с GROUP_LIST, чего достаточно для отображения панели партии.
 /// </remarks>
-internal sealed class GroupSyncService(GroupRegistry registry, ILogger<GroupSyncService> logger)
+internal sealed class GroupSyncService(GroupRegistry registry,
+    GroupPersistenceService persist, ILogger<GroupSyncService> logger)
 {
     /// <summary>SMSG_GROUP_LIST всем онлайн-членам группы; за каждого считаем свою «receiver-шапку».</summary>
     public async Task SendGroupListAsync(World.Group group, WorldState world, CancellationToken ct)
@@ -74,6 +75,15 @@ internal sealed class GroupSyncService(GroupRegistry registry, ILogger<GroupSync
         if (member is null)
             return;
         member.IsOnline = true;
+        // T6: после recovery имя могло быть stub'ом (guid hex) — подменяем настоящим Character.Name.
+        var realName = player.Character.Name;
+        if (member is { } m && m.Name != realName)
+        {
+            // Имя — init-only, поэтому не меняем сам объект, но первоначальное имя лидера в Group
+            // обновляем (нужно для SMSG_GROUP_LIST лидерского имени, видится клиенту).
+            if (group.LeaderGuid == player.Guid && group.LeaderName != realName)
+                group.LeaderName = realName;
+        }
         await SendGroupListAsync(group, player.Session.World, ct);
         await SendAllStatsAsync(group, player.Session.World, ct);
         logger.LogInformation("GROUP member {Guid} ONLINE (group {GroupId}, members {N})",
@@ -100,6 +110,7 @@ internal sealed class GroupSyncService(GroupRegistry registry, ILogger<GroupSync
             var heir = group.PickOnlineHeirExceptLeader();
             if (heir is not null && group.ChangeLeader(heir.Guid) is { } newName)
             {
+                await persist.UpdateGroupAsync(group, ct); // T6
                 var pkt = GroupPackets.BuildGroupSetLeader(newName);
                 foreach (var m in group.Members)
                 {

@@ -32,6 +32,8 @@ internal sealed class GroupMember
 internal sealed class Group
 {
     public uint Id { get; init; }
+    /// <summary>T6: id строки в БД group_data. 0 — ещё не сохранена (invite-only или не было первого accept).</summary>
+    public uint PersistedId { get; set; }
     public ulong LeaderGuid { get; set; }
     public string LeaderName { get; set; } = "";
     public GroupType Type { get; set; } = GroupType.Party;

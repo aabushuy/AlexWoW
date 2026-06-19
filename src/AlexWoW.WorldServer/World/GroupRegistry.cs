@@ -25,6 +25,28 @@ internal sealed class GroupRegistry
         return g;
     }
 
+    /// <summary>
+    /// T6: восстановить группу из БД (HostedService на старте). PersistedId = id из group_data.
+    /// In-memory Id выдаём отдельно, чтобы не пересекаться с auto-increment'ом.
+    /// </summary>
+    public Group RehydrateGroup(uint persistedId, uint leaderGuid, string leaderName,
+        GroupType type, byte lootMethod, uint lootMasterGuid)
+    {
+        var g = new Group
+        {
+            Id = _nextId++,
+            PersistedId = persistedId,
+            LeaderGuid = leaderGuid,
+            LeaderName = leaderName,
+            Type = type,
+            LootMethod = lootMethod,
+            LootMasterGuid = lootMasterGuid,
+        };
+        _byId[g.Id] = g;
+        _byChar[leaderGuid] = g;
+        return g;
+    }
+
     /// <summary>Зарегистрировать invite — для lookup'а у получателя при accept'е.</summary>
     public void TrackInvite(Group group, ulong recipientGuid)
     {

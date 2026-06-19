@@ -16,7 +16,8 @@ namespace AlexWoW.WorldServer.Handlers.Group;
 /// Тесты на CMaNGOS не дают пройти, если попытка пригласить себя/уже-приглашённого/мертвого.
 /// SMSG_GROUP_LIST sync — в T2; смена лидера/disband — в T3; XP/loot — в T4; raid — в T5.
 /// </remarks>
-internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService sync) : IOpcodeHandlerModule
+internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService sync,
+    GroupPersistenceService persist) : IOpcodeHandlerModule
 {
     [WorldOpcodeHandler(WorldOpcode.CmsgGroupInvite)]
     public async Task OnGroupInvite(WorldSession session, IncomingPacket packet, CancellationToken ct)
@@ -136,6 +137,18 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         session.Logger.LogInformation("GROUP '{User}' принял приглашение в группу {Group} (членов {N})",
             session.Account, group.Id, group.MemberCount);
 
+        // T6: persistence — первый accept делает Group Created. Сохраняем заголовок + лидера + нового.
+        if (group.PersistedId == 0)
+        {
+            await persist.SaveNewGroupAsync(group, ct);
+            var leaderMember = group.Members.FirstOrDefault(m => m.Guid == group.LeaderGuid);
+            if (leaderMember is not null)
+                await persist.SaveMemberAsync(group, leaderMember, ct);
+        }
+        var newMember = group.Members.FirstOrDefault(m => m.Guid == charGuid);
+        if (newMember is not null)
+            await persist.SaveMemberAsync(group, newMember, ct);
+
         // T2: SMSG_GROUP_LIST + PARTY_MEMBER_STATS всем членам — клиенты видят панель партии.
         await sync.SendGroupListAsync(group, session.World, ct);
         await sync.SendAllStatsAsync(group, session.World, ct);
@@ -195,6 +208,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
 
         group.RemoveMember(targetGuid);
         registry.DetachChar(targetGuid);
+        await persist.DeleteMemberAsync(group, targetGuid, ct); // T6
         session.Logger.LogInformation("GROUP '{User}' выкинул {Guid} из группы {Group}",
             session.Account, targetGuid, group.Id);
 
@@ -218,6 +232,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         var newName = group.ChangeLeader(newLeaderGuid);
         if (newName is null)
             return;
+        await persist.UpdateGroupAsync(group, ct); // T6
 
         // Broadcast SMSG_GROUP_SET_LEADER + пересинхрон состава (новая шапка для каждого).
         var pkt = GroupPackets.BuildGroupSetLeader(newName);
@@ -277,6 +292,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         }
         foreach (var iv in group.Invites.ToList())
             registry.DetachChar(iv);
+        await persist.DeleteGroupAsync(group, ct); // T6
         registry.Remove(group);
     }
 
@@ -288,6 +304,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         var wasLeader = group.IsLeader(charGuid);
         group.RemoveMember(charGuid);
         registry.DetachChar(charGuid);
+        await persist.DeleteMemberAsync(group, charGuid, ct); // T6
 
         // Уведомить ушедшего, если он онлайн (empty list — клиент скроет UI партии).
         var leaver = world.FindPlayer(charGuid);
@@ -308,6 +325,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
             var heir = group.PickOnlineHeirExceptLeader() ?? group.Members.FirstOrDefault();
             if (heir is not null && group.ChangeLeader(heir.Guid) is { } heirName)
             {
+                await persist.UpdateGroupAsync(group, ct); // T6: persist нового лидера
                 var pkt = GroupPackets.BuildGroupSetLeader(heirName);
                 foreach (var m in group.Members)
                 {
@@ -342,6 +360,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
 
         group.LootMethod = (byte)lootMethod;
         group.LootMasterGuid = lootMaster;
+        await persist.UpdateGroupAsync(group, ct); // T6
         await sync.SendGroupListAsync(group, session.World, ct);
 
         session.Logger.LogInformation("GROUP '{User}' loot method → {Method} (master {Master})",
@@ -363,6 +382,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
             return; // уже рейд
 
         group.Type = World.GroupType.Raid;
+        await persist.UpdateGroupAsync(group, ct); // T6
         await sync.SendGroupListAsync(group, session.World, ct);
         session.Logger.LogInformation("GROUP '{User}' party → RAID (group {Id})", session.Account, group.Id);
     }
@@ -391,6 +411,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
             return;
 
         target.SubGroup = newGroupIdx;
+        await persist.UpdateMemberAsync(group, target, ct); // T6
         await sync.SendGroupListAsync(group, session.World, ct);
     }
 
@@ -410,6 +431,7 @@ internal sealed class GroupHandlers(GroupRegistry registry, GroupSyncService syn
         if (target is null)
             return;
         target.IsAssistant = apply;
+        await persist.UpdateMemberAsync(group, target, ct); // T6
         await sync.SendGroupListAsync(group, session.World, ct);
     }
 

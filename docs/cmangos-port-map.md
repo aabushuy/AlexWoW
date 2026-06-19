@@ -92,7 +92,7 @@
 
 | CMaNGOS файл(ы) | Назначение | Куда ляжет | Статус |
 |---|---|---|---|
-| `src/game/Groups/Group.cpp` + `GroupHandler.cpp` | Партии/рейды (препрек для подземелий) | [`World/Group.cs`](../src/AlexWoW.WorldServer/World/Group.cs) + [`GroupRegistry.cs`](../src/AlexWoW.WorldServer/World/GroupRegistry.cs) + [`Handlers/Group/`](../src/AlexWoW.WorldServer/Handlers/Group/) + [`Protocol/GroupPackets.cs`](../src/AlexWoW.WorldServer/Protocol/GroupPackets.cs) — T1✅ invite, T2✅ sync, T3✅ leader/disband + auto-promote, T4✅ XP share (group rate 1/2/3/4/5/raid) + loot method, T5✅ raid convert / sub-groups / assistant / ready check / target icons. T6 БД-перс. | 🟡 |
+| `src/game/Groups/Group.cpp` + `GroupHandler.cpp` | Партии/рейды (препрек для подземелий) | [`World/Group.cs`](../src/AlexWoW.WorldServer/World/Group.cs) + [`GroupRegistry.cs`](../src/AlexWoW.WorldServer/World/GroupRegistry.cs) + [`Handlers/Group/`](../src/AlexWoW.WorldServer/Handlers/Group/) + [`Protocol/GroupPackets.cs`](../src/AlexWoW.WorldServer/Protocol/GroupPackets.cs) — T1✅ invite, T2✅ sync, T3✅ leader/disband + auto-promote, T4✅ XP share + loot method, T5✅ raid / sub-groups / assistant / ready check / target icons, T6✅ persistence (group_data + group_member, IGroupRepository, HostedService recovery). T7 смок-тесты. | 🟡 |
 | `src/game/Guild/Guild.cpp` + `GuildMgr.cpp` | Гильдии (~47 опкодов) | `Handlers/Guild/*` | ⬜ |
 | `src/game/Pet/Pet.cpp` + `PetAI.cpp` | Хантер/локер питомцы | `Handlers/Pet/*` | ⬜ |
 | `src/game/Mail/Mail.cpp` + `MailMgr.cpp` | Почта (12 опкодов) | `Handlers/Mail/*` | ⬜ |

@@ -29,6 +29,8 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<SpellTestResult> SpellTestResults => Set<SpellTestResult>();
     public DbSet<SpellTestRequest> SpellTestRequests => Set<SpellTestRequest>(); // QA T1: очередь запросов на авто-прогон харнесса
     public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
+    public DbSet<GroupData> Groups => Set<GroupData>(); // GROUP.T6
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>(); // GROUP.T6
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -295,6 +297,30 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasColumnName("setting_key").HasMaxLength(64).ValueGeneratedNever();
             e.Property(x => x.Value).HasColumnName("setting_value").HasMaxLength(255).IsRequired();
+        });
+
+        // GROUP.T6: persistence группы. group_data + group_member.
+        modelBuilder.Entity<GroupData>(e =>
+        {
+            e.ToTable("group_data");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.LeaderGuid).HasColumnName("leader_guid").IsRequired();
+            e.Property(x => x.LeaderName).HasColumnName("leader_name").HasMaxLength(32).IsRequired();
+            e.Property(x => x.Type).HasColumnName("type").HasDefaultValue((byte)0);
+            e.Property(x => x.LootMethod).HasColumnName("loot_method").HasDefaultValue((byte)0);
+            e.Property(x => x.LootMasterGuid).HasColumnName("loot_master_guid").HasDefaultValue((uint)0);
+        });
+
+        modelBuilder.Entity<GroupMember>(e =>
+        {
+            e.ToTable("group_member");
+            e.HasKey(x => new { x.GroupId, x.CharGuid });
+            e.Property(x => x.GroupId).HasColumnName("group_id");
+            e.Property(x => x.CharGuid).HasColumnName("char_guid");
+            e.Property(x => x.SubGroup).HasColumnName("subgroup").HasDefaultValue((byte)0);
+            e.Property(x => x.IsAssistant).HasColumnName("is_assistant").HasDefaultValue(false);
+            e.HasIndex(x => x.CharGuid).HasDatabaseName("ix_gm_char");
         });
     }
 }
