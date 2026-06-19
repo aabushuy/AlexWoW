@@ -31,6 +31,14 @@ A.KINDS = {
 A.KIND_LABEL = {}
 for _, it in ipairs(A.KINDS) do A.KIND_LABEL[it.kind] = it.label end
 
+-- Срезать символы, у которых нет глифа в шрифтах клиента 3.3.5a (рисуются как «?»):
+-- U+00B7 (middle dot) — приходит в title из БД; ←/→ (U+2190/U+2192) — встречаются в эпиках/комментариях.
+-- Применяется к любому пришедшему с сервера тексту перед отображением.
+function A.Sanitize(s)
+  if not s then return s end
+  return (s:gsub("\194\183", "-"):gsub("\226\134\144", "<-"):gsub("\226\134\146", "->"))
+end
+
 -- Число UTF-8 символов (решаем, обрезан ли заголовок при показе ≤2 строк).
 function A.ulen(s)
   local n = 0
@@ -93,7 +101,10 @@ local function HandleLine(line)
     id = tonumber(id)
     if id then
       A.building[#A.building + 1] = {
-        id = id, title = title or ("#" .. id), steps = steps or "", expected = expected or "",
+        id = id,
+        title = A.Sanitize(title) or ("#" .. id),
+        steps = A.Sanitize(steps) or "",
+        expected = A.Sanitize(expected) or "",
         spellId = tonumber(spellId), school = tonumber(school),
       }
     end

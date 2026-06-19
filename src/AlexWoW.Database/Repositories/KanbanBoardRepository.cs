@@ -63,6 +63,13 @@ public sealed class KanbanBoardRepository(string connectionString, ISpellSchoolR
         });
     }
 
+    // Метки, которые ПЕРЕНАПРАВЛЯЮТ regression-тикет из вкладки «Абилки» в «Общее»:
+    //   profession    — это профессии (живут в своём проекте 2431, на всякий случай дублируем фильтр здесь)
+    //   mount/mounts  — навыки верховой езды (эпик 2446) — не активные классовые абилки
+    //   proficiency   — навыки владения оружием (см. tools/regression-import/label-weapon-proficiencies.sql)
+    // «Общее» = всё, что НЕ в abilities/professions/talents: либо нерегрессионное, либо regression с этими метками.
+    private const string KindRedirectLabels = "'profession','mount','mounts','proficiency'";
+
     /// <summary>
     /// Условие WHERE и параметры для конкретной вкладки. Метки проверяются через EXISTS/NOT EXISTS по
     /// <c>kanban_ticket_label</c>+<c>kanban_label</c> (LOWER(name)) — паттерн из
@@ -81,7 +88,7 @@ public sealed class KanbanBoardRepository(string connectionString, ISpellSchoolR
                     " AND EXISTS (SELECT 1 FROM project.kanban_ticket_label tl JOIN project.kanban_label l ON l.id = tl.label_id" +
                     "             WHERE tl.ticket_id = t.id AND LOWER(l.name) = 'regression')" +
                     " AND NOT EXISTS (SELECT 1 FROM project.kanban_ticket_label tl JOIN project.kanban_label l ON l.id = tl.label_id" +
-                    "                 WHERE tl.ticket_id = t.id AND LOWER(l.name) = 'profession')", args);
+                    "                 WHERE tl.ticket_id = t.id AND LOWER(l.name) IN (" + KindRedirectLabels + "))", args);
             case KanbanTesterListKind.Professions:
                 args.Add("proj", ProfessionsProjectId);
                 return (
@@ -90,9 +97,13 @@ public sealed class KanbanBoardRepository(string connectionString, ISpellSchoolR
                     "             WHERE tl.ticket_id = t.id AND LOWER(l.name) = 'profession')", args);
             case KanbanTesterListKind.General:
             default:
+                // Нерегрессионное — старое поведение KB8; плюс regression с redirect-меткой (mounts/proficiency) —
+                // эти задачи логически не «классовая абилка», а смежные навыки (катание/владение оружием).
                 return (
-                    " AND NOT EXISTS (SELECT 1 FROM project.kanban_ticket_label tl JOIN project.kanban_label l ON l.id = tl.label_id" +
-                    "                 WHERE tl.ticket_id = t.id AND LOWER(l.name) = 'regression')", args);
+                    " AND (NOT EXISTS (SELECT 1 FROM project.kanban_ticket_label tl JOIN project.kanban_label l ON l.id = tl.label_id" +
+                    "                  WHERE tl.ticket_id = t.id AND LOWER(l.name) = 'regression')" +
+                    "      OR EXISTS (SELECT 1 FROM project.kanban_ticket_label tl JOIN project.kanban_label l ON l.id = tl.label_id" +
+                    "                 WHERE tl.ticket_id = t.id AND LOWER(l.name) IN (" + KindRedirectLabels + ")))", args);
         }
     }
 

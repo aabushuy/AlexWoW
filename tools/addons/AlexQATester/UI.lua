@@ -64,11 +64,12 @@ local function OnTaskClick(index)
 end
 
 -- Пояснение для пустых вкладок: что должно тут лежать и почему сейчас пусто.
+-- ASCII-only (фонты 3.3.5a не имеют глифов для «ёлочек», тире и стрелок — рисуют '?').
 local EMPTY_HINT = {
   general     = "Список пуст. Сюда попадают нерегрессионные задачи на тестирование,\nназначенные на вашего персонажа.",
-  abilities   = "Список пуст. Здесь регрессии классовых, расовых и стартовых абилок\n(проект «Регрессия абилок»), назначенные на вашего персонажа.",
-  talents     = "Список пуст. Регрессии талантов пока не созданы\n(будет отдельный проект — план KB14).",
-  professions = "Список пуст. Здесь регрессии профессий (проект «Регрессия профессий»),\nназначенные на вашего персонажа.",
+  abilities   = "Список пуст. Здесь регрессии классовых, расовых и стартовых абилок\n(проект 'Регрессия абилок'), назначенные на вашего персонажа.",
+  talents     = "Список пуст. Регрессии талантов пока не созданы\n(будет отдельный проект - план KB14).",
+  professions = "Список пуст. Здесь регрессии профессий (проект 'Регрессия профессий'),\nназначенные на вашего персонажа.",
 }
 
 -- Названия школ магии по битовой маске spell_template.SchoolMask (синхронно с SpellPreviewService.SchoolName).
@@ -87,7 +88,7 @@ local function ApplyCard(t)
   D.cardIcon.tex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
   D.cardName:SetText((name or t.title) .. (rank and rank ~= "" and ("  |cff999999" .. rank .. "|r") or ""))
   local sub = "id " .. t.spellId
-  if t.school and SCHOOL_NAME[t.school] then sub = sub .. " · " .. SCHOOL_NAME[t.school] end
+  if t.school and SCHOOL_NAME[t.school] then sub = sub .. "   " .. SCHOOL_NAME[t.school] end
   D.cardSub:SetText(sub)
   D.wowhead:SetText("https://wotlkdb.com/?spell=" .. t.spellId)
   D.wowhead:SetCursorPosition(0)
@@ -187,10 +188,11 @@ function U.Build()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPLEFT", 652, -8)
 
-  -- Кнопка «← Меню» — закрыть основное окно и вернуться к панели вкладок.
+  -- Кнопка «Меню» — закрыть основное окно и вернуться к панели вкладок. Уехала в нижнюю рамку,
+  -- чтобы не накрывать левый список (фикс ручной подгонки координат пользователем).
   local menuBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  menuBtn:SetWidth(110); menuBtn:SetHeight(24); menuBtn:SetPoint("BOTTOMLEFT", 18, 108)
-  menuBtn:SetText("← Меню")
+  menuBtn:SetWidth(100); menuBtn:SetHeight(24); menuBtn:SetPoint("BOTTOMLEFT", 222, 78)
+  menuBtn:SetText("Меню")
   menuBtn:SetScript("OnClick", function() f:Hide(); if A.MenuPanel then A.MenuPanel.Show() end end)
 
   -- Кнопка «Обновить» — перезапрашивает список задач у сервера.
