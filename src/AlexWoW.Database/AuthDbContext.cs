@@ -31,6 +31,9 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<ServerSetting> ServerSettings => Set<ServerSetting>();
     public DbSet<GroupData> Groups => Set<GroupData>(); // GROUP.T6
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>(); // GROUP.T6
+    public DbSet<GuildData> Guilds => Set<GuildData>(); // GUILD.T5
+    public DbSet<GuildRank> GuildRanks => Set<GuildRank>(); // GUILD.T5
+    public DbSet<GuildMemberData> GuildMembers => Set<GuildMemberData>(); // GUILD.T5
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -321,6 +324,49 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.SubGroup).HasColumnName("subgroup").HasDefaultValue((byte)0);
             e.Property(x => x.IsAssistant).HasColumnName("is_assistant").HasDefaultValue(false);
             e.HasIndex(x => x.CharGuid).HasDatabaseName("ix_gm_char");
+        });
+
+        // GUILD.T5: persistence гильдии (guild_data + guild_rank + guild_member).
+        modelBuilder.Entity<GuildData>(e =>
+        {
+            e.ToTable("guild_data");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(24).IsRequired();
+            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_guild_name");
+            e.Property(x => x.LeaderGuid).HasColumnName("leader_guid");
+            e.Property(x => x.Motd).HasColumnName("motd").HasMaxLength(128).HasDefaultValue("");
+            e.Property(x => x.InfoText).HasColumnName("info_text").HasMaxLength(500).HasDefaultValue("");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.EmblemStyle).HasColumnName("emblem_style").HasDefaultValue((uint)0);
+            e.Property(x => x.EmblemColor).HasColumnName("emblem_color").HasDefaultValue((uint)0);
+            e.Property(x => x.BorderStyle).HasColumnName("border_style").HasDefaultValue((uint)0);
+            e.Property(x => x.BorderColor).HasColumnName("border_color").HasDefaultValue((uint)0);
+            e.Property(x => x.BackgroundColor).HasColumnName("background_color").HasDefaultValue((uint)0);
+        });
+
+        modelBuilder.Entity<GuildRank>(e =>
+        {
+            e.ToTable("guild_rank");
+            e.HasKey(x => new { x.GuildId, x.RankId });
+            e.Property(x => x.GuildId).HasColumnName("guild_id");
+            e.Property(x => x.RankId).HasColumnName("rank_id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(32).IsRequired();
+            e.Property(x => x.Rights).HasColumnName("rights");
+            e.Property(x => x.BankMoneyPerDay).HasColumnName("bank_money_per_day").HasDefaultValue(-1);
+        });
+
+        modelBuilder.Entity<GuildMemberData>(e =>
+        {
+            e.ToTable("guild_member");
+            e.HasKey(x => new { x.GuildId, x.CharGuid });
+            e.Property(x => x.GuildId).HasColumnName("guild_id");
+            e.Property(x => x.CharGuid).HasColumnName("char_guid");
+            e.Property(x => x.RankId).HasColumnName("rank_id");
+            e.Property(x => x.PublicNote).HasColumnName("public_note").HasMaxLength(31).HasDefaultValue("");
+            e.Property(x => x.OfficerNote).HasColumnName("officer_note").HasMaxLength(31).HasDefaultValue("");
+            e.Property(x => x.JoinedAt).HasColumnName("joined_at");
+            e.HasIndex(x => x.CharGuid).HasDatabaseName("ix_guild_member_char");
         });
     }
 }

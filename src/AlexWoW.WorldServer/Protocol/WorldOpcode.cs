@@ -265,6 +265,34 @@ public enum WorldOpcode : uint
     SmsgPartyMemberStats = 0x07E,                // статус члена (HP/MP/позиция) (T2)
     SmsgPartyCommandResult = 0x07F,              // ответ на CMSG_GROUP_* (OK/ошибка)
 
+    // Гильдия (порт CMaNGOS Guilds/, GuildHandler.cpp). Опкоды 0x054, 0x081–0x093 + расширения 0x231+.
+    CmsgGuildQuery = 0x054,                     // запрос инфы о гильдии по id
+    SmsgGuildQueryResponse = 0x055,
+    CmsgGuildCreate = 0x081,                     // создать новую гильдию
+    CmsgGuildInvite = 0x082,                     // пригласить
+    SmsgGuildInvite = 0x083,
+    CmsgGuildAccept = 0x084,
+    CmsgGuildDecline = 0x085,
+    SmsgGuildDecline = 0x086,
+    CmsgGuildInfo = 0x087,                      // запрос /ginfo
+    SmsgGuildInfo = 0x088,                      // ответ /ginfo
+    CmsgGuildRoster = 0x089,                     // запрос полного состава
+    SmsgGuildRoster = 0x08A,                     // состав
+    CmsgGuildPromote = 0x08B,                     // T3
+    CmsgGuildDemote = 0x08C,                     // T3
+    CmsgGuildLeave = 0x08D,                     // выйти
+    CmsgGuildRemove = 0x08E,                     // T3: kick
+    CmsgGuildDisband = 0x08F,                     // распустить (только GM)
+    CmsgGuildLeader = 0x090,                     // T3: передать GM
+    CmsgGuildMotd = 0x091,                     // T4
+    SmsgGuildEvent = 0x092,                     // событие гильдии (JOIN/LEFT/MOTD/PROMOTE/etc.)
+    SmsgGuildCommandResult = 0x093,             // ответ на CMSG_GUILD_* команды
+    CmsgGuildRank = 0x231,                     // T3
+    CmsgGuildAddRank = 0x232,                     // T3
+    CmsgGuildDelRank = 0x233,                     // T3
+    CmsgGuildSetPublicNote = 0x234,              // T4
+    CmsgGuildSetOfficerNote = 0x235,             // T4
+
     // Расширения для рейда (GROUP.T5).
     CmsgGroupChangeSubGroup = 0x27E,             // смена subgroup'ы члена (рейд)
     CmsgGroupSwapSubGroup = 0x280,
