@@ -265,6 +265,19 @@ public enum WorldOpcode : uint
     SmsgPartyMemberStats = 0x07E,                // статус члена (HP/MP/позиция) (T2)
     SmsgPartyCommandResult = 0x07F,              // ответ на CMSG_GROUP_* (OK/ошибка)
 
+    // Питомцы (порт CMaNGOS Pet.cpp + PetHandler.cpp). 3.3.5a опкоды.
+    CmsgPetNameQuery = 0x052,
+    SmsgPetNameQueryResponse = 0x053,
+    SmsgPetCastFailed = 0x138,
+    SmsgPetTameFailure = 0x173,
+    CmsgPetSetAction = 0x174,                    // T3: расстановка в action bar пета
+    CmsgPetAction = 0x175,                       // T3: команды (stay/follow/attack/cast)
+    CmsgPetAbandon = 0x176,                      // T1: отозвать пета насовсем
+    CmsgPetRename = 0x177,                       // T3: переименовать (хантер)
+    SmsgPetNameInvalid = 0x178,
+    SmsgPetSpells = 0x179,                       // T3: книга абилок пета
+    SmsgPetMode = 0x17A,                         // T3: текущий режим react/command
+
     // Гильдия (порт CMaNGOS Guilds/, GuildHandler.cpp). Опкоды 0x054, 0x081–0x093 + расширения 0x231+.
     CmsgGuildQuery = 0x054,                     // запрос инфы о гильдии по id
     SmsgGuildQueryResponse = 0x055,

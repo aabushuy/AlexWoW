@@ -102,6 +102,8 @@ builder.Services.AddSingleton<PetRegistry>(); // PET.T1
 builder.Services.AddSingleton<AlexWoW.Database.Abstractions.IPetRepository, AlexWoW.Database.Repositories.EfPetRepository>(); // PET.T5
 builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Pet.PetPersistenceService>();
 builder.Services.AddHostedService<AlexWoW.WorldServer.Handlers.Pet.PetRecoveryHostedService>();
+builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Pet.PetAIService>(); // PET.T2
+builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Pet.HunterPetService>(); // PET.T4
 // Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();
