@@ -200,12 +200,18 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
 
             // DEFENSE.1: успешный dodge/parry/block → 5-секундное окно AURA_STATE_DEFENSE на игроке.
             // Это разблокирует Revenge (CasterAuraState=1) и подсветит кнопку у клиента
-            // (UNIT_FIELD_AURASTATE бит 0). Counterattack/Rune Strike — другие states (7/aura-spell),
-            // покрываются в следующих итерациях.
+            // (UNIT_FIELD_AURASTATE бит 0).
             if (outcome == CombatStats.MeleeOutcome.Dodge
                 || outcome == CombatStats.MeleeOutcome.Parry
                 || blocked > 0)
                 await auraState.SetDefenseAsync(player.Session, now, ct);
+
+            // DEFENSE.2: успешный parry у Hunter (class=3) → 5-секундное окно AURA_STATE_HUNTER_PARRY
+            // (UNIT_FIELD_AURASTATE бит 6). Разблокирует Counterattack (CasterAuraState=7). Только parry —
+            // не dodge/block. У других классов state=7 имеет другие триггеры (Warrior Victory Rush после
+            // kill — отдельная итерация).
+            if (outcome == CombatStats.MeleeOutcome.Parry && pclass == 3)
+                await auraState.SetHunterParryAsync(player.Session, now, ct);
             // CRIT.2: крит существа по игроку (фикс. шанс) — только по прошедшему удару, ×2 + флаг (клиент рисует крит).
             var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < CreatureCritChance;
             if (crit)

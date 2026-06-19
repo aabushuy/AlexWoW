@@ -4,61 +4,104 @@ using AlexWoW.WorldServer.Protocol;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// DEFENSE.1: управление UNIT_FIELD_AURASTATE и таймером AURA_STATE_DEFENSE.
+/// DEFENSE.1/.2: управление UNIT_FIELD_AURASTATE и таймерами состояний ауры кастера.
 ///
 /// Клиент 3.3.5a решает «можно ли кастовать спелл с CasterAuraState=X» по битам в
 /// UNIT_FIELD_AURASTATE: бит (1 &lt;&lt; (state−1)) должен быть взведён. Без обновления поля кнопка
-/// Revenge у игрока всегда серая, даже если сервер сам разрешил бы каст.
+/// абилки серая, даже если сервер сам разрешил бы каст.
 ///
-/// AURA_STATE_DEFENSE = 1 → бит 0 (mask 0x01). Выставляется на 5с при успешном dodge/parry/block
-/// у игрока (см. <see cref="CreatureCombatAI"/>), снимается в <see cref="ClearDefenseAsync"/>
-/// после успешного каста Revenge или по истечении таймера.
+/// Поддерживаемые состояния:
+/// * AURA_STATE_DEFENSE = 1 (бит 0, mask 0x01) — успешный dodge/parry/block игрока (Revenge).
+/// * AURA_STATE_HUNTER_PARRY = 7 (бит 6, mask 0x40) — успешный parry у Hunter (Counterattack).
+///   Это же число AURA_STATE_WARRIOR_VICTORY_RUSH (после kill, Victory Rush) — разные триггеры,
+///   один бит. Покрываем только parry-сторону сейчас.
+///
+/// Маска UNIT_FIELD_AURASTATE собирается из всех активных источников; апдейт клиенту шлётся
+/// только когда маска реально меняется (избегаем флуда SMSG_UPDATE_OBJECT).
 /// </summary>
 internal sealed class AuraStateService
 {
-    /// <summary>Длительность окна Revenge: 5 секунд (эталон CMaNGOS — AuraState DEFENSE).</summary>
+    /// <summary>Длительность окна Revenge / Counterattack: 5 секунд (эталон CMaNGOS).</summary>
     internal const long DefenseStateDurationMs = 5000;
 
-    /// <summary>Бит AURA_STATE_DEFENSE в UNIT_FIELD_AURASTATE (state=1 → 1 &lt;&lt; 0).</summary>
-    private const uint AuraStateMaskDefense = 1u;
+    private const uint MaskDefense       = 1u << 0;  // state=1
+    private const uint MaskHunterParry   = 1u << 6;  // state=7
 
-    /// <summary>Выставляет DEFENSE на DefenseStateDurationMs и отправляет UNIT_FIELD_AURASTATE клиенту
-    /// (кнопка Revenge подсвечивается). Идемпотентно: вызов «обновляет» окно (5с от сейчас).</summary>
+    /// <summary>DEFENSE.1: ставит AURA_STATE_DEFENSE на 5с (Revenge-окно). Вызывается из CreatureCombatAI
+    /// при успешном dodge/parry/block игрока. Идемпотентно: повторный вызов обновляет таймер.</summary>
     internal Task SetDefenseAsync(WorldSession session, long now, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0)
-            return Task.CompletedTask;
-        var wasActive = session.Combat.DefenseStateExpiresMs > now;
+        var oldMask = BuildMask(session, now);
         session.Combat.DefenseStateExpiresMs = now + DefenseStateDurationMs;
-        // Отправляем апдейт поля только если до этого бит не был взведён — иначе клиент уже подсвечивает.
-        if (wasActive)
-            return Task.CompletedTask;
-        return SendAsync(session, AuraStateMaskDefense, ct);
+        return SendIfChangedAsync(session, oldMask, now, ct);
     }
 
-    /// <summary>Снимает DEFENSE (выставлен 0). Шлём UNIT_FIELD_AURASTATE=0. Вызывается после успешного
-    /// каста Revenge (state «потрачен») и в WorldTick при истечении 5с.</summary>
+    /// <summary>DEFENSE.2: ставит AURA_STATE_HUNTER_PARRY на 5с (Counterattack-окно). Только для Hunter
+    /// (class=3) — у других классов триггер state=7 другой (Warrior Victory Rush после kill).</summary>
+    internal Task SetHunterParryAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        var oldMask = BuildMask(session, now);
+        session.Combat.HunterParryStateExpiresMs = now + DefenseStateDurationMs;
+        return SendIfChangedAsync(session, oldMask, now, ct);
+    }
+
+    /// <summary>Снимает DEFENSE (state «потрачен» после каста Revenge или по таймеру в WorldTick).</summary>
     internal Task ClearDefenseAsync(WorldSession session, CancellationToken ct)
     {
-        if (session.InWorldGuid == 0 || session.Combat.DefenseStateExpiresMs == 0)
-            return Task.CompletedTask;
+        if (session.Combat.DefenseStateExpiresMs == 0) return Task.CompletedTask;
+        var now = Environment.TickCount64;
+        var oldMask = BuildMask(session, now);
         session.Combat.DefenseStateExpiresMs = 0;
-        return SendAsync(session, 0u, ct);
+        return SendIfChangedAsync(session, oldMask, now, ct);
     }
 
+    /// <summary>Снимает HUNTER_PARRY (после каста Counterattack или по таймеру в WorldTick).</summary>
+    internal Task ClearHunterParryAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.Combat.HunterParryStateExpiresMs == 0) return Task.CompletedTask;
+        var now = Environment.TickCount64;
+        var oldMask = BuildMask(session, now);
+        session.Combat.HunterParryStateExpiresMs = 0;
+        return SendIfChangedAsync(session, oldMask, now, ct);
+    }
+
+    /// <summary>Снимает state после успешного каста спелла с указанным CasterAuraState (state «потрачен»).</summary>
+    internal Task ClearAfterCastAsync(WorldSession session, uint state, CancellationToken ct) => state switch
+    {
+        1 => ClearDefenseAsync(session, ct),
+        7 => ClearHunterParryAsync(session, ct),
+        _ => Task.CompletedTask,
+    };
+
     /// <summary>Проверка «есть ли state для каста спелла с CasterAuraState=<paramref name="needed"/>».
-    /// Только DEFENSE (1) сейчас покрыт; другие states (7=Counterattack, etc.) пока false.</summary>
+    /// state=0 — нет требования (всегда true). Прочие states — false (не покрыты).</summary>
     internal static bool HasState(WorldSession session, uint needed, long now) => needed switch
     {
         0 => true,
         1 => session.Combat.DefenseStateExpiresMs > now,
-        _ => false, // TODO: WARRIOR_VICTORY_RUSH(7), HUNTER_PARRY(7), CONFLAGRATE(10), ...
+        7 => session.Combat.HunterParryStateExpiresMs > now,
+        _ => false, // TODO: CONFLAGRATE(10), SWIFTMEND(11), ENRAGE(13), BLEEDING(14)...
     };
 
-    private static Task SendAsync(WorldSession session, uint mask, CancellationToken ct) =>
-        session.SendAsync(WorldOpcode.SmsgUpdateObject,
+    /// <summary>Собирает UNIT_FIELD_AURASTATE маску по активным state-таймерам.</summary>
+    private static uint BuildMask(WorldSession session, long now)
+    {
+        uint m = 0;
+        if (session.Combat.DefenseStateExpiresMs > now)     m |= MaskDefense;
+        if (session.Combat.HunterParryStateExpiresMs > now) m |= MaskHunterParry;
+        return m;
+    }
+
+    /// <summary>Шлёт SMSG_UPDATE_OBJECT с новым UNIT_FIELD_AURASTATE только если маска реально изменилась.</summary>
+    private static Task SendIfChangedAsync(WorldSession session, uint oldMask, long now, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0) return Task.CompletedTask;
+        var newMask = BuildMask(session, now);
+        if (newMask == oldMask) return Task.CompletedTask;
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
             PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
             {
-                m.SetUInt32(UpdateField.UnitAuraState, mask);
+                m.SetUInt32(UpdateField.UnitAuraState, newMask);
             }), ct);
+    }
 }

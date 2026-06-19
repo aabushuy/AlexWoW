@@ -190,10 +190,11 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         if (info.GcdMs > 0)
             session.Cast.GcdEndMs = now + info.GcdMs;
 
-        // DEFENSE.1: каст состоялся (гейт пройден) — потратили окно DEFENSE. Revenge — мгновенный (CastMs=0),
-        // поэтому очищаем сразу здесь, до CompleteCast. Для CasterAuraState != 1 / 0 — TODO в AuraStateService.
-        if (info.CasterAuraState == 1)
-            await auraState.ClearDefenseAsync(session, ct);
+        // DEFENSE.1/.2: каст состоялся (гейт пройден) — потратили окно state'а. Revenge/Counterattack
+        // мгновенные (CastMs=0), поэтому очищаем сразу здесь, до CompleteCast. ClearAfterCastAsync —
+        // диспетчер по CasterAuraState: 1 → DEFENSE, 7 → HUNTER_PARRY.
+        if (info.CasterAuraState != 0)
+            await auraState.ClearAfterCastAsync(session, info.CasterAuraState, ct);
 
         if (info.CastMs <= 0)
         {

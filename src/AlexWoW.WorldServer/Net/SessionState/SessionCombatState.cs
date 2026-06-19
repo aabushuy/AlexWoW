@@ -88,6 +88,11 @@ internal sealed class SessionCombatState
     /// SpellCastService отказывает, если spell.CasterAuraState=1 и now &gt;= DefenseStateExpiresMs.
     /// 0 — state не активен. После успешного каста Revenge — снимается AuraStateService.</summary>
     internal long DefenseStateExpiresMs { get; set; }
+
+    /// <summary>DEFENSE.2: момент истечения AURA_STATE_HUNTER_PARRY (мс). Бит 6 в UNIT_FIELD_AURASTATE
+    /// (значение state=7 у клиента/DBC — общее с WARRIOR_VICTORY_RUSH, но для разных классов разные
+    /// триггеры). Ставится Hunter'у на 5с при успешном parry; гейт каста Counterattack.</summary>
+    internal long HunterParryStateExpiresMs { get; set; }
     /// <summary>«На следующий замах» (MELEE.1): id абилки (Героический удар/Раскол/Свирепый удар), заместит
     /// следующую автоатаку; 0 — нет. Расходуется в <see cref="Handlers.PlayerMeleeService"/>.</summary>
     internal uint PendingNextSwingSpellId { get; set; }
@@ -126,6 +131,7 @@ internal sealed class SessionCombatState
         ComboTargetGuid = 0;
         Runes = [];           // RUNE.1: руны переинициализируются при входе в мир
         DefenseStateExpiresMs = 0; // DEFENSE.1: окно Revenge не переживает выход
+        HunterParryStateExpiresMs = 0; // DEFENSE.2: окно Counterattack не переживает выход
     }
 }
 
