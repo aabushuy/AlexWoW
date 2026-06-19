@@ -1,4 +1,4 @@
-﻿//
+//
 // MpqEntry.cs
 //
 // Authors:
@@ -29,108 +29,107 @@
 using System;
 using System.IO;
 
-namespace Foole.Mpq
+namespace Foole.Mpq;
+
+[Flags]
+public enum MpqFileFlags : uint
 {
-    [Flags]
-    public enum MpqFileFlags : uint
+    CompressedPK = 0x100, // AKA Imploded
+    CompressedMulti = 0x200,
+    Compressed = 0xff00,
+    Encrypted = 0x10000,
+    BlockOffsetAdjustedKey = 0x020000, // AKA FixSeed
+    SingleUnit = 0x1000000,
+    FileHasMetadata = 0x04000000, // Appears in WoW 1.10 or newer.  Indicates the file has associated metadata.
+    Exists = 0x80000000
+}
+
+public class MpqEntry
+{
+    public uint CompressedSize { get; private set; }
+    public uint FileSize { get; private set; }
+    public MpqFileFlags Flags { get; internal set; }
+    public uint EncryptionSeed { get; internal set; }
+
+    private readonly uint _fileOffset; // Relative to the header offset
+    public uint FilePos { get; private set; } // Absolute position in the file
+    private string _filename;
+
+    public static readonly uint Size = 16;
+
+    public string Filename
     {
-        CompressedPK = 0x100, // AKA Imploded
-        CompressedMulti = 0x200,
-        Compressed = 0xff00,
-        Encrypted = 0x10000,
-        BlockOffsetAdjustedKey = 0x020000, // AKA FixSeed
-        SingleUnit = 0x1000000,
-        FileHasMetadata = 0x04000000, // Appears in WoW 1.10 or newer.  Indicates the file has associated metadata.
-        Exists = 0x80000000
+        get
+        {
+            return _filename;
+        }
+        set
+        {
+            _filename = value;
+            EncryptionSeed = CalculateEncryptionSeed();
+        }
     }
 
-    public class MpqEntry
+    public MpqEntry(BinaryReader br, uint headerOffset)
     {
-        public uint CompressedSize { get; private set; }
-        public uint FileSize { get; private set; }
-        public MpqFileFlags Flags { get; internal set; }
-        public uint EncryptionSeed { get; internal set; }
+        _fileOffset = br.ReadUInt32();
+        FilePos = headerOffset + _fileOffset;
+        CompressedSize = br.ReadUInt32();
+        FileSize = br.ReadUInt32();
+        Flags = (MpqFileFlags)br.ReadUInt32();
+        EncryptionSeed = 0;
+    }
 
-        private uint _fileOffset; // Relative to the header offset
-        public uint FilePos { get; private set; } // Absolute position in the file
-        private string _filename;
+    private uint CalculateEncryptionSeed()
+    {
+        if (Filename == null) return 0;
 
-        public static readonly uint Size = 16;
+        uint seed = MpqArchive.HashString(Path.GetFileName(Filename), 0x300);
+        if ((Flags & MpqFileFlags.BlockOffsetAdjustedKey) == MpqFileFlags.BlockOffsetAdjustedKey)
+            seed = (seed + _fileOffset) ^ FileSize;
+        return seed;
+    }
 
-        public string Filename
+    public override string ToString()
+    {
+        if (Filename == null)
         {
-            get
-            {
-                return _filename;
-            }
-            set
-            {
-                _filename = value;
-                EncryptionSeed = CalculateEncryptionSeed();
-            }
+            if (!Exists)
+                return "(Deleted file)";
+            return string.Format("Unknown file @ {0}", FilePos);
         }
+        return Filename;
+    }
 
-        public MpqEntry(BinaryReader br, uint headerOffset)
+    public bool IsEncrypted
+    {
+        get
         {
-            _fileOffset = br.ReadUInt32();
-            FilePos = headerOffset + _fileOffset;
-            CompressedSize = br.ReadUInt32();
-            FileSize = br.ReadUInt32();
-            Flags = (MpqFileFlags)br.ReadUInt32();
-            EncryptionSeed = 0;
+            return (Flags & MpqFileFlags.Encrypted) != 0;
         }
+    }
 
-        private uint CalculateEncryptionSeed()
+    public bool IsCompressed
+    {
+        get
         {
-            if (Filename == null) return 0;
-
-            uint seed = MpqArchive.HashString(Path.GetFileName(Filename), 0x300);
-            if ((Flags & MpqFileFlags.BlockOffsetAdjustedKey) == MpqFileFlags.BlockOffsetAdjustedKey)
-                seed = (seed + _fileOffset) ^ FileSize;
-            return seed;
+            return (Flags & MpqFileFlags.Compressed) != 0;
         }
+    }
 
-        public override string ToString()
-        {
-            if (Filename == null)
-            {
-                if (!Exists)
-                    return "(Deleted file)";
-                return string.Format("Unknown file @ {0}", FilePos);
-            }
-            return Filename;
-        }
+    public bool Exists
+    {
+        get { return Flags != 0; }
+    }
 
-        public bool IsEncrypted
-        {
-            get
-            {
-                return (Flags & MpqFileFlags.Encrypted) != 0;
-            }
-        }
+    public bool IsSingleUnit
+    {
+        get { return (Flags & MpqFileFlags.SingleUnit) != 0; }
+    }
 
-        public bool IsCompressed
-        {
-            get
-            {
-                return (Flags & MpqFileFlags.Compressed) != 0;
-            }
-        }
-
-        public bool Exists
-        {
-            get { return Flags != 0; }
-        }
-
-        public bool IsSingleUnit
-        {
-            get { return (Flags & MpqFileFlags.SingleUnit) != 0; }
-        }
-
-        // For debugging
-        public int FlagsAsInt
-        {
-            get { return (int)Flags; }
-        }
+    // For debugging
+    public int FlagsAsInt
+    {
+        get { return (int)Flags; }
     }
 }

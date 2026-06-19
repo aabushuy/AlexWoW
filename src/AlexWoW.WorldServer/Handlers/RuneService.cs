@@ -44,19 +44,19 @@ internal sealed class RuneService
     /// </summary>
     private static readonly Dictionary<ulong, RuneCost> RuneCosts = new()
     {
-        [0x2]                  = new(0, 1, 0, 10),  // Icy Touch — 1 мороз
-        [0x1]                  = new(0, 0, 1, 10),  // Plague Strike — 1 нечестие
-        [0x400000]             = new(1, 0, 0, 10),  // Blood Strike — 1 кровь
-        [0x1000000]            = new(1, 0, 0, 10),  // Heart Strike — 1 кровь
-        [0x40000]              = new(1, 0, 0, 10),  // Blood Boil — 1 кровь
-        [0x1000000000000]      = new(1, 0, 0, 10),  // Pestilence — 1 кровь
-        [0x8000000]            = new(1, 0, 0, 0),   // Rune Tap — 1 кровь (силу рун не даёт)
-        [0x10]                 = new(0, 1, 1, 15),  // Death Strike — 1 мороз + 1 нечестие
-        [0x2000000000000]      = new(0, 1, 1, 15),  // Obliterate — 1 мороз + 1 нечестие
-        [0x800000000000000]    = new(0, 1, 1, 15),  // Scourge Strike — 1 мороз + 1 нечестие
-        [0x200000000]          = new(0, 1, 0, 10),  // Howling Blast — 1 мороз
-        [211106232532996]      = new(0, 1, 0, 10),  // Chains of Ice — 1 мороз (составной флаг)
-        [0x20]                 = new(1, 1, 1, 15),  // Death and Decay — по одной каждого типа
+        [0x2] = new(0, 1, 0, 10),  // Icy Touch — 1 мороз
+        [0x1] = new(0, 0, 1, 10),  // Plague Strike — 1 нечестие
+        [0x400000] = new(1, 0, 0, 10),  // Blood Strike — 1 кровь
+        [0x1000000] = new(1, 0, 0, 10),  // Heart Strike — 1 кровь
+        [0x40000] = new(1, 0, 0, 10),  // Blood Boil — 1 кровь
+        [0x1000000000000] = new(1, 0, 0, 10),  // Pestilence — 1 кровь
+        [0x8000000] = new(1, 0, 0, 0),   // Rune Tap — 1 кровь (силу рун не даёт)
+        [0x10] = new(0, 1, 1, 15),  // Death Strike — 1 мороз + 1 нечестие
+        [0x2000000000000] = new(0, 1, 1, 15),  // Obliterate — 1 мороз + 1 нечестие
+        [0x800000000000000] = new(0, 1, 1, 15),  // Scourge Strike — 1 мороз + 1 нечестие
+        [0x200000000] = new(0, 1, 0, 10),  // Howling Blast — 1 мороз
+        [211106232532996] = new(0, 1, 0, 10),  // Chains of Ice — 1 мороз (составной флаг)
+        [0x20] = new(1, 1, 1, 15),  // Death and Decay — по одной каждого типа
     };
 
     /// <summary>

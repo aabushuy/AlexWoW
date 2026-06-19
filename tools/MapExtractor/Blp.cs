@@ -72,7 +72,7 @@ public static class Blp
                     rgba[i * 4 + 3] = bit != 0 ? (byte)255 : (byte)0;
                 }
                 break;
-            // alphaDepth == 0 → полностью непрозрачный (уже 255)
+                // alphaDepth == 0 → полностью непрозрачный (уже 255)
         }
     }
 
@@ -96,54 +96,54 @@ public static class Blp
         var blockBytes = dxt == 1 ? 8 : 16;
         var pos = off;
         for (var by = 0; by < h; by += 4)
-        for (var bx = 0; bx < w; bx += 4)
-        {
-            var alpha = new byte[16];
-            for (var i = 0; i < 16; i++) alpha[i] = 255;
-
-            if (dxt == 3)
+            for (var bx = 0; bx < w; bx += 4)
             {
-                for (var i = 0; i < 16; i++)
+                var alpha = new byte[16];
+                for (var i = 0; i < 16; i++) alpha[i] = 255;
+
+                if (dxt == 3)
                 {
-                    var b = d[pos + i / 2];
-                    var a = (i & 1) == 0 ? (b & 0x0F) : (b >> 4);
-                    alpha[i] = (byte)(a * 17);
+                    for (var i = 0; i < 16; i++)
+                    {
+                        var b = d[pos + i / 2];
+                        var a = (i & 1) == 0 ? (b & 0x0F) : (b >> 4);
+                        alpha[i] = (byte)(a * 17);
+                    }
+                    pos += 8;
                 }
-                pos += 8;
-            }
-            else if (dxt == 5)
-            {
-                var a0 = d[pos];
-                var a1 = d[pos + 1];
-                var aBits = 0UL;
-                for (var i = 0; i < 6; i++) aBits |= (ulong)d[pos + 2 + i] << (8 * i);
-                for (var i = 0; i < 16; i++)
+                else if (dxt == 5)
                 {
-                    var code = (int)((aBits >> (3 * i)) & 0x7);
-                    alpha[i] = AlphaValue(a0, a1, code);
+                    var a0 = d[pos];
+                    var a1 = d[pos + 1];
+                    var aBits = 0UL;
+                    for (var i = 0; i < 6; i++) aBits |= (ulong)d[pos + 2 + i] << (8 * i);
+                    for (var i = 0; i < 16; i++)
+                    {
+                        var code = (int)((aBits >> (3 * i)) & 0x7);
+                        alpha[i] = AlphaValue(a0, a1, code);
+                    }
+                    pos += 8;
                 }
+
+                DecodeColorBlock(d, pos, dxt == 1, out var colors);
                 pos += 8;
-            }
 
-            DecodeColorBlock(d, pos, dxt == 1, out var colors);
-            pos += 8;
-
-            for (var py = 0; py < 4; py++)
-            for (var px = 0; px < 4; px++)
-            {
-                var x = bx + px;
-                var y = by + py;
-                if (x >= w || y >= h) continue;
-                var local = py * 4 + px;
-                var (r, g, b, ca) = colors[local];
-                var di = (y * w + x) * 4;
-                rgba[di + 0] = r;
-                rgba[di + 1] = g;
-                rgba[di + 2] = b;
-                // DXT1 может нести 1-битную альфу (ca=0 → прозрачно); иначе берём из DXT3/5.
-                rgba[di + 3] = dxt == 1 ? ca : alpha[local];
+                for (var py = 0; py < 4; py++)
+                    for (var px = 0; px < 4; px++)
+                    {
+                        var x = bx + px;
+                        var y = by + py;
+                        if (x >= w || y >= h) continue;
+                        var local = py * 4 + px;
+                        var (r, g, b, ca) = colors[local];
+                        var di = (y * w + x) * 4;
+                        rgba[di + 0] = r;
+                        rgba[di + 1] = g;
+                        rgba[di + 2] = b;
+                        // DXT1 может нести 1-битную альфу (ca=0 → прозрачно); иначе берём из DXT3/5.
+                        rgba[di + 3] = dxt == 1 ? ca : alpha[local];
+                    }
             }
-        }
     }
 
     private static byte AlphaValue(byte a0, byte a1, int code)

@@ -1,4 +1,4 @@
-﻿using AlexWoW.Common.Network;
+using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;

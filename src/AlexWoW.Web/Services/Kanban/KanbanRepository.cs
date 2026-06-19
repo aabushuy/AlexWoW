@@ -88,8 +88,18 @@ public sealed class KanbanRepository(IOptions<WebOptions> options)
             "SELECT LAST_INSERT_ID();",
             new
             {
-                t.Title, t.Description, t.TestSteps, t.ExpectedResult, t.Priority, t.Type, t.Status,
-                t.EpicId, t.ProjectId, t.Assignee, t.TesterGuid, ClientCheck = t.ClientCheck ? 1 : 0,
+                t.Title,
+                t.Description,
+                t.TestSteps,
+                t.ExpectedResult,
+                t.Priority,
+                t.Type,
+                t.Status,
+                t.EpicId,
+                t.ProjectId,
+                t.Assignee,
+                t.TesterGuid,
+                ClientCheck = t.ClientCheck ? 1 : 0,
             }, cancellationToken: ct));
     }
 
@@ -109,8 +119,19 @@ public sealed class KanbanRepository(IOptions<WebOptions> options)
             "WHERE id=@Id",
             new
             {
-                t.Id, t.Title, t.Description, t.TestSteps, t.ExpectedResult, t.Priority, t.Type, t.Status,
-                t.EpicId, t.ProjectId, t.Assignee, t.TesterGuid, ClientCheck = t.ClientCheck ? 1 : 0,
+                t.Id,
+                t.Title,
+                t.Description,
+                t.TestSteps,
+                t.ExpectedResult,
+                t.Priority,
+                t.Type,
+                t.Status,
+                t.EpicId,
+                t.ProjectId,
+                t.Assignee,
+                t.TesterGuid,
+                ClientCheck = t.ClientCheck ? 1 : 0,
             }, cancellationToken: ct));
     }
 

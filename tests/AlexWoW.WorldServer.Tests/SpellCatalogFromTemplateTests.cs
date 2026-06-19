@@ -16,8 +16,14 @@ public class SpellCatalogFromTemplateTests
         // Fireball-подобный: BasePoints=13, DieSides=9 → 14..22, школа Fire, каст 1000мс.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 1, SchoolMask = 4, CastingTimeIndex = 4, ManaCost = 30, PowerType = 0,
-            Effect1 = 2, EffectBasePoints1 = 13, EffectDieSides1 = 9,
+            Id = 1,
+            SchoolMask = 4,
+            CastingTimeIndex = 4,
+            ManaCost = 30,
+            PowerType = 0,
+            Effect1 = 2,
+            EffectBasePoints1 = 13,
+            EffectDieSides1 = 9,
         });
         Assert.Equal(4, info.School);
         Assert.Equal(14, info.MinAmount);
@@ -37,8 +43,13 @@ public class SpellCatalogFromTemplateTests
         // Lesser Heal-подобный: Effect=Heal(10), BasePoints=44, DieSides=12 → 45..56, школа Holy.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 2, SchoolMask = 2, CastingTimeIndex = 16, ManaCost = 30,
-            Effect1 = 10, EffectBasePoints1 = 44, EffectDieSides1 = 12,
+            Id = 2,
+            SchoolMask = 2,
+            CastingTimeIndex = 16,
+            ManaCost = 30,
+            Effect1 = 10,
+            EffectBasePoints1 = 44,
+            EffectDieSides1 = 12,
         });
         Assert.True(info.IsHeal);
         Assert.Equal(45, info.MinAmount);
@@ -53,8 +64,13 @@ public class SpellCatalogFromTemplateTests
         // Heroic Strike-подобный: Effect=WeaponDamage(58), бонус 11, ресурс — ярость (PowerType=1), флэт-кост 15.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 3, SchoolMask = 1, PowerType = 1, ManaCost = 15,
-            Effect1 = 58, EffectBasePoints1 = 10, EffectDieSides1 = 1,
+            Id = 3,
+            SchoolMask = 1,
+            PowerType = 1,
+            ManaCost = 15,
+            Effect1 = 58,
+            EffectBasePoints1 = 10,
+            EffectDieSides1 = 1,
         });
         Assert.True(info.WeaponDamage);
         Assert.Equal(1, info.PowerType);
@@ -69,7 +85,11 @@ public class SpellCatalogFromTemplateTests
         // Slam-подобный: Effect=WeaponPercentDamage(31), BasePoints=100 → урон = 100% оружия.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 4, SchoolMask = 1, PowerType = 1, Effect1 = 31, EffectBasePoints1 = 100,
+            Id = 4,
+            SchoolMask = 1,
+            PowerType = 1,
+            Effect1 = 31,
+            EffectBasePoints1 = 100,
         });
         Assert.Equal(100u, info.WeaponPercent);
         Assert.True(info.WeaponDamage); // 31 относится к weapon-эффектам
@@ -81,8 +101,13 @@ public class SpellCatalogFromTemplateTests
         // Fire Blast-подобный: мгновенный (CastingTimeIndex=1 → 0мс), кулдаун 8с (RecoveryTime).
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 5, SchoolMask = 4, CastingTimeIndex = 1, RecoveryTime = 8000,
-            Effect1 = 2, EffectBasePoints1 = 23, EffectDieSides1 = 9,
+            Id = 5,
+            SchoolMask = 4,
+            CastingTimeIndex = 1,
+            RecoveryTime = 8000,
+            Effect1 = 2,
+            EffectBasePoints1 = 23,
+            EffectDieSides1 = 9,
         });
         Assert.Equal(0, info.CastMs);
         Assert.Equal(8000, info.CooldownMs);
@@ -93,7 +118,11 @@ public class SpellCatalogFromTemplateTests
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 6, Effect1 = 2, EffectBasePoints1 = 5, RecoveryTime = 1000, CategoryRecoveryTime = 9000,
+            Id = 6,
+            Effect1 = 2,
+            EffectBasePoints1 = 5,
+            RecoveryTime = 1000,
+            CategoryRecoveryTime = 9000,
         });
         Assert.Equal(9000, info.CooldownMs);
     }
@@ -103,7 +132,11 @@ public class SpellCatalogFromTemplateTests
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 7, PowerType = 0, ManaCostPercentage = 10, Effect1 = 2, EffectBasePoints1 = 5,
+            Id = 7,
+            PowerType = 0,
+            ManaCostPercentage = 10,
+            Effect1 = 2,
+            EffectBasePoints1 = 5,
         });
         Assert.Equal(10u, info.ManaCostPct);
     }
@@ -114,8 +147,12 @@ public class SpellCatalogFromTemplateTests
         // Разбойничья абилка: энергия (PowerType=3), флэт-кост 45, % маны игнорируется.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 8, PowerType = 3, ManaCost = 45, ManaCostPercentage = 20,
-            Effect1 = 58, EffectBasePoints1 = 5,
+            Id = 8,
+            PowerType = 3,
+            ManaCost = 45,
+            ManaCostPercentage = 20,
+            Effect1 = 58,
+            EffectBasePoints1 = 5,
         });
         Assert.Equal(3, info.PowerType);
         Assert.Equal(45u, info.ManaCost);
@@ -128,8 +165,13 @@ public class SpellCatalogFromTemplateTests
         // Corruption-подобный: ApplyAura(6) с PERIODIC_DAMAGE(3), тик = BasePoints+1, интервал 3с, длит. 60с.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 9, SchoolMask = 32, DurationIndex = 3,
-            Effect1 = 6, EffectApplyAuraName1 = 3, EffectBasePoints1 = 29, EffectAmplitude1 = 3000,
+            Id = 9,
+            SchoolMask = 32,
+            DurationIndex = 3,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 3,
+            EffectBasePoints1 = 29,
+            EffectAmplitude1 = 3000,
         });
         Assert.True(info.Periodic);
         Assert.False(info.PeriodicHeal);
@@ -145,8 +187,13 @@ public class SpellCatalogFromTemplateTests
         // Renew-подобный: ApplyAura(6) с PERIODIC_HEAL(8), тик 45, длит. 15с.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 10, SchoolMask = 2, DurationIndex = 8,
-            Effect1 = 6, EffectApplyAuraName1 = 8, EffectBasePoints1 = 44, EffectAmplitude1 = 3000,
+            Id = 10,
+            SchoolMask = 2,
+            DurationIndex = 8,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 8,
+            EffectBasePoints1 = 44,
+            EffectAmplitude1 = 3000,
         });
         Assert.True(info.Periodic);
         Assert.True(info.PeriodicHeal);
@@ -159,8 +206,11 @@ public class SpellCatalogFromTemplateTests
         // Бафф +макс.HP: ApplyAura(6) MOD_INCREASE_HEALTH(34), BasePoints=79 → +80 HP, позитивная аура.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 11, DurationIndex = 5,
-            Effect1 = 6, EffectApplyAuraName1 = 34, EffectBasePoints1 = 79,
+            Id = 11,
+            DurationIndex = 5,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 34,
+            EffectBasePoints1 = 79,
         });
         Assert.True(info.AuraBuff);
         Assert.True(info.AuraPositive);
@@ -174,8 +224,12 @@ public class SpellCatalogFromTemplateTests
         // DurationIndex=9 (30с). Несмотря на отрицательный Bp ауры формы — это позитивный само-бафф с формой 22.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 47241, DurationIndex = 9,
-            Effect1 = 6, EffectApplyAuraName1 = 36, EffectMiscValue1 = 22, EffectBasePoints1 = -1,
+            Id = 47241,
+            DurationIndex = 9,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 36,
+            EffectMiscValue1 = 22,
+            EffectBasePoints1 = -1,
         });
         Assert.True(info.AuraBuff);
         Assert.True(info.AuraPositive);
@@ -189,9 +243,16 @@ public class SpellCatalogFromTemplateTests
         // §3 CoE (1490): MOD_RESISTANCE(22) Bp=-46 (дебафф) + MOD_DAMAGE_PERCENT_TAKEN(87) Bp=5 misc=126 (магия).
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 1490, DurationIndex = 5,
-            Effect1 = 6, EffectApplyAuraName1 = 22, EffectBasePoints1 = -46, EffectMiscValue1 = 126,
-            Effect2 = 6, EffectApplyAuraName2 = 87, EffectBasePoints2 = 5, EffectMiscValue2 = 126,
+            Id = 1490,
+            DurationIndex = 5,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 22,
+            EffectBasePoints1 = -46,
+            EffectMiscValue1 = 126,
+            Effect2 = 6,
+            EffectApplyAuraName2 = 87,
+            EffectBasePoints2 = 5,
+            EffectMiscValue2 = 126,
         });
         Assert.True(info.IsCurse);
         Assert.False(info.AuraPositive);              // дебафф на цель
@@ -205,8 +266,11 @@ public class SpellCatalogFromTemplateTests
         // §3 CoW (702): MOD_ATTACK_POWER(99) Bp=-22 — кёрс, но без амплификации урона (нет ауры 87).
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 702, DurationIndex = 4,
-            Effect1 = 6, EffectApplyAuraName1 = 99, EffectBasePoints1 = -22,
+            Id = 702,
+            DurationIndex = 4,
+            Effect1 = 6,
+            EffectApplyAuraName1 = 99,
+            EffectBasePoints1 = -22,
         });
         Assert.True(info.IsCurse);
         Assert.Equal(0, info.CurseDamageTakenPct);
@@ -234,7 +298,10 @@ public class SpellCatalogFromTemplateTests
         // CREATE_ITEM(24): результат 2841, count = BasePoints+1 = 2.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 13, Effect1 = 24, EffectItemType1 = 2841, EffectBasePoints1 = 1,
+            Id = 13,
+            Effect1 = 24,
+            EffectItemType1 = 2841,
+            EffectBasePoints1 = 1,
         });
         Assert.Equal(2841u, info.CreateItemId);
         Assert.Equal(2u, info.CreateItemCount);
@@ -245,8 +312,12 @@ public class SpellCatalogFromTemplateTests
     {
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 14, Effect1 = 2, EffectBasePoints1 = 5,
-            SpellFamilyName = 3, SpellFamilyFlags = 0x1, SpellFamilyFlags2 = 0,
+            Id = 14,
+            Effect1 = 2,
+            EffectBasePoints1 = 5,
+            SpellFamilyName = 3,
+            SpellFamilyFlags = 0x1,
+            SpellFamilyFlags2 = 0,
         });
         Assert.Equal(3u, info.FamilyName);
         Assert.Equal(0x1UL, info.FamilyFlags);
@@ -288,7 +359,10 @@ public class SpellCatalogFromTemplateTests
         // APPLY_AURA(6) с CC-аурой + DurationIndex 27 (10 сек) → распознаётся как CC с длительностью.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 100, DurationIndex = 27, Effect1 = 6, EffectApplyAuraName1 = auraType,
+            Id = 100,
+            DurationIndex = 27,
+            Effect1 = 6,
+            EffectApplyAuraName1 = auraType,
         });
         Assert.Equal(expected, info.CrowdControl);
         Assert.True(info.CrowdControlMs > 0);
@@ -300,7 +374,11 @@ public class SpellCatalogFromTemplateTests
         // Shadowform-подобный: APPLY_AURA(6) MOD_DAMAGE_PERCENT_DONE(79), MiscValue=32 (Shadow), Bp=14 → +15%.
         var info = SpellCatalog.FromTemplate(new SpellTemplateData
         {
-            Id = 100, Effect2 = 6, EffectApplyAuraName2 = 79, EffectMiscValue2 = 32, EffectBasePoints2 = 14,
+            Id = 100,
+            Effect2 = 6,
+            EffectApplyAuraName2 = 79,
+            EffectMiscValue2 = 32,
+            EffectBasePoints2 = 14,
         });
         Assert.Equal(15, info.DamageDonePct);
         Assert.Equal(32, info.DamageDoneSchoolMask);

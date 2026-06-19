@@ -28,21 +28,21 @@ public static class NavmeshBuild
 
         // Рельеф
         for (var i = 0; i < N; i++)
-        for (var j = 0; j < N; j++)
-        {
-            var wx = xMin + i * dx;
-            var wy = yMin + j * dy;
-            var h = terrain.GetHeight(map, wx, wy) ?? 0f;
-            var vi = (i * N + j) * 3;
-            verts[vi] = wx; verts[vi + 1] = h; verts[vi + 2] = wy;
-        }
+            for (var j = 0; j < N; j++)
+            {
+                var wx = xMin + i * dx;
+                var wy = yMin + j * dy;
+                var h = terrain.GetHeight(map, wx, wy) ?? 0f;
+                var vi = (i * N + j) * 3;
+                verts[vi] = wx; verts[vi + 1] = h; verts[vi + 2] = wy;
+            }
         int Vid(int i, int j) => i * N + j;
         for (var i = 0; i < N - 1; i++)
-        for (var j = 0; j < N - 1; j++)
-        {
-            faces.Add(Vid(i, j)); faces.Add(Vid(i, j + 1)); faces.Add(Vid(i + 1, j));
-            faces.Add(Vid(i + 1, j)); faces.Add(Vid(i, j + 1)); faces.Add(Vid(i + 1, j + 1));
-        }
+            for (var j = 0; j < N - 1; j++)
+            {
+                faces.Add(Vid(i, j)); faces.Add(Vid(i, j + 1)); faces.Add(Vid(i + 1, j));
+                faces.Add(Vid(i + 1, j)); faces.Add(Vid(i, j + 1)); faces.Add(Vid(i + 1, j + 1));
+            }
 
         // vmap-препятствия (WMO): game (x,y,z=height) → recast (x, z, y); препятствие рассечётся как solid.
         if (vmapTris is { Length: > 0 })
@@ -66,8 +66,12 @@ public static class NavmeshBuild
         var geom = new RcSampleInputGeomProvider(verts, faces.ToArray());
         var settings = new RcNavMeshBuildSettings
         {
-            cellSize = 0.3f, cellHeight = 0.2f,
-            agentHeight = 2.0f, agentRadius = 0.6f, agentMaxClimb = 0.9f, agentMaxSlope = 50f,
+            cellSize = 0.3f,
+            cellHeight = 0.2f,
+            agentHeight = 2.0f,
+            agentRadius = 0.6f,
+            agentMaxClimb = 0.9f,
+            agentMaxSlope = 50f,
         };
         try
         {

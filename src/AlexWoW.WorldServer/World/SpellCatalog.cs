@@ -56,7 +56,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModBlockPercent = 51;          // +% блока (напр. «Блок щитом»)
     private const int AuraModDodgePercent = 49;          // +% уклонения (Evasion рога) — DODGE.1
     private const int AuraModAttackerMeleeHitChance = 184; // KB#612: −% к шансу попадания атакующих по нам
-                                                          // (NE Quickness 20582 BP=−3 → −2% hit ≡ +2% наш «proxy-dodge»).
+                                                           // (NE Quickness 20582 BP=−3 → −2% hit ≡ +2% наш «proxy-dodge»).
     private const int AuraModAttackPower = 99;           // +AP мили (Боевой клич / Благословение Могущества)
     private const int AuraModRangedAttackPower = 124;    // +AP дальнего боя (вторая аура Боевого клича для охотника)
     private const int AuraMechanicImmunity = 77;         // иммунитет к механике (Ярость берсерка: страх/sap/incapacitate)
@@ -306,7 +306,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // Тип ресурса energize-тика (EffectMiscValue: 0=мана, 1=ярость, 3=энергия, 6=сила рун).
         var periodicPower = periodicEnergize ? (byte)Math.Max(0, periodicIdx switch
         {
-            0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, _ => t.EffectMiscValue3,
+            0 => t.EffectMiscValue1,
+            1 => t.EffectMiscValue2,
+            _ => t.EffectMiscValue3,
         }) : (byte)0;
 
         // CP.3: финишер (расходует очки серии) — биты AttributesEx. Бонус за очко берём с PointsPerComboPoint
@@ -359,7 +361,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var statBonus = statIdx >= 0 ? effects[statIdx].Bp + 1 : 0;
         var statMisc = statIdx switch
         {
-            0 => t.EffectMiscValue1, 1 => t.EffectMiscValue2, 2 => t.EffectMiscValue3, _ => 0,
+            0 => t.EffectMiscValue1,
+            1 => t.EffectMiscValue2,
+            2 => t.EffectMiscValue3,
+            _ => 0,
         };
         var allStats = statIdx >= 0 && statMisc == -1;
         var statIndex = statIdx >= 0 && !allStats ? (byte)Math.Clamp(statMisc, 0, 4) : (byte)0;
@@ -389,7 +394,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var enchantIdx = Array.FindIndex(effects, e => e.Eff == EffectEnchantItemTemporary);
         var enchantId = enchantIdx switch
         {
-            0 => (uint)t.EffectMiscValue1, 1 => (uint)t.EffectMiscValue2, 2 => (uint)t.EffectMiscValue3, _ => 0u,
+            0 => (uint)t.EffectMiscValue1,
+            1 => (uint)t.EffectMiscValue2,
+            2 => (uint)t.EffectMiscValue3,
+            _ => 0u,
         };
 
         var isCurse = IsCurseSpell((uint)t.Id);
@@ -399,7 +407,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var curseDamageTakenPct = curseAmpIdx >= 0 ? effects[curseAmpIdx].Bp + 1 : 0;
         var curseSchoolMask = curseAmpIdx switch
         {
-            0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
+            0 => (byte)t.EffectMiscValue1,
+            1 => (byte)t.EffectMiscValue2,
+            2 => (byte)t.EffectMiscValue3,
+            _ => (byte)0,
         };
         // ABS.1/ABS.2: absorb-щит — SCHOOL_ABSORB (69, обычный) или MANA_SHIELD (97, за счёт маны).
         // Пул = BasePoints+1, маска школ = EffectMiscValue. Mana Shield дополнительно несёт множитель маны.
@@ -407,12 +418,18 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var absorbAmount = absorbIdx >= 0 ? effects[absorbIdx].Bp + 1 : 0;
         var absorbSchoolMask = absorbIdx switch
         {
-            0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
+            0 => (byte)t.EffectMiscValue1,
+            1 => (byte)t.EffectMiscValue2,
+            2 => (byte)t.EffectMiscValue3,
+            _ => (byte)0,
         };
         var manaShieldMultiplier = absorbIdx >= 0 && effects[absorbIdx].Aura == AuraManaShield
             ? absorbIdx switch
             {
-                0 => t.EffectMultipleValue1, 1 => t.EffectMultipleValue2, 2 => t.EffectMultipleValue3, _ => 0f,
+                0 => t.EffectMultipleValue1,
+                1 => t.EffectMultipleValue2,
+                2 => t.EffectMultipleValue3,
+                _ => 0f,
             }
             : 0f;
         // IMMUNITY.1: «пузырь» неуязвимости — SCHOOL_IMMUNITY (39, маска школ = EffectMiscValue) либо
@@ -495,7 +512,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var damageDonePct = ddIdx >= 0 ? effects[ddIdx].Bp + 1 : 0;
         var damageDoneSchoolMask = ddIdx switch
         {
-            0 => (byte)t.EffectMiscValue1, 1 => (byte)t.EffectMiscValue2, 2 => (byte)t.EffectMiscValue3, _ => (byte)0,
+            0 => (byte)t.EffectMiscValue1,
+            1 => (byte)t.EffectMiscValue2,
+            2 => (byte)t.EffectMiscValue3,
+            _ => (byte)0,
         };
 
         // Фаза 2 CC: тип контроля по первой найденной CC-ауре (стан/рут/страх/немота/дезориентация).

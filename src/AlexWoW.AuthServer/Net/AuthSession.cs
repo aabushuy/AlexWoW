@@ -1,4 +1,4 @@
-﻿using System.Net.Sockets;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using AlexWoW.AuthServer.Protocol;
 using AlexWoW.Common.Network;

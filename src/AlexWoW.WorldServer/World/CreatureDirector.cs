@@ -1,4 +1,4 @@
-﻿using AlexWoW.Common.Network;
+using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;
 using AlexWoW.DataStores.Navigation;
@@ -294,9 +294,19 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
             var guid = Npcs.UnitGuid(row.Entry, world.NextDevSpawnCounter());
             var creature = world.GetOrAddCreature(guid, () => new WorldCreature
             {
-                Guid = guid, Map = map, Template = template,
-                X = x, Y = y, Z = z, O = o, HomeX = x, HomeY = y, HomeZ = z, HomeO = o,
-                MaxHealth = hp, Health = hp,
+                Guid = guid,
+                Map = map,
+                Template = template,
+                X = x,
+                Y = y,
+                Z = z,
+                O = o,
+                HomeX = x,
+                HomeY = y,
+                HomeZ = z,
+                HomeO = o,
+                MaxHealth = hp,
+                Health = hp,
             });
             session.Visibility.VisibleNpcs[guid] = creature;
             session.Visibility.DevNpcs[$"enemy:{guid}"] = guid; // уникальный слот → снимается .devclean

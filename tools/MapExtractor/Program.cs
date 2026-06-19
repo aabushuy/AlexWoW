@@ -184,13 +184,13 @@ if (args.Length >= 2 && args[0].Equals("vmap", StringComparison.OrdinalIgnoreCas
                     var gyHi = VmapWriter.Grid(MathF.Min(g0.Y, MathF.Min(g1.Y, g2.Y)));
                     var gyLo = VmapWriter.Grid(MathF.Max(g0.Y, MathF.Max(g1.Y, g2.Y)));
                     for (var gx = gxLo; gx <= gxHi; gx++)
-                    for (var gy = gyLo; gy <= gyHi; gy++)
-                    {
-                        if (gx is < 0 or > 63 || gy is < 0 or > 63) continue;
-                        if (!tileTris.TryGetValue((gx, gy), out var list))
-                            tileTris[(gx, gy)] = list = new List<float>();
-                        list.AddRange(new[] { g0.X, g0.Y, g0.Z, g1.X, g1.Y, g1.Z, g2.X, g2.Y, g2.Z });
-                    }
+                        for (var gy = gyLo; gy <= gyHi; gy++)
+                        {
+                            if (gx is < 0 or > 63 || gy is < 0 or > 63) continue;
+                            if (!tileTris.TryGetValue((gx, gy), out var list))
+                                tileTris[(gx, gy)] = list = new List<float>();
+                            list.AddRange(new[] { g0.X, g0.Y, g0.Z, g1.X, g1.Y, g1.Z, g2.X, g2.Y, g2.Z });
+                        }
                 }
             }
         }

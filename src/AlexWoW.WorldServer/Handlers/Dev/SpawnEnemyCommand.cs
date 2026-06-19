@@ -15,14 +15,23 @@ internal sealed class SpawnEnemyCommand : IDevCommand
     /// <summary>Имя типа (рус./англ.) → CreatureType (mangos).</summary>
     private static readonly Dictionary<string, byte> TypeByName = new()
     {
-        ["beast"] = 1, ["животное"] = 1, ["зверь"] = 1,
-        ["dragonkin"] = 2, ["дракон"] = 2,
-        ["demon"] = 3, ["демон"] = 3,
-        ["elemental"] = 4, ["элементаль"] = 4,
-        ["giant"] = 5, ["великан"] = 5,
-        ["undead"] = 6, ["нежить"] = 6,
-        ["humanoid"] = 7, ["гуманоид"] = 7,
-        ["mechanical"] = 9, ["механизм"] = 9,
+        ["beast"] = 1,
+        ["животное"] = 1,
+        ["зверь"] = 1,
+        ["dragonkin"] = 2,
+        ["дракон"] = 2,
+        ["demon"] = 3,
+        ["демон"] = 3,
+        ["elemental"] = 4,
+        ["элементаль"] = 4,
+        ["giant"] = 5,
+        ["великан"] = 5,
+        ["undead"] = 6,
+        ["нежить"] = 6,
+        ["humanoid"] = 7,
+        ["гуманоид"] = 7,
+        ["mechanical"] = 9,
+        ["механизм"] = 9,
     };
 
     public async Task ExecuteAsync(DevCommandContext ctx, CancellationToken ct)

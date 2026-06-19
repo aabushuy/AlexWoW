@@ -24,8 +24,8 @@ internal sealed class AuraStateService
     /// <summary>Длительность окна Revenge / Counterattack: 5 секунд (эталон CMaNGOS).</summary>
     internal const long DefenseStateDurationMs = 5000;
 
-    private const uint MaskDefense       = 1u << 0;  // state=1
-    private const uint MaskHunterParry   = 1u << 6;  // state=7
+    private const uint MaskDefense = 1u << 0;  // state=1
+    private const uint MaskHunterParry = 1u << 6;  // state=7
 
     /// <summary>DEFENSE.1: ставит AURA_STATE_DEFENSE на 5с (Revenge-окно). Вызывается из CreatureCombatAI
     /// при успешном dodge/parry/block игрока. Идемпотентно: повторный вызов обновляет таймер.</summary>
@@ -87,7 +87,7 @@ internal sealed class AuraStateService
     private static uint BuildMask(WorldSession session, long now)
     {
         uint m = 0;
-        if (session.Combat.DefenseStateExpiresMs > now)     m |= MaskDefense;
+        if (session.Combat.DefenseStateExpiresMs > now) m |= MaskDefense;
         if (session.Combat.HunterParryStateExpiresMs > now) m |= MaskHunterParry;
         return m;
     }

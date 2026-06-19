@@ -1,4 +1,4 @@
-﻿using AlexWoW.WorldServer.Net;
+using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;

@@ -50,7 +50,8 @@ public sealed class BoardModel(KanbanService kanban) : PageModel
 
         var tickets = await kanban.ListAsync(new KanbanFilter
         {
-            ProjectId = Project, EpicId = Epic,
+            ProjectId = Project,
+            EpicId = Epic,
             IncludeArchived = Archived,
             Labels = SelectedLabels.Count > 0 ? SelectedLabels : null,
         }, ct);

@@ -61,14 +61,14 @@ public static class ClientData
             if (magic == "MAIN")
             {
                 for (var y = 0; y < 64; y++)
-                for (var x = 0; x < 64; x++)
-                {
-                    var e = body + (y * 64 + x) * 8;
-                    if (e + 4 > data.Length) continue;
-                    var flags = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(e));
-                    if ((flags & 0x1) != 0)
-                        tiles.Add((x, y));
-                }
+                    for (var x = 0; x < 64; x++)
+                    {
+                        var e = body + (y * 64 + x) * 8;
+                        if (e + 4 > data.Length) continue;
+                        var flags = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(e));
+                        if ((flags & 0x1) != 0)
+                            tiles.Add((x, y));
+                    }
                 break;
             }
             pos = body + size;

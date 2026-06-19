@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using AlexWoW.Common.Network;
 using AlexWoW.Database.Abstractions;
 using AlexWoW.Database.Models;

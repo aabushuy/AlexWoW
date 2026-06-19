@@ -31,7 +31,11 @@ public static class KanbanApi
             var lbl = ParseLabels(ctx, labels);
             var list = await k.ListAsync(new KanbanFilter
             {
-                ProjectId = project, EpicId = epic, Status = status, Type = type, TesterGuid = tester,
+                ProjectId = project,
+                EpicId = epic,
+                Status = status,
+                Type = type,
+                TesterGuid = tester,
                 IncludeArchived = archived == true,
                 Labels = lbl.Count > 0 ? lbl : null,
             }, ct);
@@ -123,8 +127,12 @@ public static class KanbanApi
             await k.MoveAsync(id, "Testing", ct);
             return Results.Ok(new
             {
-                id, testerGuid = pick.Guid, testerName = pick.Name,
-                testerClass = pick.Class, testerRace = pick.Race, testerLevel = pick.Level,
+                id,
+                testerGuid = pick.Guid,
+                testerName = pick.Name,
+                testerClass = pick.Class,
+                testerRace = pick.Race,
+                testerLevel = pick.Level,
                 status = "Testing",
             });
         });

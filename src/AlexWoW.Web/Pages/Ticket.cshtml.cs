@@ -70,9 +70,19 @@ public sealed partial class TicketModel(
             DoneAt = t.DoneAt;
             Input = new InputModel
             {
-                Id = t.Id, Title = t.Title, Type = t.Type, Priority = t.Priority, Status = t.Status,
-                ProjectId = t.ProjectId, EpicId = t.EpicId, Assignee = t.Assignee, TesterGuid = t.TesterGuid,
-                ClientCheck = t.ClientCheck, Description = t.Description, TestSteps = t.TestSteps, ExpectedResult = t.ExpectedResult,
+                Id = t.Id,
+                Title = t.Title,
+                Type = t.Type,
+                Priority = t.Priority,
+                Status = t.Status,
+                ProjectId = t.ProjectId,
+                EpicId = t.EpicId,
+                Assignee = t.Assignee,
+                TesterGuid = t.TesterGuid,
+                ClientCheck = t.ClientCheck,
+                Description = t.Description,
+                TestSteps = t.TestSteps,
+                ExpectedResult = t.ExpectedResult,
                 LabelsCsv = string.Join(", ", t.Labels),
             };
 
@@ -91,9 +101,19 @@ public sealed partial class TicketModel(
             .Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var t = new KanbanTicket
         {
-            Id = Input.Id, Title = Input.Title ?? "", Type = Input.Type, Priority = Input.Priority, Status = Input.Status,
-            ProjectId = Input.ProjectId, EpicId = Input.EpicId, Assignee = Input.Assignee ?? "", TesterGuid = Input.TesterGuid,
-            ClientCheck = Input.ClientCheck, Description = Input.Description, TestSteps = Input.TestSteps, ExpectedResult = Input.ExpectedResult,
+            Id = Input.Id,
+            Title = Input.Title ?? "",
+            Type = Input.Type,
+            Priority = Input.Priority,
+            Status = Input.Status,
+            ProjectId = Input.ProjectId,
+            EpicId = Input.EpicId,
+            Assignee = Input.Assignee ?? "",
+            TesterGuid = Input.TesterGuid,
+            ClientCheck = Input.ClientCheck,
+            Description = Input.Description,
+            TestSteps = Input.TestSteps,
+            ExpectedResult = Input.ExpectedResult,
             Labels = labels,
         };
         try
