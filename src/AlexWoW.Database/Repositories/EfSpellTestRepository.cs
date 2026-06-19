@@ -1,11 +1,11 @@
 using AlexWoW.Database.Abstractions;
-using Microsoft.EntityFrameworkCore;
-using EntitySession = AlexWoW.Database.Entities.SpellTestSession;
-using EntityResult = AlexWoW.Database.Entities.SpellTestResult;
-using EntityRequest = AlexWoW.Database.Entities.SpellTestRequest;
-using ModelSession = AlexWoW.Database.Models.SpellTestSession;
-using ModelResult = AlexWoW.Database.Models.SpellTestResult;
 using AlexWoW.Database.Models;
+using Microsoft.EntityFrameworkCore;
+using EntityRequest = AlexWoW.Database.Entities.SpellTestRequest;
+using EntityResult = AlexWoW.Database.Entities.SpellTestResult;
+using EntitySession = AlexWoW.Database.Entities.SpellTestSession;
+using ModelResult = AlexWoW.Database.Models.SpellTestResult;
+using ModelSession = AlexWoW.Database.Models.SpellTestSession;
 
 namespace AlexWoW.Database.Repositories;
 
@@ -91,7 +91,7 @@ public sealed class EfSpellTestRepository(IDbContextFactory<AuthDbContext> facto
                 .SetProperty(x => x.TicketId, ticketId), ct);
     }
 
-    // --- QA T1 (Vikunja 185): очередь запросов на авто-прогон харнесса (DB-flag + World-tick) ---
+    // --- QA T1: очередь запросов на авто-прогон харнесса (DB-flag + World-tick) ---
 
     public async Task<long> EnqueueRequestAsync(string account, int casts, string? note, CancellationToken ct = default)
     {

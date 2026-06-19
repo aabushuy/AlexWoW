@@ -22,6 +22,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -34,10 +35,17 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 sys.stdout.reconfigure(encoding="utf-8")  # Win console падает на emoji в notes
 
-KANBAN_BASE = "https://alexwow.home.srv/api/kanban"
-KANBAN_TOKEN = "kb_REDACTED"
+KANBAN_BASE = os.environ.get("KANBAN_BASE", "https://alexwow.home.srv/api/kanban")
+KANBAN_TOKEN = os.environ.get("KANBAN_TOKEN")
+if not KANBAN_TOKEN:
+    sys.exit("KANBAN_TOKEN env var required (см. deploy/SECRETS.md → WEB_API_TOKEN)")
 HEADERS = {"X-Api-Token": KANBAN_TOKEN, "Content-Type": "application/json"}
-MYSQL = dict(host="192.168.2.210", user="alexwow", password="alexwow", database="mangos")
+MYSQL = dict(
+    host=os.environ.get("MANGOS_HOST", "127.0.0.1"),
+    user=os.environ.get("MANGOS_USER", "alexwow"),
+    password=os.environ.get("MANGOS_PASSWORD", "alexwow"),
+    database=os.environ.get("MANGOS_DB", "mangos"),
+)
 
 SCHOOL_NAMES = {1: "Physical", 2: "Holy", 4: "Fire", 8: "Nature", 16: "Frost", 32: "Shadow", 64: "Arcane"}
 POWER_NAMES = {0: "мана", 1: "ярость", 2: "фокус", 3: "энергия", 6: "сила рун"}

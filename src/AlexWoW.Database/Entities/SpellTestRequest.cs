@@ -2,7 +2,7 @@ namespace AlexWoW.Database.Entities;
 
 /// <summary>
 /// EF-сущность таблицы <c>spell_test_request</c> (БД alexwow_auth) — очередь внешних запросов на авто-прогон
-/// харнесса проверки заклинаний (M12 Spell QA, задача Vikunja 185 / QA T1). Web/Claude вставляет строку
+/// харнесса проверки заклинаний (M12 Spell QA, QA T1). Web/Claude вставляет строку
 /// (status=pending), World-tick подхватывает её и запускает <c>SpellTestHarnessService.RunAsync</c> для
 /// онлайн-сессии указанного аккаунта, затем пишет результат (session_id/error) и статус done/failed.
 /// Заменяет чат-команду <c>.spelltest run</c> для hands-off режима: Claude инициирует прогон SQL-INSERT'ом,

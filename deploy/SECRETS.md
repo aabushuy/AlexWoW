@@ -12,8 +12,6 @@
 | `MYSQL_USER` / `MYSQL_PASSWORD` | Юзер БД для приложений (auth/world/web).                                                       | Connection strings в compose.            |
 | `REALM_ADDRESS`            | IP, который AuthServer отдаёт клиенту как адрес world (`192.168.2.210`). Не секрет.                | —                                        |
 | `WEB_API_TOKEN`            | `X-Api-Token` для REST API канбана (`/api/kanban/*`, KB5). Нужен MCP-клиенту (`.mcp.json kanban`). | `.mcp.json` на dev-машинах.              |
-| `WEB_VIKUNJA_TOKEN`        | Bearer-токен Vikunja для дашборда (срез 2 + M12 QA-тикеты).                                         | Vikunja Settings → API tokens.           |
-| `WEB_VIKUNJA_BASE_URL` / `WEB_VIKUNJA_PROJECT_ID` / `WEB_VIKUNJA_VERIFY_SSL` | Параметры подключения Vikunja. Не секреты.            | —                                        |
 
 ## Запуск compose
 
@@ -31,31 +29,29 @@ docker compose --env-file /data/docker/alexwow-config/.env -f /data/docker/alexw
 3. Перезапустить `alexwow-web` (`docker compose up -d alexwow-web`).
 4. Синхронно обновить токен в `.mcp.json` всех dev-машин (поле `env.KANBAN_TOKEN`).
 
-### `WEB_VIKUNJA_TOKEN`
-1. Зайти на `https://tasks.home.srv` → Settings → API tokens → создать новый, скопировать.
-2. Поправить `/data/docker/alexwow-config/.env`, перезапустить `alexwow-web`.
-3. Старый токен отозвать в Vikunja.
-
 ### `MYSQL_*`
 1. Только при перенакате MySQL с нуля. Не ротировать на работающем стеке (поломает существующие connection-strings).
 2. Если совсем нужно: остановить стек, поменять `.env`, прогнать `ALTER USER 'alexwow'@'%' IDENTIFIED BY '...'` в MySQL, поднять обратно.
 
-## Содержимое `.env` (актуальный шаблон)
+## Шаблон `.env`
+
+Реальные значения — **только** в `/data/docker/alexwow-config/.env` на homeserver. В репо
+держим шаблон с плейсхолдерами; никогда не подставляем боевые токены/пароли.
 
 ```
-MYSQL_ROOT_PASSWORD=<rotate-me>
-MYSQL_USER=alexwow
-MYSQL_PASSWORD=alexwow
-REALM_ADDRESS=192.168.2.210
-WEB_API_TOKEN=kb_REDACTED
-WEB_VIKUNJA_BASE_URL=https://tasks.home.srv
-WEB_VIKUNJA_TOKEN=tk_REDACTED
-WEB_VIKUNJA_PROJECT_ID=11
-WEB_VIKUNJA_VERIFY_SSL=false
+MYSQL_ROOT_PASSWORD=<strong-random>
+MYSQL_USER=<db-user>
+MYSQL_PASSWORD=<strong-random>
+REALM_ADDRESS=<lan-ip-of-world-server>
+WEB_API_TOKEN=kb_<openssl rand -hex 10>
 ```
 
-Это не «секретный» документ — то же лежит на homeserver. Для ротации иди по разделам выше.
+Генерация:
+- `MYSQL_*` — `openssl rand -hex 16` (32 hex-символа).
+- `WEB_API_TOKEN` — `openssl rand -hex 10` с префиксом `kb_` (валидация формата в `KanbanApiAuth`).
 
 ## Backup `.env`
 
-Не бэкапим в git. На homeserver `/data/docker/alexwow-config/` — read-restricted (`chmod 750`). Если потеряется — восстановить из этого файла (значения выше) или сгенерировать новые ротацией.
+Не бэкапим в git и не в публичные хранилища. На homeserver `/data/docker/alexwow-config/`
+— `chmod 750`. Если файл потеряется — сгенерировать новые значения по разделу «Ротация»
+выше и положить рядом.

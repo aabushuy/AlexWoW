@@ -9,11 +9,6 @@
 <p><a asp-page="/Admin/Index">← К списку сессий</a></p>
 <h1>Сессия захвата #@s.Id</h1>
 
-@if (!string.IsNullOrEmpty(Model.StatusMessage))
-{
-    <div class="alert alert-ok" role="alert">@Model.StatusMessage</div>
-}
-
 <div class="panel">
     <dl class="kv">
         <dt>Класс</dt><dd style="color:@GameData.ClassColor(s.Class)">@GameData.ClassName(s.Class)</dd>
@@ -68,16 +63,7 @@ else
         }
         else
         {
-            @if (Model.VikunjaConfigured)
-            {
-                <form method="post" asp-page-handler="CreateTicket" style="margin-bottom:14px">
-                    <button type="submit" class="btn">Завести тикет в Vikunja</button>
-                </form>
-            }
-            else
-            {
-                <p class="muted">Интеграция Vikunja не настроена (<code>Web:Vikunja</code>). Скопируйте тело тикета и заведите вручную:</p>
-            }
+            <p class="muted">Скопируйте тело тикета и заведите его во внешнем трекере:</p>
             <label class="muted" for="ticketBody">Тело тикета (markdown):</label>
             <textarea id="ticketBody" class="ticket-body" readonly rows="10">@Model.TicketTitle
 

@@ -9,8 +9,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AlexWoW.Web.Pages.Admin;
 
-/// <summary>Детали сессии захвата + анализ аномалий + заведение тикета (M12 Spell QA, только для админов).</summary>
-public sealed class SessionModel(ISpellTestRepository spellTest, VikunjaTicketService vikunja) : PageModel
+/// <summary>Детали сессии захвата + анализ аномалий + готовое тело тикета (M12 Spell QA, только для админов).</summary>
+public sealed class SessionModel(ISpellTestRepository spellTest) : PageModel
 {
     [BindProperty(SupportsGet = true)]
     public long Id { get; set; }
@@ -19,16 +19,9 @@ public sealed class SessionModel(ISpellTestRepository spellTest, VikunjaTicketSe
     public SpellTestAnalysis? Analysis { get; private set; }
     public IReadOnlyList<SpellRow> Spells { get; private set; } = [];
 
-    /// <summary>Готовое тело тикета (для авто-заведения и копи-фоллбэка).</summary>
+    /// <summary>Готовое тело тикета (для копирования в внешний трекер).</summary>
     public string TicketTitle { get; private set; } = "";
     public string TicketBody { get; private set; } = "";
-
-    /// <summary>Доступно ли авто-заведение тикета в Vikunja (иначе только копи-фоллбэк).</summary>
-    public bool VikunjaConfigured => vikunja.Configured;
-
-    /// <summary>Сообщение после POST (успех/ошибка заведения тикета).</summary>
-    [TempData]
-    public string? StatusMessage { get; set; }
 
     /// <summary>Сводка по одному спеллу+типу эффекта: диапазон вычисленных величин против эталона.</summary>
     public sealed record SpellRow(uint SpellId, SpellTestResultType Type, byte School, int Casts,
@@ -39,32 +32,6 @@ public sealed class SessionModel(ISpellTestRepository spellTest, VikunjaTicketSe
         if (!await LoadAsync(ct))
             return NotFound();
         return Page();
-    }
-
-    /// <summary>Заводит один тикет в Vikunja по аномалиям сессии (идемпотентно: повторно — no-op).</summary>
-    public async Task<IActionResult> OnPostCreateTicketAsync(CancellationToken ct)
-    {
-        if (!await LoadAsync(ct))
-            return NotFound();
-        if (Session!.TicketId is not null)
-        {
-            StatusMessage = $"Тикет уже заведён (#{Session.TicketId}).";
-            return RedirectToPage(new { id = Id });
-        }
-        if (Analysis is not { HasAnomalies: true })
-        {
-            StatusMessage = "Аномалий нет — тикет не нужен.";
-            return RedirectToPage(new { id = Id });
-        }
-        var ticketId = await vikunja.CreateTaskAsync(TicketTitle, TicketBody, ct);
-        if (ticketId is null)
-        {
-            StatusMessage = "Не удалось завести тикет в Vikunja (проверьте настройки Web:Vikunja). Используйте копирование тела.";
-            return RedirectToPage(new { id = Id });
-        }
-        await spellTest.MarkAnalyzedAsync(Id, ticketId.Value, ct);
-        StatusMessage = $"Тикет #{ticketId} заведён в Vikunja.";
-        return RedirectToPage(new { id = Id });
     }
 
     private async Task<bool> LoadAsync(CancellationToken ct)

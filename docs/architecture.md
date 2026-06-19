@@ -4,8 +4,9 @@
 > Цель: **играбельный сервер** под **WotLK 3.3.5a (build 12340)**.
 > Эталон для портирования: **CMaNGOS-WotLK** (`cmangos/mangos-wotlk`), дополнительно TrinityCore 3.3.5 и WCell (C#).
 
-Статус проекта (домены готово/осталось) — в [status.md](status.md); историческая
-дорожная карта вех — в [archive/roadmap.md](archive/roadmap.md).
+Стратегия портирования CMaNGOS-WoTLK (фазы, принципы, источник истины) — в
+[strategy/cmangos-port.md](strategy/cmangos-port.md). Прогресс по доменам ведётся
+на канбан-доске (БД `project`, веб-дашборд `alexwow.home.srv/dashboard`).
 
 ---
 
@@ -123,7 +124,7 @@
 - Две физические БД: **`alexwow_auth`** — НАШИ изменяемые данные (аккаунты `account` — SRP6 соль/верификатор + `email` для веб-панели, M8; реалмы, персонажи `characters`/`character_*`, `account_data`); **`mangos`** — read-only дамп мира (статика: спавны, шаблоны, квесты, спеллы `spell_template`, …).
 
 ### 4.3 Слой доступа к данным (DAL) — `AlexWoW.Database`
-Гибрид (рефактор #23–25, см. [archive/devlog/M7-tech-debt.md](archive/devlog/M7-tech-debt.md)):
+Гибрид:
 - **EF Core 9 + Pomelo (MySQL)** для `alexwow_auth`: сущности (`Entities/`) + `AuthDbContext` + **миграции** (вместо ручных `CREATE/ALTER`). На прод-БД миграции адаптированы baseline-строкой в `__EFMigrationsHistory` (таблицы не пересоздаются). ⚠️ Под EF Core 10 релиза Pomelo ещё нет — EF9 работает на рантайме net10 через roll-forward.
 - **Dapper** для read-only дампа `mangos` (таблицы по 100+ столбцов, тяжёлые джойны — миграции не нужны).
 - Потребители (хендлеры, сессии, `*Store`) зависят от **интерфейсов-репозиториев** (`Abstractions/`), не от конкретных классов и не от голого SQL: `IAccountRepository`/`IRealmRepository`/`ISchemaInitializer`, `ICharacterRepository`/`IInventoryRepository`/`IQuestRepository`/`ICharacterStateRepository`, и focused-репозитории mangos (`ICreatureRepository`/`IItemTemplateRepository`/`IVendorRepository`/`ITrainerRepository`/`ILootRepository`/`IQuestTemplateRepository`/`IFactionRepository`/`IPlayerDataRepository`/`IGameObjectRepository`) за композитным фасадом `IWorldRepository`.
@@ -225,8 +226,7 @@ AlexWoW.slnx
 ## 9. Веб-панель игрока (`AlexWoW.Web`, M8)
 
 Сайт для игроков: регистрация, вход, смена пароля, просмотр персонажей. **ASP.NET Core Razor Pages
-(.NET 10)**, за **Caddy** на homeserver, домен **`alexwow.home.srv`**. Ход работ и решения —
-[archive/devlog/M8-web-interface.md](archive/devlog/M8-web-interface.md).
+(.NET 10)**, за **Caddy** на homeserver, домен **`alexwow.home.srv`**.
 
 - **Та же БД, тот же SRP6.** Панель работает с `alexwow_auth` через те же focused-репозитории EF
   (`IAccountRepository`/`ICharacterRepository`/`IInventoryRepository`), а соль+верификатор считает

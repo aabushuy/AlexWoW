@@ -1,0 +1,66 @@
+name: 🐛 Bug
+description: Что-то работает не так как ожидалось
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за репорт. Чем точнее воспроизведение — тем быстрее починим.
+        Для регрессии конкретного спелла/абилки — используй шаблон «🧪 Regression (spell/ability)».
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Что произошло
+      description: Что ожидал увидеть и что увидел на самом деле.
+      placeholder: |
+        Ожидал: при касте Overpower расходуется 5 ярости и наносится физ. урон.
+        Реально: спелл кастуется, но ярость не списывается.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги для воспроизведения
+      placeholder: |
+        1. Войти за Воина 10 уровня
+        2. Атаковать манекен auto-атакой
+        3. После парирования врагом — кастовать .cast 7384 (Overpower)
+        4. Смотреть UnitPower(player, 1)
+    validations:
+      required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: Клиент / билд
+      description: Версия клиента и билд, если не дефолт.
+      placeholder: "3.3.5a build 12340"
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Коммит AlexWoW
+      description: Хэш или ветка, на которой воспроизводится.
+      placeholder: "main @ 6db08d9"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи / скриншоты
+      description: Релевантные строки серверного лога (Serilog), скриншоты UI, дамп пакетов если есть.
+      render: shell
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Окружение
+      description: ОС, версия .NET, MySQL, способ запуска (docker / dotnet run).
+      placeholder: |
+        OS: Windows 11
+        .NET: 10.0.201
+        MySQL: 8.4 в docker
+        Запуск: dotnet run --project src/AlexWoW.WorldServer

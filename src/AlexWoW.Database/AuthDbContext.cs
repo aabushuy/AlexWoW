@@ -269,7 +269,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.HasIndex(x => x.SpellId).HasDatabaseName("ix_str_spell");
         });
 
-        // QA T1 (Vikunja 185): очередь внешних запросов на авто-прогон харнесса. Web/Claude вставляет
+        // QA T1: очередь внешних запросов на авто-прогон харнесса. Web/Claude вставляет
         // (status=pending), World-tick подхватывает (CAS pending→running) и финализирует (done/failed).
         modelBuilder.Entity<SpellTestRequest>(e =>
         {

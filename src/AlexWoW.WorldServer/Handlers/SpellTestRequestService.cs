@@ -7,8 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace AlexWoW.WorldServer.Handlers;
 
 /// <summary>
-/// Обработчик очереди запросов на авто-прогон харнесса проверки заклинаний (M12 Spell QA, задача Vikunja 185 /
-/// QA T1). Web/Claude вставляет pending-строку в <c>spell_test_request</c>, этот сервис (вызывается из
+/// Обработчик очереди запросов на авто-прогон харнесса проверки заклинаний (M12 Spell QA, QA T1).
+/// Web/Claude вставляет pending-строку в <c>spell_test_request</c>, этот сервис (вызывается из
 /// <see cref="WorldTick"/> раз в такт) атомарно забирает её (pending→running), находит онлайн-сессию аккаунта и
 /// запускает <see cref="SpellTestHarnessService.RunAsync"/>. По завершении пишет результат в строку: done + id
 /// созданной сессии захвата (Claude читает его SELECT'ом) либо failed + причина.

@@ -1,7 +1,7 @@
 namespace AlexWoW.Database.Models;
 
 /// <summary>
-/// Захваченный World-tick'ом запрос на авто-прогон харнесса (таблица spell_test_request, задача Vikunja 185 / QA T1).
+/// Захваченный World-tick'ом запрос на авто-прогон харнесса (таблица spell_test_request, QA T1).
 /// Возвращается <c>ClaimPendingRequestAsync</c>: только поля, нужные обработчику (id + параметры прогона).
 /// Иммутабельный DTO.
 /// </summary>

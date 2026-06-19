@@ -1,4 +1,4 @@
-﻿using AlexWoW.WorldServer.Handlers;
+using AlexWoW.WorldServer.Handlers;
 using Microsoft.Extensions.Logging;
 
 namespace AlexWoW.WorldServer.World;
@@ -25,7 +25,7 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
         var now = Environment.TickCount64;
         await factions.EnsureLoadedAsync(ct); // M6.7: ленивая загрузка реакций фракций (один раз)
 
-        // QA T1 (Vikunja 185): опрос очереди внешних запросов на авто-прогон харнесса (DB-flag). Свой гард
+        // QA T1: опрос очереди внешних запросов на авто-прогон харнесса (DB-flag). Свой гард
         // in-flight внутри сервиса — не блокирует тик (прогон идёт в фоновой задаче). До per-player цикла,
         // т.к. обработчик сам найдёт target-сессию по аккаунту из строки-запроса.
         try { await spellTestQueue.TickAsync(ct); }

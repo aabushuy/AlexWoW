@@ -1,0 +1,76 @@
+name: 🧪 Regression (spell / ability)
+description: Конкретная абилка/спелл/талант ведёт себя не как в 3.3.5a-эталоне
+labels: ["regression", "spell"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Используй когда речь о **конкретном spell_id** (или ID таланта/расовой/проф-абилки).
+        Регрессионный пайплайн отдельный — см. `tools/regression-import` и QA-харнес.
+
+  - type: input
+    id: spell_id
+    attributes:
+      label: Spell ID
+      description: ID из spell_template (DBC).
+      placeholder: "7384"
+    validations:
+      required: true
+
+  - type: input
+    id: spell_name
+    attributes:
+      label: Название
+      placeholder: "Overpower (Сокрушительный удар), Воин"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Тип
+      options:
+        - Class ability (классовая)
+        - Talent (талант)
+        - Racial (расовая)
+        - Profession (профессия)
+        - Mount / proficiency
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение (по эталону)
+      description: Со ссылкой на wowwiki / wowhead / CMaNGOS-исходник.
+      placeholder: |
+        Согласно wowhead/spell=7384: расходует 5 ярости, доступен 5 сек после parry/dodge цели.
+        В CMaNGOS обрабатывается в Spell_Warrior.cpp.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Реальное поведение
+      placeholder: "Кастуется без расхода ярости и без проверки parry-окна."
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Воспроизведение
+      placeholder: |
+        1. .level 10, .learn 7384
+        2. Атаковать манекен auto
+        3. После того как манекен парирует — .cast 7384
+        4. UnitPower("player", 1) до/после
+
+  - type: input
+    id: tester
+    attributes:
+      label: tester_guid / class / race (если из QA-пайплайна)
+      description: Заполняй если репорт пришёл из канбан-доски регрессии.
+      placeholder: "tester_guid=42, class=Warrior, race=Human"

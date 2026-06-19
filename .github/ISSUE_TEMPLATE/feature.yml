@@ -1,0 +1,53 @@
+name: ✨ Feature / Port
+description: Новая функциональность или порт системы из CMaNGOS
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Для крупных систем (гильдии, петы, аукцион) — сначала обсуди подход в issue,
+        чтобы не задвоить работу. См. [стратегию порта CMaNGOS](../docs/strategy/cmangos-port.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что хотим
+      description: Какой пользовательский сценарий или подсистема. Чем измеряется «готово».
+      placeholder: |
+        Гильдии: создание (60s, 1g), приглашение/выход, gquit, gmotd,
+        ранги, банк (M1: пустые слоты + золото). Тестим UI клиента + .ginfo.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Зачем
+      description: Какой домен закрывает, какие задачи разблокирует.
+      placeholder: "Закрывает домен «Гильдии», препрек для гильд-банка/гильд-перков и PvP-достижений."
+
+  - type: input
+    id: cmangos_source
+    attributes:
+      label: Исходник CMaNGOS (если портируем)
+      description: Конкретный файл или каталог в cmangos/mangos-wotlk.
+      placeholder: "src/game/Guilds/Guild.cpp + GuildMgr.cpp"
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Предполагаемый подход
+      description: Кратко — какие файлы трогаем, какие новые абстракции, БД-миграции, опкоды.
+      placeholder: |
+        - src/AlexWoW.WorldServer/Handlers/Guild/* — опкоды (CMSG_GUILD_*)
+        - src/AlexWoW.Database/Models/Guild* + миграция
+        - 0 третьесторонних зависимостей
+
+  - type: textarea
+    id: scope_out
+    attributes:
+      label: Что НЕ входит (out of scope)
+      description: Помогает не разрастить PR.
+      placeholder: |
+        - Гильд-банк (отдельная задача)
+        - Перки/достижения гильдии

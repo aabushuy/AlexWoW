@@ -10,8 +10,7 @@
 - `src/` — AuthServer, WorldServer, Web, Common, Cryptography, Database, DataStores
 - `tests/` — тесты
 - `deploy/` — docker-compose, SQL, deploy.ps1
-- `docs/` — архитектура, статус
-- `docs/archive/` — ⚠️ **НЕ АКТУАЛЬНА**, устаревший контент, не использовать как источник истины
+- `docs/` — архитектура, стратегия порта CMaNGOS, code-style, onboarding
 
 ## Трекинг задач
 

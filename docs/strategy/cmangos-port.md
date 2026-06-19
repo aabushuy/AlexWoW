@@ -25,10 +25,10 @@
 
 1. **Секреты в истории git**: `git log --all --full-history -S 'kb_' -S 'tk_' -S 'ZAQxsw' -S 'ACCESS_TOKEN'` — поиск токенов. Если что-то есть — `git filter-repo` или новый чистый репо без истории.
 2. **Реальные секреты сейчас**: проверить `/data/docker/alexwow-config/.env`, `deploy/SECRETS.md` (только шаблоны, не значения), `.mcp.json`, `appsettings.*.json`.
-3. **Мёртвый код/файлы**: `tools/WowLauncher/` (удалено — будет на .NET), `docs/archive/` (legacy roadmap), unreferenced сервисы.
+3. **Мёртвый код/файлы**: `tools/WowLauncher/` (удалено — будет на .NET), unreferenced сервисы.
 4. **Dead-deps**: `<PackageReference>` в csproj без использования. Лицензии third-party (`tools/MapExtractor/Foole.Mpq/`).
 5. **Code-style**: `dotnet format`, актуальный `.editorconfig`.
-6. **Документация**: переписать `README.md` (что/на чём/как запустить + link на CMaNGOS), актуализировать `docs/architecture.md`, `docs/status.md`, `docs/onboarding/`.
+6. **Документация**: переписать `README.md` (что/на чём/как запустить + link на CMaNGOS), актуализировать `docs/architecture.md`, `docs/onboarding/`.
 7. **CONTRIBUTING.md**: PR-flow, code-style, commit-convention.
 8. **Issue templates**: `.github/ISSUE_TEMPLATE/` для bug/feature/regression.
 9. **`.gitignore`**: убрать упоминания удалённых директорий, проверить покрытие секретов/клиента.

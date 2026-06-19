@@ -91,11 +91,6 @@ services:
       Web__ProjectConnectionString: "Server=alexwow-mysql;Port=3306;Database=project;User ID=${MYSQL_USER};Password=${MYSQL_PASSWORD};"
       # KB5: токен REST API канбан-доски (/api/kanban/*, заголовок X-Api-Token). LAN-internal.
       Web__ApiToken: ${WEB_API_TOKEN:?WEB_API_TOKEN required}
-      # Vikunja (дашборд срез 2 + M12 Spell QA тикеты). Токен LAN-сервера.
-      Web__Vikunja__BaseUrl: ${WEB_VIKUNJA_BASE_URL:-https://tasks.home.srv}
-      Web__Vikunja__Token: ${WEB_VIKUNJA_TOKEN:?WEB_VIKUNJA_TOKEN required}
-      Web__Vikunja__ProjectId: ${WEB_VIKUNJA_PROJECT_ID:-11}
-      Web__Vikunja__VerifySsl: ${WEB_VIKUNJA_VERIFY_SSL:-false}
     ports:
       - "8090:8080"   # HTTP; наружу (alexwow.home.srv) проксирует Caddy на 192.168.2.210:8090
     volumes:

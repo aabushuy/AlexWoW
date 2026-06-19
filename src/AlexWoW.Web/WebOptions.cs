@@ -16,27 +16,4 @@ public sealed class WebOptions
 
     /// <summary>Токен REST API канбан-доски (KB5, заголовок <c>X-Api-Token</c>). Пусто — API отключён.</summary>
     public string ApiToken { get; set; } = string.Empty;
-
-    /// <summary>Интеграция с Vikunja (M12 Spell QA — заведение тикета по аномалиям сессии). Пусто — выключено.</summary>
-    public VikunjaOptions Vikunja { get; set; } = new();
-
-    /// <summary>Настройки Vikunja REST API (секция "Web:Vikunja"). Токен/URL задаются в деплое, не в репозитории.</summary>
-    public sealed class VikunjaOptions
-    {
-        /// <summary>База API, напр. https://tasks.home.srv.</summary>
-        public string BaseUrl { get; set; } = string.Empty;
-
-        /// <summary>API-токен (Bearer).</summary>
-        public string Token { get; set; } = string.Empty;
-
-        /// <summary>Проект Vikunja, куда заводить тикеты Spell QA.</summary>
-        public uint ProjectId { get; set; }
-
-        /// <summary>Проверять TLS-сертификат (false — самоподписанный домашний сервер).</summary>
-        public bool VerifySsl { get; set; } = true;
-
-        /// <summary>Интеграция полностью настроена (иначе кнопка скрыта, доступен только копи-фоллбэк).</summary>
-        public bool Configured => !string.IsNullOrWhiteSpace(BaseUrl)
-            && !string.IsNullOrWhiteSpace(Token) && ProjectId > 0;
-    }
 }

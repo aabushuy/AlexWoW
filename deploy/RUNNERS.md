@@ -11,9 +11,20 @@
 
 Селектор `runs-on: [self-hosted, dotnet]` подходит обоим. Селектор `[self-hosted, linux, deploy]` — только homeserver.
 
-## Безопасность (ОБЯЗАТЕЛЬНО до запуска runner'а)
+## Безопасность (ОБЯЗАТЕЛЬНО для public-репо)
 
-Settings → Actions → General → Fork pull request workflows → **Require approval for all outside collaborators** (или жёстче). Иначе fork-PR с `runs-on: self-hosted` запустит произвольный код на homeserver. См. секцию «Критическая безопасность» в `docs/onboarding/runner-setup.md`.
+Два слоя защиты от запуска чужого кода на homeserver через PR из форков:
+
+1. **В workflow (`ci.yml`).** Для `pull_request`-триггера `build-test` принудительно
+   запускается на GitHub-hosted (`ubuntu-latest`) — изолированный одноразовый VM.
+   Self-hosted используется только на push в `main` / `workflow_dispatch`
+   (доверенные триггеры). `deploy-test` дополнительно отгорожен
+   `if: github.event_name != 'pull_request'`.
+2. **В настройках репо.** Settings → Actions → General → Fork pull request workflows
+   → **Require approval for all outside collaborators** (или жёстче — «first-time
+   contributors»). Это страхует от случая, когда workflow меняют в самом PR.
+
+Подробнее: `docs/onboarding/runner-setup.md` → «Критическая безопасность».
 
 ## Файлы
 

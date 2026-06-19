@@ -18,6 +18,11 @@ indent_size = 2
 indent_size = 4
 max_line_length = 120
 
+# EF Core генерит миграции с UTF-8 BOM (dotnet ef migrations add). Не боремся — при
+# каждой новой миграции BOM возвращался бы; это нормально для авто-генерируемого слоя.
+[**/Migrations/*.cs]
+charset = utf-8-bom
+
 #### Стиль .NET ####
 
 # Usings: System первым, вне namespace

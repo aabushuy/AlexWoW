@@ -18,5 +18,5 @@ public sealed class SpellTestSession
     public DateTime? EndedAt { get; set; }  // время остановки (UTC); null — ещё идёт
     public string? Note { get; set; }       // опциональная метка из .spelltest start <note>
     public byte Analyzed { get; set; }      // 1 = проанализирована и заведён тикет
-    public uint? TicketId { get; set; }     // id задачи Vikunja (если заведён тикет по аномалиям)
+    public uint? TicketId { get; set; }     // id задачи во внешнем трекере (если заведён по аномалиям)
 }

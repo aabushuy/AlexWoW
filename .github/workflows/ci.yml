@@ -16,7 +16,10 @@ concurrency:
 jobs:
   build-test:
     name: Build + Test
-    runs-on: [self-hosted, dotnet]   # любой runner с .NET 10 SDK (homeserver или windows)
+    # PR из форков → GitHub-hosted (изолированный VM, безопасно для public-репо).
+    # push в main / workflow_dispatch → self-hosted (быстрее, есть .NET кэш).
+    # См. deploy/RUNNERS.md → раздел «Безопасность».
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted","dotnet"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6

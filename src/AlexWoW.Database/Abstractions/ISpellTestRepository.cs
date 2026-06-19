@@ -5,7 +5,7 @@ namespace AlexWoW.Database.Abstractions;
 /// <summary>
 /// Репозиторий захвата проверки заклинаний (таблицы <c>spell_test_session</c>/<c>spell_test_result</c>,
 /// БД alexwow_auth). M12 Spell QA. World-сервер пишет (старт/стоп сессии + результаты захвата), Web читает
-/// (список сессий, результаты, анализ аномалий) и помечает проанализированные сессии с id тикета Vikunja.
+/// (список сессий, результаты, анализ аномалий) и помечает проанализированные сессии с id внешнего тикета.
 /// </summary>
 public interface ISpellTestRepository
 {
@@ -31,10 +31,10 @@ public interface ISpellTestRepository
     /// <summary>Все результаты сессии (для анализа аномалий на админ-странице).</summary>
     Task<IReadOnlyList<SpellTestResult>> GetResultsAsync(long sessionId, CancellationToken ct = default);
 
-    /// <summary>Помечает сессию проанализированной и проставляет id заведённого тикета Vikunja.</summary>
+    /// <summary>Помечает сессию проанализированной и проставляет id заведённого внешнего тикета.</summary>
     Task MarkAnalyzedAsync(long sessionId, uint ticketId, CancellationToken ct = default);
 
-    // --- QA T1 (Vikunja 185): очередь внешних запросов на авто-прогон харнесса (DB-flag + World-tick) ---
+    // --- QA T1: очередь внешних запросов на авто-прогон харнесса (DB-flag + World-tick) ---
 
     /// <summary>
     /// Создаёт запрос на авто-прогон для онлайн-персонажа аккаунта <paramref name="account"/>. Возвращает id

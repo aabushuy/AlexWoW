@@ -20,7 +20,7 @@ public enum SpellTestResultType : byte
 }
 
 /// <summary>
-/// Статус строки-запроса на авто-прогон харнесса (таблица spell_test_request, задача Vikunja 185 / QA T1).
+/// Статус строки-запроса на авто-прогон харнесса (таблица spell_test_request, QA T1).
 /// Жизненный цикл: pending → running → done/failed. World-tick делает CAS pending→running (claim), затем
 /// финализирует: done (проставлен session_id) либо failed (проставлен error).
 /// </summary>

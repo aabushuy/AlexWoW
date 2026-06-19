@@ -3,33 +3,34 @@
 **/obj/
 **/out/
 /publish/
+publish/
 *.user
 
-# IDE
+# IDE / OS / editor мусор
 .vs/
 .idea/
 .vscode/
 Backup/
 UpgradeLog.htm
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+*~
 
 # Локальные секреты/конфиги
 .env
 appsettings.*.Local.json
 .claude/settings.local.json
-
-# CI/CD plan Phase 3: publish-каталоги от dotnet publish (создаются deploy-manual.ps1 и CI)
-publish/
-
-# CI/CD plan Phase 2: реальный runner .env с PAT (шаблон — runner/.env.example)
+# реальный runner .env с PAT (шаблон — runner/.env.example)
 runner/.env
 
-# Клиент 3.3.5a и его данные — НЕ в git (Blizzard copyright, см. deploy/SECRETS.md)
+# Клиент 3.3.5a и его данные — НЕ в git (Blizzard copyright, см. deploy/SECRETS.md).
+# Генерируются игроком из своей копии WoW.
 client/
 *.MPQ
+*.mpq
 *.wtf
-
-# Данные клиента (НЕ коммитим — генерируются игроком из своей копии WoW)
-client/
 dbc/
 maps/
 vmaps/
@@ -49,7 +50,7 @@ tools/scripts/out-charstartoutfit.sql
 tools/scripts/charstartoutfit.sql
 charstartoutfit.sql
 
-# MCP-конфиг проекта содержит API-токен Vikunja — в репозиторий не кладём
+# MCP-конфиг проекта содержит API-токены — в репозиторий не кладём
 .mcp.json
 
 # Конфиг Codex CLI — локальный, не коммитим
