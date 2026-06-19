@@ -244,6 +244,26 @@ public enum WorldOpcode : uint
     SmsgRealmSplit = 0x38B,
     CmsgRealmSplit = 0x38C,
     CmsgReadyForAccountDataTimes = 0x4FF,
+
+    // Группа / партия (порт CMaNGOS Groups/, GroupHandler.cpp). Опкоды 0x06E–0x07F + raid-расширения.
+    CmsgGroupInvite = 0x06E,                     // клиент: пригласить по имени
+    SmsgGroupInvite = 0x06F,                     // сервер: уведомление приглашённому
+    CmsgGroupCancel = 0x070,
+    SmsgGroupCancel = 0x071,
+    CmsgGroupAccept = 0x072,                     // клиент-получатель: принять
+    CmsgGroupDecline = 0x073,                    // клиент-получатель: отклонить
+    SmsgGroupDecline = 0x074,                    // сервер: уведомление инициатору об отказе
+    CmsgGroupUninvite = 0x075,                   // удаление по имени (deprecated)
+    CmsgGroupUninviteGuid = 0x076,               // удаление по GUID (актуальное)
+    SmsgGroupUninvite = 0x077,
+    CmsgGroupSetLeader = 0x078,                  // смена лидера
+    SmsgGroupSetLeader = 0x079,
+    CmsgLootMethod = 0x07A,                      // правила лута группы (T4)
+    CmsgGroupDisband = 0x07B,                    // распад группы
+    SmsgGroupDestroyed = 0x07C,
+    SmsgGroupList = 0x07D,                       // полный состав группы (T2)
+    SmsgPartyMemberStats = 0x07E,                // статус члена (HP/MP/позиция) (T2)
+    SmsgPartyCommandResult = 0x07F,              // ответ на CMSG_GROUP_* (OK/ошибка)
 }
 
 /// <summary>Код ответа SMSG_AUTH_RESPONSE.</summary>
