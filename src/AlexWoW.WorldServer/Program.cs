@@ -98,6 +98,10 @@ builder.Services.AddSingleton<GuildRegistry>(); // GUILD.T1: реестр гил
 builder.Services.AddSingleton<AlexWoW.Database.Abstractions.IGuildRepository, AlexWoW.Database.Repositories.EfGuildRepository>(); // GUILD.T5
 builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Guild.GuildPersistenceService>();
 builder.Services.AddHostedService<AlexWoW.WorldServer.Handlers.Guild.GuildRecoveryHostedService>();
+builder.Services.AddSingleton<PetRegistry>(); // PET.T1
+builder.Services.AddSingleton<AlexWoW.Database.Abstractions.IPetRepository, AlexWoW.Database.Repositories.EfPetRepository>(); // PET.T5
+builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Pet.PetPersistenceService>();
+builder.Services.AddHostedService<AlexWoW.WorldServer.Handlers.Pet.PetRecoveryHostedService>();
 // Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();

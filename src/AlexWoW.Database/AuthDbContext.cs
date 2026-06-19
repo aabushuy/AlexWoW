@@ -34,6 +34,7 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
     public DbSet<GuildData> Guilds => Set<GuildData>(); // GUILD.T5
     public DbSet<GuildRank> GuildRanks => Set<GuildRank>(); // GUILD.T5
     public DbSet<GuildMemberData> GuildMembers => Set<GuildMemberData>(); // GUILD.T5
+    public DbSet<CharacterPet> CharacterPets => Set<CharacterPet>(); // PET.T5
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -367,6 +368,29 @@ public sealed class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbC
             e.Property(x => x.OfficerNote).HasColumnName("officer_note").HasMaxLength(31).HasDefaultValue("");
             e.Property(x => x.JoinedAt).HasColumnName("joined_at");
             e.HasIndex(x => x.CharGuid).HasDatabaseName("ix_guild_member_char");
+        });
+
+        // PET.T5: persistence питомцев (один пет на хозяина).
+        modelBuilder.Entity<CharacterPet>(e =>
+        {
+            e.ToTable("character_pet");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.OwnerGuid).HasColumnName("owner_guid");
+            e.Property(x => x.Entry).HasColumnName("entry");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(32).HasDefaultValue("");
+            e.Property(x => x.Level).HasColumnName("level");
+            e.Property(x => x.Experience).HasColumnName("experience").HasDefaultValue((uint)0);
+            e.Property(x => x.Health).HasColumnName("health").HasDefaultValue((uint)0);
+            e.Property(x => x.MaxHealth).HasColumnName("max_health").HasDefaultValue((uint)0);
+            e.Property(x => x.Mana).HasColumnName("mana").HasDefaultValue((uint)0);
+            e.Property(x => x.MaxMana).HasColumnName("max_mana").HasDefaultValue((uint)0);
+            e.Property(x => x.Type).HasColumnName("type").HasDefaultValue((byte)0);
+            e.Property(x => x.ReactState).HasColumnName("react_state").HasDefaultValue((byte)1);
+            e.Property(x => x.CommandState).HasColumnName("command_state").HasDefaultValue((byte)1);
+            e.Property(x => x.Happiness).HasColumnName("happiness").HasDefaultValue((uint)0);
+            e.Property(x => x.SummonedAt).HasColumnName("summoned_at");
+            e.HasIndex(x => x.OwnerGuid).IsUnique().HasDatabaseName("ux_charpet_owner");
         });
     }
 }
