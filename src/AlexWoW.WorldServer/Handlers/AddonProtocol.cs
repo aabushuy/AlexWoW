@@ -51,9 +51,9 @@ internal sealed class AddonProtocol(
             return;
         }
 
-        if (body == "qatasks")
+        if (body == "qatasks" || body.StartsWith("qatasks|", StringComparison.Ordinal))
         {
-            await SendQaTasksAsync(session, ct);
+            await SendQaTasksAsync(session, body, ct);
             return;
         }
 
@@ -163,17 +163,19 @@ internal sealed class AddonProtocol(
     }
 
     /// <summary>
-    /// KB8: задачи на тестирование текущего персонажа — кадр <c>QBEGIN</c> … <c>Q|id|title|steps|expected</c> …
-    /// <c>QEND</c>. Без админ-гейта (фильтр по tester_guid = персонаж). '|' в полях → '/', чтобы не ломать разбор
-    /// (переводы строк допустимы — это одно сообщение). БД project недоступна/не настроена → пустой кадр.
+    /// KB8/KB14: задачи на тестирование текущего персонажа — кадр <c>QBEGIN</c> … <c>Q|id|title|steps|expected</c> …
+    /// <c>QEND</c>. Тело клиента: <c>qatasks</c> или <c>qatasks|&lt;kind&gt;</c> (general/abilities/talents/professions —
+    /// разделение по вкладкам аддона; неизвестное значение → general). Без админ-гейта (фильтр по tester_guid).
+    /// '|' в полях → '/', чтобы не ломать разбор. БД project недоступна/не настроена → пустой кадр.
     /// </summary>
-    private async Task SendQaTasksAsync(WorldSession session, CancellationToken ct)
+    private async Task SendQaTasksAsync(WorldSession session, string body, CancellationToken ct)
     {
+        var kind = ParseListKind(body);
         await SendLineAsync(session, "QBEGIN", ct);
         if (kanban.Configured && session.Character is { } ch)
         {
             IReadOnlyList<KanbanTesterTask> tasks;
-            try { tasks = await kanban.GetTesterTasksAsync(ch.Guid, ct); }
+            try { tasks = await kanban.GetTesterTasksAsync(ch.Guid, kind, ct); }
             catch (Exception ex)
             {
                 session.Logger.LogDebug(ex, "ADDON qatasks: БД project недоступна ({Msg})", ex.Message);
@@ -182,9 +184,25 @@ internal sealed class AddonProtocol(
             foreach (var t in tasks)
                 // Title с префиксом #id — клиентский Lua показывает только заголовок (второе поле),
                 // номер тикета в отдельном поле не использует. Префикс помогает тестеру писать «по #209…» в чат.
-                await SendLineAsync(session, $"Q|{t.Id}|{Clean($"#{t.Id} · {t.Title}")}|{Clean(t.TestSteps)}|{Clean(t.ExpectedResult)}", ct);
+                // SpellId/School заполнены только для regression-вкладок; для general оба = пусто (клиент → nil).
+                await SendLineAsync(session,
+                    $"Q|{t.Id}|{Clean($"#{t.Id} · {t.Title}")}|{Clean(t.TestSteps)}|{Clean(t.ExpectedResult)}|{t.SpellId?.ToString() ?? ""}|{t.SchoolMask?.ToString() ?? ""}",
+                    ct);
         }
         await SendLineAsync(session, "QEND", ct);
+    }
+
+    private static KanbanTesterListKind ParseListKind(string body)
+    {
+        var bar = body.IndexOf('|');
+        if (bar < 0) return KanbanTesterListKind.General;
+        return body.AsSpan(bar + 1) switch
+        {
+            "abilities" => KanbanTesterListKind.Abilities,
+            "talents" => KanbanTesterListKind.Talents,
+            "professions" => KanbanTesterListKind.Professions,
+            _ => KanbanTesterListKind.General,
+        };
     }
 
     /// <summary>

@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using AlexWoW.Database.Abstractions;
+using AlexWoW.Database.Util;
 using AlexWoW.Web.Services;
 using AlexWoW.Web.Services.Kanban;
 using Microsoft.AspNetCore.Mvc;
@@ -18,10 +18,6 @@ public sealed partial class TicketModel(
     SpellPreviewService spellPreview) : PageModel
 {
     public const string AiAssignee = "Агент ИИ"; // #3.1: исполнитель — ИИ-агент (концептуальный id -1)
-
-    /// <summary>Парсит spell_id из «#<num> · …» в title (генератор регрессии в template.py использует тот же формат).</summary>
-    [GeneratedRegex(@"^#(\d+)\s*·")]
-    private static partial Regex SpellIdInTitleRegex();
 
     public bool Configured => kanban.Configured;
     public bool IsNew => Input.Id == 0;
@@ -82,9 +78,8 @@ public sealed partial class TicketModel(
 
             // Phase E: если в title распознан spell_id — подтянуть тултип-блок из spell_template.
             // Доступно для всех тикетов, не только regression — title типа «#11366 · …» бывают и в M10 эпиках.
-            var m = SpellIdInTitleRegex().Match(t.Title);
-            if (m.Success && uint.TryParse(m.Groups[1].Value, out var spellId))
-                Spell = await spellPreview.GetAsync(spellId, ct);
+            if (KanbanTitleParser.TryParseSpellId(t.Title) is int spellId)
+                Spell = await spellPreview.GetAsync((uint)spellId, ct);
         }
         return Page();
     }
