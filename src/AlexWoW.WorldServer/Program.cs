@@ -103,6 +103,7 @@ builder.Services.AddSingleton<SpellTestCaptureService>();  // M12 Spell QA: ре
 builder.Services.AddSingleton<SpellTestHarnessService>();  // M12 Spell QA: авто-харнесс прогона абилок
 builder.Services.AddSingleton<SpellTestRequestService>();  // QA T1 (Vikunja 185): очередь запросов на авто-прогон (DB-flag + World-tick)
 builder.Services.AddSingleton<AuraService>();
+builder.Services.AddSingleton<AuraStateService>();  // DEFENSE.1: UNIT_FIELD_AURASTATE + окно Revenge
 builder.Services.AddSingleton<PeriodicsService>();
 builder.Services.AddSingleton<AuraPersistenceService>();
 builder.Services.AddSingleton<ManaRegenService>();

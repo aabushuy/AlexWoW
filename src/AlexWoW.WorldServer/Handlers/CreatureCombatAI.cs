@@ -12,7 +12,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Мили игрока — <see cref="PlayerMeleeService"/>, байты пакетов — <see cref="Protocol.CombatPackets"/>.
 /// </summary>
 internal sealed class CreatureCombatAI(CombatResourcesService combatResources, AbsorbShieldService absorbShields,
-    SpellCatalog spellCatalog, KillRewardService killReward)
+    SpellCatalog spellCatalog, KillRewardService killReward, AuraStateService auraState)
 {
     /// <summary>SMSG_AI_REACTION: реакция «HOSTILE» (рык агро) при входе существа в бой.</summary>
     private const uint AiReactionHostile = 2;
@@ -197,6 +197,15 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
                 raw, dodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
+
+            // DEFENSE.1: успешный dodge/parry/block → 5-секундное окно AURA_STATE_DEFENSE на игроке.
+            // Это разблокирует Revenge (CasterAuraState=1) и подсветит кнопку у клиента
+            // (UNIT_FIELD_AURASTATE бит 0). Counterattack/Rune Strike — другие states (7/aura-spell),
+            // покрываются в следующих итерациях.
+            if (outcome == CombatStats.MeleeOutcome.Dodge
+                || outcome == CombatStats.MeleeOutcome.Parry
+                || blocked > 0)
+                await auraState.SetDefenseAsync(player.Session, now, ct);
             // CRIT.2: крит существа по игроку (фикс. шанс) — только по прошедшему удару, ×2 + флаг (клиент рисует крит).
             var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < CreatureCritChance;
             if (crit)

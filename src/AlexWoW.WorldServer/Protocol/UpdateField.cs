@@ -34,6 +34,11 @@ public static class UpdateField
     /// (стойки воина/формы друида). M6.11.</summary>
     public const int UnitBytes2 = 0x007A;
     public const int UnitFlags = 0x003B;
+    /// <summary>UNIT_FIELD_AURASTATE (3.3.5a OBJECT_END + 0x37): битовая маска состояний ауры. Бит 0 (value 1)
+    /// = AURA_STATE_DEFENSE — выставлен на 5с после успешного dodge/parry/block игрока, позволяет Revenge.
+    /// Бит 6 (value 0x40) = AURA_STATE_WARRIOR_VICTORY_RUSH / HUNTER_PARRY (Counterattack — пока не покрыто).
+    /// Клиент серит/осветляет кнопку абилки по сравнению с CasterAuraState спелла. DEFENSE.1.</summary>
+    public const int UnitAuraState = 0x003D;
     // Боевые поля (M9.2): чтобы чарпейн не показывал NaN-урон. BASEATTACKTIME size 2 (main 0x3E, off 0x3F).
     public const int UnitBaseAttackTime = 0x003E;
     public const int UnitMinDamage = 0x0046;      // float

@@ -14,7 +14,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender spellGo,
     SpellCastCompletion completion, SpellTogglesService spellToggles, CraftingService crafting,
-    InventoryGrantService inventoryGrant)
+    InventoryGrantService inventoryGrant, AuraStateService auraState)
 {
     // --- SpellCastResult (3.3.5a, сверено с CMaNGOS SpellDefines.h) ---
     private const byte CastResultNotReady = 0x43;        // 67  — спелл на кулдауне/GCD
@@ -176,9 +176,24 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
+        // DEFENSE.1: каст-гейт по AURA_STATE. Revenge (CasterAuraState=1) кастуется только в 5-секундном окне
+        // после успешного dodge/parry/block игрока. AuraStateService следит за DefenseStateExpiresMs +
+        // UNIT_FIELD_AURASTATE. Если окно не активно — отказ как и Forbearance: SPELL_FAILED_CASTER_AURASTATE.
+        if (!AuraStateService.HasState(session, info.CasterAuraState, now))
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
+            return;
+        }
+
         // Запускаем GCD от этого каста (для последующих).
         if (info.GcdMs > 0)
             session.Cast.GcdEndMs = now + info.GcdMs;
+
+        // DEFENSE.1: каст состоялся (гейт пройден) — потратили окно DEFENSE. Revenge — мгновенный (CastMs=0),
+        // поэтому очищаем сразу здесь, до CompleteCast. Для CasterAuraState != 1 / 0 — TODO в AuraStateService.
+        if (info.CasterAuraState == 1)
+            await auraState.ClearDefenseAsync(session, ct);
 
         if (info.CastMs <= 0)
         {

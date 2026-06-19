@@ -82,6 +82,12 @@ internal sealed class SessionCombatState
     internal long LastResourceTickMs { get; set; }
     /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
     internal long SacredShieldNextProcMs { get; set; }
+
+    /// <summary>DEFENSE.1: момент истечения AURA_STATE_DEFENSE (мс). Ставится на 5с при успешном
+    /// dodge/parry/block игрока (CreatureCombatAI ApplyResolveOutcome). Гейт каста Revenge:
+    /// SpellCastService отказывает, если spell.CasterAuraState=1 и now &gt;= DefenseStateExpiresMs.
+    /// 0 — state не активен. После успешного каста Revenge — снимается AuraStateService.</summary>
+    internal long DefenseStateExpiresMs { get; set; }
     /// <summary>«На следующий замах» (MELEE.1): id абилки (Героический удар/Раскол/Свирепый удар), заместит
     /// следующую автоатаку; 0 — нет. Расходуется в <see cref="Handlers.PlayerMeleeService"/>.</summary>
     internal uint PendingNextSwingSpellId { get; set; }
@@ -119,6 +125,7 @@ internal sealed class SessionCombatState
         ComboPoints = 0;      // CP.1: очки серии не переживают выход из мира
         ComboTargetGuid = 0;
         Runes = [];           // RUNE.1: руны переинициализируются при входе в мир
+        DefenseStateExpiresMs = 0; // DEFENSE.1: окно Revenge не переживает выход
     }
 }
 

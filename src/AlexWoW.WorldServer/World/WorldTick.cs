@@ -12,7 +12,7 @@ namespace AlexWoW.WorldServer.World;
 /// </summary>
 internal sealed class WorldTick(WorldState world, FactionStore factions,
     ManaRegenService manaRegen, CombatResourcesService combatResources, RuneService runes,
-    AuraService auras, PeriodicsService periodics, Handlers.PoisonService poisons,
+    AuraService auras, AuraStateService auraState, PeriodicsService periodics, Handlers.PoisonService poisons,
     PlayerMeleeService playerMelee, CreatureCombatAI creatureAi, RegenService regen,
     Handlers.CrowdControlService crowdControl, TimeSyncService timeSync,
     Handlers.SpellTestRequestService spellTestQueue, ILogger<WorldTick> logger)
@@ -42,6 +42,10 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                 await combatResources.TickAsync(player.Session, now, ct);            // M6.12: реген энергии / распад ярости
                 await runes.TickAsync(player.Session, now, ct);                      // RUNE.2: реген рун DK по кулдауну
                 await auras.TickAsync(player.Session, now, ct);                      // M6.11: истечение аур
+                // DEFENSE.1: истечение 5-секундного окна Revenge — снимаем UNIT_FIELD_AURASTATE/бит DEFENSE.
+                if (player.Session.Combat.DefenseStateExpiresMs > 0
+                    && now >= player.Session.Combat.DefenseStateExpiresMs)
+                    await auraState.ClearDefenseAsync(player.Session, ct);
                 await periodics.TickAsync(player.Session, now, ct);                  // M10.4b: тик DoT/HoT
                 await poisons.TickAsync(player.Session, now, ct);                    // §8: истечение яда-энчанта оружия
                 await regen.TickPlayerRegenAsync(player.Session, now, ct);            // M6.7: внебоевой реген HP

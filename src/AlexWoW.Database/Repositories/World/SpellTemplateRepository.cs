@@ -10,6 +10,7 @@ public sealed class SpellTemplateRepository(string connectionString)
 {
     private const string SpellColumns = """
         SELECT Id, Attributes, AttributesEx, Dispel, procFlags AS ProcFlags, procChance AS ProcChance,
+               CasterAuraState, TargetAuraState,
                SchoolMask, CastingTimeIndex, PowerType, ManaCost, ManaCostPercentage,
                RecoveryTime, CategoryRecoveryTime, StartRecoveryTime, DurationIndex,
                Effect1, Effect2, Effect3,

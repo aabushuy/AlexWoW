@@ -185,7 +185,12 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // напр. NE Quickness 20582 +2% dodge). Применяется автоматически при логине без активного каста;
         // длительность — «навсегда» (пока персонаж в мире). LoginSequenceService применяет такие ауры
         // через PeriodicsService.ApplyAuraEffectAsync после SendInitialSpellsAsync.
-        bool IsPassive = false);
+        bool IsPassive = false,
+        // DEFENSE.1: гейт-каст по состоянию ауры кастера (spell_template.CasterAuraState).
+        // 1 = AURA_STATE_DEFENSE — Revenge всех рангов; ставится игроку на 5с после dodge/parry/block.
+        // 7 = WARRIOR_VICTORY_RUSH / HUNTER_PARRY (Counterattack/Victory Rush) — отдельная механика, пока не покрыта.
+        // 0 — каст не зависит от AuraState. Проверяется в SpellCastService перед стартом каста.
+        uint CasterAuraState = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -602,7 +607,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             statBonus, statIndex,
             speedPctBonus,
             allStats,
-            isPassive);
+            isPassive,
+            t.CasterAuraState);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

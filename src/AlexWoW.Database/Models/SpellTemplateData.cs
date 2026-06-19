@@ -25,6 +25,15 @@ public sealed record SpellTemplateData
     public uint ProcFlags { get; init; }
     /// <summary>Шанс прока в % (Spell.dbc procChance). PROC.1.</summary>
     public uint ProcChance { get; init; }
+    /// <summary>Состояние ауры кастера, при котором разрешён каст спелла (Spell.dbc CasterAuraState):
+    /// 1 = DEFENSE — установлено игроку на 5с после успешного dodge/parry/block (Revenge);
+    /// 7 = WARRIOR_VICTORY_RUSH / HUNTER_PARRY — после kill (Victory Rush) или parry (Counterattack).
+    /// 0 — каст не зависит от состояния. Проверяется в SpellCastService перед стартом каста.</summary>
+    public uint CasterAuraState { get; init; }
+    /// <summary>Состояние ауры цели, при котором разрешён каст (Spell.dbc TargetAuraState).
+    /// Пример: Exorcism требует цель с AuraState=undead (KB.AuraState). Сейчас не используется, но
+    /// тянем из БД на будущее.</summary>
+    public uint TargetAuraState { get; init; }
     public uint SchoolMask { get; init; }
     public uint CastingTimeIndex { get; init; }
     public int PowerType { get; init; }
