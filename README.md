@@ -63,6 +63,7 @@ dotnet test
 
 - [Архитектура](docs/architecture.md) — компоненты, сетевой протокол 3.3.5a, БД, эталонные исходники
 - [Стратегия порта CMaNGOS](docs/strategy/cmangos-port.md) — фазы и принципы
+- [Карта порта](docs/cmangos-port-map.md) — соответствие «CMaNGOS файл → наш C#-порт»
 - [Быстрый старт](docs/getting-started.md) — локальная сборка/запуск
 - [Деплой](docs/deployment.md) — продовая выкладка
 - [Code style](docs/code-style.md) — конвенции C# в репо
@@ -82,4 +83,4 @@ dotnet test
 | [DotRecast](https://github.com/ikpil/DotRecast) | Навмеш (.NET-порт Recast/Detour) |
 | [Foole.Mpq](http://github.com/Foole/MpqReader) | MPQ-парсер в `tools/MapExtractor/Foole.Mpq` (MIT) |
 
-Соответствие «CMaNGOS-файл → наш порт» поддерживается в [docs/cmangos-port-map.md](docs/cmangos-port-map.md) (заводится в Phase 2).
+Соответствие «CMaNGOS-файл → наш порт» поддерживается в [docs/cmangos-port-map.md](docs/cmangos-port-map.md).
