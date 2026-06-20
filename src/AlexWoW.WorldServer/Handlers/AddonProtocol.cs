@@ -23,7 +23,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class AddonProtocol(
     DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items,
-    IKanbanBoardRepository kanban, ISpellDetailRepository spellDetails)
+    IKanbanBoardRepository kanban, ISpellDetailRepository spellDetails, ITeleportRepository teleports)
 {
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
@@ -67,6 +67,12 @@ internal sealed class AddonProtocol(
         if (body.StartsWith("qaspell|", StringComparison.Ordinal))
         {
             await SendSpellDetailAsync(session, body, ct);
+            return;
+        }
+
+        if (body == "devteleports")
+        {
+            await SendTeleportsAsync(session, ct);
             return;
         }
 
@@ -304,6 +310,28 @@ internal sealed class AddonProtocol(
         session.Logger.LogInformation("QA сабмит '{User}' тикет={Id} pass={Pass} → {Status}",
             session.Account, ticketId, pass, newStatus);
         await SendLineAsync(session, $"QDONE|{ticketId}|{newStatus}", ct);
+    }
+
+    /// <summary>
+    /// Список точек телепорта для панели «Телепорт» аддона: <c>TBEGIN</c> … <c>T|id|faction|name</c> …
+    /// <c>TEND</c>. Порядок — Альянс(1) → Орда(2) → Нейтральные(0), внутри фракции — по SortOrder из БД.
+    /// Источник — <see cref="ITeleportRepository"/> (та же таблица, что у <c>.tp</c> и каталога меню). Admin-гейт.
+    /// </summary>
+    private async Task SendTeleportsAsync(WorldSession session, CancellationToken ct)
+    {
+        if (!session.IsAdmin)
+            return;
+        IReadOnlyList<TeleportLocation> locs;
+        try { locs = await teleports.GetAllAsync(ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "ADDON devteleports: БД недоступна ({Msg})", ex.Message);
+            locs = [];
+        }
+        await SendLineAsync(session, "TBEGIN", ct);
+        foreach (var loc in locs.OrderBy(l => l.Faction switch { 1 => 0, 2 => 1, _ => 2 }))
+            await SendLineAsync(session, $"T|{loc.Id}|{loc.Faction}|{Clean(loc.Name)}", ct);
+        await SendLineAsync(session, "TEND", ct);
     }
 
     // Заменяем U+00B7 middle dot на ASCII '-' — клиентский WoW-фонт в списке тикетов аддона

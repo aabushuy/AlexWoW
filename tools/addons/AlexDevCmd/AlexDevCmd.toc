@@ -1,8 +1,10 @@
 ## Interface: 30300
 ## Title: Alex Dev Commands
-## Notes: Древовидный пульт dev-команд + телепорт по городам. Каталог отдаёт сервер. Кнопка у миникарты. Гейт is_admin — на сервере.
+## Notes: Пульт dev-команд: одно окно из 3 колонок (корни/ветви/рабочее пространство). Кнопка у миникарты или /dev.
 ## Author: AlexWoW
-## Version: 2.1
+## Version: 3.0
+## Dependencies: AlexUI
 ## SavedVariables: AlexDevCmdDB
 
-AlexDevCmd.lua
+Core.lua
+UI.lua

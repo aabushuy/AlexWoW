@@ -46,7 +46,7 @@ WorldFrame = makeFrame()
 GameTooltip = makeFrame()
 
 function UnitName() return "Tester" end
-function UnitClass() return "Warrior" end
+function UnitClass() return "Воин", "WARRIOR" end  -- (локализованное имя, токен) как клиент 3.3.5a
 function UnitLevel() return 80 end
 function GetSpellInfo() return nil end
 function GetItemIcon() return nil end

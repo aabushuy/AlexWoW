@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: AlexUI
+## Notes: Общий стиль и виджеты аддонов AlexWoW: окно, раскладка колонок, списки (FauxScroll), миникнопка, скан-тултип.
+## Author: AlexWoW
+## Version: 1.0
+
+AlexUI.lua

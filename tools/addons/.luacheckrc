@@ -19,7 +19,7 @@ stds.wow = {
     -- FauxScrollFrame-хелперы
     "FauxScrollFrame_Update", "FauxScrollFrame_GetOffset", "FauxScrollFrame_OnVerticalScroll",
     -- Dropdown-хелперы
-    "UIDropDownMenu_SetWidth", "UIDropDownMenu_Initialize",
+    "UIDropDownMenu_SetWidth", "UIDropDownMenu_Initialize", "UIDropDownMenu_SetText",
     "UIDropDownMenu_CreateInfo", "UIDropDownMenu_AddButton", "UIDropDownMenu_SetSelectedValue",
     -- FrameXML-константы и шрифт-объекты
     "ACCEPT", "CANCEL", "YES", "NO",
@@ -35,6 +35,8 @@ std = "lua51+wow"
 -- слэши, попап-колбэки, штатная регистрация в SlashCmdList/StaticPopupDialogs).
 globals = {
   "SlashCmdList", "StaticPopupDialogs",
+  "AlexUI",  -- общая библиотека стиля (tools/addons/AlexUI), читается/пишется аддонами
+  "AlexDevCmd", "AlexDevCmdDB",
   "AlexQATester", "AlexQATesterDB",
   "AlexDevCmdDB",
   "AlexDevCmd_SendPrompt", "AlexDevCmd_ToggleStats", "AlexDevCmd_ToggleItems",
