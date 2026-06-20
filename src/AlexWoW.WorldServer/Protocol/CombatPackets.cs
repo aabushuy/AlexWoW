@@ -19,7 +19,8 @@ public static class CombatPackets
     /// <summary>HITINFO_CRITICALHIT (0x200): крит. удар — клиент рисует крупное «крит» число. CRIT.2.</summary>
     private const uint HitInfoCriticalHit = 0x200;
 
-    private const byte VictimStateHit = 1;
+    /// <summary>VICTIMSTATE_HIT (CMaNGOS Unit.h): удар попал. Для miss с damage=0 клиент рисует «Miss».</summary>
+    public const byte VictimStateHit = 1;
     /// <summary>VICTIMSTATE_DODGE (CMaNGOS Unit.h): цель уклонилась от удара — нет урона, клиент рисует «Dodge!».</summary>
     public const byte VictimStateDodge = 2;
     /// <summary>VICTIMSTATE_PARRY: цель парировала — нет урона.</summary>

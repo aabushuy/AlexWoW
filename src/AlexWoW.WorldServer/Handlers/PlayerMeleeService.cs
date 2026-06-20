@@ -109,50 +109,66 @@ internal sealed class PlayerMeleeService(
 
         var level = (byte)(session.Character?.Level ?? 1);
 
-        // #3797 outgoing dodge: целевое существо может уклониться (база 5% — пол WotLK; точная формула с
-        // уровневой разницей и defense skill — будущая итерация). Уклонение цели открывает 5-сек окно
-        // Overpower у воина (class=1). On-next-swing абилки игнорируют уклонение (мили-абилки замещают
-        // автоатаку, для них отдельный resolver — следующий тикет).
-        const float CreatureBaseDodgePct = 5.0f;
-        if (session.Combat.PendingNextSwingSpellId == 0
-            && Random.Shared.NextDouble() * 100.0 < CreatureBaseDodgePct)
+        // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — замещает эту автоатаку:
+        // бросок оружия + флэт-бонус абилки, лог как спелл-урон. Иначе — обычная белая автоатака.
+        var pendingId = session.Combat.PendingNextSwingSpellId;
+        var pendingInfo = pendingId != 0 ? await spellCatalog.GetAsync(pendingId, ct) : null;
+        session.Combat.PendingNextSwingSpellId = 0;
+        var isAutoAttack = pendingInfo is null;
+
+        var school = pendingInfo is { School: > 0 } ? pendingInfo.School : (byte)1; // физ. (1)
+        var rawDamage = (int)ComputeMeleeDamage(session)
+            + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
+
+        // Полный outgoing melee-резолвер: miss / dodge / parry / glance (только autoattack) / crit / hit.
+        // Использует hit-/crit-рейтинги из T1 и уровневую разницу. Чистая формула — в OutgoingMeleeResolver.
+        var attackerGuid = (ulong)session.InWorldGuid;
+        var targetLevel = creature.Template.Level;
+        float hitAuraBonus = 0f, critAuraBonus = 0f;
+        foreach (var p in session.Progression.Periodics)
         {
-            session.Combat.NextMeleeSwingMs = now + (session.Combat.MainHandSpeedMs > 0 ? session.Combat.MainHandSpeedMs : (uint)SwingIntervalMs);
+            if (p.TargetGuid != 0) continue;
+            hitAuraBonus += p.HitChancePct;
+            critAuraBonus += p.MeleeCritChancePct;
+        }
+        var resolved = OutgoingMeleeResolver.Resolve(level, targetLevel,
+            hitAuraBonus, session.Combat.MeleeCritPct + critAuraBonus, isAutoAttack, Random.Shared.NextDouble());
+
+        // Промах/уклон/парирование: лог исхода + ответный агро + (на dodge у воина) окно Overpower.
+        if (resolved.Multiplier == 0f)
+        {
+            // Спелл-лог абилки тоже шлём (клиент снимает подсветку), но «жёлтым» урон без damage = 0 — для
+            // pending-swing абилок логично завершить замах SPELL_GO (без damagelog), для autoattack — просто
+            // attacker-state с victimState.
+            if (pendingInfo is not null)
+            {
+                await spellGo.SendSpellGoAsync(session, pendingId, creature.Guid, session.Combat.PendingNextSwingCastCount, ct);
+                session.Combat.PendingNextSwingCastCount = 0;
+            }
+            var victimState = resolved.Outcome switch
+            {
+                OutgoingMeleeResolver.Outcome.Dodge => CombatPackets.VictimStateDodge,
+                OutgoingMeleeResolver.Outcome.Parry => CombatPackets.VictimStateParry,
+                _ => CombatPackets.VictimStateHit, // Miss — VictimStateHit с damage=0 (клиент рисует «Miss» по hitInfo)
+            };
             await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
-                CombatPackets.BuildAttackerStateUpdate((ulong)session.InWorldGuid, creature.Guid, 0, 0,
-                    victimState: CombatPackets.VictimStateDodge), ct);
-            if (session.Character?.Class == 1)
+                CombatPackets.BuildAttackerStateUpdate(attackerGuid, creature.Guid, 0, 0, victimState: victimState), ct);
+            // #3797 Overpower: только dodge нашего удара открывает окно (вне зависимости — autoattack или ability).
+            if (resolved.Outcome == OutgoingMeleeResolver.Outcome.Dodge && session.Character?.Class == 1)
                 session.Combat.OverpowerWindowExpiresMs = now + AuraStateService.DefenseStateDurationMs;
             // Ответный бой — даже на miss/dodge цель агрится (CMaNGOS DealMeleeDamage гейт-точка).
             await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
             return;
         }
 
-        // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — замещает эту автоатаку:
-        // бросок оружия + флэт-бонус абилки, лог как спелл-урон. Иначе — обычная белая автоатака.
-        var pendingId = session.Combat.PendingNextSwingSpellId;
-        var pendingInfo = pendingId != 0 ? await spellCatalog.GetAsync(pendingId, ct) : null;
-        session.Combat.PendingNextSwingSpellId = 0;
-
-        var school = pendingInfo is { School: > 0 } ? pendingInfo.School : (byte)1; // физ. (1)
-        var rawDamage = (int)ComputeMeleeDamage(session)
-            + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
         // Фаза 2: % наносимого урона по школе (Divine Shield −50% и т.п.) — для автоатаки/абилки.
-        var damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, school, rawDamage));
-        // CRIT.2: мили-крит ×2 по шансу из статов (кэш RefreshMeleeAsync) + SPELL.T1 аура-сумма
-        // (MOD_CRIT_PERCENT + распределённый MOD_RATING/CR_CRIT_MELEE). Флаг крита — в пакете → клиент рисует крит.
-        var critAuraBonus = 0f;
-        foreach (var p in session.Progression.Periodics)
-            if (p.TargetGuid == 0)
-                critAuraBonus += p.MeleeCritChancePct;
-        var crit = Random.Shared.NextDouble() * 100.0 < (session.Combat.MeleeCritPct + critAuraBonus);
-        if (crit)
-            damage *= 2;
+        var modulated = World.DamageDoneModifier.Apply(session, school, rawDamage);
+        var damage = (uint)Math.Max(1, (int)(modulated * resolved.Multiplier));
+        var crit = resolved.Outcome == OutgoingMeleeResolver.Outcome.Crit;
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)
         if (pendingInfo is null)
             await combatResources.GainRageAsync(session, damage, attacker: true, ct); // M6.12: ярость за белый удар (спец — нет)
 
-        var attackerGuid = (ulong)session.InWorldGuid;
         if (pendingInfo is not null)
         {
             // MELEE.1: на самом замахе шлём SPELL_GO «на следующий замах»-абилки — клиент снимает подсветку
