@@ -119,6 +119,26 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
                 info = info with { CastMs = castMs, CooldownMs = cooldownMs };
         }
 
+        // SPELL.T1: spell haste — суммарный +% от активных аур (HASTE_SPELLS + HASTE_ALL) делит CastingTime
+        // и GCD. Применяется ПОСЛЕ талант-модов, чтобы хейст уменьшал уже отмодифицированный каст.
+        float spellHasteSum = 0f, allHasteSum = 0f;
+        foreach (var p in session.Progression.Periodics)
+        {
+            if (p.TargetGuid != 0)
+                continue;
+            spellHasteSum += p.SpellHastePct;
+            allHasteSum += p.AllHastePct;
+        }
+        var totalSpellHaste = spellHasteSum + allHasteSum;
+        if (totalSpellHaste != 0f && (info.CastMs > 0 || info.GcdMs > 0))
+        {
+            var hFactor = MathF.Max(0.1f, 1f + totalSpellHaste / 100f);
+            var newCast = info.CastMs > 0 ? (int)(info.CastMs / hFactor) : info.CastMs;
+            var newGcd = info.GcdMs > 0 ? (uint)(info.GcdMs / hFactor) : info.GcdMs;
+            if (newCast != info.CastMs || newGcd != info.GcdMs)
+                info = info with { CastMs = newCast, GcdMs = newGcd };
+        }
+
         var now = Environment.TickCount64;
         var cost = EffectivePowerCost(session, info);
 

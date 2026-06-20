@@ -280,9 +280,17 @@ internal sealed class SpellEffectsService(
         await spellTestCapture.RecordHealAsync(session, spellId, info, amount, effective, overheal, ct);
     }
 
-    /// <summary>CRIT.1: ролл спелл-крита по <see cref="Net.SessionState.SessionCastState.SpellCritChance"/> (% флэт).</summary>
+    /// <summary>CRIT.1: ролл спелл-крита — база (.setcrit / интеллект-вклад) +
+    /// SPELL.T1 аура-сумма (MOD_SPELL_CRIT_CHANCE/55 + MOD_RATING/CR_CRIT_SPELL).</summary>
     private static bool RollSpellCrit(WorldSession session)
-        => session.Cast.SpellCritChance > 0 && Random.Shared.Next(100) < session.Cast.SpellCritChance;
+    {
+        float auraBonus = 0f;
+        foreach (var p in session.Progression.Periodics)
+            if (p.TargetGuid == 0)
+                auraBonus += p.SpellCritChancePct;
+        var chance = session.Cast.SpellCritChance + auraBonus;
+        return chance > 0 && Random.Shared.NextDouble() * 100.0 < chance;
+    }
 
     /// <summary>Величина хила (M6.4): бросок MinAmount..MaxAmount + модификаторы кастера (эффект + итог, M10.6).</summary>
     private static uint ComputeHealAmount(WorldSession session, SpellCatalog.SpellInfo info)

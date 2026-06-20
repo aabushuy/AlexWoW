@@ -69,6 +69,18 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraSchoolImmunity = 39;           // иммунитет к школам (Divine Shield/Ice Block/Hand of Protection): маска школ = EffectMiscValue — IMMUNITY.1
     private const int AuraDamageImmunity = 40;           // иммунитет ко всему урону (все школы) — IMMUNITY.1
     private const int AuraModDamagePercentDone = 79;     // % наносимого урона по школе (Shadowform/Arcane Power/Avenging Wrath)
+    // SPELL.T1: combat ratings от баффов — фиксированный % из BasePoints+1.
+    private const int AuraModParryPercent = 47;          // +% к парированию (мили).
+    private const int AuraModCritPercent = 52;           // +% к мили-криту.
+    private const int AuraModHitChance = 54;             // +% к попаданию (мили).
+    private const int AuraModSpellHitChance = 55;        // +% к попаданию (заклинания).
+    private const int AuraModSpellCritChance = 57;       // +% к спелл-криту.
+    private const int AuraModMeleeHaste = 138;           // +% к скорости автоатаки мили.
+    private const int AuraModRangedHaste = 140;          // +% к скорости автоатаки дальнего боя.
+    private const int AuraMeleeHaste2 = 217;             // дубль 138 (отдельная категория стэка) — суммируем туда же.
+    private const int AuraModHasteAll = 193;             // +% ко всему (мили + дальний + спелл + GCD).
+    private const int AuraHasteSpells = 216;             // +% к скорости каста спеллов.
+    private const int AuraModRating = 189;               // комбинированный rating-аура: EffectMiscValue = битмаска CR_*, BasePoints+1 = очки рейтинга (конвертируются в % на уровне кастера).
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
     private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)
@@ -190,7 +202,15 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // 1 = AURA_STATE_DEFENSE — Revenge всех рангов; ставится игроку на 5с после dodge/parry/block.
         // 7 = WARRIOR_VICTORY_RUSH / HUNTER_PARRY (Counterattack/Victory Rush) — отдельная механика, пока не покрыта.
         // 0 — каст не зависит от AuraState. Проверяется в SpellCastService перед стартом каста.
-        uint CasterAuraState = 0);
+        uint CasterAuraState = 0,
+        // SPELL.T1: combat ratings от баффов (фиксированный % из BasePoints+1) — ауры 47/52/54/55/57/138/140/193/216/217.
+        // Применяются в RefreshMeleeAsync (crit/parry) и в свинг/каст-резолверах (haste). MOD_RATING (189)
+        // несёт битовую маску CR_* в EffectMiscValue и очки рейтинга в BasePoints+1 — конверсия в %
+        // выполняется в PeriodicsService.ApplyAuraEffectAsync (нужен уровень кастера → не делаем здесь).
+        float HitChanceFlat = 0f, float SpellHitChanceFlat = 0f,
+        float MeleeCritFlat = 0f, float SpellCritFlat = 0f, float ParryFlat = 0f,
+        float MeleeHasteFlat = 0f, float RangedHasteFlat = 0f, float SpellHasteFlat = 0f, float AllHasteFlat = 0f,
+        uint RatingMask = 0u, int RatingValue = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -604,6 +624,39 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         AddReagent(ref reagents, t.Reagent7, t.ReagentCount7);
         AddReagent(ref reagents, t.Reagent8, t.ReagentCount8);
 
+        // SPELL.T1: combat ratings от баффов. Простые %-ауры (BasePoints+1) и комбинированная MOD_RATING (189).
+        float ratingPct(int auraType)
+        {
+            for (var i = 0; i < 3; i++)
+                if (effects[i].Eff == EffectApplyAura && effects[i].Aura == auraType)
+                    return effects[i].Bp + 1;
+            return 0f;
+        }
+        var hitChanceFlat = ratingPct(AuraModHitChance);
+        var spellHitChanceFlat = ratingPct(AuraModSpellHitChance);
+        var meleeCritFlat = ratingPct(AuraModCritPercent);
+        var spellCritFlat = ratingPct(AuraModSpellCritChance);
+        var parryFlat = ratingPct(AuraModParryPercent);
+        var meleeHasteFlat = ratingPct(AuraModMeleeHaste) + ratingPct(AuraMeleeHaste2);
+        var rangedHasteFlat = ratingPct(AuraModRangedHaste);
+        var spellHasteFlat = ratingPct(AuraHasteSpells);
+        var allHasteFlat = ratingPct(AuraModHasteAll);
+        // MOD_RATING (189): EffectMiscValue = битмаска CR_*, BasePoints+1 = очки. Конверсия в % — в рантайме
+        // (нужен уровень кастера → PeriodicsService.ApplyAuraEffectAsync).
+        var ratingIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModRating);
+        uint ratingMask = 0;
+        int ratingValue = 0;
+        if (ratingIdx >= 0)
+        {
+            ratingValue = effects[ratingIdx].Bp + 1;
+            ratingMask = (uint)Math.Max(0, ratingIdx switch
+            {
+                0 => t.EffectMiscValue1,
+                1 => t.EffectMiscValue2,
+                _ => t.EffectMiscValue3,
+            });
+        }
+
         return new SpellInfo((byte)t.SchoolMask, min, max, SpellCastTimes.Get(t.CastingTimeIndex),
             t.ManaCost, cooldown, isHeal, manaPct, t.StartRecoveryTime, powerType, isWeapon, weaponPercent,
             isPeriodic, periodicHeal, tickAmount, tickInterval, periodicEnergize, periodicPower,
@@ -628,7 +681,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             speedPctBonus,
             allStats,
             isPassive,
-            t.CasterAuraState);
+            t.CasterAuraState,
+            hitChanceFlat, spellHitChanceFlat,
+            meleeCritFlat, spellCritFlat, parryFlat,
+            meleeHasteFlat, rangedHasteFlat, spellHasteFlat, allHasteFlat,
+            ratingMask, ratingValue);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

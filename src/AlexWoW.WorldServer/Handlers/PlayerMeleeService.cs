@@ -96,7 +96,15 @@ internal sealed class PlayerMeleeService(
             return;
         }
         session.Combat.MeleeNotInRangeNotified = false;
-        session.Combat.NextMeleeSwingMs = now + SwingIntervalMs;
+        // SPELL.T1: melee haste — суммарный +% от активных аур (мили-хейст + общий хейст). Свинг ускоряется
+        // пропорционально: NextSwing = now + speed / (1 + haste/100). База — MainHandSpeedMs (из оружия).
+        var meleeHasteSum = 0f;
+        var weaponSpeed = session.Combat.MainHandSpeedMs > 0 ? (long)session.Combat.MainHandSpeedMs : SwingIntervalMs;
+        foreach (var p in session.Progression.Periodics)
+            if (p.TargetGuid == 0)
+                meleeHasteSum += p.MeleeHastePct + p.AllHastePct;
+        var hasteFactor = MathF.Max(0.1f, 1f + meleeHasteSum / 100f);
+        session.Combat.NextMeleeSwingMs = now + (long)(weaponSpeed / hasteFactor);
         session.Combat.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
         var level = (byte)(session.Character?.Level ?? 1);
@@ -111,8 +119,13 @@ internal sealed class PlayerMeleeService(
             + (pendingInfo is { MaxAmount: > 0 } ? Random.Shared.Next(pendingInfo.MinAmount, pendingInfo.MaxAmount + 1) : 0);
         // Фаза 2: % наносимого урона по школе (Divine Shield −50% и т.п.) — для автоатаки/абилки.
         var damage = (uint)Math.Max(1, World.DamageDoneModifier.Apply(session, school, rawDamage));
-        // CRIT.2: мили-крит ×2 по шансу из статов (кэш RefreshMeleeAsync). Флаг крита — в пакете → клиент рисует крит.
-        var crit = Random.Shared.NextDouble() * 100.0 < session.Combat.MeleeCritPct;
+        // CRIT.2: мили-крит ×2 по шансу из статов (кэш RefreshMeleeAsync) + SPELL.T1 аура-сумма
+        // (MOD_CRIT_PERCENT + распределённый MOD_RATING/CR_CRIT_MELEE). Флаг крита — в пакете → клиент рисует крит.
+        var critAuraBonus = 0f;
+        foreach (var p in session.Progression.Periodics)
+            if (p.TargetGuid == 0)
+                critAuraBonus += p.MeleeCritChancePct;
+        var crit = Random.Shared.NextDouble() * 100.0 < (session.Combat.MeleeCritPct + critAuraBonus);
         if (crit)
             damage *= 2;
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage); // общий путь урона (M6.4)

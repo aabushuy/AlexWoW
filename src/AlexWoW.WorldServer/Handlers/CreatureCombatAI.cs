@@ -194,8 +194,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
                 + player.Session.Progression.Auras.Sum(a => a.DamageTakenPct);
             // DODGE.1: базовый dodge (статы) + бонус от аур (Evasion рога) — avoidance до митигейшна.
             var dodgePct = cs.DodgePct + periodics.Where(p => p.TargetGuid == 0).Sum(p => p.DodgeBonus);
+            // SPELL.T1: парри = база (статы) + аура-сумма (MOD_PARRY_PERCENT + MOD_RATING/CR_PARRY).
+            var parryPct = cs.ParryPct + periodics.Where(p => p.TargetGuid == 0).Sum(p => p.ParryChancePct);
             var (damage, outcome, blocked) = CombatStats.ResolveIncomingMelee(
-                raw, dodgePct, cs.ParryPct, blockPct, cs.ArmorValue, creature.Template.Level,
+                raw, dodgePct, parryPct, blockPct, cs.ArmorValue, creature.Template.Level,
                 dmgTaken, Random.Shared.NextDouble(), Random.Shared.NextDouble());
 
             // DEFENSE.1: успешный dodge/parry/block → 5-секундное окно AURA_STATE_DEFENSE на игроке.

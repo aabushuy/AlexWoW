@@ -1,3 +1,4 @@
+using AlexWoW.DataStores;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -39,6 +40,18 @@ public sealed class PeriodicEffect
     public bool IsCurse; // §3 дебафф-проклятие ЧК на цели — для правила «один кёрс на цель от кастера».
     public int CurseDamageTakenPct; // §3 Curse of the Elements: +% урона совпадающей школы, который цель получает от кастера.
     public byte CurseSchoolMask; // §3 маска школ для CurseDamageTakenPct (126 — вся магия).
+
+    // SPELL.T1: combat ratings (hit/crit/haste/parry) от баффов и MOD_RATING (189). Каждое поле — флэт-вклад
+    // в соответствующий резолвер; суммируется по всем активным аурам (TargetGuid==0). Снимаются истечением.
+    public float HitChancePct;            // MOD_HIT_CHANCE (54): +% к попаданию ближним боем.
+    public float SpellHitChancePct;       // MOD_SPELL_HIT_CHANCE (55): +% к попаданию заклинаниями.
+    public float MeleeCritChancePct;      // MOD_CRIT_PERCENT (52): +% к мили-криту (учитывается в RefreshMeleeAsync).
+    public float SpellCritChancePct;      // MOD_SPELL_CRIT_CHANCE (57): +% к спелл-криту (учитывается в RollSpellCrit).
+    public float ParryChancePct;          // MOD_PARRY_PERCENT (47): +% к парированию.
+    public float MeleeHastePct;           // MOD_MELEE_HASTE (138/217): +% к скорости автоатаки ближним боем.
+    public float RangedHastePct;          // MOD_RANGED_HASTE (140): +% к скорости автоатаки дальним боем.
+    public float SpellHastePct;           // HASTE_SPELLS (216): +% к скорости каста (CastingTime).
+    public float AllHastePct;             // HASTE_ALL (193): +% ко ВСЕМУ (мили + ranged + spell + GCD).
 }
 
 /// <summary>
@@ -247,6 +260,52 @@ internal sealed class PeriodicsService(
                     RangedAttackPowerBonus = info.RangedAttackPowerBonus,
                 });
                 await SendAttackPowerAsync(session, ct);
+            }
+            // SPELL.T1: combat ratings (hit/crit/haste/parry) — плоские % из аур 47/52/54/55/57/138/140/193/216/217
+            // + распределённые из MOD_RATING (189). Заводим один PeriodicEffect с суммой по типам; снимется
+            // по истечении. RefreshMeleeAsync пересчитает крит/парри/SwingTime от итоговой суммы.
+            var ratingPcts = info.RatingMask != 0
+                ? CombatRatingConversion.Distribute(info.RatingMask, info.RatingValue, level)
+                : default;
+            var hitPct = info.HitChanceFlat + ratingPcts.MeleeHitPct;
+            var spellHitPct = info.SpellHitChanceFlat + ratingPcts.SpellHitPct;
+            var meleeCritPct = info.MeleeCritFlat + ratingPcts.MeleeCritPct;
+            var spellCritPct = info.SpellCritFlat + ratingPcts.SpellCritPct;
+            var parryPct = info.ParryFlat + ratingPcts.ParryPct;
+            var meleeHastePct = info.MeleeHasteFlat + ratingPcts.MeleeHastePct;
+            var rangedHastePct = info.RangedHasteFlat + ratingPcts.RangedHastePct;
+            var spellHastePct = info.SpellHasteFlat + ratingPcts.SpellHastePct;
+            var allHastePct = info.AllHasteFlat;
+            if (hitPct != 0 || spellHitPct != 0 || meleeCritPct != 0 || spellCritPct != 0 || parryPct != 0
+                || meleeHastePct != 0 || rangedHastePct != 0 || spellHastePct != 0 || allHastePct != 0)
+            {
+                // Дедуп: если этот же спелл уже даёт rating-эффект — снять прежнюю запись (refresh ауры).
+                session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0
+                    && (p.HitChancePct != 0 || p.SpellHitChancePct != 0
+                        || p.MeleeCritChancePct != 0 || p.SpellCritChancePct != 0 || p.ParryChancePct != 0
+                        || p.MeleeHastePct != 0 || p.RangedHastePct != 0
+                        || p.SpellHastePct != 0 || p.AllHastePct != 0));
+                session.Progression.Periodics.Add(new PeriodicEffect
+                {
+                    SpellId = spellId,
+                    TargetGuid = 0,
+                    ExpiresAtMs = expires,
+                    DoesTick = false,
+                    HitChancePct = hitPct,
+                    SpellHitChancePct = spellHitPct,
+                    MeleeCritChancePct = meleeCritPct,
+                    SpellCritChancePct = spellCritPct,
+                    ParryChancePct = parryPct,
+                    MeleeHastePct = meleeHastePct,
+                    RangedHastePct = rangedHastePct,
+                    SpellHastePct = spellHastePct,
+                    AllHastePct = allHastePct,
+                });
+                // Серверные резолверы (PlayerMeleeService / CreatureCombatAI / SpellCastService /
+                // SpellEffectsService) читают session.Progression.Periodics на лету и складывают эти %
+                // к базовым session.Combat.* — без явного пересчёта UPDATE_OBJECT здесь. UI-сводка
+                // (PlayerCritPercentage/PlayerParryPercentage) обновится при ближайшем RefreshMeleeAsync
+                // (смена экипировки / левел-ап / повторный логин) — за фиксированные баффы это приемлемо.
             }
             if (info.StatBonus != 0)
             {
