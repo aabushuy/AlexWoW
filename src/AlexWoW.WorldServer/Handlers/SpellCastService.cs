@@ -278,6 +278,13 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         if (clearcastConsumed)
             await auras.RemoveAsync(session, 12536, ct);
 
+        // Sword and Board (50227): бафф воина-таника, делающий следующий Shield Slam бесплатным (cost-mod
+        // уже отработал через SpellModifierService). На КАСТЕ Shield Slam потребляем буф (аналог
+        // Clearcasting). Список рангов SS — общий с SwordAndBoardHandler.
+        if (Array.IndexOf(Spells.Warrior.SwordAndBoardHandler.ShieldSlamRanks, spellId) >= 0
+            && session.Progression.Auras.Any(a => a.SpellId == 50227))
+            await auras.RemoveAsync(session, 50227, ct);
+
         // SPELL.T4 Rogue Preparation (14185): мгновенно сбрасывает кулдауны Vanish/Cold Blood/Sprint/
         // Evasion (и Shadowstep с талантом — добавим в регрессии). Эталон CMaNGOS spell_warr_charge-стиль:
         // EffectScriptEffect → специальная обработка по spellId. У нас — inline-сброс CD сразу после гейта.

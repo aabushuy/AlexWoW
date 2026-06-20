@@ -34,6 +34,19 @@ internal sealed class CombatResourcesService
     /// <summary>Задержка после боя до начала распада ярости (мс) — как внебоевой реген HP.</summary>
     private const long OutOfCombatDelayMs = 5000;
 
+    /// <summary>Прямое начисление ярости (для талантов: Natural Reaction, Anger Management, Bloodrage и т.п.):
+    /// добавляет <paramref name="unitsX10"/> ярости (×10 нотация — 10 = 1 в UI) с клампом по MaxRage, шлёт
+    /// SMSG_POWER_UPDATE. Для ярость-классов и форм друида (бер); прочие — no-op.</summary>
+    internal async Task AddRageAsync(WorldSession session, uint unitsX10, CancellationToken ct)
+    {
+        if (session.Character is null || EffectivePowerType(session) != PowerRage)
+            return;
+        if (unitsX10 == 0 || session.Combat.Rage >= MaxRage)
+            return;
+        session.Combat.Rage = Math.Min(MaxRage, session.Combat.Rage + unitsX10);
+        await SendPowerAsync(session, PowerRage, session.Combat.Rage, ct);
+    }
+
     /// <summary>
     /// Начисляет ярость от мили-урона (формула CMaNGOS <c>Player::RewardRage</c>): атакующему — больше
     /// (+ фактор скорости оружия), получившему урон — меньше. Только для ярость-классов. M6.12.

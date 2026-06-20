@@ -53,10 +53,18 @@ internal sealed class SpellEffectsService(
 
         // PROC.1/PROC.2/T5: прок на вредный спелл — здесь известны крит, школа, и source spellId
         // (для family-фильтра, напр. Sword and Board → только Devastate/Revenge SPELLFAMILY_WARRIOR).
-        await procs.TryProcAsync(session, ProcFlag.DealHarmfulSpell, ct,
+        // ВАЖНО: weapon-based абилки (Devastate/Mortal Strike/Slam/Heroic Strike) — это DealMeleeAbility
+        // (бит 4), не DealHarmfulSpell (бит 16). CMaNGOS Unit::ProcDamageAndSpell разделяет: мили-абилки
+        // используют оружие, обычные спеллы — нет. Без разделения таланты с ProcFlags=16 (S&B, Improved
+        // Devastate, Imp. Sunder Armor) не проксят.
+        var dealFlag = (info.WeaponDamage || info.WeaponPercent > 0)
+            ? ProcFlag.DealMeleeAbility
+            : ProcFlag.DealHarmfulSpell;
+        await procs.TryProcAsync(session, dealFlag, ct,
             procEx: crit ? ProcFlagEx.CriticalHit : ProcFlagEx.NormalHit,
             spellSchoolMask: info.School,
-            sourceSpellId: spellId);
+            sourceSpellId: spellId,
+            weaponAttackSpeedMs: dealFlag == ProcFlag.DealMeleeAbility ? session.Combat.MainHandSpeedMs : 0u);
 
         if (died)
         {
