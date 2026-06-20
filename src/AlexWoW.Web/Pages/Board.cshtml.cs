@@ -1,3 +1,4 @@
+using AlexWoW.Database.Abstractions;
 using AlexWoW.Web.Services.Kanban;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -8,7 +9,7 @@ namespace AlexWoW.Web.Pages;
 /// Канбан-доска QA (KB3): 5 колонок статусов, карточки тикетов, фильтр по проекту/эпику, перемещение
 /// между колонками. Только админам (политика "Admin", см. Program.cs). Данные — <see cref="KanbanService"/>.
 /// </summary>
-public sealed class BoardModel(KanbanService kanban) : PageModel
+public sealed class BoardModel(KanbanService kanban, ICharacterRepository characters) : PageModel
 {
     public bool Configured => kanban.Configured;
 
@@ -28,6 +29,9 @@ public sealed class BoardModel(KanbanService kanban) : PageModel
     public IReadOnlyList<string> AllLabels { get; private set; } = [];
     public IReadOnlyList<string> Columns => KanbanVocab.Statuses;
     public Dictionary<string, List<KanbanTicket>> ByStatus { get; } = [];
+
+    /// <summary>Имена тестировщиков по guid (для подписи на карточке рядом с исполнителем).</summary>
+    public IReadOnlyDictionary<uint, string> TesterNames { get; private set; } = new Dictionary<uint, string>();
 
     public async Task OnGetAsync(CancellationToken ct)
     {
@@ -58,6 +62,10 @@ public sealed class BoardModel(KanbanService kanban) : PageModel
         foreach (var t in tickets)
             if (ByStatus.TryGetValue(t.Status, out var col))
                 col.Add(t);
+
+        // Имена тестировщиков (guid → имя) для подписи на карточках. Падение БД персонажей не должно ронять доску.
+        try { TesterNames = (await characters.GetTestersAsync(ct)).ToDictionary(c => c.Guid, c => c.Name); }
+        catch { /* БД персонажей недоступна — карточки просто без имени тестировщика */ }
     }
 
     public async Task<IActionResult> OnPostMoveAsync(int id, string status, int? project, int? epic,

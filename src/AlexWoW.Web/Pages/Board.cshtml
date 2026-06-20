@@ -39,6 +39,7 @@
     .kb-move { display: inline; }
     .kb-move button { background: none; border: 1px solid rgba(255,255,255,.2); color: #ddd; border-radius: 5px; cursor: pointer; padding: 0 6px; }
     .kb-cc { color: #ffd54f; }
+    .kb-tester { color: #6fcf97; margin-left: 6px; }
     /* Архив: приглушённая карточка + бейдж */
     .kb-card.kb-arch { opacity: .55; }
     .kb-arch-badge { font-size: .68rem; padding: 1px 6px; border-radius: 9px; background: #455; color: #fff; }
@@ -141,7 +142,13 @@ else
                                 }
                             </div>
                             <div class="kb-foot">
-                                <span>@(string.IsNullOrEmpty(t.Assignee) ? "—" : t.Assignee)</span>
+                                <span>
+                                    @(string.IsNullOrEmpty(t.Assignee) ? "—" : t.Assignee)
+                                    @if (t.TesterGuid is { } tg && Model.TesterNames.TryGetValue(tg, out var tn))
+                                    {
+                                        <span class="kb-tester" title="Тестировщик">🧪 @tn</span>
+                                    }
+                                </span>
                                 <span>
                                     @if (prev != null)
                                     {
