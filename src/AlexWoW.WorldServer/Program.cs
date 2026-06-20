@@ -111,6 +111,9 @@ builder.Services.AddWorldOpcodeHandlers();
 // SPELL.T2: реестр DUMMY/OVERRIDE_CLASS_SCRIPTS-обработчиков (per-spellId скрипты талантов/абилок) —
 // сканом сборки на [DummyAuraHandler(spellId)]. Hook'и из PeriodicsService (apply/remove) и ProcService (proc).
 builder.Services.AddDummyAuraHandlers();
+// EffectDummyRegistry: per-spellId обработчики SPELL_EFFECT_DUMMY (Effect=3) — Slam/Execute/Mortal Strike/…
+// сканом сборки на [EffectDummyHandler(spellId)]. Hook из SpellCastCompletion.
+builder.Services.AddEffectDummyHandlers();
 builder.Services.AddSingleton<AddonProtocol>(); // не модуль (своих опкодов нет) — сервис для ChatHandlers (M7 #36)
 // M7 S3: спелл-кластер — статики сконвертированы в stateless DI-синглтоны (данные спеллов, оркестрация
 // каста и его завершение, ауры/периодика и их персист, реген ресурсов, переключатели, эффекты, крафт).

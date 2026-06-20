@@ -235,7 +235,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         uint RatingMask = 0u, int RatingValue = 0,
         // SPELL.T2: спелл несёт DUMMY (4) или OVERRIDE_CLASS_SCRIPTS (112) аура-эффект → DummyAuraRegistry
         // получает hook на apply/remove/proc. Сам обработчик резолвится по spellId.
-        bool HasDummyAura = false, bool HasOverrideClassScripts = false);
+        bool HasDummyAura = false, bool HasOverrideClassScripts = false,
+        // EffectDummyRegistry hook: спелл несёт SPELL_EFFECT_DUMMY (Effect=3) — «голый» dummy-эффект,
+        // CMaNGOS обрабатывает в Spell::EffectDummy switch (Slam/Execute/Mortal Strike/Bloodthirst и т.п.).
+        // DummyBasePoints — BasePoints+1 первого DUMMY-эффекта (бонус-урон у Slam, флэт-урон у Execute).
+        bool HasDummyEffect = false, int DummyBasePoints = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -670,6 +674,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // DummyAuraRegistry по spellId; на парсинге достаточно знать, что hook надо дёрнуть.
         var hasDummy = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraDummy);
         var hasOverrideClassScripts = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraOverrideClassScripts);
+        // EffectDummyRegistry hook: Effect=3 (SPELL_EFFECT_DUMMY) — Slam/Execute/Mortal Strike/Bloodthirst
+        // и прочие «голые» dummy-эффекты, требующие per-spellId обработчика.
+        var dummyEffectIdx = Array.FindIndex(effects, e => e.Eff == EffectDummy);
+        var hasDummyEffect = dummyEffectIdx >= 0;
+        var dummyBasePoints = hasDummyEffect ? effects[dummyEffectIdx].Bp + 1 : 0;
         // SPELL.T5 (стаб): area-auras (тотемы шамана / ауры паладина / аспекты охотника). Парсинг и
         // настоящая реализация — в отдельных регрессионных тикетах (нужен World/Totem.cs spawn-объект,
         // tick-loop, broadcast-аур ближним пати).
@@ -719,7 +728,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             meleeCritFlat, spellCritFlat, parryFlat,
             meleeHasteFlat, rangedHasteFlat, spellHasteFlat, allHasteFlat,
             ratingMask, ratingValue,
-            hasDummy, hasOverrideClassScripts);
+            hasDummy, hasOverrideClassScripts, hasDummyEffect, dummyBasePoints);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

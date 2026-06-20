@@ -1,3 +1,4 @@
+using AlexWoW.WorldServer.Handlers.Spells;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -15,7 +16,7 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
     ManaRegenService manaRegen, CombatResourcesService combatResources,
     SpellEffectsService spellEffects, PeriodicsService periodics, CraftingService crafting,
     CrowdControlService crowdControl, ComboPointService comboPoints, DispelService dispel, ProcService procs,
-    RuneService runes, AuraService auras, CreatureCombatAI creatureAi)
+    RuneService runes, AuraService auras, CreatureCombatAI creatureAi, EffectDummyRegistry effectDummies)
 {
     /// <summary>
     /// Откладывает завершение каста ТОЧНО на время каста (Task.Delay, не грубый 250-мс тик): завершаем,
@@ -132,14 +133,20 @@ internal sealed class SpellCastCompletion(SpellCatalog spellCatalog, SpellGoSend
         // Прямой эффект: хил, либо урон (если есть прямой урон — чистый DoT без прямого числа не шлём).
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — НЕ бьём сейчас, ставим в
         // очередь; следующая автоатака заместится этой абилкой (PlayerMeleeService). Ярость уже списана на касте.
+        // EffectDummyRegistry: если спелл — «голый» dummy-эффект с зарегистрированным обработчиком
+        // (Slam/Execute/Mortal Strike/…) — отдать ему приоритет; обработчик сам решит, что делать с уроном.
+        bool dummyHandled = false;
+        if (info.HasDummyEffect && effectDummies.Has(spellId))
+            dummyHandled = await effectDummies.ApplyAsync(session, spellId, info, targetGuid, now, ct);
+
         if (info.OnNextSwing)
         {
             session.Combat.PendingNextSwingSpellId = spellId;
             session.Combat.PendingNextSwingCastCount = castCount; // для SPELL_GO на замахе (снятие подсветки кнопки)
         }
-        else if (info.IsHeal)
+        else if (!dummyHandled && info.IsHeal)
             await spellEffects.ApplyHealAsync(session, spellId, info, targetGuid, ct);
-        else if (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0)
+        else if (!dummyHandled && (info.MaxAmount > 0 || info.WeaponDamage || info.WeaponPercent > 0))
             await spellEffects.ApplyDamageAsync(session, spellId, info, targetGuid, now, ct, combo);
 
         // M10.4b: периодическая аура (DoT/HoT) — поверх прямого эффекта (напр. Immolate: удар + DoT).
