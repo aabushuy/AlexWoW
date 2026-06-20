@@ -165,7 +165,7 @@ local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_ENTERING_WORLD")
 loader:RegisterEvent("CHAT_MSG_ADDON")
-loader:SetScript("OnEvent", function(self, event, ...)
+loader:SetScript("OnEvent", function(_, event, ...)
   if event == "ADDON_LOADED" then
     if ... ~= "AlexQATester" then return end
     AlexQATesterDB = AlexQATesterDB or {}

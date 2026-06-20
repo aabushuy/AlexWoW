@@ -651,7 +651,7 @@ local function BuildItemsUI()
     itemsFilter.quality = self.value
     UIDropDownMenu_SetSelectedValue(itemsQualityDD, self.value)
   end
-  UIDropDownMenu_Initialize(itemsQualityDD, function(self, level)
+  UIDropDownMenu_Initialize(itemsQualityDD, function(_, level)
     for _, o in ipairs(QUALITY_OPTS) do
       local info = UIDropDownMenu_CreateInfo()
       info.text = o.t; info.value = o.q; info.func = qualSet; info.checked = (itemsFilter.quality == o.q)
@@ -799,8 +799,6 @@ local function Toggle()
 end
 
 -- ---- Кнопка у миникарты ----
-local minimapButton
-
 local function MinimapUpdatePosition(self)
   local angle = math.rad(AlexDevCmdDB.minimapAngle or 200)
   self:SetPoint("CENTER", Minimap, "CENTER", 80 * math.cos(angle), 80 * math.sin(angle))
@@ -846,7 +844,6 @@ local function BuildMinimapButton()
   end)
   btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-  minimapButton = btn
   MinimapUpdatePosition(btn)
 end
 
@@ -855,7 +852,7 @@ local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_ENTERING_WORLD")
 loader:RegisterEvent("CHAT_MSG_ADDON")
-loader:SetScript("OnEvent", function(self, event, ...)
+loader:SetScript("OnEvent", function(_, event, ...)
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= ADDON then return end
