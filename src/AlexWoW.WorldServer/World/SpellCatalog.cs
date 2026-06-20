@@ -89,6 +89,20 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     // SPELL.T2: per-spellId скриптовые ауры (DummyAuraRegistry). Парсим как флаг — обработчик сам читает контекст.
     private const int AuraDummy = 4;                     // SPELL_AURA_DUMMY — кастомная логика per-spellId (Ignite/Clearcasting/Vigilance/Earth Shield/…).
     private const int AuraOverrideClassScripts = 112;    // SPELL_AURA_OVERRIDE_CLASS_SCRIPTS — то же, через scriptId (EffectMiscValue).
+    // SPELL.T6 (стаб): periodic-trigger family — каждый interval кастует EffectTriggerSpell.
+    // Полная реализация (channel-каст Blizzard/Hurricane/Tranquility, Prayer of Mending raid-proc) —
+    // отдельные регрессионные тикеты под эпиком (нужен PeriodicEffect.TriggerSpellId + tick → cast).
+    private const int AuraPeriodicTriggerSpell = 23;            // channel-каст: Blizzard/Hurricane/Tranquility.
+    private const int AuraPeriodicDummy = 226;                  // periodic dummy script (per-spell tick logic).
+    private const int AuraPeriodicTriggerSpellWithValue = 227;  // то же + value.
+    private const int AuraRaidProcFromCharge = 223;             // raid-proc по charge (Prayer of Mending).
+    private const int AuraRaidProcFromChargeWithValue = 225;    // то же + value (Beacon-like).
+    // SPELL.T6 (стаб): глифы (Effect 147) и dual spec (156/157). Полная реализация — отдельный
+    // мульти-тикетный эпик: character_glyphs/spec колонки EF Core, GlyphProperties.dbc парсинг,
+    // UI расширения CMSG_LEARN_TALENT для glyph-слотов, сценарий переключения активного spec.
+    private const int EffectApplyGlyph = 147;
+    private const int EffectActivateSpec = 156;
+    private const int EffectTalentSpecsCount = 157;
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
     private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)

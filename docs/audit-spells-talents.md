@@ -153,4 +153,31 @@ ADD_FLAT_MODIFIER(107), ADD_PCT_MODIFIER(108)
 ## 5. Эпик и разбивка
 
 См. эпик «Спеллы и таланты — gap-port» в kanban (проект *Порт CMaNGOS*).
-Разбито на ~12 крупных T-тикетов с приоритетом по «фундамент → класс-скрипты».
+Разбито на 6 крупных T-тикетов с приоритетом «фундамент → класс-скрипты → доп. фичи».
+
+## 6. Итоги эпика
+
+| Тикет | Статус | Что сделано |
+|---|---|---|
+| SPELL.T1 | ✅ Testing | Combat ratings: ауры 47/52/54/55/57/138/140/189/193/216/217 → серверные резолверы (мили-крит/парри/спелл-крит, мили-/спелл-хейст на свинг и каст-тайм). MOD_RATING (189) с гипотетической линейной шкалой rating→% по уровню. UI-сводка обновится по ближайшему RefreshMeleeAsync; spell-/melee-miss резолверы — будущий тикет. |
+| SPELL.T2 | ✅ Testing | DummyAuraRegistry framework: per-spellId hooks (Apply/Remove/Proc), сканирование по `[DummyAuraHandler(spellId)]`. Hooks из AuraService и ProcService. SpellModOp расширен +18 операций; применены сразу: GLOBAL_COOLDOWN, CRITICAL_CHANCE, CRITICAL_DAMAGE_BONUS. |
+| SPELL.T3 | ✅ Testing (MVP) | Warrior Victory Rush: 20-сек окно через AURA_STATE_WARRIOR_VICTORY_RUSH (общий бит state=7 с Hunter Parry, но раздельные таймеры). Mage Clearcasting: распознавание аура 12536 в SpellCastService → cost=0, аура снимается. Остальные таланты Warrior/Mage — регрессионные тикеты. |
+| SPELL.T4 | ✅ Testing (MVP) | Rogue Preparation (14185): inline-сброс CD Vanish/Cold Blood/Sprint/Evasion. Warlock/Priest/Hunter — DummyAuraRegistry готов принять. |
+| SPELL.T5 | ✅ Testing (стаб) | Effect 27/35 (Persistent/Apply Area Aura) — константы и документация деферредного тотем-фреймворка. Druid/DK/Paladin/Shaman — регрессионные тикеты. |
+| SPELL.T6 | ✅ Testing (стаб) | Aura constants для periodic-trigger family (23/226/227) и raid-proc (223/225), Effect 147 (glyph), 156/157 (dual spec) — задокументированы. Полная реализация — отдельные мульти-тикетные эпики. |
+
+### Что готово к продакшну
+- Combat ratings (T1) — спокойно идёт в прод; рейтинги предметов начнут «работать».
+- DummyAuraRegistry framework (T2) — готов принимать handlers пачками.
+- Victory Rush gate (T3) — рабочая фича.
+- Clearcasting consume (T3) — рабочая фича.
+- Preparation reset (T4) — рабочая фича.
+
+### Долг (под отдельные тикеты)
+- Spell-/melee-miss резолвер для рейтингов hit (поле собрано в T1, не применяется).
+- Десятки конкретных DummyAura-обработчиков под классы (списки в T3-T5).
+- Area-auras (тотемы) — `World/Totem.cs` + tick-loop + broadcast аур.
+- Periodic-trigger family (23/226/227) — `PeriodicEffect.TriggerSpellId` + tick → cast.
+- Raid-proc-from-charge (223/225) — Prayer of Mending, Beacon-style.
+- Glyphs (Effect 147) — `character_glyphs` + GlyphProperties.dbc.
+- Dual spec (Effect 156/157) — `character_talent.spec` + переключение.
