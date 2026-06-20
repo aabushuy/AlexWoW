@@ -17,11 +17,13 @@ public static class OutgoingMeleeResolver
     /// <param name="targetLevel">Уровень цели-существа.</param>
     /// <param name="hitBonusPct">Сумма +% к hit от аур (MOD_HIT_CHANCE + MOD_RATING/CR_HIT_MELEE).</param>
     /// <param name="critPct">Шанс крита (статы + аура-бонусы MOD_CRIT_PERCENT + MOD_RATING/CR_CRIT_MELEE).</param>
+    /// <param name="expertiseReductionPct">Снижение dodge и parry противника от expertise
+    /// (MOD_EXPERTISE + CR_EXPERTISE из MOD_RATING). 1 expertise unit = 0.25%.</param>
     /// <param name="isAutoAttack">true — белая автоатака (применим glance); false — мили-абилка.</param>
     /// <param name="roll01">Случайное число [0;1) — для тестируемости передаём извне.</param>
     public static (Outcome Outcome, float Multiplier) Resolve(
         byte attackerLevel, byte targetLevel,
-        float hitBonusPct, float critPct, bool isAutoAttack, double roll01)
+        float hitBonusPct, float critPct, float expertiseReductionPct, bool isAutoAttack, double roll01)
     {
         var levelDiff = Math.Max(0, targetLevel - attackerLevel);
         // Шанс miss: 5% база + штраф за уровень (≤2 — 0.5% за уровень, >2 — 2% за уровень).
@@ -30,13 +32,14 @@ public static class OutgoingMeleeResolver
         missPct = Math.Max(0f, missPct - hitBonusPct); // hit-рейтинг снижает miss
         missPct = Math.Clamp(missPct, 0f, 60f);
 
-        // Dodge цели: та же шкала уровня. Expertise не моделируется — игнорируем.
+        // Dodge цели: та же шкала уровня, снижается expertise (минимум 0%).
         var dodgePct = 5f + (levelDiff <= 2 ? levelDiff * 0.5f : 2f * 0.5f + (levelDiff - 2) * 2f);
-        dodgePct = Math.Clamp(dodgePct, 0f, 30f);
+        dodgePct = Math.Clamp(dodgePct - expertiseReductionPct, 0f, 30f);
 
         // Parry: гуманоиды парируют (5% база) — мы не различаем тип моба, предполагаем 5% если уровень >= 10.
-        // У реальных не-гуманоидов (звери) парирования нет; пока упрощение. Атака сзади — не моделируем.
-        var parryPct = targetLevel >= 10 ? 5f : 0f;
+        // Expertise одинаково снижает parry. У реальных не-гуманоидов (звери) парирования нет; пока
+        // упрощение. Атака сзади — не моделируем.
+        var parryPct = targetLevel >= 10 ? Math.Max(0f, 5f - expertiseReductionPct) : 0f;
 
         // Glancing blow: только автоатака против цели НА УРОВНЕ ИЛИ ВЫШЕ (CMaNGOS: только если targetLevel > attackerLevel).
         // Шанс: 10% × max(0, level diff), кэп 40%. Множитель урона: 0.7 (упрощение CMaNGOS skill-based).

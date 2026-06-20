@@ -52,6 +52,7 @@ public sealed class PeriodicEffect
     public float RangedHastePct;          // MOD_RANGED_HASTE (140): +% к скорости автоатаки дальним боем.
     public float SpellHastePct;           // HASTE_SPELLS (216): +% к скорости каста (CastingTime).
     public float AllHastePct;             // HASTE_ALL (193): +% ко ВСЕМУ (мили + ranged + spell + GCD).
+    public float ExpertiseReductionPct;   // MOD_EXPERTISE (210) + CR_EXPERTISE из MOD_RATING — снижение dodge/parry противника, %.
 }
 
 /// <summary>
@@ -276,15 +277,19 @@ internal sealed class PeriodicsService(
             var rangedHastePct = info.RangedHasteFlat + ratingPcts.RangedHastePct;
             var spellHastePct = info.SpellHasteFlat + ratingPcts.SpellHastePct;
             var allHastePct = info.AllHasteFlat;
+            // Expertise: флэт-units (аура 210) × 0.25% + распределённый из MOD_RATING (CR_EXPERTISE).
+            var expertisePct = info.ExpertiseFlat * 0.25f + ratingPcts.ExpertiseReductionPct;
             if (hitPct != 0 || spellHitPct != 0 || meleeCritPct != 0 || spellCritPct != 0 || parryPct != 0
-                || meleeHastePct != 0 || rangedHastePct != 0 || spellHastePct != 0 || allHastePct != 0)
+                || meleeHastePct != 0 || rangedHastePct != 0 || spellHastePct != 0 || allHastePct != 0
+                || expertisePct != 0)
             {
                 // Дедуп: если этот же спелл уже даёт rating-эффект — снять прежнюю запись (refresh ауры).
                 session.Progression.Periodics.RemoveAll(p => p.SpellId == spellId && p.TargetGuid == 0
                     && (p.HitChancePct != 0 || p.SpellHitChancePct != 0
                         || p.MeleeCritChancePct != 0 || p.SpellCritChancePct != 0 || p.ParryChancePct != 0
                         || p.MeleeHastePct != 0 || p.RangedHastePct != 0
-                        || p.SpellHastePct != 0 || p.AllHastePct != 0));
+                        || p.SpellHastePct != 0 || p.AllHastePct != 0
+                        || p.ExpertiseReductionPct != 0));
                 session.Progression.Periodics.Add(new PeriodicEffect
                 {
                     SpellId = spellId,
@@ -300,6 +305,7 @@ internal sealed class PeriodicsService(
                     RangedHastePct = rangedHastePct,
                     SpellHastePct = spellHastePct,
                     AllHastePct = allHastePct,
+                    ExpertiseReductionPct = expertisePct,
                 });
                 // Серверные резолверы (PlayerMeleeService / CreatureCombatAI / SpellCastService /
                 // SpellEffectsService) читают session.Progression.Periodics на лету и складывают эти %

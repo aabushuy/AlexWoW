@@ -117,6 +117,9 @@ public static class CombatRatingConversion
         public float MeleeHastePct;
         public float RangedHastePct;
         public float SpellHastePct;
+        /// <summary>Снижение dodge/parry противника от expertise (CR_EXPERTISE из MOD_RATING).
+        /// Уже в процентах — каждое expertise unit = 0.25%; rating→unit конверсия учтена.</summary>
+        public float ExpertiseReductionPct;
     }
 
     /// <summary>Раскладывает MOD_RATING (битмаска <paramref name="ratingMask"/>, очки <paramref name="rating"/>,
@@ -143,7 +146,12 @@ public static class CombatRatingConversion
                 case CombatRating.HasteMelee: r.MeleeHastePct += pct; break;
                 case CombatRating.HasteRanged: r.RangedHastePct += pct; break;
                 case CombatRating.HasteSpell: r.SpellHastePct += pct; break;
-                // taken/expertise/weapon skill пока игнорируем — отдельная задача T1+
+                case CombatRating.Expertise:
+                    // CR_EXPERTISE: pct здесь — «expertise units» (RatingPerPctAt80[23] = 32.79 = очков
+                    // рейтинга на 1 unit). 1 unit = 0.25% снижение dodge и parry противника.
+                    r.ExpertiseReductionPct += pct * 0.25f;
+                    break;
+                // taken/weapon skill пока игнорируем — отдельная задача
             }
         }
         return r;

@@ -124,15 +124,17 @@ internal sealed class PlayerMeleeService(
         // Использует hit-/crit-рейтинги из T1 и уровневую разницу. Чистая формула — в OutgoingMeleeResolver.
         var attackerGuid = (ulong)session.InWorldGuid;
         var targetLevel = creature.Template.Level;
-        float hitAuraBonus = 0f, critAuraBonus = 0f;
+        float hitAuraBonus = 0f, critAuraBonus = 0f, expertiseBonus = 0f;
         foreach (var p in session.Progression.Periodics)
         {
             if (p.TargetGuid != 0) continue;
             hitAuraBonus += p.HitChancePct;
             critAuraBonus += p.MeleeCritChancePct;
+            expertiseBonus += p.ExpertiseReductionPct;
         }
         var resolved = OutgoingMeleeResolver.Resolve(level, targetLevel,
-            hitAuraBonus, session.Combat.MeleeCritPct + critAuraBonus, isAutoAttack, Random.Shared.NextDouble());
+            hitAuraBonus, session.Combat.MeleeCritPct + critAuraBonus, expertiseBonus,
+            isAutoAttack, Random.Shared.NextDouble());
 
         // Промах/уклон/парирование: лог исхода + ответный агро + (на dodge у воина) окно Overpower.
         if (resolved.Multiplier == 0f)
