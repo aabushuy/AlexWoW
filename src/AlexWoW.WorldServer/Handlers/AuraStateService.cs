@@ -24,6 +24,9 @@ internal sealed class AuraStateService
     /// <summary>Длительность окна Revenge / Counterattack: 5 секунд (эталон CMaNGOS).</summary>
     internal const long DefenseStateDurationMs = 5000;
 
+    /// <summary>SPELL.T3: длительность окна Victory Rush после kill (20 секунд, эталон CMaNGOS).</summary>
+    internal const long VictoryRushStateDurationMs = 20000;
+
     private const uint MaskDefense = 1u << 0;  // state=1
     private const uint MaskHunterParry = 1u << 6;  // state=7
 
@@ -65,21 +68,43 @@ internal sealed class AuraStateService
         return SendIfChangedAsync(session, oldMask, now, ct);
     }
 
-    /// <summary>Снимает state после успешного каста спелла с указанным CasterAuraState (state «потрачен»).</summary>
+    /// <summary>SPELL.T3: ставит WARRIOR_VICTORY_RUSH (state=7) на 20с — вызывается KillRewardService
+    /// для класса воина (1) после kill. Тот же бит UNIT_FIELD_AURASTATE, что и HUNTER_PARRY, но отдельный
+    /// таймер: класс-специфичные триггеры не должны путаться при клиринге.</summary>
+    internal Task SetVictoryRushAsync(WorldSession session, long now, CancellationToken ct)
+    {
+        var oldMask = BuildMask(session, now);
+        session.Combat.VictoryRushStateExpiresMs = now + VictoryRushStateDurationMs;
+        return SendIfChangedAsync(session, oldMask, now, ct);
+    }
+
+    /// <summary>Снимает VICTORY_RUSH (после каста Victory Rush или по таймеру).</summary>
+    internal Task ClearVictoryRushAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.Combat.VictoryRushStateExpiresMs == 0) return Task.CompletedTask;
+        var now = Environment.TickCount64;
+        var oldMask = BuildMask(session, now);
+        session.Combat.VictoryRushStateExpiresMs = 0;
+        return SendIfChangedAsync(session, oldMask, now, ct);
+    }
+
+    /// <summary>Снимает state после успешного каста спелла с указанным CasterAuraState (state «потрачен»).
+    /// Для state=7 — класс-специфичная очистка: воину снимаем Victory Rush, охотнику — Hunter Parry.</summary>
     internal Task ClearAfterCastAsync(WorldSession session, uint state, CancellationToken ct) => state switch
     {
         1 => ClearDefenseAsync(session, ct),
-        7 => ClearHunterParryAsync(session, ct),
+        7 => session.Character?.Class == 1 ? ClearVictoryRushAsync(session, ct) : ClearHunterParryAsync(session, ct),
         _ => Task.CompletedTask,
     };
 
     /// <summary>Проверка «есть ли state для каста спелла с CasterAuraState=<paramref name="needed"/>».
-    /// state=0 — нет требования (всегда true). Прочие states — false (не покрыты).</summary>
+    /// state=0 — нет требования (всегда true). Для state=7 — любая из двух классовых веток (warrior=Victory Rush,
+    /// hunter=Hunter Parry; делят бит, но не таймер). Прочие states — false (не покрыты).</summary>
     internal static bool HasState(WorldSession session, uint needed, long now) => needed switch
     {
         0 => true,
         1 => session.Combat.DefenseStateExpiresMs > now,
-        7 => session.Combat.HunterParryStateExpiresMs > now,
+        7 => session.Combat.HunterParryStateExpiresMs > now || session.Combat.VictoryRushStateExpiresMs > now,
         _ => false, // TODO: CONFLAGRATE(10), SWIFTMEND(11), ENRAGE(13), BLEEDING(14)...
     };
 
@@ -88,7 +113,8 @@ internal sealed class AuraStateService
     {
         uint m = 0;
         if (session.Combat.DefenseStateExpiresMs > now) m |= MaskDefense;
-        if (session.Combat.HunterParryStateExpiresMs > now) m |= MaskHunterParry;
+        if (session.Combat.HunterParryStateExpiresMs > now || session.Combat.VictoryRushStateExpiresMs > now)
+            m |= MaskHunterParry;
         return m;
     }
 

@@ -83,6 +83,16 @@ internal sealed class SessionCombatState
     /// <summary>Sacred Shield (53601): время, когда прок поглощения снова доступен (ICD 6 с). ABS.3.</summary>
     internal long SacredShieldNextProcMs { get; set; }
 
+    /// <summary>SPELL.T3 Warrior Victory Rush (34428): время последнего убийства существа игроком (мс,
+    /// <see cref="System.Environment.TickCount64"/>). Окно Victory Rush — 20с (CMaNGOS), вне окна каст отказан.
+    /// Ставится KillRewardService.OnCreatureKilledAsync; 0 — ещё никого не убивали.</summary>
+    internal long LastKillMs { get; set; }
+
+    /// <summary>SPELL.T3 Warrior Victory Rush: момент истечения AURA_STATE_WARRIOR_VICTORY_RUSH (бит 6 в
+    /// UNIT_FIELD_AURASTATE, значение state=7 — общий с HUNTER_PARRY, но триггер у воина другой: после kill).
+    /// Ставится KillRewardService для класса воина на 20с. 0 — state не активен.</summary>
+    internal long VictoryRushStateExpiresMs { get; set; }
+
     /// <summary>DEFENSE.1: момент истечения AURA_STATE_DEFENSE (мс). Ставится на 5с при успешном
     /// dodge/parry/block игрока (CreatureCombatAI ApplyResolveOutcome). Гейт каста Revenge:
     /// SpellCastService отказывает, если spell.CasterAuraState=1 и now &gt;= DefenseStateExpiresMs.

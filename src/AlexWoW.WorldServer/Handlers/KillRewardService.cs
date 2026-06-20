@@ -19,6 +19,7 @@ internal sealed class KillRewardService(
     InventoryGrantService inventoryGrant,
     ProcService procs,
     GroupRegistry groupRegistry,
+    AuraStateService auraState,
     IWorldRepository worldDb)
 {
     /// <summary>UNIT_DYNFLAG_LOOTABLE — труп подсвечивается и кликается для обыска.</summary>
@@ -44,6 +45,14 @@ internal sealed class KillRewardService(
     /// </summary>
     internal async Task OnCreatureKilledAsync(WorldSession session, WorldCreature creature, CancellationToken ct)
     {
+        // SPELL.T3 Warrior Victory Rush: окно 20с после убийства — взводим тайм-штамп и AURA_STATE (бит 6 в
+        // UNIT_FIELD_AURASTATE) только для класса воина. Клиент подсветит кнопку Victory Rush; cast-резолвер
+        // проверит окно через AuraStateService.HasState(state=7).
+        var now = Environment.TickCount64;
+        session.Combat.LastKillMs = now;
+        if (session.Character?.Class == 1)
+            await auraState.SetVictoryRushAsync(session, now, ct);
+
         // CP.2: очки серии теряются со смертью комбо-цели (no-op, если копились на другой/уже расходованы).
         await comboPoints.ClearForTargetAsync(session, creature.Guid, ct);
 

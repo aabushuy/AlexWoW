@@ -14,7 +14,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender spellGo,
     SpellCastCompletion completion, SpellTogglesService spellToggles, CraftingService crafting,
-    InventoryGrantService inventoryGrant, AuraStateService auraState)
+    InventoryGrantService inventoryGrant, AuraStateService auraState, AuraService auras)
 {
     // --- SpellCastResult (3.3.5a, сверено с CMaNGOS SpellDefines.h) ---
     private const byte CastResultNotReady = 0x43;        // 67  — спелл на кулдауне/GCD
@@ -144,6 +144,18 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         var now = Environment.TickCount64;
         var cost = EffectivePowerCost(session, info);
 
+        // SPELL.T3 Mage Clearcasting (12536): следующий спелл, использующий ману, бесплатен.
+        // Аура накладывается generic-проком от талантов Arcane Concentration (11213/11225/11226/11227/11228).
+        // Срабатывает только на mana-спеллах с положительной стоимостью; маркер потрачен → снимаем ауру.
+        const uint ClearcastingAuraId = 12536;
+        var clearcastConsumed = false;
+        if (info.PowerType == PowerMana && cost > 0
+            && session.Progression.Auras.Any(a => a.SpellId == ClearcastingAuraId))
+        {
+            cost = 0;
+            clearcastConsumed = true;
+        }
+
         // Кулдаун: спелл ещё не готов → отказ (клиент снимет предсказанный каст, покажет ошибку).
         if (session.Cast.SpellCooldowns.TryGetValue(spellId, out var readyAt) && now < readyAt)
         {
@@ -211,6 +223,10 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // Запускаем GCD от этого каста (для последующих).
         if (info.GcdMs > 0)
             session.Cast.GcdEndMs = now + info.GcdMs;
+
+        // SPELL.T3 Mage Clearcasting: гейт прошли, аура «потрачена» — снимаем.
+        if (clearcastConsumed)
+            await auras.RemoveAsync(session, 12536, ct);
 
         // DEFENSE.1/.2: каст состоялся (гейт пройден) — потратили окно state'а. Revenge/Counterattack
         // мгновенные (CastMs=0), поэтому очищаем сразу здесь, до CompleteCast. ClearAfterCastAsync —
