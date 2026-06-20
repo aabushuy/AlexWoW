@@ -28,6 +28,11 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     /// <summary>Толеранс GCD-гейта (мс): не режем каст у границы GCD из-за скью клиент/сервер. M10.3.</summary>
     private const long GcdToleranceMs = 250;
 
+    /// <summary>SPELL.T4 Rogue Preparation (14185): список абилок, чьи кулдауны мгновенно сбрасываются.
+    /// Эталон CMaNGOS: Vanish (1856), Cold Blood (14177), Sprint (2983), Evasion (5277). Glyph of
+    /// Preparation добавляет ещё Kick/Blade Flurry/Dismantle — выйдет отдельным регрессионным тикетом.</summary>
+    private static readonly uint[] PreparationResetSpells = [1856, 14177, 2983, 5277];
+
     /// <summary>Дистанция (ярды²) сдвига, прерывающая каст (поворот на месте не считается). M6.4.</summary>
     private const float InterruptMoveSq = 0.25f; // ~0.5 ярда
 
@@ -227,6 +232,16 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // SPELL.T3 Mage Clearcasting: гейт прошли, аура «потрачена» — снимаем.
         if (clearcastConsumed)
             await auras.RemoveAsync(session, 12536, ct);
+
+        // SPELL.T4 Rogue Preparation (14185): мгновенно сбрасывает кулдауны Vanish/Cold Blood/Sprint/
+        // Evasion (и Shadowstep с талантом — добавим в регрессии). Эталон CMaNGOS spell_warr_charge-стиль:
+        // EffectScriptEffect → специальная обработка по spellId. У нас — inline-сброс CD сразу после гейта.
+        if (spellId == 14185)
+        {
+            foreach (var sid in PreparationResetSpells)
+                session.Cast.SpellCooldowns.Remove(sid);
+            session.Logger.LogDebug("PREPARATION '{User}': сброс CD {Count} абилок", session.Account, PreparationResetSpells.Length);
+        }
 
         // DEFENSE.1/.2: каст состоялся (гейт пройден) — потратили окно state'а. Revenge/Counterattack
         // мгновенные (CastMs=0), поэтому очищаем сразу здесь, до CompleteCast. ClearAfterCastAsync —
