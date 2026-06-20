@@ -20,6 +20,10 @@ public static class CombatPackets
     private const uint HitInfoCriticalHit = 0x200;
 
     private const byte VictimStateHit = 1;
+    /// <summary>VICTIMSTATE_DODGE (CMaNGOS Unit.h): цель уклонилась от удара — нет урона, клиент рисует «Dodge!».</summary>
+    public const byte VictimStateDodge = 2;
+    /// <summary>VICTIMSTATE_PARRY: цель парировала — нет урона.</summary>
+    public const byte VictimStateParry = 3;
     private const uint SchoolMaskPhysical = 1;
 
     /// <summary>SMSG_ATTACKSTART (3.3.5): plain u64 attacker + u64 victim.</summary>

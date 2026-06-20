@@ -98,6 +98,10 @@ internal sealed class SessionCombatState
     /// активна всегда после изучения, попытка каста вне окна → SPELL_FAILED_CASTER_AURASTATE).</summary>
     internal long RuneStrikeWindowExpiresMs { get; set; }
 
+    /// <summary>#3797 Warrior Overpower (7384): окно 5с после dodged мили-удара игроком-воином (его автоатака
+    /// уклонена целью). Только класс Warrior=1. Чисто серверный гейт.</summary>
+    internal long OverpowerWindowExpiresMs { get; set; }
+
     /// <summary>DEFENSE.1: момент истечения AURA_STATE_DEFENSE (мс). Ставится на 5с при успешном
     /// dodge/parry/block игрока (CreatureCombatAI ApplyResolveOutcome). Гейт каста Revenge:
     /// SpellCastService отказывает, если spell.CasterAuraState=1 и now &gt;= DefenseStateExpiresMs.
@@ -149,6 +153,7 @@ internal sealed class SessionCombatState
         HunterParryStateExpiresMs = 0; // DEFENSE.2: окно Counterattack не переживает выход
         VictoryRushStateExpiresMs = 0; // SPELL.T3: окно Victory Rush не переживает выход
         RuneStrikeWindowExpiresMs = 0; // #3797: окно Rune Strike не переживает выход
+        OverpowerWindowExpiresMs = 0;  // #3797: окно Overpower не переживает выход
     }
 }
 

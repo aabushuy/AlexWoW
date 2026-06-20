@@ -234,6 +234,15 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
+        // #3797 Warrior Overpower (7384): окно 5с после dodged автоатаки игрока-воина (PlayerMeleeService).
+        // Аналогичный серверный гейт.
+        if (spellId == 7384 && session.Combat.OverpowerWindowExpiresMs <= now)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
+            return;
+        }
+
         // Запускаем GCD от этого каста (для последующих).
         if (info.GcdMs > 0)
             session.Cast.GcdEndMs = now + info.GcdMs;
@@ -256,6 +265,9 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // повторный каст в том же окне без нового dodge/parry попадал в гейт-отказ.
         if (spellId is 56815 or 56816)
             session.Combat.RuneStrikeWindowExpiresMs = 0;
+        // #3797 Warrior Overpower (7384): окно «потрачено» успешным кастом — сбрасываем.
+        if (spellId == 7384)
+            session.Combat.OverpowerWindowExpiresMs = 0;
 
         // DEFENSE.1/.2: каст состоялся (гейт пройден) — потратили окно state'а. Revenge/Counterattack
         // мгновенные (CastMs=0), поэтому очищаем сразу здесь, до CompleteCast. ClearAfterCastAsync —

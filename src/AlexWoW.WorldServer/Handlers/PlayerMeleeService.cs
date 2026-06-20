@@ -108,6 +108,26 @@ internal sealed class PlayerMeleeService(
         session.Combat.LastCombatMs = now; // M6.7: бой → пауза внебоевого регена HP
 
         var level = (byte)(session.Character?.Level ?? 1);
+
+        // #3797 outgoing dodge: целевое существо может уклониться (база 5% — пол WotLK; точная формула с
+        // уровневой разницей и defense skill — будущая итерация). Уклонение цели открывает 5-сек окно
+        // Overpower у воина (class=1). On-next-swing абилки игнорируют уклонение (мили-абилки замещают
+        // автоатаку, для них отдельный resolver — следующий тикет).
+        const float CreatureBaseDodgePct = 5.0f;
+        if (session.Combat.PendingNextSwingSpellId == 0
+            && Random.Shared.NextDouble() * 100.0 < CreatureBaseDodgePct)
+        {
+            session.Combat.NextMeleeSwingMs = now + (session.Combat.MainHandSpeedMs > 0 ? session.Combat.MainHandSpeedMs : (uint)SwingIntervalMs);
+            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgAttackerStateUpdate,
+                CombatPackets.BuildAttackerStateUpdate((ulong)session.InWorldGuid, creature.Guid, 0, 0,
+                    victimState: CombatPackets.VictimStateDodge), ct);
+            if (session.Character?.Class == 1)
+                session.Combat.OverpowerWindowExpiresMs = now + AuraStateService.DefenseStateDurationMs;
+            // Ответный бой — даже на miss/dodge цель агрится (CMaNGOS DealMeleeDamage гейт-точка).
+            await creatureAi.EnsureCreatureRetaliationAsync(session, creature, roar: true, ct);
+            return;
+        }
+
         // MELEE.1: «на следующий замах» (Героический удар/Раскол/Свирепый удар) — замещает эту автоатаку:
         // бросок оружия + флэт-бонус абилки, лог как спелл-урон. Иначе — обычная белая автоатака.
         var pendingId = session.Combat.PendingNextSwingSpellId;
