@@ -22,7 +22,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// <c>qasubmit</c> — задачи на тестирование канбан-доски и сабмит результата (KB8, <see cref="IKanbanBoardRepository"/>).
 /// </summary>
 internal sealed class AddonProtocol(
-    DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items, IKanbanBoardRepository kanban)
+    DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items,
+    IKanbanBoardRepository kanban, ISpellDetailRepository spellDetails)
 {
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
@@ -60,6 +61,12 @@ internal sealed class AddonProtocol(
         if (body.StartsWith("qasubmit", StringComparison.Ordinal))
         {
             await HandleQaSubmitAsync(session, body, ct);
+            return;
+        }
+
+        if (body.StartsWith("qaspell|", StringComparison.Ordinal))
+        {
+            await SendSpellDetailAsync(session, body, ct);
             return;
         }
 
@@ -190,6 +197,43 @@ internal sealed class AddonProtocol(
                     ct);
         }
         await SendLineAsync(session, "QEND", ct);
+    }
+
+    /// <summary>
+    /// KB14: детали спелла для блока детализации аддона (вкладки Абилки/Таланты/Профессии). Тело:
+    /// <c>qaspell|&lt;spellId&gt;</c>. Кадр <c>DBEGIN|id</c> … <c>DD|label|value</c> (школа/семейство/уровень/
+    /// ресурс/эффекты) … <c>DR|itemId|count|name</c> (реагенты рецепта) … <c>DEND</c>. Отдельные токены —
+    /// чтобы клиент не путал с каталогом меню/статами. Само описание спелла берёт клиент (тултип spell.dbc).
+    /// </summary>
+    private async Task SendSpellDetailAsync(WorldSession session, string body, CancellationToken ct)
+    {
+        var bar = body.IndexOf('|');
+        if (bar < 0 || !uint.TryParse(body.AsSpan(bar + 1), out var spellId))
+            return;
+
+        SpellDetail? d;
+        try { d = await spellDetails.GetAsync(spellId, ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "ADDON qaspell: БД мира недоступна ({Msg})", ex.Message);
+            d = null;
+        }
+
+        await SendLineAsync(session, $"DBEGIN|{spellId}", ct);
+        if (d is not null)
+        {
+            await SendLineAsync(session, $"DD|Школа|{Clean(d.School)}", ct);
+            await SendLineAsync(session, $"DD|Семейство|{Clean(d.Family)}", ct);
+            if (d.Level > 0)
+                await SendLineAsync(session, $"DD|Уровень|{d.Level}", ct);
+            if (d.ManaCost > 0)
+                await SendLineAsync(session, $"DD|Ресурс|{d.ManaCost} {Clean(d.PowerType)}", ct);
+            foreach (var eff in d.Effects)
+                await SendLineAsync(session, $"DD|Эффект|{Clean(eff)}", ct);
+            foreach (var r in d.Reagents)
+                await SendLineAsync(session, $"DR|{r.ItemId}|{r.Count}|{Clean(r.Name)}", ct);
+        }
+        await SendLineAsync(session, "DEND", ct);
     }
 
     private static KanbanTesterListKind ParseListKind(string body)

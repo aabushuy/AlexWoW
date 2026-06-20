@@ -1,53 +1,74 @@
---[[ AlexQATester UI (KB14): главное окно AlexQATesterFrame.
+--[[ AlexQATester UI (KB14, переработка): единое окно из 3 колонок.
 
-  Двухпанельное «как Журнал заданий»: слева FauxScrollFrame со списком, справа UIPanelScrollFrame
-  с деталями и контролами сабмита (чекбокс / комментарий / Готово). Окно скрыто после загрузки;
-  открывается через AlexQATester.UI.OpenWithKind(kind) — вызывается из MenuPanel по клику на вкладку.
+  Пропорции ширины колонок 1:2:3:
+    Колонка 1 — навигация по типу тикета (Общие / Абилки / Таланты / Профессии).
+    Колонка 2 — список тикетов «#<id> - <Title>», сортировка по Title ASC.
+    Колонка 3 — детализация выбранного тикета (диспетчер по типу):
+      общие         — шаги воспроизведения + ожидаемый результат;
+      абилки/таланты — иконка+имя, описание (клиентский тултип spell.dbc) + детали с сервера;
+      профессии     — иконка+имя + таблица реагентов (с сервера).
+    На всех типах снизу — комментарий + чекбокс «Соответствует ожидаемому результату» + «Готово».
 ]]
 
 local A = AlexQATester
 A.UI = A.UI or {}
 local U = A.UI
 
-local LIST_ROW_H, LIST_NUM_ROWS = 22, 14
-local mainFrame, listScroll, listRows, titleFs = nil, nil, {}, nil
-local D = {}  -- виджеты правой панели (detail)
+-- Геометрия окна и колонок.
+local W, H = 720, 520
+local MARGIN, TOP, BOTTOM, GAP = 16, 52, 14, 10
+local INNER = W - 2 * MARGIN                 -- 688
+local UNIT = (INNER - 2 * GAP) / 6           -- 1:2:3 → 6 долей
+local COL1, COL2, COL3 = UNIT, UNIT * 2, UNIT * 3
+local COL_TOP, COL_H = -TOP, H - TOP - BOTTOM
+local LIST_ROW_H, LIST_NUM_ROWS = 22, 18
+local CHILD_W = COL3 - 28                     -- ширина контента детализации (минус скроллбар)
 
+local mainFrame, listScroll, listRows, navButtons, scanTip
+local D = {}                                  -- виджеты детализации
+
+-- Пояснения для пустых вкладок (ASCII — фонты 3.3.5a без «ёлочек»/тире/стрелок рисуют '?').
+local EMPTY_HINT = {
+  general     = "Список пуст. Сюда попадают нерегрессионные задачи на тестирование,\nназначенные на вашего персонажа.",
+  abilities   = "Список пуст. Здесь регрессии классовых, расовых и стартовых абилок,\nназначенные на вашего персонажа.",
+  talents     = "Список пуст. Регрессии талантов пока не созданы.",
+  professions = "Список пуст. Здесь регрессии профессий,\nназначенные на вашего персонажа.",
+}
+
+-- ─── Описание спелла через клиентский тултип (spell.dbc): скан строк скрытого GameTooltip ───
+local function ScanSpellDescription(spellId)
+  if not scanTip then return "" end
+  scanTip:ClearLines()
+  scanTip:SetSpellByID(spellId)
+  local lines = {}
+  for i = 2, scanTip:NumLines() do            -- строка 1 — имя (показываем отдельно)
+    local fs = _G["AlexQAScanTooltipTextLeft" .. i]
+    local txt = fs and fs:GetText()
+    if txt and txt ~= "" then lines[#lines + 1] = txt end
+  end
+  return table.concat(lines, "\n")
+end
+
+-- ─── Сообщение об отправке / контролы сабмита ───
 local function SetMsg(text, isErr)
   if not D.msg then return end
   D.msg:SetText(text or "")
-  if isErr then D.msg:SetTextColor(0.6, 0.1, 0.05) else D.msg:SetTextColor(0.1, 0.4, 0.1) end
+  if isErr then D.msg:SetTextColor(1, 0.3, 0.25) else D.msg:SetTextColor(0.4, 1, 0.4) end
 end
-
 function U.SetMsg(text, isErr) SetMsg(text, isErr) end
 function U.IsChecked() return D.check and D.check:GetChecked() end
 function U.GetComment() return D.comment and D.comment:GetText() end
 
--- ---- Список (левая панель) ----
--- Имя/иконку/ранг берём из клиентских DBC через GetSpellInfo — данные тех же spell.dbc, что и у сервера.
-local function ResolveName(t)
-  if t.spellId then
-    local n, rank = GetSpellInfo(t.spellId)
-    if n then return (rank and rank ~= "" and (n .. " (" .. rank .. ")")) or n end
-  end
-  return t.title
-end
-
+-- ─── Список (колонка 2) ───
 local function ListRefresh()
-  FauxScrollFrame_Update(listScroll, #A.tasks, LIST_NUM_ROWS, LIST_ROW_H, nil, nil, nil, nil, nil, nil, 1)
+  FauxScrollFrame_Update(listScroll, #A.tasks, LIST_NUM_ROWS, LIST_ROW_H)
   local offset = FauxScrollFrame_GetOffset(listScroll)
   for i = 1, LIST_NUM_ROWS do
     local row = listRows[i]
     local t = A.tasks[i + offset]
     if t then
       row.index = i + offset
-      if t.spellId then
-        local _, _, icon = GetSpellInfo(t.spellId)
-        row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark"); row.icon:Show()
-      else
-        row.icon:SetTexture(nil); row.icon:Hide()
-      end
-      row.text:SetText(ResolveName(t))
+      row.text:SetText(A.utrunc(t.title, 36))
       if row.index == A.selected then row.sel:Show() else row.sel:Hide() end
       row:Show()
     else
@@ -57,107 +78,155 @@ local function ListRefresh()
   end
 end
 
-local function OnTaskClick(index)
-  if not A.tasks[index] then return end
-  A.selected = index
-  ListRefresh(); U.ShowDetail()
+-- ─── Детализация (колонка 3) ───
+local function HideDetailWidgets()
+  D.cardIcon:Hide(); D.cardName:Hide(); D.desc:Hide(); D.details:Hide()
+  D.reagHeader:Hide()
+  for _, r in ipairs(D.reagRows) do r:Hide() end
+  D.body:Hide()
+  D.check:Hide(); D.checkLabel:Hide(); D.comLabel:Hide(); D.commentBg:Hide(); D.doneBtn:Hide(); D.msg:Hide()
 end
 
--- Пояснение для пустых вкладок: что должно тут лежать и почему сейчас пусто.
--- ASCII-only (фонты 3.3.5a не имеют глифов для «ёлочек», тире и стрелок — рисуют '?').
-local EMPTY_HINT = {
-  general     = "Список пуст. Сюда попадают нерегрессионные задачи на тестирование,\nназначенные на вашего персонажа.",
-  abilities   = "Список пуст. Здесь регрессии классовых, расовых и стартовых абилок\n(проект 'Регрессия абилок'), назначенные на вашего персонажа.",
-  talents     = "Список пуст. Регрессии талантов пока не созданы\n(будет отдельный проект - план KB14).",
-  professions = "Список пуст. Здесь регрессии профессий (проект 'Регрессия профессий'),\nназначенные на вашего персонажа.",
-}
+local function LayoutSubmit(y)
+  D.check:ClearAllPoints(); D.check:SetPoint("TOPLEFT", -2, -y); D.check:Show()
+  D.checkLabel:ClearAllPoints(); D.checkLabel:SetPoint("LEFT", D.check, "RIGHT", 2, 0); D.checkLabel:Show()
+  y = y + 28
+  D.comLabel:ClearAllPoints(); D.comLabel:SetPoint("TOPLEFT", 0, -y); D.comLabel:Show()
+  y = y + 18
+  D.commentBg:ClearAllPoints(); D.commentBg:SetPoint("TOPLEFT", 0, -y); D.commentBg:Show()
+  y = y + 84
+  D.doneBtn:ClearAllPoints(); D.doneBtn:SetPoint("TOPLEFT", 0, -y); D.doneBtn:Show()
+  D.msg:ClearAllPoints(); D.msg:SetPoint("LEFT", D.doneBtn, "RIGHT", 10, 0); D.msg:Show()
+  return y + 32
+end
 
--- Названия школ магии по битовой маске spell_template.SchoolMask (синхронно с SpellPreviewService.SchoolName).
-local SCHOOL_NAME = {
-  [1] = "Физическая", [2] = "Священная", [4] = "Огонь", [8] = "Природа",
-  [16] = "Лёд", [32] = "Тень", [64] = "Тайная магия",
-}
-
-local function ApplyCard(t)
-  if not t.spellId then
-    D.card:Hide(); D.card:SetHeight(0)
-    return 0
+-- Перерисовать таблицу реагентов; вернуть y под ней. Прайминг иконок (кэш предметов) — через скан-тултип.
+local function LayoutReagents(reag, y)
+  D.reagHeader:ClearAllPoints(); D.reagHeader:SetPoint("TOPLEFT", 0, -y)
+  D.reagHeader:SetText(#reag > 0 and "Реагенты:" or "Реагенты: загрузка…"); D.reagHeader:Show()
+  y = y + D.reagHeader:GetStringHeight() + 4
+  local pending = false
+  for i, rg in ipairs(reag) do
+    local row = D.reagRows[i]
+    if not row then break end
+    row:ClearAllPoints(); row:SetPoint("TOPLEFT", 4, -y)
+    local icon = GetItemIcon(rg.itemId)
+    if not icon then
+      if scanTip then scanTip:SetHyperlink("item:" .. rg.itemId) end  -- прайм кэша → SMSG_ITEM_QUERY
+      icon = "Interface\\Icons\\INV_Misc_QuestionMark"; pending = true
+    end
+    row.icon:SetTexture(icon)
+    row.text:SetText(string.format("%s  |cffffffffx%d|r  |cff808080(id %d)|r", rg.name, rg.count, rg.itemId))
+    row:Show()
+    y = y + 22
   end
-  local name, rank, icon = GetSpellInfo(t.spellId)
-  D.cardIcon.spellId = t.spellId
-  D.cardIcon.tex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-  D.cardName:SetText((name or t.title) .. (rank and rank ~= "" and ("  |cff999999" .. rank .. "|r") or ""))
-  local sub = "id " .. t.spellId
-  if t.school and SCHOOL_NAME[t.school] then sub = sub .. "   " .. SCHOOL_NAME[t.school] end
-  D.cardSub:SetText(sub)
-  D.wowhead:SetText("https://wotlkdb.com/?spell=" .. t.spellId)
-  D.wowhead:SetCursorPosition(0)
-  local h = 48 + 6 + 16  -- иконка + отступ + EditBox
-  D.card:SetHeight(h); D.card:Show()
-  return h + 10  -- + отступ к body
+  if mainFrame then mainFrame.pendingIcons = pending end
+  return y
 end
 
--- ---- Детализация (правая панель) ----
-function U.ShowDetail()
-  local t = A.tasks[A.selected]
+function U.ShowDetail(t)
+  HideDetailWidgets()
   if not t then
     D.title:SetText("")
-    D.card:Hide(); D.card:SetHeight(0)
+    D.body:ClearAllPoints(); D.body:SetPoint("TOPLEFT", 0, -8)
     D.body:SetText(#A.tasks == 0 and (EMPTY_HINT[A.currentKind] or "Список пуст.") or "Выберите задачу слева.")
-    D.child:SetHeight(D.body:GetStringHeight() + 4)
-    D.check:Hide(); D.checkLabel:Hide(); D.commentBg:Hide(); D.comLabel:Hide(); D.doneBtn:Hide()
-    SetMsg("", false)
+    D.body:Show()
+    D.child:SetHeight(D.body:GetStringHeight() + 16)
     return
   end
-  D.title:SetText(A.utrunc(t.title, A.TITLE_MAX))
-  local cardH = ApplyCard(t)
-  local header = A.ulen(t.title) > A.TITLE_MAX and (t.title .. "\n\n") or ""
-  D.body:SetText(header .. "|cff8a5a00Шаги тестирования:|r\n" .. (t.steps ~= "" and t.steps or "—")
-    .. "\n\n|cff8a5a00Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—"))
-  -- title + (card если есть) + body + контролы (24 чекбокс + 12 отступ + 16 лейбл + 4 + 80 поле + 10 низ).
-  D.child:SetHeight(D.title:GetStringHeight() + 12 + cardH + D.body:GetStringHeight() + 18 + 24 + 12 + 16 + 4 + 80 + 10)
+
+  local y = 8
+  D.title:ClearAllPoints(); D.title:SetPoint("TOPLEFT", 0, -y)
+  D.title:SetText(A.utrunc(t.name or t.title, A.TITLE_MAX)); D.title:Show()
+  y = y + D.title:GetStringHeight() + 10
+
+  local kind = A.currentKind
+  local spellKind = t.spellId and (kind == "abilities" or kind == "talents" or kind == "professions")
+  if spellKind then
+    local name, _, icon = GetSpellInfo(t.spellId)
+    D.cardIcon:ClearAllPoints(); D.cardIcon:SetPoint("TOPLEFT", 0, -y); D.cardIcon.spellId = t.spellId
+    D.cardIcon.tex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark"); D.cardIcon:Show()
+    D.cardName:ClearAllPoints(); D.cardName:SetPoint("TOPLEFT", D.cardIcon, "TOPRIGHT", 8, -6)
+    D.cardName:SetText(name or t.name or ("#" .. t.spellId)); D.cardName:Show()
+    y = y + 44
+
+    local det = A.details[t.spellId]
+    if kind == "professions" then
+      y = LayoutReagents(det and det.reagents or {}, y) + 8
+    else
+      local desc = ScanSpellDescription(t.spellId)
+      if desc ~= "" then
+        D.desc:ClearAllPoints(); D.desc:SetPoint("TOPLEFT", 0, -y); D.desc:SetText(desc); D.desc:Show()
+        y = y + D.desc:GetStringHeight() + 10
+      end
+      if det and #det.meta > 0 then
+        local parts = {}
+        for _, m in ipairs(det.meta) do parts[#parts + 1] = "|cffffd100" .. m.label .. ":|r " .. m.value end
+        D.details:ClearAllPoints(); D.details:SetPoint("TOPLEFT", 0, -y)
+        D.details:SetText(table.concat(parts, "\n")); D.details:Show()
+        y = y + D.details:GetStringHeight() + 10
+      end
+    end
+  else
+    local body = "|cffffd100Шаги воспроизведения:|r\n" .. (t.steps ~= "" and t.steps or "—")
+      .. "\n\n|cffffd100Ожидаемый результат:|r\n" .. (t.expected ~= "" and t.expected or "—")
+    D.body:ClearAllPoints(); D.body:SetPoint("TOPLEFT", 0, -y); D.body:SetText(body); D.body:Show()
+    y = y + D.body:GetStringHeight() + 12
+  end
+
   D.check:SetChecked(false)
   D.comment:SetText("")
-  D.check:Show(); D.checkLabel:Show(); D.commentBg:Show(); D.comLabel:Show(); D.doneBtn:Show()
+  y = LayoutSubmit(y)
   SetMsg("", false)
+  D.child:SetHeight(y + 10)
 end
 
--- Колбэк протокола: сервер прислал новый список (или удалил тикет после сабмита).
--- Сортировка: для regression-вкладок (есть SchoolMask) — по школе, затем по имени из GetSpellInfo;
--- для general (school = nil) — по title (фолбэк, выглядит стабильнее серверного «по дате»).
+-- ─── Колбэки протокола ───
 function U.OnTasksLoaded()
-  table.sort(A.tasks, function(a, b)
-    local sa, sb = a.school or 999, b.school or 999
-    if sa ~= sb then return sa < sb end
-    return ResolveName(a) < ResolveName(b)
-  end)
-  if A.selected then A.selected = 1 end
-  if mainFrame then ListRefresh(); U.ShowDetail() end
+  if not mainFrame then return end
+  ListRefresh()
+  U.ShowDetail(A.tasks[A.selected])
 end
 
-local function ApplyTitle()
-  if not titleFs then return end
-  local label = A.KIND_LABEL[A.currentKind] or "Общее"
-  titleFs:SetText("Тестирование: " .. label)
+function U.OnDetailLoaded(spellId)
+  local t = A.tasks[A.selected]
+  if t and t.spellId == spellId then U.ShowDetail(t) end
 end
 
-function U.OpenWithKind(kind)
-  A.currentKind = kind or "general"
+-- ─── Выбор группы / тикета ───
+local function SelectKind(kind)
+  A.currentKind = kind
   A.selected = nil
-  if not mainFrame then U.Build() end
-  if D.check then D.check:SetChecked(false) end
-  if D.comment then D.comment:SetText("") end
-  ApplyTitle()
-  mainFrame:Show()
-  A.RequestTasks(A.currentKind)
+  for _, b in ipairs(navButtons) do
+    if b.kind == kind then b.sel:Show() else b.sel:Hide() end
+  end
+  A.RequestTasks(kind)
+  U.ShowDetail(nil)
 end
 
--- ---- Окно ----
+local function SelectTask(index)
+  if not A.tasks[index] then return end
+  A.selected = index
+  local t = A.tasks[index]
+  if t.spellId then A.RequestSpellDetail(t.spellId) end
+  ListRefresh()
+  U.ShowDetail(t)
+end
+
+-- ─── Построение окна ───
 function U.Build()
   if mainFrame then return end
+  listRows, navButtons = {}, {}
+
   local f = CreateFrame("Frame", "AlexQATesterFrame", UIParent)
-  f:SetWidth(768); f:SetHeight(512)
+  f:SetWidth(W); f:SetHeight(H)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+  f:SetBackdrop({
+    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    tile = true, tileSize = 32, edgeSize = 32,
+    insets = { left = 11, right = 12, top = 12, bottom = 11 },
+  })
   f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", f.StartMoving)
   f:SetScript("OnDragStop", function(self)
@@ -168,43 +237,32 @@ function U.Build()
   f:SetClampedToScreen(true)
   f:Hide()
 
-  -- Иконка-книга в круглом медальоне сверху-слева (декор).
-  local emblem = f:CreateTexture(nil, "BACKGROUND")
-  emblem:SetTexture("Interface\\MailFrame\\Mail-Icon")
-  emblem:SetWidth(54); emblem:SetHeight(54)
-  emblem:SetPoint("TOPLEFT", 10, -8)
-  emblem:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-
-  -- Двухпанельные текстуры рамки квест-лога (лево 512 + право 256 = 768).
-  local texL = f:CreateTexture(nil, "BORDER")
-  texL:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Left")
-  texL:SetWidth(512); texL:SetHeight(512); texL:SetPoint("TOPLEFT", 0, 0)
-  local texR = f:CreateTexture(nil, "BORDER")
-  texR:SetTexture("Interface\\QuestFrame\\UI-QuestLogDualPane-Right")
-  texR:SetWidth(256); texR:SetHeight(512); texR:SetPoint("TOPLEFT", texL, "TOPRIGHT", 0, 0)
-
-  titleFs = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  titleFs:SetPoint("TOP", -32, -18); titleFs:SetText("Тестирование")
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOP", 0, -16); title:SetText("Тестирование")
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-  close:SetPoint("TOPLEFT", 652, -8)
+  close:SetPoint("TOPRIGHT", -6, -6)
 
-  -- Кнопка «Меню» — закрыть основное окно и вернуться к панели вкладок. Уехала в нижнюю рамку,
-  -- чтобы не накрывать левый список (фикс ручной подгонки координат пользователем).
-  local menuBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  menuBtn:SetWidth(100); menuBtn:SetHeight(24); menuBtn:SetPoint("BOTTOMLEFT", 222, 78)
-  menuBtn:SetText("Меню")
-  menuBtn:SetScript("OnClick", function() f:Hide(); if A.MenuPanel then A.MenuPanel.Show() end end)
+  -- Колонка 1 — навигация по типам.
+  for i, item in ipairs(A.KINDS) do
+    local b = CreateFrame("Button", nil, f)
+    b:SetWidth(COL1); b:SetHeight(26)
+    b:SetPoint("TOPLEFT", MARGIN, COL_TOP - (i - 1) * 30)
+    b.kind = item.kind
+    local sel = b:CreateTexture(nil, "BACKGROUND")
+    sel:SetAllPoints(); sel:SetTexture(0.9, 0.75, 0.1, 0.25); sel:Hide(); b.sel = sel
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
+    local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("LEFT", 6, 0); fs:SetText(item.label)
+    b:SetScript("OnClick", function(self) SelectKind(self.kind) end)
+    navButtons[i] = b
+  end
 
-  -- Кнопка «Обновить» — перезапрашивает список задач у сервера.
-  local refreshBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  refreshBtn:SetWidth(110); refreshBtn:SetHeight(24); refreshBtn:SetPoint("BOTTOMLEFT", 18, 78)
-  refreshBtn:SetText("Обновить")
-  refreshBtn:SetScript("OnClick", function() A.RequestTasks(A.currentKind) end)
-
-  -- ЛЕВО: список задач (FauxScrollFrame).
+  -- Колонка 2 — список тикетов.
+  local col2x = MARGIN + COL1 + GAP
   listScroll = CreateFrame("ScrollFrame", "AlexQAListScroll", f, "FauxScrollFrameTemplate")
-  listScroll:SetPoint("TOPLEFT", 26, -74)
-  listScroll:SetWidth(294); listScroll:SetHeight(LIST_NUM_ROWS * LIST_ROW_H + 28)
+  listScroll:SetPoint("TOPLEFT", col2x, COL_TOP)
+  listScroll:SetWidth(COL2 - 4); listScroll:SetHeight(COL_H)
   listScroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, LIST_ROW_H, ListRefresh)
   end)
@@ -213,119 +271,102 @@ function U.Build()
     row:SetHeight(LIST_ROW_H)
     if i == 1 then row:SetPoint("TOPLEFT", listScroll, "TOPLEFT", 0, 0)
     else row:SetPoint("TOPLEFT", listRows[i - 1], "BOTTOMLEFT", 0, 0) end
-    row:SetPoint("RIGHT", listScroll, "RIGHT", 0, 0)
+    row:SetPoint("RIGHT", listScroll, "RIGHT", -2, 0)
     local sel = row:CreateTexture(nil, "BACKGROUND")
-    sel:SetAllPoints(); sel:SetTexture(0.9, 0.75, 0.1, 0.20); sel:Hide()
-    row.sel = sel
-    -- Иконка спелла слева (только для regression-задач, где сервер прислал spellId).
-    local icon = row:CreateTexture(nil, "ARTWORK")
-    icon:SetWidth(18); icon:SetHeight(18); icon:SetPoint("LEFT", 2, 0)
-    icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-    row.icon = icon
+    sel:SetAllPoints(); sel:SetTexture(0.9, 0.75, 0.1, 0.20); sel:Hide(); row.sel = sel
     local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fs:SetPoint("LEFT", icon, "RIGHT", 4, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT")
-    fs:SetTextColor(1, 0.82, 0)
-    row.text = fs
+    fs:SetPoint("LEFT", 4, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT")
+    fs:SetTextColor(1, 0.82, 0); row.text = fs
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight"); hl:SetBlendMode("ADD"); hl:SetAlpha(0.4)
-    row:SetScript("OnClick", function(self) OnTaskClick(self.index) end)
+    row:SetScript("OnClick", function(self) SelectTask(self.index) end)
     listRows[i] = row
   end
 
-  -- ПРАВО: детализация.
-  local rx = 360
-  local QFONTHEADER = "Fonts\\MORPHEUS.TTF"
-  local QFONT = "Fonts\\FRIZQT__.TTF"
-
+  -- Колонка 3 — детализация (скролл-фрейм с дочерним контентом).
+  local col3x = col2x + COL2 + GAP
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
-  D.scroll:SetPoint("TOPLEFT", rx, -74); D.scroll:SetWidth(290); D.scroll:SetHeight(336)
-  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(280); D.child:SetHeight(10)
+  D.scroll:SetPoint("TOPLEFT", col3x, COL_TOP); D.scroll:SetWidth(COL3 - 8); D.scroll:SetHeight(COL_H)
+  D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(CHILD_W); D.child:SetHeight(10)
   D.scroll:SetScrollChild(D.child)
 
   D.title = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  D.title:SetPoint("TOPLEFT", 0, -10); D.title:SetWidth(280); D.title:SetJustifyH("LEFT")
-  D.title:SetFont(QFONTHEADER, 16); D.title:SetTextColor(0.30, 0.20, 0.10)
+  D.title:SetWidth(CHILD_W); D.title:SetJustifyH("LEFT")
 
-  -- Spell-карточка: иконка 48×48, имя (ранг), подзаголовок (id · уровень). Hover на иконку →
-  -- родной GameTooltip:SetSpellByID — это тот же тултип, что игрок видит в spellbook (скрин 2 ТЗ).
-  D.card = CreateFrame("Frame", nil, D.child)
-  D.card:SetPoint("TOPLEFT", D.title, "BOTTOMLEFT", 0, -10)
-  D.card:SetWidth(280); D.card:SetHeight(0); D.card:Hide()
-  D.cardIcon = CreateFrame("Frame", nil, D.card)
-  D.cardIcon:SetWidth(48); D.cardIcon:SetHeight(48); D.cardIcon:SetPoint("TOPLEFT", 0, 0)
-  D.cardIcon:EnableMouse(true)
+  D.cardIcon = CreateFrame("Frame", nil, D.child)
+  D.cardIcon:SetWidth(40); D.cardIcon:SetHeight(40); D.cardIcon:EnableMouse(true)
   local iconTex = D.cardIcon:CreateTexture(nil, "ARTWORK")
-  iconTex:SetAllPoints(); iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-  D.cardIcon.tex = iconTex
+  iconTex:SetAllPoints(); iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93); D.cardIcon.tex = iconTex
   D.cardIcon:SetScript("OnEnter", function(self)
     if not self.spellId then return end
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetSpellByID(self.spellId)
-    GameTooltip:Show()
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetSpellByID(self.spellId); GameTooltip:Show()
   end)
   D.cardIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
-  D.cardName = D.card:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  D.cardName:SetPoint("TOPLEFT", D.cardIcon, "TOPRIGHT", 8, -2)
-  D.cardName:SetPoint("RIGHT", D.card, "RIGHT", 0, 0); D.cardName:SetJustifyH("LEFT")
-  D.cardName:SetFont(QFONTHEADER, 14); D.cardName:SetTextColor(0.30, 0.20, 0.10)
-  D.cardSub = D.card:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  D.cardSub:SetPoint("TOPLEFT", D.cardName, "BOTTOMLEFT", 0, -4)
-  D.cardSub:SetPoint("RIGHT", D.card, "RIGHT", 0, 0); D.cardSub:SetJustifyH("LEFT")
-  D.cardSub:SetFont(QFONT, 11); D.cardSub:SetTextColor(0.30, 0.20, 0.10)
-  -- Wowhead-URL: readonly EditBox для копирования (в клиенте 3.3.5 нет браузера).
-  D.wowhead = CreateFrame("EditBox", nil, D.card)
-  D.wowhead:SetPoint("TOPLEFT", D.cardIcon, "BOTTOMLEFT", 0, -6)
-  D.wowhead:SetPoint("RIGHT", D.card, "RIGHT", 0, 0); D.wowhead:SetHeight(16)
-  D.wowhead:SetAutoFocus(false); D.wowhead:SetFontObject(GameFontNormalSmall)
-  D.wowhead:SetTextColor(0.10, 0.30, 0.70)
-  D.wowhead:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-  D.wowhead:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+  D.cardName = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  D.cardName:SetWidth(CHILD_W - 48); D.cardName:SetJustifyH("LEFT")
 
-  D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  D.body:SetPoint("TOPLEFT", D.card, "BOTTOMLEFT", 0, -10); D.body:SetWidth(280); D.body:SetJustifyH("LEFT")
-  D.body:SetFont(QFONT, 12); D.body:SetTextColor(0.30, 0.20, 0.10)
+  D.desc = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  D.desc:SetWidth(CHILD_W); D.desc:SetJustifyH("LEFT")
+  D.details = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.details:SetWidth(CHILD_W); D.details:SetJustifyH("LEFT")
+
+  D.reagHeader = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  D.reagHeader:SetWidth(CHILD_W); D.reagHeader:SetJustifyH("LEFT")
+  D.reagRows = {}
+  for i = 1, 8 do
+    local r = CreateFrame("Frame", nil, D.child); r:SetWidth(CHILD_W); r:SetHeight(20)
+    local ic = r:CreateTexture(nil, "ARTWORK")
+    ic:SetWidth(18); ic:SetHeight(18); ic:SetPoint("LEFT", 0, 0); ic:SetTexCoord(0.07, 0.93, 0.07, 0.93); r.icon = ic
+    local tx = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    tx:SetPoint("LEFT", ic, "RIGHT", 6, 0); tx:SetJustifyH("LEFT"); r.text = tx
+    r:Hide(); D.reagRows[i] = r
+  end
+
+  D.body = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  D.body:SetWidth(CHILD_W); D.body:SetJustifyH("LEFT")
 
   D.check = CreateFrame("CheckButton", nil, D.child, "UICheckButtonTemplate")
   D.check:SetWidth(24); D.check:SetHeight(24)
-  D.check:SetPoint("TOPLEFT", D.body, "BOTTOMLEFT", -2, -18)
   D.checkLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  D.checkLabel:SetPoint("TOPLEFT", D.check, "TOPRIGHT", 4, -4); D.checkLabel:SetWidth(252); D.checkLabel:SetJustifyH("LEFT")
+  D.checkLabel:SetWidth(CHILD_W - 28); D.checkLabel:SetJustifyH("LEFT")
   D.checkLabel:SetText("Соответствует ожидаемому результату")
-  D.checkLabel:SetFont(QFONT, 13); D.checkLabel:SetTextColor(0.30, 0.20, 0.10)
-
   D.comLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  D.comLabel:SetPoint("TOPLEFT", D.check, "BOTTOMLEFT", 2, -12); D.comLabel:SetText("Комментарий:")
-  D.comLabel:SetFont(QFONT, 14); D.comLabel:SetTextColor(0.30, 0.20, 0.10)
+  D.comLabel:SetText("Комментарий:")
+
   D.commentBg = CreateFrame("Frame", nil, D.child)
-  D.commentBg:SetPoint("TOPLEFT", D.comLabel, "BOTTOMLEFT", 0, -4); D.commentBg:SetWidth(280); D.commentBg:SetHeight(120)
+  D.commentBg:SetWidth(CHILD_W); D.commentBg:SetHeight(78)
   D.commentBg:SetBackdrop({
     bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 },
   })
-  D.commentBg:SetBackdropColor(0, 0, 0, 0.4)
-  D.commentScroll = CreateFrame("ScrollFrame", "AlexQACommentScroll", D.commentBg, "UIPanelScrollFrameTemplate")
-  D.commentScroll:SetPoint("TOPLEFT", 8, -8); D.commentScroll:SetPoint("BOTTOMRIGHT", -28, 8)
-  D.comment = CreateFrame("EditBox", nil, D.commentScroll)
+  D.commentBg:SetBackdropColor(0, 0, 0, 0.5)
+  D.comment = CreateFrame("EditBox", nil, D.commentBg)
   D.comment:SetMultiLine(true); D.comment:SetAutoFocus(false); D.comment:SetFontObject(ChatFontNormal)
-  D.comment:SetWidth(238); D.comment:SetHeight(1)
+  D.comment:SetPoint("TOPLEFT", 6, -6); D.comment:SetPoint("BOTTOMRIGHT", -6, 6)
   D.comment:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-  D.comment:SetScript("OnCursorChanged", function(self, _x, y, _w, h)
-    local sf = self:GetParent()
-    local height, offset = sf:GetHeight(), sf:GetVerticalScroll()
-    if -y < offset then sf:SetVerticalScroll(-y)
-    elseif -y + h > offset + height then sf:SetVerticalScroll(-y + h - height) end
-  end)
-  D.commentScroll:SetScrollChild(D.comment)
 
-  D.doneBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  D.doneBtn:SetWidth(80); D.doneBtn:SetHeight(26)
-  D.doneBtn:SetPoint("TOPLEFT", rx + 236, -410)
-  D.doneBtn:SetText("Готово")
+  D.doneBtn = CreateFrame("Button", nil, D.child, "UIPanelButtonTemplate")
+  D.doneBtn:SetWidth(90); D.doneBtn:SetHeight(24); D.doneBtn:SetText("Готово")
   D.doneBtn:SetScript("OnClick", A.Submit)
+  D.msg = D.child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  D.msg:SetWidth(CHILD_W - 100); D.msg:SetJustifyH("LEFT")
 
-  D.msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  D.msg:SetPoint("RIGHT", D.doneBtn, "LEFT", -10, 0); D.msg:SetWidth(250); D.msg:SetJustifyH("RIGHT")
+  -- Скрытый тултип для скана описания спелла и прайминга кэша предметов (иконки реагентов).
+  scanTip = CreateFrame("GameTooltip", "AlexQAScanTooltip", nil, "GameTooltipTemplate")
+  scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+  -- Иконки реагентов приходят асинхронно — дорисовываем, пока не подгрузятся (с лимитом попыток).
+  f:SetScript("OnUpdate", function(self, elapsed)
+    self.acc = (self.acc or 0) + elapsed
+    if self.acc < 0.3 then return end
+    self.acc = 0
+    if self.pendingIcons then
+      self.tries = (self.tries or 0) + 1
+      if self.tries > 20 then self.pendingIcons = false
+      else U.ShowDetail(A.tasks[A.selected]) end
+    end
+  end)
 
   if AlexQATesterDB.pos then
     local p, rp, x, y = unpack(AlexQATesterDB.pos)
@@ -333,8 +374,17 @@ function U.Build()
   end
 
   mainFrame = f
-  ApplyTitle()
 end
 
 function U.IsShown() return mainFrame and mainFrame:IsShown() end
 function U.Hide() if mainFrame then mainFrame:Hide() end end
+
+function U.Toggle()
+  if not mainFrame then U.Build() end
+  if mainFrame:IsShown() then
+    mainFrame:Hide()
+  else
+    mainFrame:Show()
+    SelectKind(A.currentKind or "general")
+  end
+end

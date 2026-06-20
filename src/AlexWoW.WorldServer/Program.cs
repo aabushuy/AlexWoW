@@ -66,6 +66,8 @@ builder.Services.AddSingleton<IWorldRepository, WorldRepository>();
 // KB7: доступ к канбан-доске в БД project (задачи на тестирование для тестировщиков). Отдельная строка подключения.
 // KB14: ISpellSchoolRepository подгружает SchoolMask из mangos.spell_template — нужен для сортировки regression-списка по школе.
 builder.Services.AddSingleton<ISpellSchoolRepository>(sp => new SpellSchoolRepository(WorldConn(sp)));
+// KB14: детали спелла (школа/семейство/эффекты + реагенты) для блока детализации аддона AlexQATester — qaspell.
+builder.Services.AddSingleton<ISpellDetailRepository>(sp => new SpellDetailRepository(WorldConn(sp)));
 builder.Services.AddSingleton<IKanbanBoardRepository>(sp => new KanbanBoardRepository(
     sp.GetRequiredService<IOptions<WorldServerOptions>>().Value.ProjectConnectionString,
     sp.GetRequiredService<ISpellSchoolRepository>()));
