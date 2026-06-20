@@ -87,7 +87,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
     /// </summary>
     public Task SummonTrainingDummyAsync(WorldSession session, CancellationToken ct)
         => SummonDummyAsync(session, Npcs.TrainingDummyGuid, Npcs.TrainingDummy, Npcs.TrainingDummyHealth,
-            sideOffset: 0f, wounded: false, ct);
+            sideOffset: 0f, spawnHpPct: 1f, ct);
 
     /// <summary>
     /// Лечебный манекен (M12 Spell QA): дружественная цель для проверки хилов/HoT. Призывается ранен (HP = ½
@@ -96,20 +96,20 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
     /// </summary>
     public Task SummonHealDummyAsync(WorldSession session, CancellationToken ct)
         => SummonDummyAsync(session, Npcs.HealDummyGuid, Npcs.HealDummy, Npcs.HealDummyHealth,
-            sideOffset: 2.5f, wounded: true, ct);
+            sideOffset: 2.5f, spawnHpPct: 0.01f, ct);
 
     /// <summary>Атакующий манекен (проверка защиты): уровень 80, отвечает при атаке — бьёт игрока, чтобы
     /// проверять уклонение/парирование/блок/броню/«Глухую оборону». Ставится сбоку, чтобы не слипаться.</summary>
     public Task SummonAttackDummyAsync(WorldSession session, CancellationToken ct)
         => SummonDummyAsync(session, Npcs.AttackDummyGuid, Npcs.AttackDummy, Npcs.AttackDummyHealth,
-            sideOffset: -2.5f, wounded: false, ct);
+            sideOffset: -2.5f, spawnHpPct: 1f, ct);
 
     /// <summary>Кастующий манекен (Фаза 2 INT.1): крутит каст-бар по игроку — стенд для проверки прерывания.
     /// В бою с игроком (CombatTargetGuid), чтобы тикала AI; первый каст — почти сразу.</summary>
     public async Task SummonCasterDummyAsync(WorldSession session, CancellationToken ct)
     {
         await SummonDummyAsync(session, Npcs.CasterDummyGuid, Npcs.CasterDummy, Npcs.CasterDummyHealth,
-            sideOffset: 5f, wounded: false, ct);
+            sideOffset: 5f, spawnHpPct: 1f, ct);
         if (world.FindCreature(Npcs.CasterDummyGuid) is { } caster)
         {
             caster.CombatTargetGuid = (ulong)session.InWorldGuid; // вводим в «бой» → тикает TickCreatureCombatAsync
@@ -118,19 +118,45 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
             caster.SchoolLockMask = 0;
             caster.NextCastMs = Environment.TickCount64 + 1000; // первый каст через ~1с
 
-            // DSP.2: вешаем снимаемый Magic-бафф (стенд для Purge/Spellsteal).
+            // DSP.2: основной снимаемый Magic-бафф (стенд для Purge/Spellsteal) — его отслеживает dispel-логика.
             caster.BuffSpellId = Npcs.CasterDummyBuffSpellId;
             caster.BuffDispelType = Npcs.CasterDummyBuffDispelType;
             caster.BuffSlot = CasterDummyBuffSlot;
             var level = (byte)(session.Character?.Level ?? 80);
-            const byte flags = Protocol.AuraFlags.Effect1 | Protocol.AuraFlags.Positive | Protocol.AuraFlags.SelfCast;
-            await world.BroadcastToObserversAsync(caster, WorldOpcode.SmsgAuraUpdate,
-                Protocol.AuraPackets.BuildApplyByCaster(caster.Guid, caster.Guid, CasterDummyBuffSlot,
-                    Npcs.CasterDummyBuffSpellId, flags, level, 1, 0), ct);
+            // Ф2 #14 «Маг»: три снимаемых Magic-баффа (Интеллект + Стамина + метка друида) на слотах 41/42/43.
+            await ApplyDummyBuffAsync(caster, CasterDummyBuffSlot, Npcs.CasterDummyBuffSpellId, level, ct);
+            await ApplyDummyBuffAsync(caster, CasterDummyBuffSlot + 1, Npcs.MageBuffStaminaSpellId, level, ct);
+            await ApplyDummyBuffAsync(caster, CasterDummyBuffSlot + 2, Npcs.MageBuffMarkSpellId, level, ct);
         }
     }
 
-    /// <summary>Слот ауры-баффа кастующего манекена (отличный от CC-слота 40). DSP.2.</summary>
+    /// <summary>Повесить визуальный положительный бафф на манекена (для стенда dispel/spellsteal). Ф2 #14.</summary>
+    private Task ApplyDummyBuffAsync(WorldCreature dummy, byte slot, uint spellId, byte level, CancellationToken ct)
+    {
+        const byte flags = Protocol.AuraFlags.Effect1 | Protocol.AuraFlags.Positive | Protocol.AuraFlags.SelfCast;
+        return world.BroadcastToObserversAsync(dummy, WorldOpcode.SmsgAuraUpdate,
+            Protocol.AuraPackets.BuildApplyByCaster(dummy.Guid, dummy.Guid, slot, spellId, flags, level, 1, 0), ct);
+    }
+
+    /// <summary>Ф2 #14 Манекен-охотник: стреляет по игроку на расстоянии (физ. урон). В «бою» → тикает AI.</summary>
+    public async Task SummonHunterDummyAsync(WorldSession session, CancellationToken ct)
+    {
+        await SummonDummyAsync(session, Npcs.HunterDummyGuid, Npcs.HunterDummy, Npcs.HunterDummyHealth,
+            sideOffset: -5f, spawnHpPct: 1f, ct);
+        if (world.FindCreature(Npcs.HunterDummyGuid) is { } hunter)
+        {
+            hunter.CombatTargetGuid = (ulong)session.InWorldGuid;
+            hunter.NextCastMs = Environment.TickCount64 + 1000; // первый выстрел через ~1с (поле переиспользуем как тайм. выстрела)
+        }
+    }
+
+    /// <summary>Ф2 #14 Лечебный манекен: скромный HP (хилы заметны), старт 70%, самослив быстрее регена
+    /// (тикает в WorldTick). Дружелюбен — валидная цель лечения. Не в «бою».</summary>
+    public Task SummonHealerDummyAsync(WorldSession session, CancellationToken ct)
+        => SummonDummyAsync(session, Npcs.HealerDummyGuid, Npcs.HealerDummy, Npcs.HealerDummyHealth,
+            sideOffset: 2.5f, spawnHpPct: Npcs.HealerSpawnPct, ct);
+
+    /// <summary>Слот основного баффа мага-манекена (41/42/43 для трёх баффов). DSP.2 / Ф2 #14.</summary>
     private const byte CasterDummyBuffSlot = 41;
 
     /// <summary>
@@ -139,7 +165,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
     /// боевого состояния. <paramref name="wounded"/> — выставить HP в ½ макс. (лечебный манекен), иначе полный.
     /// </summary>
     private async Task SummonDummyAsync(WorldSession session, ulong guid, CreatureTemplate template,
-        uint maxHealth, float sideOffset, bool wounded, CancellationToken ct)
+        uint maxHealth, float sideOffset, float spawnHpPct, CancellationToken ct)
     {
         var map = session.Character?.Map ?? 0;
         // 3 ярда вперёд + боковой сдвиг (перпендикуляр к направлению взгляда) — чтобы два манекена не слипались.
@@ -179,7 +205,7 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
         // + полный сброс боевого состояния (как свежий манекен). Лечебный — глубоко ранен (1% макс., заведомо ниже
         // потолка лечения ½ макс. в ApplyHealAsync), чтобы любой хил давал effective>0 в течение всей сессии.
         dummy.X = x; dummy.Y = y; dummy.Z = z; dummy.O = o;
-        dummy.Health = wounded ? Math.Max(1, dummy.MaxHealth / 100) : dummy.MaxHealth;
+        dummy.Health = (uint)Math.Max(1, dummy.MaxHealth * spawnHpPct);
         dummy.CombatTargetGuid = 0;
         dummy.Evading = false;
         dummy.RespawnAtMs = null;

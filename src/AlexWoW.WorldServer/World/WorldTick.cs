@@ -79,6 +79,8 @@ internal sealed class WorldTick(WorldState world, FactionStore factions,
                         await creatureAi.TickEvadeAsync(world, creature, now, ct);
                     else if (creature.CombatTargetGuid != 0)
                         await creatureAi.TickCreatureCombatAsync(world, creature, now, ct);
+                    else if (Protocol.Npcs.IsHealerDummy(creature.Template.Entry))
+                        await creatureAi.TickHealerDrainAsync(world, creature, now, ct); // Ф2 #14: самослив вместо регена
                     else
                         await regen.TickRegenAsync(world, creature, now, ct);
                     continue;

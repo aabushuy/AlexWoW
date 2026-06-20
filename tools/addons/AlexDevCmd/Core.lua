@@ -42,12 +42,13 @@ A.STATIONS = {
   { key = "anvil", label = "Наковальня" }, { key = "forge", label = "Горн" },
   { key = "cookfire", label = "Костёр" }, { key = "mailbox", label = "Почтовый ящик" },
 }
--- Манекены (Фаза 1 — 4 готовых серверных варианта `.dummy [..]`). Охотник/Маг/Лечебный(70%) — Фаза 2.
+-- Манекены (Ф2 #14): 5 вариантов `.dummy [..]`. Маг = кастующий + баффы Int/Sta/метка; Лечебный = 70%+самослив.
 A.DUMMIES = {
-  { arg = "", label = "Бездействующий (урон)" },
-  { arg = "attack", label = "Атакующий (защита)" },
-  { arg = "caster", label = "Кастующий (прерывание)" },
-  { arg = "heal", label = "Лечебный" },
+  { arg = "", label = "Бездействующий" },
+  { arg = "attack", label = "Воин" },
+  { arg = "hunter", label = "Охотник" },
+  { arg = "caster", label = "Маг" },
+  { arg = "healer", label = "Лечебный" },
 }
 -- UnitClass('player') второй результат (токен) → ключ для `.trainer <class>`.
 A.CLASS_KEYWORD = {

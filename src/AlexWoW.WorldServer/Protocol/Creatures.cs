@@ -150,6 +150,36 @@ public static class Npcs
         Faction: 7,    // нейтральный (жёлтый) — атакуемый
         UnitType: 7);  // Humanoid
 
+    // ── Охотник (Ф2 #14): стреляет по игроку на расстоянии (физ. урон, эмуляция охотника). Урон НАНОСИТ.
+    public const uint HunterDummyEntry = 990024;
+    public const uint HunterDummyHealth = 50_000_000;
+    public const uint HunterDummySpawnId = 9000024;
+    public static readonly ulong HunterDummyGuid = UnitGuid(HunterDummyEntry, HunterDummySpawnId);
+    public static bool IsHunterDummy(uint entry) => entry == HunterDummyEntry;
+    public const uint HunterShotSpellId = 75;  // Auto Shot — визуал лога урона
+    public const byte SchoolPhysical = 1;
+    public static readonly CreatureTemplate HunterDummy = new(
+        Entry: HunterDummyEntry, Name: "Манекен-охотник", SubName: "Уровень 80 — стрельба на расстоянии",
+        DisplayId: 3019, Level: 80, Faction: 7, UnitType: 7);
+
+    // ── Маг (Ф2 #14): кастующий манекен + доп. баффы (Стамина, метка друида) поверх Интеллекта —
+    // стенд для Purge/Spellsteal/Dispel (3 снимаемых Magic-баффа).
+    public const uint MageBuffStaminaSpellId = 1243; // Сила духа (Stamina), Dispel=1 Magic
+    public const uint MageBuffMarkSpellId = 1126;    // Метка дикой природы (друид «лапка»), Dispel=1 Magic
+
+    // ── Лечебный (Ф2 #14): отдельный манекен со СКРОМНЫМ HP (хилы заметны) + самослив быстрее регена,
+    // старт 70%. Отдельный entry, чтобы не ломать M12-харнес (тот использует 990021 с большим HP).
+    public const uint HealerDummyEntry = 990025;
+    public const uint HealerDummyHealth = 50_000;
+    public const uint HealerDummySpawnId = 9000025;
+    public static readonly ulong HealerDummyGuid = UnitGuid(HealerDummyEntry, HealerDummySpawnId);
+    public static bool IsHealerDummy(uint entry) => entry == HealerDummyEntry;
+    public const float HealerSpawnPct = 0.7f;        // старт 70% HP
+    public const uint HealerDrainPerSec = 1500;      // самослив/сек (первая версия — донастроим в игре)
+    public static readonly CreatureTemplate HealerDummy = new(
+        Entry: HealerDummyEntry, Name: "Лечебный манекен", SubName: "Уровень 80 — самослив, лечите его",
+        DisplayId: 3019, Level: 80, Faction: 35, UnitType: 7); // дружелюбен — валидная цель хила
+
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()
     {
         [TestDummy.Entry] = TestDummy,

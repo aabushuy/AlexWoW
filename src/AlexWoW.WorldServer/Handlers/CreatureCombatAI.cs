@@ -23,6 +23,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     private const float CreatureCritChance = 5f; // % крита существа по игроку (упрощённо; ×2). CRIT.2
     private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
     private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
+    private const long HunterShotGapMs = 1800;      // Ф2 #14: пауза между выстрелами манекена-охотника.
 
     // --- Преследование/возврат (M6.7 инкр.2) ---
     /// <summary>Скорость бега существа (ярды/с) — совпадает с RunSpeed в create-блоке существа.</summary>
@@ -148,6 +149,13 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         if (Npcs.IsCasterDummy(creature.Template.Entry))
         {
             await TickCasterDummyAsync(world, creature, player, now, ct);
+            return;
+        }
+
+        // Ф2 #14: манекен-охотник — стреляет по игроку на расстоянии (физ. урон), не подходит вплотную.
+        if (Npcs.IsHunterDummy(creature.Template.Entry))
+        {
+            await TickHunterDummyAsync(world, creature, player, now, ct);
             return;
         }
 
@@ -461,6 +469,38 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         creature.CastEndMs = now + CasterDummyCastMs;
         await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellStart,
             SpellPackets.BuildSpellStart(creature.Guid, Npcs.CasterDummyCastSpellId, 0, CasterDummyCastMs, player.Guid), ct);
+    }
+
+    /// <summary>Ф2 #14 Манекен-охотник: на кадансе наносит игроку физ. урон «выстрелом» (эмуляция дальнего боя).
+    /// Урон — упрощённо по уровню (как мили существа); визуал — Auto Shot (SpellGo + лог урона). Тюнинг — в игре.</summary>
+    private async Task TickHunterDummyAsync(WorldState world, WorldCreature creature, WorldPlayer player, long now, CancellationToken ct)
+    {
+        if (now < creature.NextCastMs)
+            return;
+        creature.NextCastMs = now + HunterShotGapMs;
+        creature.O = MathF.Atan2(player.Y - creature.Y, player.X - creature.X);
+        var dmg = ComputeCreatureMeleeDamage(creature.Template.Level);
+        world.ApplyPlayerDamage(player, dmg);
+        player.Session.Combat.LastCombatMs = now;
+        await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellGo,
+            SpellPackets.BuildSpellGo(creature.Guid, Npcs.HunterShotSpellId, player.Guid, 0), ct);
+        await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgSpellNonMeleeDamageLog,
+            SpellPackets.BuildDamageLog(creature.Guid, (ulong)player.Session.InWorldGuid, Npcs.HunterShotSpellId, dmg, 0, Npcs.SchoolPhysical), ct);
+        await world.BroadcastPlayerHealthAsync(player, ct);
+    }
+
+    /// <summary>Ф2 #14 Лечебный манекен: самослив HP (кадэнс 1с) быстрее регена — хилер должен перелечивать.
+    /// Не убиваем (минимум 1% макс.), чтобы цель оставалась валидной. Тикается из WorldTick (вне боя).</summary>
+    internal async Task TickHealerDrainAsync(WorldState world, WorldCreature creature, long now, CancellationToken ct)
+    {
+        if (now < creature.NextRegenMs)
+            return;
+        creature.NextRegenMs = now + 1000;
+        var floor = Math.Max(1u, creature.MaxHealth / 100);
+        if (creature.Health <= floor)
+            return;
+        creature.Health = (uint)Math.Max(floor, (long)creature.Health - Npcs.HealerDrainPerSec);
+        await world.BroadcastCreatureHealthAsync(creature, ct);
     }
 
     /// <summary>BLOCK.2 Щит небес (Holy Shield): при блоке — урон Светом по атакующему существу
