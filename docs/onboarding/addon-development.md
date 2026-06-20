@@ -7,8 +7,9 @@
 
 ## Трекинг задач
 
-Все работы по аддонам ведутся в эпике **Addons** на канбан-доске (БД `project`, project id **41**):
-<https://alexwow.home.srv/Board?project=41>. Новый тикет по аддону — Task/Bug внутри этого эпика.
+Все работы по аддонам ведутся в эпике **Addons** (id **3843**, project **41**) на канбан-доске
+(БД `project`): <https://alexwow.home.srv/Board?project=41&epic=3843>. Новый тикет по аддону —
+Task/Bug внутри этого эпика.
 
 ## Что где лежит
 
