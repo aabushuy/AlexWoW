@@ -407,6 +407,9 @@ internal sealed class PeriodicsService(
             IsCurse = info.IsCurse,
             CurseDamageTakenPct = info.CurseDamageTakenPct,
             CurseSchoolMask = info.CurseSchoolMask,
+            // Mortal Wound (Mortal Strike): −% к лечению цели — переиспользуем поле HealReductionPct
+            // (с Wound Poison). Применяется в SpellEffectsService.ApplyHealAsync через HealReductionPctFor.
+            HealReductionPct = info.HealingReductionPct,
         });
     }
 

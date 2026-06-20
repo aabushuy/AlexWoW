@@ -69,6 +69,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModIncreaseSpeed = 31;         // +% скорости бега (Sprint, Ghost Wolf, Travel Form, Cheetah)
     private const int AuraProcTriggerDamage = 43;        // урон по атакующему при проке (Священный щит — при блоке) — BLOCK.2
     private const int AuraModDamagePercentTaken = 87;    // % получаемого урона (напр. «Глухая оборона», отрицательный)
+    private const int AuraModHealingPctFromCaster = 118; // −% к лечению цели (Mortal Strike Mortal Wound, BP+1=−50).
     private const int AuraSchoolAbsorb = 69;             // поглощение урона по школе (PW:Shield/Ice Barrier/варды) — ABS.1
     private const int AuraManaShield = 97;               // поглощение урона за счёт маны (Mana Shield мага) — ABS.2
     private const int AuraSchoolImmunity = 39;           // иммунитет к школам (Divine Shield/Ice Block/Hand of Protection): маска школ = EffectMiscValue — IMMUNITY.1
@@ -243,7 +244,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // EffectDummyRegistry hook: спелл несёт SPELL_EFFECT_DUMMY (Effect=3) — «голый» dummy-эффект,
         // CMaNGOS обрабатывает в Spell::EffectDummy switch (Slam/Execute/Mortal Strike/Bloodthirst и т.п.).
         // DummyBasePoints — BasePoints+1 первого DUMMY-эффекта (бонус-урон у Slam, флэт-урон у Execute).
-        bool HasDummyEffect = false, int DummyBasePoints = 0);
+        bool HasDummyEffect = false, int DummyBasePoints = 0,
+        // MOD_HEALING_PCT_FROM_CASTER (aura 118): спелл-дебафф снижает входящее лечение цели на % (Mortal
+        // Strike Mortal Wound −50%). >0 — величина снижения (взятая по модулю). Применяется через
+        // session.Progression.Periodics.HealReductionPct (тот же путь, что Wound Poison разбойника).
+        int HealingReductionPct = 0);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -683,6 +688,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var dummyEffectIdx = Array.FindIndex(effects, e => e.Eff == EffectDummy);
         var hasDummyEffect = dummyEffectIdx >= 0;
         var dummyBasePoints = hasDummyEffect ? effects[dummyEffectIdx].Bp + 1 : 0;
+
+        // Mortal Wound и аналоги: aura 118 c BP+1 < 0 — снижение лечения цели (берём по модулю в %).
+        var healCutAura = Array.Find(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModHealingPctFromCaster);
+        var healingReductionPct = healCutAura.Eff == EffectApplyAura ? Math.Abs(healCutAura.Bp + 1) : 0;
         // SPELL.T5 (стаб): area-auras (тотемы шамана / ауры паладина / аспекты охотника). Парсинг и
         // настоящая реализация — в отдельных регрессионных тикетах (нужен World/Totem.cs spawn-объект,
         // tick-loop, broadcast-аур ближним пати).
@@ -733,7 +742,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             meleeCritFlat, spellCritFlat, parryFlat,
             meleeHasteFlat, rangedHasteFlat, spellHasteFlat, allHasteFlat,
             ratingMask, ratingValue,
-            hasDummy, hasOverrideClassScripts, hasDummyEffect, dummyBasePoints);
+            hasDummy, hasOverrideClassScripts, hasDummyEffect, dummyBasePoints,
+            healingReductionPct);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)
