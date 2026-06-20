@@ -46,6 +46,12 @@ internal sealed class AddonProtocol(
             return;
         }
 
+        if (body.StartsWith("itembyid|", StringComparison.Ordinal))
+        {
+            await SendItemByIdAsync(session, body, ct);
+            return;
+        }
+
         if (body.StartsWith("itemsearch", StringComparison.Ordinal))
         {
             await SendItemSearchAsync(session, body, ct);
@@ -73,6 +79,12 @@ internal sealed class AddonProtocol(
         if (body == "devteleports")
         {
             await SendTeleportsAsync(session, ct);
+            return;
+        }
+
+        if (body == "auras")
+        {
+            await SendAurasAsync(session, ct);
             return;
         }
 
@@ -313,6 +325,31 @@ internal sealed class AddonProtocol(
     }
 
     /// <summary>
+    /// Поиск предмета по точному id для панели «Реагенты» (режим «по id»): тело <c>itembyid|&lt;id&gt;</c>,
+    /// ответ тем же кадром, что и поиск по имени (<c>IBEGIN</c>/<c>I|…</c>/<c>IEND</c>) — клиент переиспользует
+    /// разбор рынка. Admin-гейт.
+    /// </summary>
+    private async Task SendItemByIdAsync(WorldSession session, string body, CancellationToken ct)
+    {
+        if (!session.IsAdmin)
+            return;
+        var bar = body.IndexOf('|');
+        IReadOnlyList<ItemTemplateData> results = [];
+        if (bar >= 0 && uint.TryParse(body.AsSpan(bar + 1), out var id))
+        {
+            try { results = await items.SearchAsync(new ItemSearchFilter { Entry = id, Limit = 1 }, ct); }
+            catch (Exception ex)
+            {
+                session.Logger.LogDebug(ex, "ADDON itembyid: БД мира недоступна ({Msg})", ex.Message);
+            }
+        }
+        await SendLineAsync(session, "IBEGIN", ct);
+        foreach (var it in results)
+            await SendLineAsync(session, $"I|{it.Entry}|{it.Quality}|{it.ItemLevel}|{it.RequiredLevel}|{it.Name.Replace('|', ' ')}", ct);
+        await SendLineAsync(session, "IEND", ct);
+    }
+
+    /// <summary>
     /// Список точек телепорта для панели «Телепорт» аддона: <c>TBEGIN</c> … <c>T|id|faction|name</c> …
     /// <c>TEND</c>. Порядок — Альянс(1) → Орда(2) → Нейтральные(0), внутри фракции — по SortOrder из БД.
     /// Источник — <see cref="ITeleportRepository"/> (та же таблица, что у <c>.tp</c> и каталога меню). Admin-гейт.
@@ -332,6 +369,20 @@ internal sealed class AddonProtocol(
         foreach (var loc in locs.OrderBy(l => l.Faction switch { 1 => 0, 2 => 1, _ => 2 }))
             await SendLineAsync(session, $"T|{loc.Id}|{loc.Faction}|{Clean(loc.Name)}", ct);
         await SendLineAsync(session, "TEND", ct);
+    }
+
+    /// <summary>
+    /// Активные ауры игрока для панели «Бафф» аддона: <c>ABEGIN</c> … <c>A|spellId</c> … <c>AEND</c>.
+    /// Иконку/имя клиент берёт сам (GetSpellInfo), снятие — <c>.unbuff &lt;spellId&gt;</c>. Admin-гейт.
+    /// </summary>
+    private async Task SendAurasAsync(WorldSession session, CancellationToken ct)
+    {
+        if (!session.IsAdmin)
+            return;
+        await SendLineAsync(session, "ABEGIN", ct);
+        foreach (var a in session.Progression.Auras)
+            await SendLineAsync(session, $"A|{a.SpellId}", ct);
+        await SendLineAsync(session, "AEND", ct);
     }
 
     // Заменяем U+00B7 middle dot на ASCII '-' — клиентский WoW-фонт в списке тикетов аддона

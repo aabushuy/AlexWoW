@@ -95,36 +95,44 @@ local function BuildTrainer()
   return p
 end
 
--- ─── Панель: Бафф ───
+-- ─── Панель: Бафф (наложить по id + список активных с «Снять») ───
 local function BuildBuff()
   local p = NewPanel()
   Header(p, "Баффы")
-  local applyLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  applyLbl:SetPoint("TOPLEFT", 6, -44); applyLbl:SetText("ID спелла:")
-  local idBox = L.EditBox(p, 90, 20, true)
-  idBox:SetPoint("LEFT", applyLbl, "RIGHT", 8, 0)
+  local lbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  lbl:SetPoint("TOPLEFT", 6, -44); lbl:SetText("ID спелла:")
+  local idBox = L.EditBox(p, 90, 20, true); idBox:SetPoint("LEFT", lbl, "RIGHT", 8, 0)
   local applyBtn = L.Button(p, "Наложить", 100, 24, function()
     local id = idBox:GetText()
-    if id and id ~= "" then A.Cmd(".buff " .. id) end
+    if id and id ~= "" then A.Cmd(".buff " .. id); idBox:SetText(""); A.RequestAuras() end
   end)
   applyBtn:SetPoint("LEFT", idBox, "RIGHT", 8, 0)
+  idBox:SetScript("OnEnterPressed", function() applyBtn:Click() end)
+  local allBtn = L.Button(p, "Снять все", 110, 24, function() A.Cmd(".unbuff all"); A.RequestAuras() end)
+  allBtn:SetPoint("TOPLEFT", 6, -76)
 
-  local rmLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  rmLbl:SetPoint("TOPLEFT", 6, -78); rmLbl:SetText("Снять id:")
-  local rmBox = L.EditBox(p, 90, 20, true)
-  rmBox:SetPoint("LEFT", rmLbl, "RIGHT", 8, 0)
-  local rmBtn = L.Button(p, "Снять", 100, 24, function()
-    local id = rmBox:GetText()
-    if id and id ~= "" then A.Cmd(".unbuff " .. id) end
-  end)
-  rmBtn:SetPoint("LEFT", rmBox, "RIGHT", 8, 0)
-
-  local allBtn = L.Button(p, "Снять все", 120, 24, function() A.Cmd(".unbuff all") end)
-  allBtn:SetPoint("TOPLEFT", 6, -112)
-
-  local note = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  note:SetPoint("TOPLEFT", 6, -150); note:SetWidth(C3W - 12); note:SetJustifyH("LEFT")
-  note:SetText("Список активных баффов с иконками и кнопкой «Снять» — Фаза 2.")
+  local listLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  listLbl:SetPoint("TOPLEFT", 6, -110); listLbl:SetText("Активные баффы:")
+  local list = L.CreateFauxList({
+    parent = p, x = 4, y = -130, w = C3W - 8, h = layout.height - 130 - 8, rowH = 22,
+    numRows = math.floor((layout.height - 130 - 8) / 22),
+  })
+  p.list = list
+  list.render = function(row, item)
+    if not row.icon then
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetWidth(18); row.icon:SetHeight(18); row.icon:SetPoint("LEFT", 2, 0); L.CropIcon(row.icon)
+      row.rm = L.Button(row, "Снять", 56, 18)
+      row.rm:SetScript("OnClick", function(self) A.Cmd(".unbuff " .. self.spellId); A.RequestAuras() end)
+      row.rm:SetPoint("RIGHT", -2, 0)
+      row.text:ClearAllPoints(); row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0); row.text:SetPoint("RIGHT", row.rm, "LEFT", -4, 0)
+    end
+    local name, _, icon = GetSpellInfo(item.spellId)
+    row.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+    row.text:SetText(name or ("#" .. item.spellId))
+    row.rm.spellId = item.spellId
+  end
+  p.refresh = function() list.data = A.auras; A.RequestAuras(); list:Refresh() end
   return p
 end
 
@@ -178,21 +186,27 @@ local function BuildCreatures()
   return p
 end
 
--- ─── Панель: Реагенты (поиск по имени → список → выдать) ───
+-- ─── Панель: Реагенты (поиск по id / по имени → список → выдать) ───
 local function BuildReagents()
   local p = NewPanel()
   Header(p, "Реагенты")
-  local box = L.EditBox(p, 180, 20); box:SetPoint("TOPLEFT", 10, -44)
-  local searchBtn = L.Button(p, "Искать", 90, 22, function()
-    local nm = box:GetText() or ""
-    A.reagentMode = true
-    A.RequestMarket("itemsearch||||||1|" .. nm)  -- showAll=1, имя; класс/подкласс пусто
-  end)
+  local box = L.EditBox(p, 160, 20); box:SetPoint("TOPLEFT", 10, -44)
+  local searchBtn = L.Button(p, "Искать", 80, 22)
   searchBtn:SetPoint("LEFT", box, "RIGHT", 8, 0)
-  box:SetScript("OnEnterPressed", function() searchBtn:Click() end)
+  local byName = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
+  byName:SetWidth(22); byName:SetHeight(22); byName:SetPoint("TOPLEFT", 6, -70)
+  local byNameLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  byNameLbl:SetPoint("LEFT", byName, "RIGHT", 2, 0); byNameLbl:SetText("По названию (иначе по id)")
+  local function doSearch()
+    local q = box:GetText() or ""
+    if byName:GetChecked() then A.RequestMarket("itemsearch||||||1|" .. q)  -- showAll=1, имя
+    else A.RequestMarket("itembyid|" .. q) end
+  end
+  searchBtn:SetScript("OnClick", doSearch)
+  box:SetScript("OnEnterPressed", doSearch)
 
   local cntLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  cntLbl:SetPoint("TOPLEFT", 10, -74); cntLbl:SetText("Количество")
+  cntLbl:SetPoint("TOPLEFT", 10, -100); cntLbl:SetText("Количество")
   local cnt = L.EditBox(p, 44, 18, true); cnt:SetPoint("LEFT", cntLbl, "RIGHT", 8, 0); cnt:SetText("1")
   local addBtn = L.Button(p, "Добавить", 100, 22, function()
     local item = p.list.selected and A.marketItems[p.list.selected]
@@ -201,8 +215,8 @@ local function BuildReagents()
   addBtn:SetPoint("LEFT", cnt, "RIGHT", 14, 0)
 
   local list = L.CreateFauxList({
-    parent = p, x = 4, y = -104, w = C3W - 8, h = layout.height - 104 - 8, rowH = 22,
-    numRows = math.floor((layout.height - 104 - 8) / 22),
+    parent = p, x = 4, y = -128, w = C3W - 8, h = layout.height - 128 - 8, rowH = 22,
+    numRows = math.floor((layout.height - 128 - 8) / 22),
     onClick = function(i) p.list.selected = i; p.list:Refresh() end,
   })
   p.list = list
@@ -415,6 +429,9 @@ function U.OnTeleports() if currentRoot == "teleport" then col2:Refresh() end en
 function U.OnMarket()
   if currentPanel == "market" and panels.market then panels.market.refresh() end
   if currentPanel == "reagents" and panels.reagents then panels.reagents.refresh() end
+end
+function U.OnAuras()
+  if currentPanel == "char.buff" and panels["char.buff"] then panels["char.buff"].list:Refresh() end
 end
 
 -- ─── Построение ───

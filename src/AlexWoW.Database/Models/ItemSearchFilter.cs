@@ -17,6 +17,9 @@ public enum ItemKind
 /// </summary>
 public sealed record ItemSearchFilter
 {
+    /// <summary>Точный <c>entry</c> предмета — поиск по id (панель «Реагенты»). null — без ограничения.</summary>
+    public uint? Entry { get; init; }
+
     /// <summary>Требуемый уровень персонажа — нижняя граница (RequiredLevel ≥).</summary>
     public uint? LevelMin { get; init; }
 
@@ -59,6 +62,11 @@ public sealed record ItemSearchFilter
     {
         var clauses = new List<string>();
 
+        if (Entry is { } entry)
+        {
+            clauses.Add("entry = @entry");
+            parameters.Add("entry", entry);
+        }
         if (LevelMin is { } min)
         {
             clauses.Add("RequiredLevel >= @lvlMin");

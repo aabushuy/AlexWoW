@@ -19,6 +19,8 @@ A.tpBuilding = nil
 A.marketItems = {}      -- [{ id, quality, ilvl, reqlvl, name }] из itemsearch
 A.marketBuilding = nil
 A.creatureQueue = {}    -- накопленные для «Существа»: [{ key, label, level, count }]
+A.auras = {}            -- [{ spellId }] активные ауры (имя/иконку резолвит клиент)
+A.auraBuilding = nil
 
 -- ─── Справочники (стабильные, маппинг на dev-команды) ───
 A.CREATURE_TYPES = {
@@ -112,6 +114,7 @@ end
 function A.Cmd(command) SendChatMessage(command, "SAY") end
 function A.RequestTeleports() SendAddonMessage(PREFIX, "devteleports", "WHISPER", UnitName("player")) end
 function A.RequestMarket(body) SendAddonMessage(PREFIX, body, "WHISPER", UnitName("player")) end
+function A.RequestAuras() SendAddonMessage(PREFIX, "auras", "WHISPER", UnitName("player")) end
 
 -- ─── Разбор кадров от сервера ───
 local function HandleLine(line)
@@ -139,6 +142,16 @@ local function HandleLine(line)
       A.marketBuilding[#A.marketBuilding + 1] = { id = id, quality = tonumber(q) or 1,
         ilvl = tonumber(il) or 0, reqlvl = tonumber(rl) or 0, name = nm or ("#" .. id) }
     end
+  elseif line == "ABEGIN" then
+    A.auraBuilding = {}
+  elseif line == "AEND" then
+    if A.auraBuilding then
+      A.auras = A.auraBuilding; A.auraBuilding = nil
+      if A.UI then A.UI.OnAuras() end
+    end
+  elseif A.auraBuilding and string.sub(line, 1, 2) == "A|" then
+    local id = tonumber(string.sub(line, 3))
+    if id then A.auraBuilding[#A.auraBuilding + 1] = { spellId = id } end
   end
 end
 
