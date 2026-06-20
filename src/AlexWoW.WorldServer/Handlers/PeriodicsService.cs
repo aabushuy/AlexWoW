@@ -585,7 +585,8 @@ internal sealed class PeriodicsService(
     /// <summary>MOD_STAT (29): применяет сумму активных аур-бонусов статов к UnitStat0..4. Stamina даёт
     /// +10 MaxHealth/единицу, Intellect — +15 MaxMana/единицу (упрощённые формулы CMaNGOS). Без аур-бонуса —
     /// возвращает к базе из <see cref="SessionCombatState.BaseStr"/>… и <see cref="SessionCombatState.BaseMaxHealth"/>.</summary>
-    private Task SendStatsAsync(WorldSession session, CancellationToken ct)
+    // internal: dev-редактор характеристик (SetStatCommand) пушит первичные статы после session-оверрайда BaseX.
+    internal Task SendStatsAsync(WorldSession session, CancellationToken ct)
     {
         if (session.InWorldGuid == 0)
             return Task.CompletedTask;

@@ -209,7 +209,8 @@ internal sealed class CombatResourcesService
     /// Шлёт текущее значение ресурса себе: VALUES-апдейт <c>UNIT_FIELD_POWER1+powerType</c> (консистентность
     /// поля) + SMSG_POWER_UPDATE (двигает полоску у клиента 3.3.5a). Аналог регена маны (<see cref="ManaRegenService"/>).
     /// </summary>
-    private static async Task SendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
+    // internal: dev-редактор «Основное» (SetStatCommand) пушит ярость/энергию/руническую силу после set.
+    internal static async Task SendPowerAsync(WorldSession session, byte powerType, uint amount, CancellationToken ct)
     {
         var guid = (ulong)session.InWorldGuid;
         await session.SendAsync(WorldOpcode.SmsgUpdateObject,

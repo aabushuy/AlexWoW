@@ -1,12 +1,13 @@
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>
-/// §178 (Доработка А) <c>.setstat &lt;key&gt; &lt;value&gt;</c> — задать вторичную характеристику из редактора
-/// аддона (крит/уклон/броня/оружие…). Ключи и кламп — <see cref="DevStatsCatalog"/>. После записи пушит
-/// обновлённый кадр <c>stats</c> в аддон (окно-редактор показывает актуальное значение). Команда приходит
-/// SAY-чатом от аддона (как и прочие dev-команды).
+/// §178/Ф2 <c>.setstat &lt;key&gt; &lt;value&gt;</c> — задать характеристику из dev-панелей аддона
+/// («Основное»/«Характеристики»). Ключи/кламп/группа — <see cref="DevStatsCatalog"/>. После записи пушит
+/// нужное клиенту: первичные статы → <see cref="PeriodicsService"/>.SendStatsAsync (UNIT_FIELD_STAT + MaxHP/Mana);
+/// ресурсы → реген-маны / <see cref="CombatResourcesService"/>.SendPowerAsync / broadcast HP. Вторичные —
+/// только серверный combat-кэш (плюс старый кадр редактора). Команда приходит SAY-чатом от аддона.
 /// </summary>
-internal sealed class SetStatCommand(DevStatsCatalog stats, AddonProtocol addon) : IDevCommand
+internal sealed class SetStatCommand(DevStatsCatalog stats, AddonProtocol addon, PeriodicsService periodics, ManaRegenService manaRegen) : IDevCommand
 {
     public IReadOnlyList<string> Names { get; } = ["setstat"];
     public string Help => ".setstat <key> <value>";
@@ -20,12 +21,23 @@ internal sealed class SetStatCommand(DevStatsCatalog stats, AddonProtocol addon)
             await ctx.ReplyAsync("Использование: .setstat <key> <value>", ct);
             return;
         }
-        if (!stats.TrySet(ctx.Session, ctx.Args[0], ctx.Args[1], out var label))
+        if (!stats.TrySet(ctx.Session, ctx.Args[0], ctx.Args[1], out var label, out var push))
         {
             await ctx.ReplyAsync($"Неизвестный стат или значение: {ctx.Args[0]}", ct);
             return;
         }
         await ctx.ReplyAsync($"{label} = {ctx.Args[1]}", ct);
-        await addon.SendStatsAsync(ctx.Session, ct); // пуш обновлённого кадра → окно-редактор обновится
+
+        var s = ctx.Session;
+        switch (push)
+        {
+            case StatPush.Stats: await periodics.SendStatsAsync(s, ct); break;
+            case StatPush.Health: if (s.Player is { } pl) await s.World.BroadcastPlayerHealthAsync(pl, ct); break;
+            case StatPush.Mana: await manaRegen.SendManaUpdateAsync(s, ct); break;
+            case StatPush.Rage: await CombatResourcesService.SendPowerAsync(s, 1, s.Combat.Rage, ct); break;       // powertype ярости
+            case StatPush.Energy: await CombatResourcesService.SendPowerAsync(s, 3, s.Combat.Energy, ct); break;  // энергия
+            case StatPush.Runic: await CombatResourcesService.SendPowerAsync(s, 6, s.Combat.RunicPower, ct); break; // рунич. сила
+            default: await addon.SendStatsAsync(s, ct); break; // вторичные — обновить старый кадр редактора (если слушают)
+        }
     }
 }

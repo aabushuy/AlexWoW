@@ -11,6 +11,8 @@ stds.wow = {
     -- Базовый API
     "CreateFrame", "SendAddonMessage", "SendChatMessage",
     "UnitName", "UnitClass", "UnitLevel",
+    "UnitHealth", "UnitPower", "UnitPowerMax", "UnitStat",
+    "GetCritChance", "GetDodgeChance", "GetParryChance", "GetBlockChance",
     "GetCursorPosition", "GetItemIcon", "GetSpellInfo",
     "strsplit", "wipe",
     -- Глобальные таблицы / фреймы клиента

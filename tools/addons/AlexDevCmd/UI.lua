@@ -44,15 +44,6 @@ local function ShowPanel(key)
   end
 end
 
--- ─── Панель: заглушка (Фаза 2) ───
-local function BuildStub(text)
-  local p = NewPanel()
-  local fs = p:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  fs:SetPoint("TOPLEFT", 6, -10); fs:SetWidth(C3W - 12); fs:SetJustifyH("LEFT")
-  fs:SetText(text)
-  return p
-end
-
 -- ─── Панель: список вариантов + кнопки-действия (манекены / проф-тренеры / станки) ───
 -- opts: title, items ({label,..}), actions ({ {text, fn(selectedItem)} }), rowH?
 local function BuildActionList(opts)
@@ -91,6 +82,95 @@ local function BuildTrainer()
   p.refresh = function()
     local _, name = A.PlayerTrainer()
     hdr:SetText("Тренер: " .. (name or "?"))
+  end
+  return p
+end
+
+-- ─── Панель: Персонаж → Основное (уровень/ресурсы/ловкость) ───
+local function BuildCharBasic()
+  local p = NewPanel()
+  Header(p, "Основное")
+  local rows = {
+    { key = "level", label = "Уровень", read = function() return UnitLevel("player") end },
+    { key = "hp", label = "Здоровье", read = function() return UnitHealth("player") end },
+    { key = "mana", label = "Мана", read = function() return UnitPower("player", 0) end },
+    { key = "rage", label = "Ярость", read = function()
+      local m = UnitPowerMax("player", 1); return (m and m > 0) and math.floor(UnitPower("player", 1) / m * 100) or 0
+    end },
+    { key = "agi", label = "Ловкость", read = function() local _, e = UnitStat("player", 2); return e end },
+  }
+  local boxes = {}
+  for i, r in ipairs(rows) do
+    local lbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lbl:SetPoint("TOPLEFT", 10, -44 - (i - 1) * 30); lbl:SetWidth(110); lbl:SetJustifyH("LEFT"); lbl:SetText(r.label)
+    local box = L.EditBox(p, 100, 20, true); box:SetPoint("LEFT", lbl, "RIGHT", 8, 0)
+    boxes[r.key] = box
+  end
+  local save = L.Button(p, "Сохранить", 130, 26, function()
+    local lv = tonumber(boxes.level:GetText())
+    if lv and lv ~= UnitLevel("player") then A.Cmd(".level " .. lv) end  -- .level сбрасывает/лечит — шлём только при смене
+    for _, k in ipairs({ "hp", "mana", "rage", "agi" }) do
+      local v = boxes[k]:GetText()
+      if v and v ~= "" then A.Cmd(".setstat " .. k .. " " .. v) end
+    end
+  end)
+  save:SetPoint("TOPLEFT", 10, -44 - 5 * 30 - 4)
+  local note = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  note:SetPoint("TOPLEFT", 10, -44 - 5 * 30 - 40); note:SetWidth(C3W - 20); note:SetJustifyH("LEFT")
+  note:SetText("Оверрайды живут до смены уровня/экипировки/релога (session-only).")
+  p.refresh = function() for _, r in ipairs(rows) do boxes[r.key]:SetText(tostring(r.read() or 0)) end end
+  return p
+end
+
+-- ─── Панель: Персонаж → Характеристики (группы, session-оверрайды) ───
+local STAT_DEFS = {
+  { g = "Основные", rows = {
+    { "str", "Сила", function() local _, e = UnitStat("player", 1); return e end },
+    { "agi", "Ловкость", function() local _, e = UnitStat("player", 2); return e end },
+    { "sta", "Выносливость", function() local _, e = UnitStat("player", 3); return e end },
+    { "int", "Интеллект", function() local _, e = UnitStat("player", 4); return e end },
+    { "spi", "Дух", function() local _, e = UnitStat("player", 5); return e end },
+  } },
+  { g = "Ближний бой", rows = {
+    { "critmelee", "Крит, %", function() return GetCritChance and math.floor(GetCritChance()) end },
+    { "wpnmin", "Урон оружия (мин)" }, { "wpnmax", "Урон оружия (макс)" }, { "wpnspeed", "Скорость оружия, мс" },
+  } },
+  { g = "Магия", rows = { { "critspell", "Крит заклинаний, %" } } },
+  { g = "Защита", rows = {
+    { "dodge", "Уклонение, %", function() return GetDodgeChance and math.floor(GetDodgeChance()) end },
+    { "parry", "Парирование, %", function() return GetParryChance and math.floor(GetParryChance()) end },
+    { "block", "Блок, %", function() return GetBlockChance and math.floor(GetBlockChance()) end },
+    { "armor", "Броня" },
+  } },
+}
+local function BuildCharStats()
+  local p = NewPanel()
+  Header(p, "Характеристики")
+  local content = L.CreateContentColumn({ parent = p, x = 4, y = -40, w = C3W - 8, h = layout.height - 40 - 40, childW = C3W - 30 })
+  local child, boxes, y = content.child, {}, 6
+  for _, grp in ipairs(STAT_DEFS) do
+    local gh = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    gh:SetPoint("TOPLEFT", 0, -y); gh:SetText("|cffffd100" .. grp.g .. "|r"); y = y + 22
+    for _, r in ipairs(grp.rows) do
+      local lbl = child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      lbl:SetPoint("TOPLEFT", 8, -y); lbl:SetWidth(150); lbl:SetJustifyH("LEFT"); lbl:SetText(r[2])
+      local box = L.EditBox(child, 80, 18, true); box:SetPoint("LEFT", lbl, "RIGHT", 8, 0)
+      box.read = r[3]; boxes[r[1]] = box; y = y + 24
+    end
+    y = y + 6
+  end
+  child:SetHeight(y + 6)
+  local save = L.Button(p, "Сохранить", 130, 26, function()
+    for k, box in pairs(boxes) do
+      local v = box:GetText()
+      if v and v ~= "" then A.Cmd(".setstat " .. k .. " " .. v) end
+    end
+  end)
+  save:SetPoint("BOTTOMLEFT", 4, 8)
+  p.refresh = function()
+    for _, box in pairs(boxes) do
+      if box.read then local cur = box.read(); if cur then box:SetText(tostring(cur)) end end
+    end
   end
   return p
 end
@@ -460,8 +540,8 @@ function U.Build()
   scanTip = L.CreateScanTooltip("AlexDevScanTooltip")
 
   -- col3-панели
-  panels["char.basic"] = BuildStub("Персонаж → Основное: поля Уровень/Здоровье/Мана/Ярость/Ловкость + «Сохранить».\nФаза 2 (нужны серверные сеттеры).")
-  panels["char.stats"] = BuildStub("Персонаж → Характеристики: групповой редактор (Основные/Ближний/Дальний/Магия/Защита).\nФаза 2 (расширение серверного редактора статов).")
+  panels["char.basic"] = BuildCharBasic()
+  panels["char.stats"] = BuildCharStats()
   panels["char.buff"] = BuildBuff()
   panels["trainer"] = BuildTrainer()
   panels["enemies.dummies"] = BuildActionList({
