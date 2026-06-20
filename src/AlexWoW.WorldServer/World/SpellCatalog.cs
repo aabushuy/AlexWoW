@@ -225,6 +225,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // 7 = WARRIOR_VICTORY_RUSH / HUNTER_PARRY (Counterattack/Victory Rush) — отдельная механика, пока не покрыта.
         // 0 — каст не зависит от AuraState. Проверяется в SpellCastService перед стартом каста.
         uint CasterAuraState = 0,
+        // Гейт-каст по состоянию ауры ЦЕЛИ (spell_template.TargetAuraState).
+        // 2 = AURA_STATE_HEALTHLESS_20_PERCENT — Execute/Hammer of Wrath/Drain Life: цель должна иметь
+        // HP ≤ 20%. 4 = HEALTHLESS_35_PERCENT (Soul Fire), 7 = AURA_STATE_BLEEDING (Lacerate stacks) и т.п.
+        uint TargetAuraState = 0,
         // SPELL.T1: combat ratings от баффов (фиксированный % из BasePoints+1) — ауры 47/52/54/55/57/138/140/193/216/217.
         // Применяются в RefreshMeleeAsync (crit/parry) и в свинг/каст-резолверах (haste). MOD_RATING (189)
         // несёт битовую маску CR_* в EffectMiscValue и очки рейтинга в BasePoints+1 — конверсия в %
@@ -724,6 +728,7 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             allStats,
             isPassive,
             t.CasterAuraState,
+            t.TargetAuraState,
             hitChanceFlat, spellHitChanceFlat,
             meleeCritFlat, spellCritFlat, parryFlat,
             meleeHasteFlat, rangedHasteFlat, spellHasteFlat, allHasteFlat,

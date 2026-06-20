@@ -33,6 +33,22 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
     /// Preparation добавляет ещё Kick/Blade Flurry/Dismantle — выйдет отдельным регрессионным тикетом.</summary>
     private static readonly uint[] PreparationResetSpells = [1856, 14177, 2983, 5277];
 
+    /// <summary>Проверка TargetAuraState: state=2 (HEALTHLESS_20_PERCENT) → HP цели ≤ 20%.
+    /// Будущие states (4/7/12 и т.п.) — добавлять сюда. Цель = существо в мире (по guid).</summary>
+    private static bool TargetHasAuraState(WorldSession session, ulong targetGuid, uint state)
+    {
+        if (targetGuid == 0)
+            return state == 0;
+        var creature = session.World.FindCreature(targetGuid);
+        if (creature is null || !creature.IsAlive || creature.MaxHealth == 0)
+            return false;
+        return state switch
+        {
+            2 => creature.Health * 100 <= creature.MaxHealth * 20, // HEALTHLESS_20_PERCENT
+            _ => false, // TODO: 4 (35%), 7 (BLEEDING), 12 (DEADLY_POISON), …
+        };
+    }
+
     /// <summary>Дистанция (ярды²) сдвига, прерывающая каст (поворот на месте не считается). M6.4.</summary>
     private const float InterruptMoveSq = 0.25f; // ~0.5 ярда
 
@@ -237,6 +253,17 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         // #3797 Warrior Overpower (7384): окно 5с после dodged автоатаки игрока-воина (PlayerMeleeService).
         // Аналогичный серверный гейт.
         if (spellId == 7384 && session.Combat.OverpowerWindowExpiresMs <= now)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
+            return;
+        }
+
+        // TargetAuraState (spell_template): спелл требует, чтобы у цели был активен указанный AURA_STATE.
+        // state=2 (HEALTHLESS_20_PERCENT) — Execute/Hammer of Wrath/Drain Life: цель HP ≤ 20%. Проверяем
+        // напрямую по HP цели-существа (не материализуем UNIT_FIELD_AURASTATE на NPC — серверный гейт).
+        // Будущие state: 4 (35%), 7 (Bleeding), 12 (Deadly Poison) и т.п. — по мере востребованности.
+        if (info.TargetAuraState != 0 && !TargetHasAuraState(session, targetGuid, info.TargetAuraState))
         {
             await session.SendAsync(WorldOpcode.SmsgCastFailed,
                 SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
