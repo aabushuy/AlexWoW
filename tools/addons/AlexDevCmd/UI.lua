@@ -188,7 +188,11 @@ local function BuildBuff()
   end)
   applyBtn:SetPoint("LEFT", idBox, "RIGHT", 8, 0)
   idBox:SetScript("OnEnterPressed", function() applyBtn:Click() end)
-  local allBtn = L.Button(p, "Снять все", 110, 24, function() A.Cmd(".unbuff all"); A.RequestAuras() end)
+  local allBtn = L.Button(p, "Снять все", 110, 24, function()
+    A.Cmd(".unbuff all")
+    for i = #A.auras, 1, -1 do A.auras[i] = nil end  -- оптимистично очищаем (мгновенный отклик)
+    p.list:Refresh(); A.RequestAuras()
+  end)
   allBtn:SetPoint("TOPLEFT", 6, -76)
 
   local listLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -203,7 +207,11 @@ local function BuildBuff()
       row.icon = row:CreateTexture(nil, "ARTWORK")
       row.icon:SetWidth(18); row.icon:SetHeight(18); row.icon:SetPoint("LEFT", 2, 0); L.CropIcon(row.icon)
       row.rm = L.Button(row, "Снять", 56, 18)
-      row.rm:SetScript("OnClick", function(self) A.Cmd(".unbuff " .. self.spellId); A.RequestAuras() end)
+      row.rm:SetScript("OnClick", function(self)
+        A.Cmd(".unbuff " .. self.spellId)
+        for i, a in ipairs(A.auras) do if a.spellId == self.spellId then table.remove(A.auras, i); break end end
+        p.list:Refresh(); A.RequestAuras()
+      end)
       row.rm:SetPoint("RIGHT", -2, 0)
       row.text:ClearAllPoints(); row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0); row.text:SetPoint("RIGHT", row.rm, "LEFT", -4, 0)
     end
@@ -305,7 +313,12 @@ local function BuildReagents()
       row.icon = row:CreateTexture(nil, "ARTWORK")
       row.icon:SetWidth(18); row.icon:SetHeight(18); row.icon:SetPoint("LEFT", 2, 0); L.CropIcon(row.icon)
       row.text:ClearAllPoints(); row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0); row.text:SetPoint("RIGHT", -4, 0)
+      row:SetScript("OnEnter", function(self)
+        if self.itemId then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. self.itemId); GameTooltip:Show() end
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
+    row.itemId = item.id
     local tex = GetItemIcon(item.id)
     if not tex and scanTip then scanTip:SetHyperlink("item:" .. item.id) end
     row.icon:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
@@ -431,7 +444,12 @@ local function BuildMarket()
       row.icon = row:CreateTexture(nil, "ARTWORK")
       row.icon:SetWidth(20); row.icon:SetHeight(20); row.icon:SetPoint("LEFT", 2, 0); L.CropIcon(row.icon)
       row.text:ClearAllPoints(); row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0); row.text:SetPoint("RIGHT", -4, 0)
+      row:SetScript("OnEnter", function(self)
+        if self.itemId then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. self.itemId); GameTooltip:Show() end
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
+    row.itemId = item.id
     local tex = GetItemIcon(item.id)
     if not tex and scanTip then scanTip:SetHyperlink("item:" .. item.id) end
     row.icon:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
@@ -511,7 +529,8 @@ function U.OnMarket()
   if currentPanel == "reagents" and panels.reagents then panels.reagents.refresh() end
 end
 function U.OnAuras()
-  if currentPanel == "char.buff" and panels["char.buff"] then panels["char.buff"].list:Refresh() end
+  local p = panels["char.buff"]
+  if currentPanel == "char.buff" and p then p.list.data = A.auras; p.list:Refresh() end  -- repoint: A.auras — новая таблица после AEND
 end
 
 -- ─── Построение ───

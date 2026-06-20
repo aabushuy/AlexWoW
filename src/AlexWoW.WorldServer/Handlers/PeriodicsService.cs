@@ -647,6 +647,33 @@ internal sealed class PeriodicsService(
             }), ct);
     }
 
+    /// <summary>
+    /// Dev-редактор: пуш ТОЛЬКО полей статов (UnitStat0..4 = BaseX + аур-бонусы), без пересчёта MaxHealth/Mana.
+    /// Полный <see cref="SendStatsAsync"/> завязан на <c>BaseMaxHealth</c>, который при обычном входе может быть
+    /// не инициализирован (=0) → MaxHealth схлопывается в 1. Для session-оверрайда статов это не нужно.
+    /// </summary>
+    internal Task SendStatFieldsAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        var bonus = new int[5];
+        foreach (var p in session.Progression.Periodics.Where(p => p.TargetGuid == 0 && p.StatBonus != 0))
+        {
+            if (p.AllStats) { for (var i = 0; i < 5; i++) bonus[i] += p.StatBonus; }
+            else bonus[p.StatIndex] += p.StatBonus;
+        }
+        var c = session.Combat;
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.UnitStat0, (uint)Math.Max(0, (int)c.BaseStr + bonus[0]));
+                m.SetUInt32(UpdateField.UnitStat1, (uint)Math.Max(0, (int)c.BaseAgi + bonus[1]));
+                m.SetUInt32(UpdateField.UnitStat2, (uint)Math.Max(0, (int)c.BaseSta + bonus[2]));
+                m.SetUInt32(UpdateField.UnitStat3, (uint)Math.Max(0, (int)c.BaseInt + bonus[3]));
+                m.SetUInt32(UpdateField.UnitStat4, (uint)Math.Max(0, (int)c.BaseSpi + bonus[4]));
+            }), ct);
+    }
+
     /// <summary>+AP/RAP от ауры (Боевой клич): сумма бонусов аур → UNIT_FIELD_ATTACK_POWER /
     /// UNIT_FIELD_RANGED_ATTACK_POWER (UI «Сила атаки»). Кэшируем бонус в <see cref="SessionCombatState"/>,
     /// чтобы PlayerMeleeService использовал актуальное значение в формуле автоатаки без повторного суммирования.</summary>

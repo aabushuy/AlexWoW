@@ -59,6 +59,11 @@ function U.CreateWindow(name, title, w, h)
   f:SetClampedToScreen(true)
   f:Hide()
 
+  -- Плотная чёрная подложка: DialogBox-фон полупрозрачный, сквозь него просвечивает мир. Кроем непрозрачным.
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 1)
+  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
+
   local t = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   t:SetPoint("TOP", 0, -16); t:SetText(title or "")
   f.titleFs = t
@@ -161,8 +166,12 @@ function U.Button(parent, text, w, h, onClick)
   return b
 end
 
+-- ВАЖНО: InputBoxTemplate рисует рамку дочерними текстурами $parentLeft/$parentMiddle/$parentRight —
+-- без имени фрейма $parent не резолвится и поле «разрывает». Поэтому имя ОБЯЗАТЕЛЬНО (генерируем).
+local editCounter = 0
 function U.EditBox(parent, w, h, numeric)
-  local e = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+  editCounter = editCounter + 1
+  local e = CreateFrame("EditBox", "AlexUIEditBox" .. editCounter, parent, "InputBoxTemplate")
   e:SetWidth(w); e:SetHeight(h); e:SetAutoFocus(false)
   if numeric then e:SetNumeric(true) end
   e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
