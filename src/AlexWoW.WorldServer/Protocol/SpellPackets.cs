@@ -136,6 +136,19 @@ public static class SpellPackets
     /// <summary>SPELL_HIT_TYPE_CRIT (0x02) в hit_info — клиент рисует крит (жёлтое увеличенное число). CRIT.1.</summary>
     private const uint SpellHitTypeCrit = 0x02;
 
+    /// <summary>SMSG_SPELLLOGMISS (3.3.5): u32 spellId + u64 caster + u8 unused + u32 count + по цели
+    /// u64 target + u8 missInfo. missInfo: 0=Miss, 1=Resist, 2=Dodge, 3=Parry, 4=Block, 5=Evade, 6=Immune,
+    /// 7=Immune2, 8=Deflect, 9=Absorb, 10=Reflect. Шлётся всем наблюдателям (как DamageLog).</summary>
+    public static byte[] BuildSpellMiss(ulong caster, uint spellId, ulong target, byte missInfo)
+        => new ByteWriter(26)
+            .UInt32(spellId)
+            .UInt64(caster)
+            .UInt8(0)              // unused
+            .UInt32(1)             // count = 1
+            .UInt64(target)
+            .UInt8(missInfo)
+            .ToArray();
+
     public static byte[] BuildDamageLog(ulong target, ulong attacker, uint spellId, uint damage, uint overkill, byte school, bool crit = false)
     {
         var w = new ByteWriter(48);

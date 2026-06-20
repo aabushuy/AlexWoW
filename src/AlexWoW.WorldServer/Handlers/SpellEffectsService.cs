@@ -29,6 +29,29 @@ internal sealed class SpellEffectsService(
             return; // цель пропала/мертва — спелл «впустую»
 
         session.Combat.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
+
+        // SPELL miss-резолвер: base 100% hit, штраф за разницу уровней (>3 levels above caster: −3% за уровень,
+        // +1 после 17%), плюс аура-сумма SpellHitChancePct из T1 (MOD_SPELL_HIT_CHANCE + MOD_RATING/CR_HIT_SPELL).
+        // Эталон CMaNGOS Unit::MagicSpellHitResult. Гарантированный пол — 1% (никогда не 100% miss).
+        var callerLevel = (int)(session.Character?.Level ?? 1);
+        var targetLevel = (int)creature.Template.Level;
+        var levelDiff = Math.Max(0, targetLevel - callerLevel);
+        var levelMissBase = levelDiff <= 2 ? 4 + levelDiff : 6 + (levelDiff - 2) * 11; // CMaNGOS leveldiff base miss
+        float hitBonus = 0f;
+        foreach (var p in session.Progression.Periodics)
+            if (p.TargetGuid == 0)
+                hitBonus += p.SpellHitChancePct;
+        var hitChance = 100 - levelMissBase + (int)hitBonus;
+        hitChance = Math.Clamp(hitChance, 1, 100);
+        if (hitChance < 100 && Random.Shared.Next(100) >= hitChance)
+        {
+            await session.World.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellLogMiss,
+                SpellPackets.BuildSpellMiss((ulong)session.InWorldGuid, spellId, creature.Guid, missInfo: 0), ct);
+            session.Logger.LogDebug("SPELL MISS '{User}' spell={Spell} target={Name} (lvl diff={Diff}, chance={Chance}%)",
+                session.Account, spellId, creature.Template.Name, levelDiff, hitChance);
+            return;
+        }
+
         var damage = ComputeDamage(session, info, comboPoints);
         // CRIT.1: спелл-крит — ролл шанса, на крит урон ×1.5 (множитель CMaNGOS), флаг в лог (клиент рисует крит).
         // SPELL.T2: SPELLMOD_CRITICAL_DAMAGE_BONUS (15) — талант-модификатор крит-урона (Spell Power, Vindication).

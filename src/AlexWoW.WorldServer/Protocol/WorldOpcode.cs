@@ -127,6 +127,7 @@ public enum WorldOpcode : uint
     SmsgSpellHealLog = 0x150,
     SmsgSpellEnergizeLog = 0x151,                // восполнение ресурса спеллом (плавающее «+мана») — Seal of Wisdom
     SmsgPeriodicAuraLog = 0x24E,                 // тик DoT/HoT (плавающее число) — M10.4b
+    SmsgSpellLogMiss = 0x24F,                    // спелл промахнулся/резистнут целью — клиент рисует «Miss/Resist» (SPELL.miss-resolver)
     SmsgSpellNonMeleeDamageLog = 0x250,
     SmsgPowerUpdate = 0x480,
     SmsgConvertRune = 0x486,                     // u8 index + u8 newType — конвертация руны DK в death (RUNE.5)
