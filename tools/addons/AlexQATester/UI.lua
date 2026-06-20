@@ -15,14 +15,14 @@ A.UI = A.UI or {}
 local U = A.UI
 
 -- Геометрия окна и колонок.
-local W, H = 720, 520
+local W, H = 864, 520
 local MARGIN, TOP, BOTTOM, GAP = 16, 52, 14, 10
 local INNER = W - 2 * MARGIN                 -- 688
-local UNIT = (INNER - 2 * GAP) / 6           -- 1:2:3 → 6 долей
-local COL1, COL2, COL3 = UNIT, UNIT * 2, UNIT * 3
+local UNIT = (INNER - 2 * GAP) / 8           -- 1:3:4 → 8 долей
+local COL1, COL2, COL3 = UNIT, UNIT * 3, UNIT * 4
 local COL_TOP, COL_H = -TOP, H - TOP - BOTTOM
 local LIST_ROW_H, LIST_NUM_ROWS = 22, 18
-local CHILD_W = COL3 - 28                     -- ширина контента детализации (минус скроллбар)
+local CHILD_W = COL3 - 44                     -- ширина контента детализации (минус скроллбар, отодвинутый внутрь)
 
 local mainFrame, listScroll, listRows, navButtons, scanTip
 local D = {}                                  -- виджеты детализации
@@ -68,7 +68,7 @@ local function ListRefresh()
     local t = A.tasks[i + offset]
     if t then
       row.index = i + offset
-      row.text:SetText(A.utrunc(t.title, 36))
+      row.text:SetText(A.utrunc(t.name, 44))   -- без номера тикета (t.name = заголовок без «#id - »)
       if row.index == A.selected then row.sel:Show() else row.sel:Hide() end
       row:Show()
     else
@@ -262,7 +262,7 @@ function U.Build()
   local col2x = MARGIN + COL1 + GAP
   listScroll = CreateFrame("ScrollFrame", "AlexQAListScroll", f, "FauxScrollFrameTemplate")
   listScroll:SetPoint("TOPLEFT", col2x, COL_TOP)
-  listScroll:SetWidth(COL2 - 4); listScroll:SetHeight(COL_H)
+  listScroll:SetWidth(COL2 - 20); listScroll:SetHeight(COL_H)  -- -16px: скроллбар уходит внутрь от правой кромки
   listScroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, LIST_ROW_H, ListRefresh)
   end)
@@ -286,7 +286,7 @@ function U.Build()
   -- Колонка 3 — детализация (скролл-фрейм с дочерним контентом).
   local col3x = col2x + COL2 + GAP
   D.scroll = CreateFrame("ScrollFrame", "AlexQADetailScroll", f, "UIPanelScrollFrameTemplate")
-  D.scroll:SetPoint("TOPLEFT", col3x, COL_TOP); D.scroll:SetWidth(COL3 - 8); D.scroll:SetHeight(COL_H)
+  D.scroll:SetPoint("TOPLEFT", col3x, COL_TOP); D.scroll:SetWidth(COL3 - 24); D.scroll:SetHeight(COL_H)  -- -16px: скроллбар внутрь от правой кромки
   D.child = CreateFrame("Frame", nil, D.scroll); D.child:SetWidth(CHILD_W); D.child:SetHeight(10)
   D.scroll:SetScrollChild(D.child)
 
