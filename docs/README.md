@@ -14,6 +14,7 @@
 | [Деплой](deployment.md) | Выкладка на homeserver (локальная сборка → бинарники); веб-панель за Caddy |
 | [Code style](code-style.md) | C#-конвенции репо: язык, нейминг, форматирование |
 | [Onboarding](onboarding/) | Setup self-hosted runners, sample-конфиги SSH/MCP |
+| [Разработка аддонов](onboarding/addon-development.md) | Клиентские аддоны: окружение, проверки без клиента (luacheck + luajit), трекинг |
 | Дашборд `alexwow.home.srv/dashboard` | Живой прогресс по доменам (БД `project`) |
 
 ## Как ведём документацию

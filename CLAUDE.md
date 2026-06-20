@@ -16,6 +16,12 @@
 
 Задачи по проекту ведутся в **БД `project`** на домашнем сервере (MySQL на `home.srv` / `192.168.2.210`).
 
+## Аддоны
+
+Клиентские аддоны (WoW 3.3.5a, Lua) — в `tools/addons/`. Настройка разработки и тестирования
+(в т.ч. проверки **без запуска клиента**: `pwsh tools/addons/run-checks.ps1`) — в
+`docs/onboarding/addon-development.md`. Все задачи по аддонам — в эпике **Addons** (канбан, project 41).
+
 ## Инфраструктура / Homeserver
 
 Справка: `D:\Seafile\Home Library\Knowledge Base\20 IT\10 Homeserver.md`
