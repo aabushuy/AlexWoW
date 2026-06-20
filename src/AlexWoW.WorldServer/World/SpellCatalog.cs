@@ -45,6 +45,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int EffectEnchantItemTemporary = 54;   // §8 временный энчант оружия (яды/имбу): MiscValue = SpellItemEnchantment id
     private const int EffectEnergize = 30;               // начисление ресурса (MiscValue = power type) — M10.6
     private const int EffectDummy = 3;                   // dummy — скриптовый эффект (ярость Рывка) — M10.6
+    // SPELL.T5 (стаб): area-auras — основа тотемов шамана, аур паладина, аспектов охотника на пати.
+    // Полная реализация (спавн объекта, тик периодического эффекта, апплай аур на ближних пати) —
+    // отдельный регрессионный тикет (потребует World/Totem.cs + tick-loop).
+    private const int EffectPersistentAreaAura = 27;     // SPELL_EFFECT_PERSISTENT_AREA_AURA — стационарный AoE источник (totem, Blizzard, Hurricane).
+    private const int EffectApplyAreaAura = 35;          // SPELL_EFFECT_APPLY_AREA_AURA — аура на всех пати в радиусе кастера (Paladin auras, Aspect of the Hawk).
     // AuraType (EffectApplyAuraName*, CMaNGOS): периодический урон/хил + простой бонус к HP.
     private const int AuraPeriodicDamage = 3;
     private const int AuraPeriodicHeal = 8;
@@ -651,6 +656,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         // DummyAuraRegistry по spellId; на парсинге достаточно знать, что hook надо дёрнуть.
         var hasDummy = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraDummy);
         var hasOverrideClassScripts = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraOverrideClassScripts);
+        // SPELL.T5 (стаб): area-auras (тотемы шамана / ауры паладина / аспекты охотника). Парсинг и
+        // настоящая реализация — в отдельных регрессионных тикетах (нужен World/Totem.cs spawn-объект,
+        // tick-loop, broadcast-аур ближним пати).
 
         // MOD_RATING (189): EffectMiscValue = битмаска CR_*, BasePoints+1 = очки. Конверсия в % — в рантайме
         // (нужен уровень кастера → PeriodicsService.ApplyAuraEffectAsync).
