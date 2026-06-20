@@ -8,6 +8,7 @@ using AlexWoW.DataStores.Terrain;
 using AlexWoW.WorldServer;
 using AlexWoW.WorldServer.Handlers;
 using AlexWoW.WorldServer.Handlers.Dev;
+using AlexWoW.WorldServer.Handlers.Spells;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
 using Microsoft.EntityFrameworkCore;
@@ -107,6 +108,9 @@ builder.Services.AddSingleton<AlexWoW.WorldServer.Handlers.Pet.HunterPetService>
 // Опкод-модули + роутер (M7 #35): модули — DI-синглтоны (скан сборки), роутер собирает их методы
 // с [WorldOpcodeHandler] в таблицу. Сессии создаёт фабрика с parameter object (без service locator).
 builder.Services.AddWorldOpcodeHandlers();
+// SPELL.T2: реестр DUMMY/OVERRIDE_CLASS_SCRIPTS-обработчиков (per-spellId скрипты талантов/абилок) —
+// сканом сборки на [DummyAuraHandler(spellId)]. Hook'и из PeriodicsService (apply/remove) и ProcService (proc).
+builder.Services.AddDummyAuraHandlers();
 builder.Services.AddSingleton<AddonProtocol>(); // не модуль (своих опкодов нет) — сервис для ChatHandlers (M7 #36)
 // M7 S3: спелл-кластер — статики сконвертированы в stateless DI-синглтоны (данные спеллов, оркестрация
 // каста и его завершение, ауры/периодика и их персист, реген ресурсов, переключатели, эффекты, крафт).

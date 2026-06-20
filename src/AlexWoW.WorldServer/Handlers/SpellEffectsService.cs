@@ -31,9 +31,15 @@ internal sealed class SpellEffectsService(
         session.Combat.LastCombatMs = now; // M6.7: урон спеллом — пауза внебоевого регена HP
         var damage = ComputeDamage(session, info, comboPoints);
         // CRIT.1: спелл-крит — ролл шанса, на крит урон ×1.5 (множитель CMaNGOS), флаг в лог (клиент рисует крит).
-        var crit = RollSpellCrit(session);
+        // SPELL.T2: SPELLMOD_CRITICAL_DAMAGE_BONUS (15) — талант-модификатор крит-урона (Spell Power, Vindication).
+        // База 50% доп. урона (×1.5); талант добавляет/умножает % к самому БОНУСУ, не к итогу.
+        var crit = RollSpellCrit(session, info);
         if (crit)
-            damage = damage * 3 / 2;
+        {
+            const int baseCritBonusPct = 50; // ×1.5 = +50%
+            var critBonusPct = SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.CriticalDamage, baseCritBonusPct);
+            damage = (uint)(damage + damage * Math.Max(0, critBonusPct) / 100L);
+        }
         // §3 Curse of the Elements: +% урона совпадающей школы по проклятой цели (амплификация магического урона).
         damage = (uint)PeriodicsService.CurseAmplify(session, creature.Guid, info.School, (int)damage);
         var (_, overkill, died) = session.World.ApplyCreatureDamage(creature, damage);
@@ -238,7 +244,7 @@ internal sealed class SpellEffectsService(
         if (targetGuid != 0 && session.World.FindCreature(targetGuid) is { } healDummy
             && Protocol.Npcs.IsHealDummy(healDummy.Template.Entry) && healDummy.IsAlive)
         {
-            var critH = RollSpellCrit(session);
+            var critH = RollSpellCrit(session, info);
             var amt = ComputeHealAmount(session, info);
             if (critH) amt = amt * 3 / 2; // CRIT.1: крит-хил ×1.5
             // §8 Wound Poison: входящее лечение цели снижено на % дебаффа лечения от кастера.
@@ -264,7 +270,7 @@ internal sealed class SpellEffectsService(
             return;
 
         var ts = target.Session;
-        var critHeal = RollSpellCrit(session);
+        var critHeal = RollSpellCrit(session, info);
         var amount = ComputeHealAmount(session, info);
         if (critHeal) amount = amount * 3 / 2; // CRIT.1: крит-хил ×1.5
         var before = ts.Combat.Health;
@@ -281,14 +287,16 @@ internal sealed class SpellEffectsService(
     }
 
     /// <summary>CRIT.1: ролл спелл-крита — база (.setcrit / интеллект-вклад) +
-    /// SPELL.T1 аура-сумма (MOD_SPELL_CRIT_CHANCE/55 + MOD_RATING/CR_CRIT_SPELL).</summary>
-    private static bool RollSpellCrit(WorldSession session)
+    /// SPELL.T1 аура-сумма (MOD_SPELL_CRIT_CHANCE/55 + MOD_RATING/CR_CRIT_SPELL) +
+    /// SPELL.T2 SPELLMOD_CRITICAL_CHANCE талантов (Holy Spec, Imp. Scorch — через семейство/маску).</summary>
+    private static bool RollSpellCrit(WorldSession session, SpellCatalog.SpellInfo info)
     {
         float auraBonus = 0f;
         foreach (var p in session.Progression.Periodics)
             if (p.TargetGuid == 0)
                 auraBonus += p.SpellCritChancePct;
-        var chance = session.Cast.SpellCritChance + auraBonus;
+        var baseChance = session.Cast.SpellCritChance + (int)auraBonus;
+        var chance = SpellModifiers.Apply(session.Progression.SpellMods, info, SpellModOp.CritChance, baseChance);
         return chance > 0 && Random.Shared.NextDouble() * 100.0 < chance;
     }
 

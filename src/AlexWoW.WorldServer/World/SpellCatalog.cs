@@ -81,6 +81,9 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
     private const int AuraModHasteAll = 193;             // +% ко всему (мили + дальний + спелл + GCD).
     private const int AuraHasteSpells = 216;             // +% к скорости каста спеллов.
     private const int AuraModRating = 189;               // комбинированный rating-аура: EffectMiscValue = битмаска CR_*, BasePoints+1 = очки рейтинга (конвертируются в % на уровне кастера).
+    // SPELL.T2: per-spellId скриптовые ауры (DummyAuraRegistry). Парсим как флаг — обработчик сам читает контекст.
+    private const int AuraDummy = 4;                     // SPELL_AURA_DUMMY — кастомная логика per-spellId (Ignite/Clearcasting/Vigilance/Earth Shield/…).
+    private const int AuraOverrideClassScripts = 112;    // SPELL_AURA_OVERRIDE_CLASS_SCRIPTS — то же, через scriptId (EffectMiscValue).
     // CC-ауры (SpellAuraDefines.h): контроль цели. MiscValue не нужен — тип определяем по самой ауре.
     private const int AuraModConfuse = 5;                // дезориентация (Polymorph/Blind)
     private const int AuraModFear = 7;                   // страх (Psychic Scream/Fear)
@@ -210,7 +213,10 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         float HitChanceFlat = 0f, float SpellHitChanceFlat = 0f,
         float MeleeCritFlat = 0f, float SpellCritFlat = 0f, float ParryFlat = 0f,
         float MeleeHasteFlat = 0f, float RangedHasteFlat = 0f, float SpellHasteFlat = 0f, float AllHasteFlat = 0f,
-        uint RatingMask = 0u, int RatingValue = 0);
+        uint RatingMask = 0u, int RatingValue = 0,
+        // SPELL.T2: спелл несёт DUMMY (4) или OVERRIDE_CLASS_SCRIPTS (112) аура-эффект → DummyAuraRegistry
+        // получает hook на apply/remove/proc. Сам обработчик резолвится по spellId.
+        bool HasDummyAura = false, bool HasOverrideClassScripts = false);
 
     /// <summary>Вид контроля (CC, Фаза 2): по типу CC-ауры спелла. None — не контроль.</summary>
     public enum CrowdControlKind : byte { None = 0, Stun = 1, Root = 2, Fear = 3, Silence = 4, Disorient = 5 }
@@ -641,6 +647,11 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
         var rangedHasteFlat = ratingPct(AuraModRangedHaste);
         var spellHasteFlat = ratingPct(AuraHasteSpells);
         var allHasteFlat = ratingPct(AuraModHasteAll);
+        // SPELL.T2: DUMMY (4) / OVERRIDE_CLASS_SCRIPTS (112) — флаг наличия. Обработчик резолвится в
+        // DummyAuraRegistry по spellId; на парсинге достаточно знать, что hook надо дёрнуть.
+        var hasDummy = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraDummy);
+        var hasOverrideClassScripts = effects.Any(e => e.Eff == EffectApplyAura && e.Aura == AuraOverrideClassScripts);
+
         // MOD_RATING (189): EffectMiscValue = битмаска CR_*, BasePoints+1 = очки. Конверсия в % — в рантайме
         // (нужен уровень кастера → PeriodicsService.ApplyAuraEffectAsync).
         var ratingIdx = Array.FindIndex(effects, e => e.Eff == EffectApplyAura && e.Aura == AuraModRating);
@@ -685,7 +696,8 @@ public sealed class SpellCatalog(IWorldRepository worldDb, ILogger<SpellCatalog>
             hitChanceFlat, spellHitChanceFlat,
             meleeCritFlat, spellCritFlat, parryFlat,
             meleeHasteFlat, rangedHasteFlat, spellHasteFlat, allHasteFlat,
-            ratingMask, ratingValue);
+            ratingMask, ratingValue,
+            hasDummy, hasOverrideClassScripts);
     }
 
     private static void AddReagent(ref List<(uint Item, uint Count)>? reagents, int item, uint count)

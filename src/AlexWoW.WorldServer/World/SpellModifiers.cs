@@ -11,14 +11,32 @@ public enum SpellModOp : byte
 {
     Damage = 0,         // SPELLMOD_DAMAGE — итоговый урон/хил
     Duration = 1,       // SPELLMOD_DURATION — длительность ауры
+    Threat = 2,         // SPELLMOD_THREAT — угроза (для танк-талантов: ↑ Warrior, ↓ Hunter Misdirection)
     Effect1 = 3,        // SPELLMOD_EFFECT1 — величина эффекта 1 (напр. Improved Rend → тик Кровопускания)
+    Charges = 4,        // SPELLMOD_CHARGES — число зарядов ауры (Lightning Shield, Fingers of Frost)
+    Range = 5,          // SPELLMOD_RANGE — дальность каста (Reach of the Drahkin'tar и т.п.)
+    Radius = 6,         // SPELLMOD_RADIUS — радиус AoE-эффекта
+    CritChance = 7,     // SPELLMOD_CRITICAL_CHANCE — +% к крит-шансу спелла (Holy Specialization, Imp. SCorch)
     AllEffects = 8,     // SPELLMOD_ALL_EFFECTS — величины всех эффектов (напр. Improved Cleave)
+    NotLoseCastingTime = 9, // SPELLMOD_NOT_LOSE_CASTING_TIME — каст не сбрасывается уроном (Concentration Aura)
     CastingTime = 10,   // SPELLMOD_CASTING_TIME — время каста
     Cooldown = 11,      // SPELLMOD_COOLDOWN — кулдаун
     Effect2 = 12,       // SPELLMOD_EFFECT2
+    IgnoreArmor = 13,   // SPELLMOD_IGNORE_ARMOR — игнор брони (Hand of Reckoning и т.п.)
     Cost = 14,          // SPELLMOD_COST — стоимость ресурса (напр. Improved Heroic Strike)
+    CriticalDamage = 15, // SPELLMOD_CRITICAL_DAMAGE_BONUS — множитель крит-урона (Spell Power, Vindication)
+    ResistMissChance = 16, // SPELLMOD_RESIST_MISS_CHANCE — снижает шанс резиста (Imp. Faerie Fire, Surge of Light)
+    JumpTargets = 17,   // SPELLMOD_JUMP_TARGETS — число прыжков (Chain Lightning, Chain Heal, Glyph of CL)
+    ResistDispelChance = 18, // SPELLMOD_RESIST_DISPEL_CHANCE — сопротивление диспелу (Persistence)
+    RadiusModifier = 19, // SPELLMOD_RADIUS_MODIFIER — % к радиусу (Glyph of Healing Wave area)
+    Reflect = 20,       // SPELLMOD_REFLECT — % отражения (Spell Reflection talents)
     Dot = 22,           // SPELLMOD_DOT — величина периодического тика
     Effect3 = 23,       // SPELLMOD_EFFECT3
+    SpellBonusDamage = 24, // SPELLMOD_SPELL_BONUS_DAMAGE — бонус-урон от spell power
+    GlobalCooldown = 26, // SPELLMOD_GLOBAL_COOLDOWN — модификатор GCD (Glyph of XYZ, Tunnel Vision)
+    PeriodicDamage = 27, // SPELLMOD_PERIODIC_DAMAGE — % к периодическому урону (Glyph of Curse of Agony)
+    MultipleValue = 28, // SPELLMOD_MULTIPLE_VALUE — мультипликатор (Glyph of Frostbolt и т.п.)
+    ResistPowerCost = 29, // SPELLMOD_RESIST_POWER_COST — % шанс не потратить ресурс при касте
 }
 
 /// <summary>

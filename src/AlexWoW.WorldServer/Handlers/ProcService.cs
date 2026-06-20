@@ -1,6 +1,7 @@
 // Порт CMaNGOS-WoTLK: src/game/Spells/UnitAuraProcHandler.cpp (Unit::ProcDamageAndSpell, ~4372 строки)
 // https://github.com/cmangos/mangos-wotlk/blob/master/src/game/Spells/UnitAuraProcHandler.cpp. GPL-2.0.
 
+using AlexWoW.WorldServer.Handlers.Spells;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.World;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,7 @@ namespace AlexWoW.WorldServer.Handlers;
 /// CMaNGOS (HandleDummyAuraProc, HandleProcTriggerSpellAuraProc, HandleHasteAuraProc и т.п. — пока
 /// унифицированный шанс-триггер для всех).
 /// </remarks>
-internal sealed class ProcService(SpellCatalog spellCatalog, AuraService auras)
+internal sealed class ProcService(SpellCatalog spellCatalog, AuraService auras, DummyAuraRegistry dummyAuras)
 {
     /// <summary>
     /// Событие <paramref name="procFlag"/> произошло на сессии <paramref name="session"/>.
@@ -51,12 +52,23 @@ internal sealed class ProcService(SpellCatalog spellCatalog, AuraService auras)
         var now = Environment.TickCount64;
         SpellCatalog.SpellInfo? sourceSpell = null; // ленивая загрузка для T5
 
+        // SPELL.T2: контекст прока — единожды на TryProc (передаётся DUMMY-обработчикам). Кастером
+        // считается owner сессии; контекст не зависит от конкретной ауры.
+        var dummyCtx = new DummyProcContext(procFlag, procEx, spellSchoolMask, sourceSpellId, weaponAttackSpeedMs);
+
         foreach (var aura in session.Progression.Auras.ToList())
         {
             // §8 Печати паладина — on-hit прок обрабатывает SealService (по свингу), НЕ дублируем generic-проком:
             // иначе триггер-спелл печати наложился бы на САМОГО паладина как само-бафф (Печать справедливости →
             // оглушение себя; Печать мудрости/света → дубль-аура «второй печатью», ломающая эксклюзивность).
             if (SpellCatalog.ExclusiveAuraGroup(aura.SpellId) == SpellCatalog.GroupPaladinSeal)
+                continue;
+
+            // SPELL.T2: per-spellId DUMMY-обработчик (talent script) может «съесть» прок (Ignite, Clearcasting,
+            // Earth Shield и т.п.). Если он вернул true — generic-триггер (info.ProcTriggerSpellId) НЕ запускаем.
+            // Зовём ДО проверки info, чтобы покрыть DUMMY-ауры без ProcTriggerSpellId в spell_template.
+            if (dummyAuras.Has(aura.SpellId)
+                && await dummyAuras.OnProcAsync(session, aura.SpellId, dummyCtx, ct))
                 continue;
 
             var info = await spellCatalog.GetAsync(aura.SpellId, ct);

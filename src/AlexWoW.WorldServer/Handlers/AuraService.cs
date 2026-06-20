@@ -1,4 +1,5 @@
 using AlexWoW.Database.Abstractions;
+using AlexWoW.WorldServer.Handlers.Spells;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -12,7 +13,10 @@ namespace AlexWoW.WorldServer.Handlers;
 /// M6.12; формы друида — позже). Фундамент под расход/эффекты абилок и баффы спеллов. Точка применения —
 /// каст спелла с аура-эффектом (SpellHandlers). Персист через релог — <see cref="AuraPersistenceService"/>.
 /// </summary>
-internal sealed class AuraService(ICharacterStateRepository charState, CombatResourcesService combatResources)
+internal sealed class AuraService(
+    ICharacterStateRepository charState,
+    CombatResourcesService combatResources,
+    DummyAuraRegistry dummyAuras)
 {
     private const int MaxAuraSlots = 56; // визуальные слоты аур игрока (3.3.5)
 
@@ -91,6 +95,10 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
             try { await charState.AddAuraAsync(session.InWorldGuid, spellId, form, ct); }
             catch { /* персист не критичен для текущей сессии */ }
         }
+
+        // SPELL.T2: per-spellId скрипт ауры (Ignite/Clearcasting/Vigilance/…). Если зарегистрирован —
+        // дёргаем OnApplyAsync. Резолв обработчика — O(1) (фрозен-словарь), для незарегистрированных no-op.
+        await dummyAuras.OnApplyAsync(session, spellId, ct);
     }
 
     /// <summary>Снимает ауру по spellId, если есть (M6.11).</summary>
@@ -148,6 +156,10 @@ internal sealed class AuraService(ICharacterStateRepository charState, CombatRes
         // Скорость: пересчитать без снятой ауры (вернуть к базе или к меньшему бонусу).
         if (aura.SpeedPctBonus != 0)
             await SendSpeedAsync(session, ct);
+
+        // SPELL.T2: per-spellId скрипт ауры — откат побочных эффектов apply'я (Vigilance снять threat-передачу,
+        // Earth Shield убрать proc-источник и т.п.). Резолв обработчика — O(1), no-op для незарегистрированных.
+        await dummyAuras.OnRemoveAsync(session, aura.SpellId, ct);
     }
 
     /// <summary>Базовая скорость бега (ярд/с), CMaNGOS PLAYER_BASE_RUN_SPEED.</summary>

@@ -115,8 +115,10 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
         {
             var castMs = Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.CastingTime, info.CastMs));
             var cooldownMs = Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.Cooldown, info.CooldownMs));
-            if (castMs != info.CastMs || cooldownMs != info.CooldownMs)
-                info = info with { CastMs = castMs, CooldownMs = cooldownMs };
+            // SPELL.T2: GLOBAL_COOLDOWN (26) — талант-модификатор GCD (Glyph of Frostbolt и т.п.).
+            var gcdMs = (uint)Math.Max(0, SpellModifiers.Apply(mods, info, SpellModOp.GlobalCooldown, (int)info.GcdMs));
+            if (castMs != info.CastMs || cooldownMs != info.CooldownMs || gcdMs != info.GcdMs)
+                info = info with { CastMs = castMs, CooldownMs = cooldownMs, GcdMs = gcdMs };
         }
 
         // SPELL.T1: spell haste — суммарный +% от активных аур (HASTE_SPELLS + HASTE_ALL) делит CastingTime
