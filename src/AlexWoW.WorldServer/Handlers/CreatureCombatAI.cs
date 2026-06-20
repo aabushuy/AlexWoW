@@ -214,6 +214,12 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             // kill — отдельная итерация).
             if (outcome == CombatStats.MeleeOutcome.Parry && pclass == 3)
                 await auraState.SetHunterParryAsync(player.Session, now, ct);
+
+            // #3797 DK Rune Strike: успешный dodge/parry у DK (class=6) → 5-секундное серверное окно
+            // (без клиентского AURA_STATE — Rune Strike не использует бит UNIT_FIELD_AURASTATE).
+            // SpellCastService проверит RuneStrikeWindowExpiresMs для spellId 56815/56816.
+            if (pclass == 6 && (outcome == CombatStats.MeleeOutcome.Dodge || outcome == CombatStats.MeleeOutcome.Parry))
+                player.Session.Combat.RuneStrikeWindowExpiresMs = now + AuraStateService.DefenseStateDurationMs;
             // CRIT.2: крит существа по игроку (фикс. шанс) — только по прошедшему удару, ×2 + флаг (клиент рисует крит).
             var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < CreatureCritChance;
             if (crit)

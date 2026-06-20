@@ -93,6 +93,11 @@ internal sealed class SessionCombatState
     /// Ставится KillRewardService для класса воина на 20с. 0 — state не активен.</summary>
     internal long VictoryRushStateExpiresMs { get; set; }
 
+    /// <summary>#3797 DK Rune Strike (56815/56816): окно 5с после успешного dodge/parry игроком (только
+    /// класс DK=6). Чисто серверный гейт — клиентский AURA_STATE для Rune Strike не задействован (кнопка
+    /// активна всегда после изучения, попытка каста вне окна → SPELL_FAILED_CASTER_AURASTATE).</summary>
+    internal long RuneStrikeWindowExpiresMs { get; set; }
+
     /// <summary>DEFENSE.1: момент истечения AURA_STATE_DEFENSE (мс). Ставится на 5с при успешном
     /// dodge/parry/block игрока (CreatureCombatAI ApplyResolveOutcome). Гейт каста Revenge:
     /// SpellCastService отказывает, если spell.CasterAuraState=1 и now &gt;= DefenseStateExpiresMs.
@@ -142,6 +147,8 @@ internal sealed class SessionCombatState
         Runes = [];           // RUNE.1: руны переинициализируются при входе в мир
         DefenseStateExpiresMs = 0; // DEFENSE.1: окно Revenge не переживает выход
         HunterParryStateExpiresMs = 0; // DEFENSE.2: окно Counterattack не переживает выход
+        VictoryRushStateExpiresMs = 0; // SPELL.T3: окно Victory Rush не переживает выход
+        RuneStrikeWindowExpiresMs = 0; // #3797: окно Rune Strike не переживает выход
     }
 }
 

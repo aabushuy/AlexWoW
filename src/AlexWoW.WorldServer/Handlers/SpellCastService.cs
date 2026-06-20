@@ -225,6 +225,15 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
             return;
         }
 
+        // #3797 DK Rune Strike (56815/56816): окно открывается на 5с при dodge/parry DK'ом (CreatureCombatAI).
+        // Чисто серверный гейт (без AURA_STATE-бита) — вне окна каст отказан тем же кодом отказа.
+        if (spellId is 56815 or 56816 && session.Combat.RuneStrikeWindowExpiresMs <= now)
+        {
+            await session.SendAsync(WorldOpcode.SmsgCastFailed,
+                SpellPackets.BuildCastFailed(castCount, spellId, CastResultCasterAurastate), ct);
+            return;
+        }
+
         // Запускаем GCD от этого каста (для последующих).
         if (info.GcdMs > 0)
             session.Cast.GcdEndMs = now + info.GcdMs;
@@ -242,6 +251,11 @@ internal sealed class SpellCastService(SpellCatalog spellCatalog, SpellGoSender 
                 session.Cast.SpellCooldowns.Remove(sid);
             session.Logger.LogDebug("PREPARATION '{User}': сброс CD {Count} абилок", session.Account, PreparationResetSpells.Length);
         }
+
+        // #3797 DK Rune Strike (56815/56816): окно «потрачено» успешным кастом — снимаем таймер, чтобы
+        // повторный каст в том же окне без нового dodge/parry попадал в гейт-отказ.
+        if (spellId is 56815 or 56816)
+            session.Combat.RuneStrikeWindowExpiresMs = 0;
 
         // DEFENSE.1/.2: каст состоялся (гейт пройден) — потратили окно state'а. Revenge/Counterattack
         // мгновенные (CastMs=0), поэтому очищаем сразу здесь, до CompleteCast. ClearAfterCastAsync —
