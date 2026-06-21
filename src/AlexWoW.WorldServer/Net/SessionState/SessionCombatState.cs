@@ -58,6 +58,10 @@ internal sealed class SessionCombatState
     internal float BlockPct { get; set; }
     /// <summary>Шанс мили-крита (%) из статов (кэш RefreshMeleeAsync) — ролл крита автоатаки/мили-абилки. CRIT.2.</summary>
     internal float MeleeCritPct { get; set; }
+    /// <summary>Ф2 #1: рейтинг меткости (combat rating, очки) — session-оверрайд dev-редактора. Конвертируется
+    /// в % снижения промаха автоатаки/мили-абилок (CombatRatingConversion) и пушится в
+    /// PLAYER_FIELD_COMBAT_RATING_1[HitMelee] для отображения «Рейтинг меткости» в листе персонажа.</summary>
+    internal uint BaseMeleeHitRating { get; set; }
     internal uint ArmorValue { get; set; }
     /// <summary>Базовая сила атаки (мили) из статов/класса — кэш RefreshMeleeAsync. Используется в формуле
     /// автоатаки игрока и при отдельной пересылке поля UNIT_FIELD_ATTACK_POWER (PeriodicsService.SendAttackPowerAsync).</summary>

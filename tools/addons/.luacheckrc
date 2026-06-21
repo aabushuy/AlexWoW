@@ -13,6 +13,7 @@ stds.wow = {
     "UnitName", "UnitClass", "UnitLevel",
     "UnitHealth", "UnitPower", "UnitPowerMax", "UnitStat", "UnitAttackPower", "UnitRangedAttackPower",
     "GetCritChance", "GetDodgeChance", "GetParryChance", "GetBlockChance",
+    "GetCombatRating", "CR_HIT_MELEE",
     "GetCursorPosition", "GetItemIcon", "GetSpellInfo",
     "strsplit", "wipe",
     -- Глобальные таблицы / фреймы клиента

@@ -136,6 +136,13 @@ public static class UpdateField
     public const int PlayerRangedCritPercentage = 0x0406; // UNIT_END + 0x372
     public const int PlayerOffhandCritPercentage = 0x0407; // UNIT_END + 0x373
 
+    /// <summary>PLAYER_FIELD_COMBAT_RATING_1 (UNIT_END 0x94 + 0x43B), 25 INT — combat ratings (meткость/
+    /// крит/мастерство/защита/устойчивость…). Индекс поля = (int)<see cref="DataStores.CombatRatingConversion.CombatRating"/>
+    /// (HitMelee=5, Expertise=23 и т.д.). Пейпердолл показывает «Рейтинг меткости/Мастерство» отсюда. Сверено с CMaNGOS.</summary>
+    public const int PlayerCombatRating1 = 0x04CF;
+    /// <summary>Поле combat rating по индексу типа (0..24): PLAYER_FIELD_COMBAT_RATING_1 + index.</summary>
+    public static int CombatRatingField(int ratingIndex) => PlayerCombatRating1 + ratingIndex;
+
     /// <summary>Поле OBJECT_FIELD_ENTRYID видимого предмета для слота экипировки 0..18.</summary>
     public static int VisibleItemEntry(int equipSlot) => PlayerVisibleItem1EntryId + equipSlot * 2;
 

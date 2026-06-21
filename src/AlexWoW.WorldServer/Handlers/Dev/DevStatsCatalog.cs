@@ -4,7 +4,7 @@ using AlexWoW.WorldServer.Net;
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>Что пушить клиенту после записи стата (Ф2 dev-редактор). None — только серверный combat-кэш.</summary>
-internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic, AttackPower }
+internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic, AttackPower, CombatRatings }
 
 /// <summary>
 /// §178/Ф2 Каталог редактируемых характеристик для dev-панелей аддона («Основное» и «Характеристики»).
@@ -38,6 +38,8 @@ internal sealed class DevStatsCatalog
         // Сила атаки (мили/дальний) — session-оверрайд BaseX AP, читается формулой автоатаки; пуш UNIT_FIELD_ATTACK_POWER.
         new("attackpower", "Ближний бой", "Сила атаки", s => s.Combat.BaseMeleeAttackPower, (s, v) => s.Combat.BaseMeleeAttackPower = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.AttackPower),
         new("rangedap", "Дальний бой", "Сила атаки", s => s.Combat.BaseRangedAttackPower, (s, v) => s.Combat.BaseRangedAttackPower = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.AttackPower),
+        // Ф2 #1: рейтинг меткости (combat rating) — снижает промах игрока; пуш в PLAYER_FIELD_COMBAT_RATING_1[HitMelee].
+        new("hitmelee", "Ближний бой", "Рейт. меткости", s => s.Combat.BaseMeleeHitRating, (s, v) => s.Combat.BaseMeleeHitRating = (uint)Math.Max(0, v), 0, 10_000, StatPush.CombatRatings),
         // Вторичные (существующие) — кэш combat-резолвера, перезаписывается RefreshMeleeAsync. Группы — для UI.
         new("critmelee", "Ближний бой", "Крит ближнего боя, %", s => s.Combat.MeleeCritPct, (s, v) => s.Combat.MeleeCritPct = (float)v, 0, 100, StatPush.None),
         new("wpnmin", "Ближний бой", "Урон оружия (мин)", s => s.Combat.WeaponMinDamage, (s, v) => s.Combat.WeaponMinDamage = (float)v, 0, 1_000_000, StatPush.None),

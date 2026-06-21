@@ -133,6 +133,7 @@ local STAT_DEFS = {
   } },
   { g = "Ближний бой", rows = {
     { "attackpower", "Сила атаки", function() local b, p, n = UnitAttackPower("player"); return (b or 0) + (p or 0) + (n or 0) end },
+    { "hitmelee", "Рейт. меткости", function() return GetCombatRating and GetCombatRating(CR_HIT_MELEE or 6) end },
     { "critmelee", "Крит, %", function() return GetCritChance and math.floor(GetCritChance()) end },
     { "wpnmin", "Урон оружия (мин)" }, { "wpnmax", "Урон оружия (макс)" }, { "wpnspeed", "Скорость оружия, мс" },
   } },

@@ -696,6 +696,20 @@ internal sealed class PeriodicsService(
             }), ct);
     }
 
+    /// <summary>Ф2 #1: пуш combat-rating оверрайдов dev-редактора в PLAYER_FIELD_COMBAT_RATING_1 (лист персонажа
+    /// показывает «Рейтинг меткости» и т.п.). Пока — меткость; expertise/защита/устойчивость добавятся сюда же.</summary>
+    internal Task SendCombatRatingsAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.HitMelee),
+                    session.Combat.BaseMeleeHitRating);
+            }), ct);
+    }
+
     private async Task RemoveAsync(WorldSession session, PeriodicEffect p, CancellationToken ct)
     {
         session.Progression.Periodics.Remove(p);

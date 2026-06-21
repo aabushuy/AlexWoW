@@ -1,3 +1,4 @@
+using AlexWoW.DataStores;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -132,6 +133,9 @@ internal sealed class PlayerMeleeService(
             critAuraBonus += p.MeleeCritChancePct;
             expertiseBonus += p.ExpertiseReductionPct;
         }
+        // Ф2 #1: session-оверрайд рейтинга меткости из dev-редактора → % снижения промаха (та же конверсия, что у аур).
+        hitAuraBonus += CombatRatingConversion.ToPct(CombatRatingConversion.CombatRating.HitMelee,
+            (int)session.Combat.BaseMeleeHitRating, level);
         var resolved = OutgoingMeleeResolver.Resolve(level, targetLevel,
             hitAuraBonus, session.Combat.MeleeCritPct + critAuraBonus, expertiseBonus,
             isAutoAttack, Random.Shared.NextDouble());
