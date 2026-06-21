@@ -23,8 +23,13 @@ namespace AlexWoW.WorldServer.Handlers;
 /// </summary>
 internal sealed class AddonProtocol(
     DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items,
-    IKanbanBoardRepository kanban, ISpellDetailRepository spellDetails, ITeleportRepository teleports)
+    IKanbanBoardRepository kanban, ISpellDetailRepository spellDetails, ITeleportRepository teleports,
+    IVendorRepository vendors)
 {
+    /// <summary>Entry тестового вендора материалов/инструментов профессий («Tradesman Kontor», Trade Supplies):
+    /// нитки/флюс/краска/флаконы/пергамент/молоты и т.п. Тот же, что ставит <c>.reagentvendor</c>. Профессия → Вендор.</summary>
+    private const uint ProfVendorEntry = 27021;
+
     public const uint LangAddon = 0xFFFFFFFF;
     private const byte ChatMsgWhisper = 0x07; // тип чата для addon-сообщения (как в TrinityCore)
 
@@ -55,6 +60,12 @@ internal sealed class AddonProtocol(
         if (body.StartsWith("itemsearch", StringComparison.Ordinal))
         {
             await SendItemSearchAsync(session, body, ct);
+            return;
+        }
+
+        if (body == "vendoritems")
+        {
+            await SendVendorItemsAsync(session, ct);
             return;
         }
 
@@ -184,6 +195,30 @@ internal sealed class AddonProtocol(
         await SendLineAsync(session, "IBEGIN", ct);
         foreach (var it in results)
             await SendLineAsync(session, $"I|{it.Entry}|{it.Quality}|{it.ItemLevel}|{it.RequiredLevel}|{it.Name.Replace('|', ' ')}", ct);
+        await SendLineAsync(session, "IEND", ct);
+    }
+
+    /// <summary>
+    /// Профессия → Вендор: ассортимент тестового вендора материалов/инструментов (<see cref="ProfVendorEntry"/>) —
+    /// тот же кадр <c>IBEGIN</c>/<c>I|id|q|ilvl|reqlvl|name</c>/<c>IEND</c>, что и поиск рынка (аддон кладёт в общий
+    /// список + «Взять» = <c>.additem</c>). Качество/уровень не из npc_vendor → 0 (аддон рисует иконку+имя). Не-админу — ничего.
+    /// </summary>
+    private async Task SendVendorItemsAsync(WorldSession session, CancellationToken ct)
+    {
+        if (!session.IsAdmin)
+            return;
+
+        IReadOnlyList<Database.Models.VendorItem> goods;
+        try { goods = await vendors.GetVendorItemsAsync(ProfVendorEntry, ct); }
+        catch (Exception ex)
+        {
+            session.Logger.LogDebug(ex, "ADDON vendoritems: БД мира недоступна ({Msg})", ex.Message);
+            goods = [];
+        }
+
+        await SendLineAsync(session, "IBEGIN", ct);
+        foreach (var g in goods)
+            await SendLineAsync(session, $"I|{g.ItemId}|0|0|0|{g.Name.Replace('|', ' ')}", ct);
         await SendLineAsync(session, "IEND", ct);
     }
 

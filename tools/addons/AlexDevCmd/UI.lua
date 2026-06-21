@@ -40,6 +40,7 @@ local function ShowPanel(key)
   if p then
     currentPanel = key
     if p.refresh then p.refresh() end
+    if p.onShow then p.onShow() end
     p:Show()
   end
 end
@@ -476,6 +477,43 @@ local function BuildMarket()
   return p
 end
 
+-- ─── Панель: Профессия → Вендор (материалы/инструменты тестового вендора + «Взять») ───
+-- Запрос «vendoritems» → сервер отдаёт ассортимент вендора 27021 тем же кадром, что и рынок (A.marketItems).
+local function BuildVendor()
+  local p = NewPanel()
+  Header(p, "Вендор: материалы и инструменты")
+  local list = L.CreateFauxList({
+    parent = p, x = 4, y = -40, w = C3W - 8, h = layout.height - 40 - 36, rowH = 24,
+    numRows = math.floor((layout.height - 40 - 36) / 24),
+    onClick = function(i) p.list.selected = i; p.list:Refresh() end,
+  })
+  p.list = list
+  list.render = function(row, item)
+    if not row.icon then
+      row.icon = row:CreateTexture(nil, "ARTWORK")
+      row.icon:SetWidth(20); row.icon:SetHeight(20); row.icon:SetPoint("LEFT", 2, 0); L.CropIcon(row.icon)
+      row.text:ClearAllPoints(); row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0); row.text:SetPoint("RIGHT", -4, 0)
+      row:SetScript("OnEnter", function(self)
+        if self.itemId then GameTooltip:SetOwner(self, "ANCHOR_RIGHT"); GameTooltip:SetHyperlink("item:" .. self.itemId); GameTooltip:Show() end
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    row.itemId = item.id
+    local tex = GetItemIcon(item.id)
+    if not tex and scanTip then scanTip:SetHyperlink("item:" .. item.id) end
+    row.icon:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
+    row.text:SetText(item.name)
+  end
+  local takeBtn = L.Button(p, "Взять", 120, 26, function()
+    local item = p.list.selected and A.marketItems[p.list.selected]
+    if item then A.Cmd(".additem " .. item.id) end
+  end)
+  takeBtn:SetPoint("BOTTOMLEFT", 4, 6)
+  p.refresh = function() list.data = A.marketItems; list:Refresh() end
+  p.onShow = function() A.RequestMarket("vendoritems") end
+  return p
+end
+
 -- ─── col2: переключение содержимого под корень ───
 local function Col2Branches(root)
   col2.data = root.branches; col2.selected = 1
@@ -538,6 +576,7 @@ function U.OnTeleports() if currentRoot == "teleport" then col2:Refresh() end en
 function U.OnMarket()
   if currentPanel == "market" and panels.market then panels.market.refresh() end
   if currentPanel == "reagents" and panels.reagents then panels.reagents.refresh() end
+  if currentPanel == "prof.vendor" and panels["prof.vendor"] then panels["prof.vendor"].refresh() end
 end
 function U.OnAuras()
   local p = panels["char.buff"]
@@ -593,6 +632,7 @@ function U.Build()
       { text = "Убрать все", fn = function() A.Cmd(".craft off") end },
     },
   })
+  panels["prof.vendor"] = BuildVendor()
   panels["reagents"] = BuildReagents()
   panels["market"] = BuildMarket()
   panels["teleport"] = BuildTeleport()

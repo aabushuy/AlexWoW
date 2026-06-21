@@ -71,6 +71,7 @@ A.ROOTS = {
   { key = "prof", label = "Профессия", branches = {
     { key = "prof.trainers", label = "Тренер" },
     { key = "prof.stations", label = "Станки" },
+    { key = "prof.vendor", label = "Вендор" },
   } },
   { key = "reagents", label = "Реагенты" },
   { key = "market", label = "Рынок" },
