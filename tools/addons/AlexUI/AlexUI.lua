@@ -149,12 +149,31 @@ end
 
 -- ─── Колонка-контент (скролл + дочерний фрейм) для рабочего пространства ───
 -- opts: parent, name?, x, y(<0), w, h, childW. Возвращает { scroll, child }.
+-- ВАЖНО: UIPanelScrollFrameTemplate вешает скроллбар СНАРУЖИ справа (relativePoint TOPRIGHT, x>0). При
+-- колонке шириной почти во всю панель он уезжает за край окна — недоступен. Переякориваем бар ВНУТРЬ
+-- правого края + вешаем колесо мыши (шаблон сам по контент-области колесо не вешает).
+local contentColCounter = 0
 function U.CreateContentColumn(opts)
-  local scroll = CreateFrame("ScrollFrame", opts.name, opts.parent, "UIPanelScrollFrameTemplate")
+  contentColCounter = contentColCounter + 1
+  local name = opts.name or ("AlexUIContentCol" .. contentColCounter)
+  local scroll = CreateFrame("ScrollFrame", name, opts.parent, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", opts.x, opts.y); scroll:SetWidth(opts.w); scroll:SetHeight(opts.h)
+  local bar = _G[name .. "ScrollBar"]
+  if bar then
+    bar:ClearAllPoints()
+    bar:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", -2, -18)
+    bar:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", -2, 18)
+  end
   local child = CreateFrame("Frame", nil, scroll)
   child:SetWidth(opts.childW or (opts.w - 22)); child:SetHeight(10)
   scroll:SetScrollChild(child)
+  scroll:EnableMouseWheel(true)
+  scroll:SetScript("OnMouseWheel", function(self, delta)
+    local maxScroll = self:GetVerticalScrollRange()
+    local new = self:GetVerticalScroll() - delta * 24
+    if new < 0 then new = 0 elseif new > maxScroll then new = maxScroll end
+    self:SetVerticalScroll(new)
+  end)
   return { scroll = scroll, child = child }
 end
 
