@@ -25,6 +25,7 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     private const uint CasterDummyCastMs = 2500;    // каст-тайм кастующего манекена (удобно ловить прерывание). INT.1
     private const long CasterDummyCastGapMs = 1500; // пауза между кастами кастующего манекена. INT.1
     private const long HunterShotGapMs = 1800;      // Ф2 #14: пауза между выстрелами манекена-охотника.
+    private const float HunterShootRangeSq = 41f * 41f; // Ф2 #14: дальность стрельбы охотника (квадрат, ярды).
 
     // --- Преследование/возврат (M6.7 инкр.2) ---
     /// <summary>Скорость бега существа (ярды/с) — совпадает с RunSpeed в create-блоке существа.</summary>
@@ -484,6 +485,16 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
     /// Урон — упрощённо по уровню (как мили существа); визуал — Auto Shot (SpellGo + лог урона). Тюнинг — в игре.</summary>
     private async Task TickHunterDummyAsync(WorldState world, WorldCreature creature, WorldPlayer player, long now, CancellationToken ct)
     {
+        // Ф2 #14 фикс: охотник стоит на месте, поэтому home-leash (от спавна) при убегании игрока НЕ срабатывает —
+        // он стрелял бы бесконечно на любой дистанции. Свой leash по дистанции ДО ИГРОКА: убежал за радиус → evade.
+        var pdx = creature.X - player.X;
+        var pdy = creature.Y - player.Y;
+        var pdz = creature.Z - player.Z;
+        if (pdx * pdx + pdy * pdy + pdz * pdz > HunterShootRangeSq)
+        {
+            await BeginEvadeAsync(world, creature, ct);
+            return;
+        }
         if (now < creature.NextCastMs)
             return;
         creature.NextCastMs = now + HunterShotGapMs;
@@ -493,8 +504,10 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
         player.Session.Combat.LastCombatMs = now;
         await world.BroadcastToObserversAsync(creature, WorldOpcode.SmsgSpellGo,
             SpellPackets.BuildSpellGo(creature.Guid, Npcs.HunterShotSpellId, player.Guid, 0), ct);
+        // Ф2 #14 фикс: BuildDamageLog(target, attacker) — было перепутано (creature как target, игрок как attacker),
+        // отчего лог показывал «игрок наносит урон манекену». Верно: target = игрок, attacker = манекен.
         await world.BroadcastToPlayerObserversAsync(player, WorldOpcode.SmsgSpellNonMeleeDamageLog,
-            SpellPackets.BuildDamageLog(creature.Guid, (ulong)player.Session.InWorldGuid, Npcs.HunterShotSpellId, dmg, 0, Npcs.SchoolPhysical), ct);
+            SpellPackets.BuildDamageLog((ulong)player.Session.InWorldGuid, creature.Guid, Npcs.HunterShotSpellId, dmg, 0, Npcs.SchoolPhysical), ct);
         await world.BroadcastPlayerHealthAsync(player, ct);
     }
 
