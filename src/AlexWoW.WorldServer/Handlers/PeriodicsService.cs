@@ -710,6 +710,12 @@ internal sealed class PeriodicsService(
                     session.Combat.BaseMeleeHitRating);
                 m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.DefenseSkill),
                     (uint)(session.Combat.BaseDefenseSkill * 4.92f));
+                // Устойчивость: пейпердолл «Устойчивость» берёт CR_CRIT_TAKEN_MELEE (не spell) — в WotLK resilience
+                // ставит все три crit-taken рейтинга поровну. Пушим melee/ranged/spell одинаково.
+                m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.CritTakenMelee),
+                    session.Combat.BaseResilienceRating);
+                m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.CritTakenRanged),
+                    session.Combat.BaseResilienceRating);
                 m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.CritTakenSpell),
                     session.Combat.BaseResilienceRating);
             }), ct);
