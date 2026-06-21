@@ -138,17 +138,12 @@ public sealed class CreatureDirector(WorldState world, Navmesh navmesh, IWorldRe
             Protocol.AuraPackets.BuildApplyByCaster(dummy.Guid, dummy.Guid, slot, spellId, flags, level, 1, 0), ct);
     }
 
-    /// <summary>Ф2 #14 Манекен-охотник: стреляет по игроку на расстоянии (физ. урон). В «бою» → тикает AI.</summary>
-    public async Task SummonHunterDummyAsync(WorldSession session, CancellationToken ct)
-    {
-        await SummonDummyAsync(session, Npcs.HunterDummyGuid, Npcs.HunterDummy, Npcs.HunterDummyHealth,
+    /// <summary>Ф2 #14 Манекен-охотник: стреляет по игроку на расстоянии (физ. урон). НЕ агрится сам при
+    /// призыве (иначе убивал персонажа на тестах) — отвечает выстрелами только после атаки по нему
+    /// (EnsureCreatureRetaliation выставит CombatTargetGuid → TickHunterDummyAsync).</summary>
+    public Task SummonHunterDummyAsync(WorldSession session, CancellationToken ct)
+        => SummonDummyAsync(session, Npcs.HunterDummyGuid, Npcs.HunterDummy, Npcs.HunterDummyHealth,
             sideOffset: -5f, spawnHpPct: 1f, ct);
-        if (world.FindCreature(Npcs.HunterDummyGuid) is { } hunter)
-        {
-            hunter.CombatTargetGuid = (ulong)session.InWorldGuid;
-            hunter.NextCastMs = Environment.TickCount64 + 1000; // первый выстрел через ~1с (поле переиспользуем как тайм. выстрела)
-        }
-    }
 
     /// <summary>Ф2 #14 Лечебный манекен: скромный HP (хилы заметны), старт 70%, самослив быстрее регена
     /// (тикает в WorldTick). Дружелюбен — валидная цель лечения. Не в «бою».</summary>

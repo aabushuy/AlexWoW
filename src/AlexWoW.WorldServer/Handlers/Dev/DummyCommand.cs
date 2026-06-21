@@ -38,7 +38,7 @@ internal sealed class DummyCommand : IDevCommand
         if (ctx.ArgLower(0) == "hunter")
         {
             await ctx.Session.World.SummonHunterDummyAsync(ctx.Session, ct);
-            await ctx.ReplyAsync("Манекен-охотник перемещён к вам (стреляет на расстоянии — физ. урон)", ct);
+            await ctx.ReplyAsync("Манекен-охотник перемещён к вам (атакуйте — ответит выстрелами на расстоянии)", ct);
             return;
         }
         await ctx.Session.World.SummonTrainingDummyAsync(ctx.Session, ct);
