@@ -38,6 +38,11 @@ internal sealed class SessionCastState
     /// моделируется, и 0 не зашумляет Spell QA (сверка с min/max). Включается дев-командой <c>.setcrit</c>.</summary>
     internal int SpellCritChance { get; set; }
 
+    /// <summary>Ф2 #2: сила заклинаний (плоский бонус к школьному урону) — session-оверрайд dev-редактора.
+    /// Прибавляется к урону заклинаний (SpellEffectsService.ComputeDamage) и пушится в
+    /// PLAYER_FIELD_MOD_DAMAGE_DONE_POS (лист «Заклинания → Сила заклинаний»).</summary>
+    internal uint SpellPower { get; set; }
+
     /// <summary>Сброс при выходе из мира — только то, что сбрасывалось в LeaveWorld и раньше
     /// (мана/GCD/тайминги переживают выход by design — переинициализируются при входе).</summary>
     internal void Reset()

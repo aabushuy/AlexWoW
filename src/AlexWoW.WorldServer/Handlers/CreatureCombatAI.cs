@@ -1,3 +1,4 @@
+using AlexWoW.DataStores;
 using AlexWoW.WorldServer.Net;
 using AlexWoW.WorldServer.Protocol;
 using AlexWoW.WorldServer.World;
@@ -229,9 +230,17 @@ internal sealed class CreatureCombatAI(CombatResourcesService combatResources, A
             if (pclass == 6 && (outcome == CombatStats.MeleeOutcome.Dodge || outcome == CombatStats.MeleeOutcome.Parry))
                 player.Session.Combat.RuneStrikeWindowExpiresMs = now + AuraStateService.DefenseStateDurationMs;
             // CRIT.2: крит существа по игроку (фикс. шанс) — только по прошедшему удару, ×2 + флаг (клиент рисует крит).
-            var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < CreatureCritChance;
+            // Ф2 #2 Защита: бонус-навык защиты снижает шанс быть раскритованным (0.04%/очко, эталон WotLK).
+            var critChance = CreatureCritChance - player.Session.Combat.BaseDefenseSkill * 0.04f;
+            var crit = outcome == CombatStats.MeleeOutcome.Hit && Random.Shared.NextDouble() * 100.0 < Math.Max(0f, critChance);
             if (crit)
-                damage *= 2;
+            {
+                // Ф2 #2 Устойчивость: resilience срезает бонус крит-урона (крит даёт +100%; resilience×2.2 — коэф WotLK).
+                var resilPct = CombatRatingConversion.ToPct(CombatRatingConversion.CombatRating.CritTakenSpell,
+                    (int)player.Session.Combat.BaseResilienceRating, player.Session.Character?.Level ?? 80);
+                var critBonusFrac = Math.Clamp(1.0 - resilPct * 2.2 / 100.0, 0.0, 1.0);
+                damage = (uint)Math.Max(damage, damage * (1.0 + critBonusFrac));
+            }
             // ABS.1: absorb-щиты гасят урон ПОСЛЕ митигейшна, до HP (мили существа — физическая школа, маска 1).
             var absorbed = await absorbShields.AbsorbAsync(player.Session, SchoolMaskPhysical, damage, ct);
             // ABS.3 Sacred Shield (53601): прок-поглощение текущего удара (до ~500), не чаще раз в 6 с.

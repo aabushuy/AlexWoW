@@ -134,18 +134,24 @@ local STAT_DEFS = {
   { g = "Ближний бой", rows = {
     { "attackpower", "Сила атаки", function() local b, p, n = UnitAttackPower("player"); return (b or 0) + (p or 0) + (n or 0) end },
     { "hitmelee", "Рейт. меткости", function() return GetCombatRating and GetCombatRating(CR_HIT_MELEE or 6) end },
+    { "expertise", "Мастерство", function() return GetExpertise and GetExpertise() end },
     { "critmelee", "Крит, %", function() return GetCritChance and math.floor(GetCritChance()) end },
     { "wpnmin", "Урон оружия (мин)" }, { "wpnmax", "Урон оружия (макс)" }, { "wpnspeed", "Скорость оружия, мс" },
   } },
   { g = "Дальний бой", rows = {
     { "rangedap", "Сила атаки", function() local b, p, n = UnitRangedAttackPower("player"); return (b or 0) + (p or 0) + (n or 0) end },
   } },
-  { g = "Магия", rows = { { "critspell", "Крит заклинаний, %" } } },
+  { g = "Магия", rows = {
+    { "critspell", "Крит заклинаний, %" },
+    { "spellpower", "Сила заклинаний", function() return GetSpellBonusDamage and GetSpellBonusDamage(6) end },
+  } },
   { g = "Защита", rows = {
     { "dodge", "Уклонение, %", function() return GetDodgeChance and math.floor(GetDodgeChance()) end },
     { "parry", "Парирование, %", function() return GetParryChance and math.floor(GetParryChance()) end },
     { "block", "Блок, %", function() return GetBlockChance and math.floor(GetBlockChance()) end },
     { "armor", "Броня" },
+    { "defense", "Защита (бонус)" },
+    { "resilience", "Устойчивость", function() return GetCombatRating and GetCombatRating(CR_CRIT_TAKEN_SPELL or 17) end },
   } },
 }
 local function BuildCharStats()

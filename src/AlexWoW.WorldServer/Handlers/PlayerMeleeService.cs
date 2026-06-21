@@ -136,6 +136,8 @@ internal sealed class PlayerMeleeService(
         // Ф2 #1: session-оверрайд рейтинга меткости из dev-редактора → % снижения промаха (та же конверсия, что у аур).
         hitAuraBonus += CombatRatingConversion.ToPct(CombatRatingConversion.CombatRating.HitMelee,
             (int)session.Combat.BaseMeleeHitRating, level);
+        // Ф2 #2: session-оверрайд мастерства (очки) → снижение dodge/parry цели на 0.25%/очко (как expertise).
+        expertiseBonus += session.Combat.BaseExpertise * 0.25f;
         var resolved = OutgoingMeleeResolver.Resolve(level, targetLevel,
             hitAuraBonus, session.Combat.MeleeCritPct + critAuraBonus, expertiseBonus,
             isAutoAttack, Random.Shared.NextDouble());

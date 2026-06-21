@@ -696,8 +696,9 @@ internal sealed class PeriodicsService(
             }), ct);
     }
 
-    /// <summary>Ф2 #1: пуш combat-rating оверрайдов dev-редактора в PLAYER_FIELD_COMBAT_RATING_1 (лист персонажа
-    /// показывает «Рейтинг меткости» и т.п.). Пока — меткость; expertise/защита/устойчивость добавятся сюда же.</summary>
+    /// <summary>Ф2 #1/#2: пуш combat-rating оверрайдов dev-редактора в PLAYER_FIELD_COMBAT_RATING_1 (лист персонажа
+    /// показывает «Рейтинг меткости»/«Защита»/«Устойчивость»). Меткость и устойчивость — как рейтинг 1:1;
+    /// защита — очки навыка ×4.92 (рейтинг защиты на 80), чтобы лист показал прибавку к навыку защиты.</summary>
     internal Task SendCombatRatingsAsync(WorldSession session, CancellationToken ct)
     {
         if (session.InWorldGuid == 0)
@@ -707,6 +708,37 @@ internal sealed class PeriodicsService(
             {
                 m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.HitMelee),
                     session.Combat.BaseMeleeHitRating);
+                m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.DefenseSkill),
+                    (uint)(session.Combat.BaseDefenseSkill * 4.92f));
+                m.SetUInt32(UpdateField.CombatRatingField((int)CombatRatingConversion.CombatRating.CritTakenSpell),
+                    session.Combat.BaseResilienceRating);
+            }), ct);
+    }
+
+    /// <summary>Ф2 #2: пуш мастерства (PLAYER_EXPERTISE/OFFHAND) для отображения в листе «Ближний бой → Мастерство».</summary>
+    internal Task SendExpertiseAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                m.SetUInt32(UpdateField.PlayerExpertise, session.Combat.BaseExpertise);
+                m.SetUInt32(UpdateField.PlayerOffhandExpertise, session.Combat.BaseExpertise);
+            }), ct);
+    }
+
+    /// <summary>Ф2 #2: пуш силы заклинаний (PLAYER_FIELD_MOD_DAMAGE_DONE_POS, все 7 школ) для листа
+    /// «Заклинания → Сила заклинаний» (берёт максимум по школам).</summary>
+    internal Task SendSpellPowerAsync(WorldSession session, CancellationToken ct)
+    {
+        if (session.InWorldGuid == 0)
+            return Task.CompletedTask;
+        return session.SendAsync(WorldOpcode.SmsgUpdateObject,
+            PlayerSpawn.BuildPlayerValuesUpdate((ulong)session.InWorldGuid, m =>
+            {
+                for (var school = 0; school < 7; school++)
+                    m.SetUInt32(UpdateField.PlayerFieldModDamageDonePos + school, session.Cast.SpellPower);
             }), ct);
     }
 

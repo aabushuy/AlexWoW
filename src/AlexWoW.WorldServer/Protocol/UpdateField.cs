@@ -109,6 +109,13 @@ public static class UpdateField
     /// в клиентском UnitDamage; по умолч. ДОЛЖЕН быть 1.0 (CMaNGOS), иначе слот-тултип оружия делит на 0 →
     /// 1.#INF. M7 #16.</summary>
     public const int PlayerFieldModDamageDonePct = 0x04A1;
+    /// <summary>PLAYER_FIELD_MOD_DAMAGE_DONE_POS (UNIT_END 0x94 + 0x3FF), 7 INT по школам — плоский бонус урона
+    /// заклинаний (+spell power). Пейпердолл (вкладка «Заклинания» → «Сила заклинаний») берёт максимум по школам. Ф2 #2.</summary>
+    public const int PlayerFieldModDamageDonePos = 0x0493;
+    /// <summary>PLAYER_EXPERTISE / PLAYER_OFFHAND_EXPERTISE (UNIT_END 0x94 + 0x36F/0x370) — мастерство (очки),
+    /// пейпердолл «Ближний бой → Мастерство». Ф2 #2.</summary>
+    public const int PlayerExpertise = 0x0403;
+    public const int PlayerOffhandExpertise = 0x0404;
     public const int PlayerBytes = 0x0099;        // skin|face|hairStyle|hairColor
     public const int PlayerBytes2 = 0x009A;       // facialHair|...|restState
     public const int PlayerBytes3 = 0x009B;       // gender|drunk

@@ -62,6 +62,15 @@ internal sealed class SessionCombatState
     /// в % снижения промаха автоатаки/мили-абилок (CombatRatingConversion) и пушится в
     /// PLAYER_FIELD_COMBAT_RATING_1[HitMelee] для отображения «Рейтинг меткости» в листе персонажа.</summary>
     internal uint BaseMeleeHitRating { get; set; }
+    /// <summary>Ф2 #2: мастерство (очки expertise) — session-оверрайд. Снижает dodge/parry цели на 0.25%/очко
+    /// (OutgoingMeleeResolver). Пушится в PLAYER_EXPERTISE/PLAYER_OFFHAND_EXPERTISE (лист «Мастерство»).</summary>
+    internal uint BaseExpertise { get; set; }
+    /// <summary>Ф2 #2: защита (бонус-очки навыка) — session-оверрайд. Снижает шанс быть раскритованным существом
+    /// на 0.04%/очко (CreatureCombatAI). Пушится как CR_DEFENSE_SKILL рейтинг (лист «Защита»).</summary>
+    internal uint BaseDefenseSkill { get; set; }
+    /// <summary>Ф2 #2: устойчивость (resilience rating) — session-оверрайд. Снижает бонус крит-урона существа по
+    /// игроку (CombatRatingConversion → %). Пушится в CR_CRIT_TAKEN_SPELL (лист «Устойчивость»).</summary>
+    internal uint BaseResilienceRating { get; set; }
     internal uint ArmorValue { get; set; }
     /// <summary>Базовая сила атаки (мили) из статов/класса — кэш RefreshMeleeAsync. Используется в формуле
     /// автоатаки игрока и при отдельной пересылке поля UNIT_FIELD_ATTACK_POWER (PeriodicsService.SendAttackPowerAsync).</summary>

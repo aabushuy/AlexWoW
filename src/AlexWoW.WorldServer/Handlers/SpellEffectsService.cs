@@ -240,7 +240,8 @@ internal sealed class SpellEffectsService(
             }
             else
             {
-                value = SpellModifiers.Apply(mods, info, SpellModOp.Damage, bonus);
+                // Ф2 #2: плоский вклад силы заклинаний (session-оверрайд dev-редактора) к школьному урону.
+                value = SpellModifiers.Apply(mods, info, SpellModOp.Damage, bonus + (int)session.Cast.SpellPower);
                 floor = 0;
             }
         }

@@ -33,7 +33,9 @@ internal sealed class SetStatCommand(DevStatsCatalog stats, AddonProtocol addon,
         {
             case StatPush.Stats: await periodics.SendStatFieldsAsync(s, ct); break; // только UnitStat (без MaxHealth — иначе 1 HP)
             case StatPush.AttackPower: await periodics.SendAttackPowerAsync(s, ct); break;
-            case StatPush.CombatRatings: await periodics.SendCombatRatingsAsync(s, ct); break; // Ф2 #1: меткость и др. рейтинги
+            case StatPush.CombatRatings: await periodics.SendCombatRatingsAsync(s, ct); break; // Ф2 #1/#2: меткость/защита/устойчивость
+            case StatPush.Expertise: await periodics.SendExpertiseAsync(s, ct); break;          // Ф2 #2: мастерство
+            case StatPush.SpellPower: await periodics.SendSpellPowerAsync(s, ct); break;        // Ф2 #2: сила заклинаний
             case StatPush.Health: if (s.Player is { } pl) await s.World.BroadcastPlayerHealthAsync(pl, ct); break;
             case StatPush.Mana: await manaRegen.SendManaUpdateAsync(s, ct); break;
             case StatPush.Rage: await CombatResourcesService.SendPowerAsync(s, 1, s.Combat.Rage, ct); break;       // powertype ярости

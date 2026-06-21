@@ -4,7 +4,7 @@ using AlexWoW.WorldServer.Net;
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>Что пушить клиенту после записи стата (Ф2 dev-редактор). None — только серверный combat-кэш.</summary>
-internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic, AttackPower, CombatRatings }
+internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic, AttackPower, CombatRatings, Expertise, SpellPower }
 
 /// <summary>
 /// §178/Ф2 Каталог редактируемых характеристик для dev-панелей аддона («Основное» и «Характеристики»).
@@ -40,16 +40,24 @@ internal sealed class DevStatsCatalog
         new("rangedap", "Дальний бой", "Сила атаки", s => s.Combat.BaseRangedAttackPower, (s, v) => s.Combat.BaseRangedAttackPower = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.AttackPower),
         // Ф2 #1: рейтинг меткости (combat rating) — снижает промах игрока; пуш в PLAYER_FIELD_COMBAT_RATING_1[HitMelee].
         new("hitmelee", "Ближний бой", "Рейт. меткости", s => s.Combat.BaseMeleeHitRating, (s, v) => s.Combat.BaseMeleeHitRating = (uint)Math.Max(0, v), 0, 10_000, StatPush.CombatRatings),
+        // Ф2 #2: мастерство (очки expertise) — снижает dodge/parry цели; пуш в PLAYER_EXPERTISE (лист «Мастерство»).
+        new("expertise", "Ближний бой", "Мастерство", s => s.Combat.BaseExpertise, (s, v) => s.Combat.BaseExpertise = (uint)Math.Max(0, v), 0, 200, StatPush.Expertise),
         // Вторичные (существующие) — кэш combat-резолвера, перезаписывается RefreshMeleeAsync. Группы — для UI.
         new("critmelee", "Ближний бой", "Крит ближнего боя, %", s => s.Combat.MeleeCritPct, (s, v) => s.Combat.MeleeCritPct = (float)v, 0, 100, StatPush.None),
         new("wpnmin", "Ближний бой", "Урон оружия (мин)", s => s.Combat.WeaponMinDamage, (s, v) => s.Combat.WeaponMinDamage = (float)v, 0, 1_000_000, StatPush.None),
         new("wpnmax", "Ближний бой", "Урон оружия (макс)", s => s.Combat.WeaponMaxDamage, (s, v) => s.Combat.WeaponMaxDamage = (float)v, 0, 1_000_000, StatPush.None),
         new("wpnspeed", "Ближний бой", "Скорость оружия, мс", s => s.Combat.MainHandSpeedMs, (s, v) => s.Combat.MainHandSpeedMs = (uint)Math.Max(1, v), 1, 100_000, StatPush.None),
         new("critspell", "Магия", "Крит заклинаний, %", s => s.Cast.SpellCritChance, (s, v) => s.Cast.SpellCritChance = (int)v, 0, 100, StatPush.None),
+        // Ф2 #2: сила заклинаний — плоский бонус к школьному урону; пуш в PLAYER_FIELD_MOD_DAMAGE_DONE_POS.
+        new("spellpower", "Магия", "Сила заклинаний", s => s.Cast.SpellPower, (s, v) => s.Cast.SpellPower = (uint)Math.Max(0, v), 0, 100_000, StatPush.SpellPower),
         new("dodge", "Защита", "Уклонение, %", s => s.Combat.DodgePct, (s, v) => s.Combat.DodgePct = (float)v, 0, 100, StatPush.None),
         new("parry", "Защита", "Парирование, %", s => s.Combat.ParryPct, (s, v) => s.Combat.ParryPct = (float)v, 0, 100, StatPush.None),
         new("block", "Защита", "Блок, %", s => s.Combat.BlockPct, (s, v) => s.Combat.BlockPct = (float)v, 0, 100, StatPush.None),
         new("armor", "Защита", "Броня", s => s.Combat.ArmorValue, (s, v) => s.Combat.ArmorValue = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.None),
+        // Ф2 #2: защита (бонус-навык) — снижает раскрит существом; пуш CR_DEFENSE_SKILL (лист «Защита»).
+        new("defense", "Защита", "Защита (бонус)", s => s.Combat.BaseDefenseSkill, (s, v) => s.Combat.BaseDefenseSkill = (uint)Math.Max(0, v), 0, 1_000, StatPush.CombatRatings),
+        // Ф2 #2: устойчивость (resilience rating) — снижает крит-урон существа; пуш CR_CRIT_TAKEN_SPELL (лист «Устойчивость»).
+        new("resilience", "Защита", "Устойчивость", s => s.Combat.BaseResilienceRating, (s, v) => s.Combat.BaseResilienceRating = (uint)Math.Max(0, v), 0, 10_000, StatPush.CombatRatings),
     ];
 
     /// <summary>Строки старого кадра редактора: <c>S|key|label|value</c> (value — текущее, инвариант).</summary>
