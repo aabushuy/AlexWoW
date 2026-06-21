@@ -180,9 +180,17 @@ public static class Npcs
         Entry: HealerDummyEntry, Name: "Лечебный манекен", SubName: "Уровень 80 — самослив, лечите его",
         DisplayId: 3019, Level: 80, Faction: 35, UnitType: 7); // дружелюбен — валидная цель хила
 
+    // Реестр шаблонов для CREATURE_QUERY-фоллбэка: дев-манекены живут только в памяти (не в БД мира),
+    // поэтому без записи здесь клиент не получает имя и рисует «Неизвестно». Ф2: регистрируем все.
     private static readonly Dictionary<uint, CreatureTemplate> ByEntry = new()
     {
         [TestDummy.Entry] = TestDummy,
+        [TrainingDummy.Entry] = TrainingDummy,
+        [HealDummy.Entry] = HealDummy,
+        [AttackDummy.Entry] = AttackDummy,
+        [CasterDummy.Entry] = CasterDummy,
+        [HunterDummy.Entry] = HunterDummy,
+        [HealerDummy.Entry] = HealerDummy,
     };
 
     public static CreatureTemplate? Find(uint entry)
