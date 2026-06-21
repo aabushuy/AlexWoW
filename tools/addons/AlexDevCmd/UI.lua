@@ -132,8 +132,12 @@ local STAT_DEFS = {
     { "spi", "Дух", function() local _, e = UnitStat("player", 5); return e end },
   } },
   { g = "Ближний бой", rows = {
+    { "attackpower", "Сила атаки", function() local b, p, n = UnitAttackPower("player"); return (b or 0) + (p or 0) + (n or 0) end },
     { "critmelee", "Крит, %", function() return GetCritChance and math.floor(GetCritChance()) end },
     { "wpnmin", "Урон оружия (мин)" }, { "wpnmax", "Урон оружия (макс)" }, { "wpnspeed", "Скорость оружия, мс" },
+  } },
+  { g = "Дальний бой", rows = {
+    { "rangedap", "Сила атаки", function() local b, p, n = UnitRangedAttackPower("player"); return (b or 0) + (p or 0) + (n or 0) end },
   } },
   { g = "Магия", rows = { { "critspell", "Крит заклинаний, %" } } },
   { g = "Защита", rows = {

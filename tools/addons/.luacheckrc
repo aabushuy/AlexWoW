@@ -11,7 +11,7 @@ stds.wow = {
     -- Базовый API
     "CreateFrame", "SendAddonMessage", "SendChatMessage",
     "UnitName", "UnitClass", "UnitLevel",
-    "UnitHealth", "UnitPower", "UnitPowerMax", "UnitStat",
+    "UnitHealth", "UnitPower", "UnitPowerMax", "UnitStat", "UnitAttackPower", "UnitRangedAttackPower",
     "GetCritChance", "GetDodgeChance", "GetParryChance", "GetBlockChance",
     "GetCursorPosition", "GetItemIcon", "GetSpellInfo",
     "strsplit", "wipe",

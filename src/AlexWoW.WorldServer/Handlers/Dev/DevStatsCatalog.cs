@@ -4,7 +4,7 @@ using AlexWoW.WorldServer.Net;
 namespace AlexWoW.WorldServer.Handlers.Dev;
 
 /// <summary>Что пушить клиенту после записи стата (Ф2 dev-редактор). None — только серверный combat-кэш.</summary>
-internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic }
+internal enum StatPush { None, Stats, Health, Mana, Rage, Energy, Runic, AttackPower }
 
 /// <summary>
 /// §178/Ф2 Каталог редактируемых характеристик для dev-панелей аддона («Основное» и «Характеристики»).
@@ -35,6 +35,9 @@ internal sealed class DevStatsCatalog
         new("rage", "Ресурсы", "Ярость", s => s.Combat.Rage / 10.0, (s, v) => s.Combat.Rage = (uint)(Math.Clamp(v, 0, 100) * 10), 0, 100, StatPush.Rage),
         new("energy", "Ресурсы", "Энергия", s => s.Combat.Energy, (s, v) => s.Combat.Energy = (uint)Math.Clamp(v, 0, 100), 0, 100, StatPush.Energy),
         new("runic", "Ресурсы", "Рунич. сила", s => s.Combat.RunicPower / 10.0, (s, v) => s.Combat.RunicPower = (uint)(Math.Clamp(v, 0, 100) * 10), 0, 100, StatPush.Runic),
+        // Сила атаки (мили/дальний) — session-оверрайд BaseX AP, читается формулой автоатаки; пуш UNIT_FIELD_ATTACK_POWER.
+        new("attackpower", "Ближний бой", "Сила атаки", s => s.Combat.BaseMeleeAttackPower, (s, v) => s.Combat.BaseMeleeAttackPower = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.AttackPower),
+        new("rangedap", "Дальний бой", "Сила атаки", s => s.Combat.BaseRangedAttackPower, (s, v) => s.Combat.BaseRangedAttackPower = (uint)Math.Max(0, v), 0, 1_000_000, StatPush.AttackPower),
         // Вторичные (существующие) — кэш combat-резолвера, перезаписывается RefreshMeleeAsync. Группы — для UI.
         new("critmelee", "Ближний бой", "Крит ближнего боя, %", s => s.Combat.MeleeCritPct, (s, v) => s.Combat.MeleeCritPct = (float)v, 0, 100, StatPush.None),
         new("wpnmin", "Ближний бой", "Урон оружия (мин)", s => s.Combat.WeaponMinDamage, (s, v) => s.Combat.WeaponMinDamage = (float)v, 0, 1_000_000, StatPush.None),

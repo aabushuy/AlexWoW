@@ -677,7 +677,8 @@ internal sealed class PeriodicsService(
     /// <summary>+AP/RAP от ауры (Боевой клич): сумма бонусов аур → UNIT_FIELD_ATTACK_POWER /
     /// UNIT_FIELD_RANGED_ATTACK_POWER (UI «Сила атаки»). Кэшируем бонус в <see cref="SessionCombatState"/>,
     /// чтобы PlayerMeleeService использовал актуальное значение в формуле автоатаки без повторного суммирования.</summary>
-    private Task SendAttackPowerAsync(WorldSession session, CancellationToken ct)
+    // internal: dev-редактор «Характеристики» пушит Силу атаки после session-оверрайда BaseMeleeAttackPower.
+    internal Task SendAttackPowerAsync(WorldSession session, CancellationToken ct)
     {
         if (session.InWorldGuid == 0)
             return Task.CompletedTask;
