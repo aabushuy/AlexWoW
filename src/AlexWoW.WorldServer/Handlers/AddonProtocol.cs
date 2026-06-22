@@ -19,7 +19,8 @@ namespace AlexWoW.WorldServer.Handlers;
 /// Команды: <c>menu</c> — каталог dev-меню (<see cref="DevMenuCatalog"/>); <c>stats</c> — кадр вторичных
 /// характеристик для окна-редактора (§178, <see cref="DevStatsCatalog"/>); <c>itemsearch</c> — поиск
 /// предметов для окна «Добавить вещь» (переиспользует <see cref="IItemSearchRepository"/>); <c>qatasks</c>/
-/// <c>qasubmit</c> — задачи на тестирование канбан-доски и сабмит результата (KB8, <see cref="IKanbanBoardRepository"/>).
+/// <c>qasubmit</c> — задачи на тестирование канбан-доски и сабмит результата (KB8, <see cref="IKanbanBoardRepository"/>);
+/// <c>testerstatus</c> — флаг тестировщика персонажа для QA-панели (кадр <c>TSTATUS|0|1</c>).
 /// </summary>
 internal sealed class AddonProtocol(
     DevMenuCatalog devMenu, DevStatsCatalog devStats, IItemSearchRepository items,
@@ -96,6 +97,12 @@ internal sealed class AddonProtocol(
         if (body == "auras")
         {
             await SendAurasAsync(session, ct);
+            return;
+        }
+
+        if (body == "testerstatus")
+        {
+            await SendTesterStatusAsync(session, ct);
             return;
         }
 
@@ -418,6 +425,18 @@ internal sealed class AddonProtocol(
         foreach (var a in session.Progression.Auras)
             await SendLineAsync(session, $"A|{a.SpellId}", ct);
         await SendLineAsync(session, "AEND", ct);
+    }
+
+    /// <summary>
+    /// QA → Тестировщик: текущий флаг тестировщика персонажа — одна строка <c>TSTATUS|0</c>/<c>TSTATUS|1</c>.
+    /// Аддон рисует ОДНУ кнопку «Активировать»/«Деактивировать» по флагу. Публичный: вызывается по запросу
+    /// <c>testerstatus</c> (открытие панели) и пушем из <see cref="Dev.TesterCommand"/> после <c>.tester on|off</c>
+    /// (кнопка обновляется без повторного запроса). Свой флаг персонажа — без админ-гейта.
+    /// </summary>
+    public async Task SendTesterStatusAsync(WorldSession session, CancellationToken ct)
+    {
+        var on = session.Character is { IsTester: true };
+        await SendLineAsync(session, $"TSTATUS|{(on ? 1 : 0)}", ct);
     }
 
     // Заменяем U+00B7 middle dot на ASCII '-' — клиентский WoW-фонт в списке тикетов аддона

@@ -21,6 +21,7 @@ A.marketBuilding = nil
 A.creatureQueue = {}    -- накопленные для «Существа»: [{ key, label, level, count }]
 A.auras = {}            -- [{ spellId }] активные ауры (имя/иконку резолвит клиент)
 A.auraBuilding = nil
+A.isTester = nil        -- флаг тестировщика QA: nil — ещё не пришёл с сервера, true/false — кадр TSTATUS
 
 -- ─── Справочники (стабильные, маппинг на dev-команды) ───
 A.CREATURE_TYPES = {
@@ -117,6 +118,7 @@ function A.Cmd(command) SendChatMessage(command, "SAY") end
 function A.RequestTeleports() SendAddonMessage(PREFIX, "devteleports", "WHISPER", UnitName("player")) end
 function A.RequestMarket(body) SendAddonMessage(PREFIX, body, "WHISPER", UnitName("player")) end
 function A.RequestAuras() SendAddonMessage(PREFIX, "auras", "WHISPER", UnitName("player")) end
+function A.RequestTesterStatus() SendAddonMessage(PREFIX, "testerstatus", "WHISPER", UnitName("player")) end
 
 -- ─── Разбор кадров от сервера ───
 local function HandleLine(line)
@@ -154,6 +156,9 @@ local function HandleLine(line)
   elseif A.auraBuilding and string.sub(line, 1, 2) == "A|" then
     local id = tonumber(string.sub(line, 3))
     if id then A.auraBuilding[#A.auraBuilding + 1] = { spellId = id } end
+  elseif string.sub(line, 1, 8) == "TSTATUS|" then
+    A.isTester = string.sub(line, 9) == "1"  -- флаг тестировщика (QA → Тестировщик)
+    if A.UI then A.UI.OnTesterStatus() end
   end
 end
 

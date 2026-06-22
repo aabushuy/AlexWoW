@@ -47,6 +47,7 @@ winget install DEVCOM.LuaJIT
 - **AlexQATester** — есть неймспейс `AlexQATester` с чистыми функциями (`Sanitize`/`ulen`/`utrunc`)
   и наблюдаемым состоянием (`AlexQATester.tasks`), поэтому покрыт spec'ом
   ([`tests/alexqatester_spec.lua`](tests/alexqatester_spec.lua)).
-- **AlexDevCmd** — внутреннее состояние (каталог, дерево категорий) пока файл-локальное и снаружи
-  не наблюдаемо, поэтому покрыт только luacheck. Тесты логики появятся, если вынести парсер
-  каталога в наблюдаемый неймспейс.
+- **AlexDevCmd** — покрыт luacheck + luajit-spec ([`tests/alexdevcmd_spec.lua`](tests/alexdevcmd_spec.lua)):
+  чистые хелперы (`FactionLabel`/`ParseTeleport`/`PlayerTrainer`/`AddCreature`) и парсер addon-кадров
+  (телепорты/рынок, флаг тестировщика `TSTATUS`) через реальный событийный шов `CHAT_MSG_ADDON`. Дерево
+  категорий рынка пока файл-локальное и спеком не покрыто — появится, если вынести его в наблюдаемый неймспейс.

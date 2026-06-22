@@ -206,6 +206,10 @@ local function BuildBuff()
     p.list:Refresh(); A.RequestAuras()
   end)
   allBtn:SetPoint("TOPLEFT", 6, -76)
+  local refreshBtn = L.Button(p, "Обновить", 100, 24, function()
+    A.RequestAuras(); p.list:Refresh()  -- перезапросить ауры у сервера (список обновится по кадру AEND)
+  end)
+  refreshBtn:SetPoint("LEFT", allBtn, "RIGHT", 8, 0)
 
   local listLbl = p:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   listLbl:SetPoint("TOPLEFT", 6, -110); listLbl:SetText("Активные баффы:")
@@ -340,14 +344,33 @@ local function BuildReagents()
   return p
 end
 
--- ─── Панель: QA → Тестировщик ───
+-- ─── Панель: QA → Тестировщик (одна кнопка-переключатель по флагу с сервера) ───
 local function BuildQaTester()
   local p = NewPanel()
   Header(p, "Тестировщик")
-  local on = L.Button(p, "Активировать", 150, 26, function() A.Cmd(".tester on") end)
-  on:SetPoint("TOPLEFT", 4, -48)
-  local off = L.Button(p, "Деактивировать", 150, 26, function() A.Cmd(".tester off") end)
-  off:SetPoint("TOPLEFT", 4, -82)
+  local status = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  status:SetPoint("TOPLEFT", 6, -48); status:SetWidth(C3W - 12); status:SetJustifyH("LEFT")
+  local btn = L.Button(p, "Активировать", 170, 28)
+  btn:SetPoint("TOPLEFT", 6, -80)
+  -- Перерисовать по A.isTester: nil — статус ещё не пришёл с сервера (кнопка ждёт), true/false — флаг.
+  local function apply()
+    local t = A.isTester
+    if t == nil then
+      status:SetText("Статус: запрос…")
+      btn:SetText("Активировать"); btn:Disable()
+    else
+      status:SetText(t and "Статус: |cff40ff40тестировщик|r" or "Статус: |cffff8080не тестировщик|r")
+      btn:SetText(t and "Деактивировать" or "Активировать"); btn:Enable()
+    end
+  end
+  btn:SetScript("OnClick", function()
+    if A.isTester == nil then return end
+    A.Cmd(A.isTester and ".tester off" or ".tester on")
+    A.isTester = not A.isTester  -- оптимистично; сервер подтвердит кадром TSTATUS (см. Core.lua)
+    apply()
+  end)
+  p.update = apply
+  p.refresh = function() apply(); A.RequestTesterStatus() end
   return p
 end
 
@@ -582,6 +605,10 @@ function U.OnAuras()
   local p = panels["char.buff"]
   if currentPanel == "char.buff" and p then p.list.data = A.auras; p.list:Refresh() end  -- repoint: A.auras — новая таблица после AEND
 end
+function U.OnTesterStatus()
+  local p = panels["qa.tester"]
+  if p and p.update then p.update() end  -- кадр TSTATUS пришёл — перерисовать единственную кнопку
+end
 
 -- ─── Построение ───
 function U.Build()
@@ -655,5 +682,5 @@ end
 
 function U.Toggle()
   if not mainFrame then U.Build() end
-  if mainFrame:IsShown() then mainFrame:Hide() else mainFrame:Show(); A.RequestTeleports() end
+  if mainFrame:IsShown() then mainFrame:Hide() else mainFrame:Show(); mainFrame:Raise(); A.RequestTeleports() end
 end

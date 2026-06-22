@@ -15,6 +15,7 @@ U.VERSION = 1
 
 -- ─── Константы стиля ───
 U.ICON_TEXCOORD = { 0.07, 0.93, 0.07, 0.93 }   -- обрезка рамки иконок
+U.SCROLLBAR_INSET = 20                          -- полоса под вертикальный скроллбар у правой кромки списка
 U.COLOR = {
   gold = { 1, 0.82, 0 },        -- текст-акцент (заголовки строк)
   sel  = { 0.9, 0.75, 0.1 },    -- подсветка выбранной строки (альфа задаётся отдельно)
@@ -57,6 +58,11 @@ function U.CreateWindow(name, title, w, h)
   f:SetScript("OnDragStart", f.StartMoving)
   f:SetScript("OnDragStop", f.StopMovingOrSizing)
   f:SetClampedToScreen(true)
+  -- Перекрытие окон (наш пульт ↔ окно тестировщика): единая страта + toplevel — клик по окну поднимает
+  -- его НАД соседним полностью (а не «просвечивает»). Непрозрачная подложка ниже довершает перекрытие.
+  f:SetFrameStrata("HIGH")
+  f:SetToplevel(true)
+  f:SetScript("OnMouseDown", f.Raise)
   f:Hide()
 
   -- Плотная чёрная подложка: DialogBox-фон полупрозрачный, сквозь него просвечивает мир. Кроем непрозрачным.
@@ -106,12 +112,23 @@ function U.CreateFauxList(opts)
   scroll:SetPoint("TOPLEFT", opts.x, opts.y); scroll:SetWidth(opts.w); scroll:SetHeight(opts.h)
   list.scroll = scroll
 
+  -- Скроллбар FauxScrollFrameTemplate по умолчанию висит СНАРУЖИ справа (TOPLEFT→TOPRIGHT): у списков
+  -- во всю ширину панели он уезжает за правую кромку окна и недоступен. Переякориваем ВНУТРЬ правого
+  -- края — как в CreateContentColumn (Персонаж → Характеристики). Строки резервируют под него полосу.
+  local bar = _G[name .. "ScrollBar"]
+  if bar then
+    bar:ClearAllPoints()
+    bar:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", -2, -16)
+    bar:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", -2, 16)
+  end
+  local rightPad = opts.rightPad or -U.SCROLLBAR_INSET
+
   for i = 1, list.num do
     local row = CreateFrame("Button", nil, opts.parent)
     row:SetHeight(list.rowH)
     if i == 1 then row:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
     else row:SetPoint("TOPLEFT", list.rows[i - 1], "BOTTOMLEFT", 0, 0) end
-    row:SetPoint("RIGHT", scroll, "RIGHT", opts.rightPad or -2, 0)
+    row:SetPoint("RIGHT", scroll, "RIGHT", rightPad, 0)
     row.sel = U.AddSelection(row)
     local fs = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("LEFT", opts.textInset or 6, 0); fs:SetPoint("RIGHT", -4, 0); fs:SetJustifyH("LEFT")

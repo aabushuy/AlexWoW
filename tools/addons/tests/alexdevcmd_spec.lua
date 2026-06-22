@@ -64,5 +64,12 @@ check("market: count", #A.marketItems, 2)
 check("market[1] id", A.marketItems[1].id, 6948)
 check("market[2] name", A.marketItems[2].name, "Грубый камень")
 
+-- ─── Флаг тестировщика (кадр TSTATUS, QA → Тестировщик) ───
+check("tester: исходно nil", A.isTester, nil)
+send("TSTATUS|1")
+check("tester: TSTATUS|1 → true", A.isTester, true)
+send("TSTATUS|0")
+check("tester: TSTATUS|0 → false", A.isTester, false)
+
 print(string.format("\n%d checks, %d failed", total, failed))
 os.exit(failed > 0 and 1 or 0)

@@ -235,7 +235,17 @@ function U.Build()
     AlexQATesterDB.pos = { p, rp, x, y }
   end)
   f:SetClampedToScreen(true)
+  -- Перекрытие с dev-пультом: единая страта HIGH + toplevel — клик поднимает окно НАД соседним целиком
+  -- (как в AlexUI.CreateWindow). Непрозрачная подложка ниже не даёт нижнему окну «просвечивать».
+  f:SetFrameStrata("HIGH")
+  f:SetToplevel(true)
+  f:SetScript("OnMouseDown", f.Raise)
   f:Hide()
+
+  -- Плотная чёрная подложка: DialogBox-фон полупрозрачный, сквозь него видно мир/нижнее окно. Кроем непрозрачным.
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetTexture(0, 0, 0, 1)
+  bg:SetPoint("TOPLEFT", 10, -10); bg:SetPoint("BOTTOMRIGHT", -10, 10)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   title:SetPoint("TOP", 0, -16); title:SetText("Тестирование")
@@ -385,6 +395,7 @@ function U.Toggle()
     mainFrame:Hide()
   else
     mainFrame:Show()
+    mainFrame:Raise()
     SelectKind(A.currentKind or "general")
   end
 end
