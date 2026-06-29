@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.79" />
-    <PackageReference Include="MySqlConnector" Version="2.5.0" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
     <!-- EF Core 9 + Pomelo 9: для нашей изменяемой БД alexwow_auth (сущности + миграции). Под EF Core 10
          релиза Pomelo пока нет; сборки EF9 работают на рантайме net10 (roll-forward). Срез 2 рефактора #23. -->
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
